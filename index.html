@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockMind — 하락장 멘탈 방어 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1420; --card: #171e2e; --card2: #1d2638;
+    --line: #2a3550; --txt: #e6ebf5; --sub: #8b97b0;
+    --up: #ff5b5b; --down: #4d8dff; /* 한국식: 상승=빨강, 하락=파랑 */
+    --accent: #ffc94d; --good: #3ddc97;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--txt); font-family: -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; padding: 16px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--sub); font-size: 12px; margin-bottom: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .card h2 { font-size: 15px; margin-bottom: 10px; color: var(--accent); }
+  .card h2 small { color: var(--sub); font-weight: normal; font-size: 11px; margin-left: 6px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input, select, button { background: var(--card2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 14px; }
+  input:focus, select:focus { outline: 1px solid var(--accent); }
+  button.primary { background: var(--accent); color: #14181f; font-weight: bold; cursor: pointer; border: none; }
+  button.chip { font-size: 12px; padding: 6px 10px; cursor: pointer; }
+  button.chip:hover { border-color: var(--accent); }
+  #searchBox { position: relative; flex: 1; min-width: 200px; }
+  #searchInput { width: 100%; }
+  #searchResults { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; z-index: 30; max-height: 260px; overflow-y: auto; display: none; }
+  #searchResults div { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
+  #searchResults div:hover { background: var(--card); }
+  #searchResults .sym { color: var(--accent); font-weight: bold; margin-right: 6px; }
+  #searchResults .exch { color: var(--sub); font-size: 11px; float: right; }
+  .chartWrap { position: relative; height: 380px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--sub); font-weight: normal; font-size: 12px; position: sticky; top: 0; background: var(--card); }
+  td:first-child, th:first-child { text-align: left; }
+  .tableWrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+  .pos { color: var(--up); } .neg { color: var(--down); }
+  .evtTag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; white-space: nowrap; }
+  .badge { display: inline-block; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--sub); }
+  .badge b { display: block; font-size: 16px; color: var(--txt); margin-top: 2px; }
+  .hidden { display: none; }
+  #status { color: var(--sub); font-size: 13px; margin: 8px 0; }
+  #status.err { color: var(--up); }
+  .mentalNote { font-size: 12px; color: var(--sub); line-height: 1.6; margin-top: 8px; }
+  .avgHighlight { color: var(--good); font-weight: bold; }
+  @media (max-width: 640px) { .chartWrap { height: 280px; } th, td { padding: 6px 5px; font-size: 12px; } }
+</style>
+</head>
+<body>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.1</small></h1>
+<div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
+
+<div class="card">
+  <div class="row">
+    <div id="searchBox">
+      <input id="searchInput" placeholder="종목명(한글 가능) 또는 티커 입력 (예: 삼성전자, AAPL, GLD)" autocomplete="off">
+      <div id="searchResults"></div>
+    </div>
+    <select id="rangeSel">
+      <option value="5y">5년</option>
+      <option value="10y" selected>10년</option>
+      <option value="20y">20년</option>
+      <option value="max">전체</option>
+    </select>
+    <button class="primary" id="loadBtn">분석</button>
+  </div>
+  <div class="row" style="margin-top:10px" id="presets">
+    <button class="chip" data-s="005930.KS">삼성전자</button>
+    <button class="chip" data-s="^KS11">코스피</button>
+    <button class="chip" data-s="SPY">S&P500(SPY)</button>
+    <button class="chip" data-s="QQQ">나스닥100(QQQ)</button>
+    <button class="chip" data-s="AAPL">애플</button>
+    <button class="chip" data-s="TSLA">테슬라</button>
+    <button class="chip" data-s="GLD">금(GLD)</button>
+    <button class="chip" data-s="TLT">미국채20년(TLT)</button>
+    <button class="chip" data-s="KRW=X">달러/원</button>
+    <button class="chip" data-s="BTC-USD">비트코인</button>
+  </div>
+  <div id="status"></div>
+</div>
+
+<div id="resultArea" class="hidden">
+
+  <div class="card">
+    <h2 id="chartTitle">가격 차트</h2>
+    <div class="row" style="margin-bottom:8px">
+      <label style="font-size:12px;color:var(--sub)"><input type="checkbox" id="logScale"> 로그 스케일</label>
+      <label style="font-size:12px;color:var(--sub)"><input type="checkbox" id="showEvents" checked> 주요 이벤트 표시</label>
+    </div>
+    <div class="chartWrap"><canvas id="mainChart"></canvas></div>
+    <div id="eventLegend" class="mentalNote"></div>
+  </div>
+
+  <div class="card">
+    <h2>내 평단가 기준 시나리오 <small>과거가 반복된다면 내 계좌는 어디까지 갈까</small></h2>
+    <div class="row">
+      <input id="avgPrice" type="number" step="any" placeholder="내 평단가 입력" style="width:180px">
+      <button class="primary" id="applyAvg">적용</button>
+      <span id="avgUnit" class="badge" style="display:none"></span>
+    </div>
+    <div id="avgSummary" class="row" style="margin-top:10px"></div>
+    <div class="mentalNote" id="avgNote"></div>
+  </div>
+
+  <div class="card">
+    <h2>연도별 핵심 지표 <small>연초 가격 · 최고/최저 · 최대 일일 상승/하락</small></h2>
+    <div class="tableWrap"><table id="yearTable"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>고점 대비 하락 (Drawdown) <small>10% 이상 하락한 구간과 당시 이슈</small></h2>
+    <div class="tableWrap"><table id="ddTable"></table></div>
+    <div class="mentalNote">※ 회복일: 하락 전 고점 가격을 다시 회복한 날. "진행중"은 아직 전고점을 회복하지 못한 상태.</div>
+  </div>
+
+  <div class="card">
+    <h2>저점 대비 상승 (Rally) <small>바닥에서 얼마나 올랐나</small></h2>
+    <div class="tableWrap"><table id="rallyTable"></table></div>
+    <div class="mentalNote">※ 하락의 반대편 데이터. 공포에 팔았다면 이 상승을 전부 놓쳤다는 뜻.</div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+/* ================= CORE (순수 계산 함수 — 테스트 대상) ================= */
+
+// Yahoo v8 chart JSON → [{t(ms), c, h, l}] (null 제거)
+function parseChart(json) {
+  var r = json.chart.result[0];
+  var ts = r.timestamp || [];
+  var q = r.indicators.quote[0];
+  var rows = [];
+  for (var i = 0; i < ts.length; i++) {
+    var c = q.close[i];
+    if (c == null || !isFinite(c)) continue;
+    rows.push({
+      t: ts[i] * 1000,
+      c: c,
+      h: (q.high && q.high[i] != null) ? q.high[i] : c,
+      l: (q.low && q.low[i] != null) ? q.low[i] : c
+    });
+  }
+  return { rows: rows, meta: r.meta || {} };
+}
+
+// 연도별 지표: 연초가(첫 거래일 종가), 최고, 최저, 최대 일일 상승/하락, 연간 수익률
+function yearlyStats(rows) {
+  var byYear = {};
+  for (var i = 0; i < rows.length; i++) {
+    var y = new Date(rows[i].t).getFullYear();
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(i);
+  }
+  var years = Object.keys(byYear).map(Number).sort(function (a, b) { return a - b; });
+  var out = [];
+  for (var k = 0; k < years.length; k++) {
+    var idxs = byYear[years[k]];
+    var first = rows[idxs[0]].c, last = rows[idxs[idxs.length - 1]].c;
+    var hi = -Infinity, lo = Infinity, hiT = 0, loT = 0;
+    var maxGain = 0, maxDrop = 0, maxGainT = 0, maxDropT = 0;
+    for (var j = 0; j < idxs.length; j++) {
+      var i2 = idxs[j], row = rows[i2];
+      if (row.h > hi) { hi = row.h; hiT = row.t; }
+      if (row.l < lo) { lo = row.l; loT = row.t; }
+      if (i2 > 0) {
+        var chg = rows[i2].c / rows[i2 - 1].c - 1;
+        if (chg > maxGain) { maxGain = chg; maxGainT = row.t; }
+        if (chg < maxDrop) { maxDrop = chg; maxDropT = row.t; }
+      }
+    }
+    out.push({
+      year: years[k], first: first, last: last, ret: last / first - 1,
+      high: hi, highT: hiT, low: lo, lowT: loT,
+      maxGain: maxGain, maxGainT: maxGainT, maxDrop: maxDrop, maxDropT: maxDropT
+    });
+  }
+  return out;
+}
+
+// 고점 대비 하락 에피소드 (threshold 이상만). 종가 기준.
+// 반환: [{peakI, troughI, recoverI|null, dd}]
+function drawdownEpisodes(rows, threshold) {
+  var eps = [];
+  var peakI = 0, troughI = 0, dd = 0;
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i].c >= rows[peakI].c) {
+      // 전고점 회복 → 직전 에피소드 확정
+      if (dd <= -threshold) {
+        eps.push({ peakI: peakI, troughI: troughI, recoverI: i, dd: dd });
+      }
+      peakI = i; troughI = i; dd = 0;
+    } else {
+      var cur = rows[i].c / rows[peakI].c - 1;
+      if (cur < dd) { dd = cur; troughI = i; }
+    }
+  }
+  if (dd <= -threshold) {
+    eps.push({ peakI: peakI, troughI: troughI, recoverI: null, dd: dd });
+  }
+  return eps;
+}
+
+// 저점 대비 상승: 에피소드 저점 → 다음 에피소드 고점(or 시리즈 끝의 최고점)
+function ralliesFromEpisodes(rows, eps) {
+  var rallies = [];
+  for (var k = 0; k < eps.length; k++) {
+    var startI = eps[k].troughI;
+    var endLimit = (k + 1 < eps.length) ? eps[k + 1].peakI : rows.length - 1;
+    if (endLimit <= startI) continue;
+    var hiI = startI;
+    for (var i = startI; i <= endLimit; i++) {
+      if (rows[i].c > rows[hiI].c) hiI = i;
+    }
+    var gain = rows[hiI].c / rows[startI].c - 1;
+    if (gain > 0.0001) {
+      rallies.push({ fromI: startI, toI: hiI, gain: gain });
+    }
+  }
+  return rallies;
+}
+
+// 이벤트 매칭: 구간 [t1, t2] 내 이벤트 반환
+function matchEvents(events, t1, t2) {
+  var out = [];
+  for (var i = 0; i < events.length; i++) {
+    var t = events[i].ts;
+    if (t >= t1 && t <= t2) out.push(events[i]);
+  }
+  return out;
+}
+
+/* ================= 상수: 주요 이벤트 (연 1회 수동 업데이트) ================= */
+var EVENT_TYPES = {
+  "전쟁": "#ff5b5b", "위기": "#ff9d4d", "금리": "#ffc94d",
+  "팬데믹": "#c47dff", "정치": "#4dc3ff", "회복": "#3ddc97"
+};
+var EVENTS_RAW = [
+  ["2000-03-10", "위기", "닷컴버블 고점"],
+  ["2001-09-11", "전쟁", "9·11 테러"],
+  ["2003-03-20", "전쟁", "이라크 전쟁"],
+  ["2007-10-31", "위기", "금융위기 직전 고점"],
+  ["2008-09-15", "위기", "리먼 파산"],
+  ["2009-03-09", "회복", "금융위기 저점"],
+  ["2010-05-02", "위기", "유럽 재정위기(그리스 구제금융)"],
+  ["2011-08-05", "위기", "미국 신용등급 강등"],
+  ["2015-08-11", "위기", "위안화 절하 쇼크"],
+  ["2016-06-24", "정치", "브렉시트 투표"],
+  ["2016-11-08", "정치", "트럼프 당선"],
+  ["2018-10-10", "위기", "미중 무역분쟁 급락"],
+  ["2018-12-19", "금리", "연준 인상 지속(파월 쇼크)"],
+  ["2019-08-01", "금리", "연준 금리인하 전환"],
+  ["2020-02-20", "팬데믹", "코로나19 폭락 시작"],
+  ["2020-03-23", "회복", "코로나 저점·무제한 QE"],
+  ["2022-02-24", "전쟁", "러시아-우크라이나 전쟁"],
+  ["2022-03-16", "금리", "연준 금리인상 시작"],
+  ["2022-06-15", "금리", "자이언트 스텝(75bp)"],
+  ["2022-10-13", "회복", "인플레 피크아웃(증시 저점권)"],
+  ["2023-03-10", "위기", "SVB 파산"],
+  ["2023-10-07", "전쟁", "이스라엘-하마스 전쟁"],
+  ["2024-08-05", "위기", "엔캐리 청산 급락"],
+  ["2024-09-18", "금리", "연준 금리인하 시작"],
+  ["2024-12-03", "정치", "한국 비상계엄"],
+  ["2025-04-02", "정치", "미국 상호관세 발표"]
+];
+var EVENTS = EVENTS_RAW.map(function (e) {
+  return { ts: new Date(e[0] + "T00:00:00+09:00").getTime(), type: e[1], name: e[2], date: e[0] };
+});
+
+/* ================= UI ================= */
+var state = { rows: null, meta: null, symbol: null, chart: null, eps: null };
+
+function $(id) { return document.getElementById(id); }
+function fmtDate(t) {
+  var d = new Date(t);
+  return d.getFullYear() + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + String(d.getDate()).padStart(2, "0");
+}
+function isKRW() {
+  var cur = state.meta && state.meta.currency;
+  return cur === "KRW";
+}
+function fmtPrice(v) {
+  if (v == null || !isFinite(v)) return "-";
+  if (isKRW()) return Math.round(v).toLocaleString("ko-KR") + "원";
+  var digits = v < 10 ? 3 : 2;
+  return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: digits });
+}
+function fmtPct(v) {
+  var s = (v * 100).toFixed(1) + "%";
+  return v > 0 ? "+" + s : s;
+}
+function pctCls(v) { return v >= 0 ? "pos" : "neg"; }
+function evtTag(e) {
+  var col = EVENT_TYPES[e.type] || "#999";
+  return '<span class="evtTag" style="border:1px solid ' + col + ';color:' + col + '">' + e.name + "</span>";
+}
+function setStatus(msg, isErr) {
+  var el = $("status");
+  el.textContent = msg || "";
+  el.className = isErr ? "err" : "";
+}
+
+/* ---------- 검색 자동완성 ---------- */
+var searchTimer = null;
+$("searchInput").addEventListener("input", function () {
+  var q = this.value.trim();
+  clearTimeout(searchTimer);
+  if (q.length < 2) { $("searchResults").style.display = "none"; return; }
+  searchTimer = setTimeout(function () { doSearch(q); }, 350);
+});
+document.addEventListener("click", function (e) {
+  if (!$("searchBox").contains(e.target)) $("searchResults").style.display = "none";
+});
+function doSearch(q) {
+  fetch("/api/search?q=" + encodeURIComponent(q))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var box = $("searchResults");
+      var qs = data.quotes || [];
+      if (!qs.length) { box.style.display = "none"; return; }
+      box.innerHTML = qs.map(function (it) {
+        return '<div data-s="' + it.symbol + '"><span class="sym">' + it.symbol + "</span>" +
+          it.name + '<span class="exch">' + it.exch + "</span></div>";
+      }).join("");
+      box.style.display = "block";
+      Array.prototype.forEach.call(box.children, function (child) {
+        child.onclick = function () {
+          $("searchInput").value = child.getAttribute("data-s");
+          box.style.display = "none";
+          load();
+        };
+      });
+    })
+    .catch(function () { /* 검색 실패는 조용히 무시 */ });
+}
+
+/* ---------- 데이터 로드 ---------- */
+$("loadBtn").onclick = load;
+$("searchInput").addEventListener("keydown", function (e) { if (e.key === "Enter") load(); });
+Array.prototype.forEach.call($("presets").children, function (b) {
+  b.onclick = function () { $("searchInput").value = b.getAttribute("data-s"); load(); };
+});
+
+function load() {
+  var symbol = $("searchInput").value.trim();
+  if (!symbol) return;
+  var range = $("rangeSel").value;
+  setStatus("데이터 불러오는 중...");
+  fetch("/api/chart?symbol=" + encodeURIComponent(symbol) + "&range=" + range)
+    .then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || "HTTP " + r.status); });
+      return r.json();
+    })
+    .then(function (json) {
+      var parsed = parseChart(json);
+      if (parsed.rows.length < 30) throw new Error("데이터가 너무 적습니다 (" + parsed.rows.length + "건)");
+      state.rows = parsed.rows;
+      state.meta = parsed.meta;
+      state.symbol = symbol;
+      setStatus("");
+      render();
+    })
+    .catch(function (e) { setStatus("오류: " + e.message, true); });
+}
+
+/* ---------- 렌더링 ---------- */
+function render() {
+  $("resultArea").classList.remove("hidden");
+  var rows = state.rows;
+  var name = state.meta.shortName || state.meta.longName || state.symbol;
+  var last = rows[rows.length - 1];
+  $("chartTitle").textContent = name + " (" + state.symbol + ") — 현재가 " + fmtPrice(last.c);
+
+  renderChart();
+  renderYearTable();
+  state.eps = drawdownEpisodes(rows, 0.10);
+  renderDdTable();
+  renderRallyTable();
+  renderAvg();
+
+  $("avgUnit").style.display = "inline-block";
+  $("avgUnit").textContent = isKRW() ? "단위: 원" : "단위: " + (state.meta.currency || "USD");
+}
+
+var eventLinePlugin = {
+  id: "eventLines",
+  afterDraw: function (chart) {
+    if (!$("showEvents").checked || !state.rows) return;
+    var xs = chart.scales.x, ys = chart.scales.y, ctx = chart.ctx;
+    var t0 = state.rows[0].t, t1 = state.rows[state.rows.length - 1].t;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.font = "10px sans-serif";
+    for (var i = 0; i < EVENTS.length; i++) {
+      var e = EVENTS[i];
+      if (e.ts < t0 || e.ts > t1) continue;
+      // 가장 가까운 데이터 인덱스 찾기 (이진 탐색 생략, 선형 근사)
+      var frac = (e.ts - t0) / (t1 - t0);
+      var idx = Math.round(frac * (state.rows.length - 1));
+      var x = xs.getPixelForValue(idx);
+      var col = EVENT_TYPES[e.type] || "#999";
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(x, ys.top); ctx.lineTo(x, ys.bottom); ctx.stroke();
+      ctx.globalAlpha = 0.9; ctx.fillStyle = col;
+      ctx.save();
+      ctx.translate(x + 3, ys.top + 4);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(e.name, 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+};
+
+function renderChart() {
+  var rows = state.rows;
+  var labels = rows.map(function (r) { return fmtDate(r.t); });
+  var data = rows.map(function (r) { return r.c; });
+  if (state.chart) state.chart.destroy();
+  state.chart = new Chart($("mainChart"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data, borderColor: "#ffc94d", borderWidth: 1.4,
+        pointRadius: 0, tension: 0, fill: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) { return fmtPrice(ctx.parsed.y); }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: "#8b97b0", maxTicksLimit: 10, maxRotation: 0 }, grid: { color: "#222b40" } },
+        y: {
+          type: $("logScale").checked ? "logarithmic" : "linear",
+          ticks: { color: "#8b97b0", callback: function (v) { return fmtPrice(v); } },
+          grid: { color: "#222b40" }
+        }
+      }
+    },
+    plugins: [eventLinePlugin]
+  });
+
+  var legend = Object.keys(EVENT_TYPES).map(function (t) {
+    return '<span class="evtTag" style="border:1px solid ' + EVENT_TYPES[t] + ';color:' + EVENT_TYPES[t] + '">' + t + "</span>";
+  }).join(" ");
+  $("eventLegend").innerHTML = "이벤트 유형: " + legend;
+}
+$("logScale").onchange = function () { if (state.rows) renderChart(); };
+$("showEvents").onchange = function () { if (state.chart) state.chart.update(); };
+
+function renderYearTable() {
+  var ys = yearlyStats(state.rows);
+  var html = "<thead><tr><th>연도</th><th>연초가</th><th>연간수익</th><th>최고가</th><th>최저가</th>" +
+    "<th>최대 일일상승</th><th>최대 일일하락</th></tr></thead><tbody>";
+  for (var i = ys.length - 1; i >= 0; i--) {
+    var y = ys[i];
+    html += "<tr><td>" + y.year + "</td>" +
+      "<td>" + fmtPrice(y.first) + "</td>" +
+      '<td class="' + pctCls(y.ret) + '">' + fmtPct(y.ret) + "</td>" +
+      "<td>" + fmtPrice(y.high) + " <small style='color:var(--sub)'>" + fmtDate(y.highT) + "</small></td>" +
+      "<td>" + fmtPrice(y.low) + " <small style='color:var(--sub)'>" + fmtDate(y.lowT) + "</small></td>" +
+      '<td class="pos">' + fmtPct(y.maxGain) + " <small style='color:var(--sub)'>" + fmtDate(y.maxGainT) + "</small></td>" +
+      '<td class="neg">' + fmtPct(y.maxDrop) + " <small style='color:var(--sub)'>" + fmtDate(y.maxDropT) + "</small></td></tr>";
+  }
+  $("yearTable").innerHTML = html + "</tbody>";
+}
+
+function renderDdTable() {
+  var rows = state.rows, eps = state.eps;
+  var sorted = eps.slice().sort(function (a, b) { return a.dd - b.dd; });
+  var avg = parseFloat($("avgPrice").value);
+  var hasAvg = isFinite(avg) && avg > 0;
+  var html = "<thead><tr><th>낙폭</th><th>고점</th><th>저점</th><th>회복일</th><th>하락기간</th>" +
+    (hasAvg ? "<th>내 평단가 적용 시</th>" : "") + "<th>당시 이슈</th></tr></thead><tbody>";
+  for (var i = 0; i < sorted.length; i++) {
+    var ep = sorted[i];
+    var pk = rows[ep.peakI], tr = rows[ep.troughI];
+    var days = Math.round((tr.t - pk.t) / 86400000);
+    var evts = matchEvents(EVENTS, pk.t, (ep.recoverI != null ? rows[ep.recoverI].t : rows[rows.length - 1].t));
+    html += '<tr><td class="neg" style="font-weight:bold">' + fmtPct(ep.dd) + "</td>" +
+      "<td>" + fmtPrice(pk.c) + "<br><small style='color:var(--sub)'>" + fmtDate(pk.t) + "</small></td>" +
+      "<td>" + fmtPrice(tr.c) + "<br><small style='color:var(--sub)'>" + fmtDate(tr.t) + "</small></td>" +
+      "<td>" + (ep.recoverI != null ? fmtDate(rows[ep.recoverI].t) : '<span class="neg">진행중</span>') + "</td>" +
+      "<td>" + days + "일</td>" +
+      (hasAvg ? '<td class="avgHighlight">' + fmtPrice(avg * (1 + ep.dd)) + "</td>" : "") +
+      "<td style='text-align:left;white-space:normal;max-width:220px'>" + (evts.map(evtTag).join("") || "-") + "</td></tr>";
+  }
+  if (!sorted.length) html += "<tr><td colspan='7'>10% 이상 하락 구간이 없습니다.</td></tr>";
+  $("ddTable").innerHTML = html + "</tbody>";
+}
+
+function renderRallyTable() {
+  var rows = state.rows;
+  var rallies = ralliesFromEpisodes(rows, state.eps).sort(function (a, b) { return b.gain - a.gain; });
+  var avg = parseFloat($("avgPrice").value);
+  var hasAvg = isFinite(avg) && avg > 0;
+  var html = "<thead><tr><th>상승폭</th><th>저점</th><th>고점</th><th>기간</th>" +
+    (hasAvg ? "<th>내 평단가 적용 시</th>" : "") + "<th>당시 이슈</th></tr></thead><tbody>";
+  for (var i = 0; i < rallies.length; i++) {
+    var ra = rallies[i];
+    var fr = rows[ra.fromI], to = rows[ra.toI];
+    var days = Math.round((to.t - fr.t) / 86400000);
+    var evts = matchEvents(EVENTS, fr.t, to.t);
+    html += '<tr><td class="pos" style="font-weight:bold">' + fmtPct(ra.gain) + "</td>" +
+      "<td>" + fmtPrice(fr.c) + "<br><small style='color:var(--sub)'>" + fmtDate(fr.t) + "</small></td>" +
+      "<td>" + fmtPrice(to.c) + "<br><small style='color:var(--sub)'>" + fmtDate(to.t) + "</small></td>" +
+      "<td>" + days + "일</td>" +
+      (hasAvg ? '<td class="avgHighlight">' + fmtPrice(avg * (1 + ra.gain)) + "</td>" : "") +
+      "<td style='text-align:left;white-space:normal;max-width:220px'>" + (evts.map(evtTag).join("") || "-") + "</td></tr>";
+  }
+  if (!rallies.length) html += "<tr><td colspan='6'>표시할 상승 구간이 없습니다.</td></tr>";
+  $("rallyTable").innerHTML = html + "</tbody>";
+}
+
+/* ---------- 평단가 시나리오 ---------- */
+$("applyAvg").onclick = renderAvg;
+$("avgPrice").addEventListener("keydown", function (e) { if (e.key === "Enter") renderAvg(); });
+
+function renderAvg() {
+  var avg = parseFloat($("avgPrice").value);
+  var box = $("avgSummary"), note = $("avgNote");
+  if (!isFinite(avg) || avg <= 0) { box.innerHTML = ""; note.textContent = "평단가를 입력하면 과거 최악의 하락이 재현될 때 내 계좌가 어디까지 가는지 보여줍니다."; renderDdTable(); renderRallyTable(); return; }
+
+  var rows = state.rows, eps = state.eps;
+  var worstDd = 0, worstDaily = 0;
+  for (var i = 0; i < eps.length; i++) if (eps[i].dd < worstDd) worstDd = eps[i].dd;
+  for (var j = 1; j < rows.length; j++) {
+    var chg = rows[j].c / rows[j - 1].c - 1;
+    if (chg < worstDaily) worstDaily = chg;
+  }
+  var ddCount = eps.filter(function (e) { return e.dd <= -0.2; }).length;
+  var last = rows[rows.length - 1].c;
+  var curPnl = last / avg - 1;
+
+  box.innerHTML =
+    '<span class="badge">현재 수익률<b class="' + pctCls(curPnl) + '">' + fmtPct(curPnl) + "</b></span>" +
+    '<span class="badge">역대 최대 낙폭 재현 시<b class="neg">' + fmtPrice(avg * (1 + worstDd)) + " (" + fmtPct(worstDd) + ")</b></span>" +
+    '<span class="badge">최악의 하루 재현 시<b class="neg">' + fmtPrice(avg * (1 + worstDaily)) + " (" + fmtPct(worstDaily) + ")</b></span>" +
+    '<span class="badge">20%+ 하락 발생 횟수<b>' + ddCount + "회</b></span>";
+
+  note.innerHTML = "이 종목은 지난 기간 동안 <b>" + eps.length + "번</b>의 10% 이상 하락을 겪었고, 그때마다 " +
+    (eps.some(function (e) { return e.recoverI == null; }) ? "대부분" : "전부") + " 회복했습니다. " +
+    "하락은 <b>예외가 아니라 일상</b>입니다. 아래 표의 '내 평단가 적용 시' 열에서 각 하락이 재현될 때의 내 가격을 미리 봐두세요.";
+
+  renderDdTable();
+  renderRallyTable();
+}
+</script>
+</body>
+</html>
