@@ -50,11 +50,30 @@
   .mentalNote { font-size: 12px; color: var(--sub); line-height: 1.7; margin-top: 8px; }
   .avgHighlight { color: var(--good); font-weight: bold; }
   #eventList { margin-top: 10px; font-size: 12px; line-height: 2; }
+  /* --- 장바구니 비교 --- */
+  .cartChip { display: inline-flex; align-items: center; gap: 6px; background: var(--card2);
+    border: 1px solid var(--line); border-radius: 20px; padding: 5px 10px 5px 8px; font-size: 12px; margin: 2px; }
+  .cartChip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .cartChip b { cursor: pointer; color: var(--sub); font-size: 15px; line-height: 1; padding-left: 2px; }
+  .cartChip b:hover { color: var(--up); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  #cmpSearchBox { position: relative; flex: 1; min-width: 200px; }
+  #cmpInput { width: 100%; }
+  #cmpResults { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2);
+    border: 1px solid var(--line); border-radius: 8px; z-index: 30; max-height: 260px;
+    overflow-y: auto; display: none; margin-top: 3px; }
+  #cmpResults .item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
+  #cmpResults .item:hover { background: #253048; }
+  #cmpResults .exch { color: var(--sub); font-size: 11px; float: right; }
+  #cmpStatus { color: var(--sub); font-size: 13px; margin: 8px 0; }
+  #cmpStatus.err { color: var(--up); }
+  h3 { font-size: 13px; color: var(--txt); margin: 18px 0 8px; }
+  h3 small { color: var(--sub); font-weight: normal; font-size: 11px; margin-left: 6px; }
   @media (max-width: 640px) { .chartWrap { height: 300px; } th, td { padding: 6px 5px; font-size: 12px; } }
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.2</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.3</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="card">
@@ -127,6 +146,41 @@
     <div class="mentalNote">※ 하락의 반대편 데이터. 공포에 팔았다면 이 상승을 전부 놓쳤다는 뜻.</div>
   </div>
 
+</div>
+
+<div class="card" id="compareCard">
+  <h2>장바구니 비교 <small>내 종목이 무너질 때 무엇이 버텼는가 — 헷지자산 탐색</small></h2>
+  <div class="row">
+    <div id="cmpSearchBox">
+      <input id="cmpInput" placeholder="비교할 종목 추가 (예: 금, 미국채20년, 달러)" autocomplete="off">
+      <div id="cmpResults"></div>
+    </div>
+    <button class="chip" id="cmpAddCurrent">위 분석 종목 담기</button>
+    <select id="cmpRange">
+      <option value="5y">5년</option>
+      <option value="10y" selected>10년</option>
+      <option value="20y">20년</option>
+    </select>
+    <button class="primary" id="cmpRun">비교 실행</button>
+  </div>
+  <div class="row" id="cmpChips" style="margin-top:10px"></div>
+  <div id="cmpStatus"></div>
+
+  <div id="cmpBody" class="hidden">
+    <h3>정규화 수익률 곡선 <small id="cmpPeriod"></small></h3>
+    <div class="chartWrap"><canvas id="cmpChart"></canvas></div>
+
+    <h3>자산별 요약 <small>위기 평균성과 = 아래 '하락' 구간들의 평균 수익률</small></h3>
+    <div class="tableWrap"><table id="cmpSummary"></table></div>
+
+    <h3>사건별 성과 <small>같은 사건에서 자산들이 어떻게 갈렸는가</small></h3>
+    <div class="tableWrap"><table id="cmpCrisis"></table></div>
+    <div class="mentalNote">※ 헷지자산의 조건은 "많이 오르는 것"이 아니라 "내 주식이 무너질 때 덜 무너지거나 오르는 것". 위 표에서 파란색(하락) 사건 행에 빨간색(상승)으로 표시된 자산이 그 사건의 헷지였습니다.</div>
+
+    <h3>상관계수 행렬 <small>일간 수익률 기준 · 1에 가까울수록 같이 움직임</small></h3>
+    <div class="tableWrap"><table id="cmpCorr"></table></div>
+    <div class="mentalNote">※ <span style="color:var(--good)">초록(음수)</span>은 반대로 움직인다는 뜻으로 헷지 효과가 있고, <span style="color:var(--up)">빨강(양수)</span>은 같이 움직여 분산 효과가 작다는 뜻입니다. 다만 상관계수는 <b>평상시 평균</b>이라, 위기 때만 동조화되는 자산도 있으니 위의 사건별 성과와 함께 보세요.</div>
+  </div>
 </div>
 
 <script src="tickers.js"></script>
@@ -690,5 +744,6 @@ function renderAvg() {
   renderRallyTable();
 }
 </script>
+<script src="compare.js"></script>
 </body>
 </html>
