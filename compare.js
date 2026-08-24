@@ -282,15 +282,45 @@ $("cmpRun").onclick = function () {
 };
 
 /* ---------- 렌더링 ---------- */
+
+// 현재 확대 구간(cmpState.view)에 해당하는 부분 시계열을 잘라낸다.
+function getView() {
+  var A = cmpState.aligned;
+  var full = { days: A.days, values: A.values };
+  if (!cmpState.view) return full;
+  var d1 = dayKey(cmpState.view.t1), d2 = dayKey(cmpState.view.t2);
+  var i1 = -1, i2 = -1;
+  for (var i = 0; i < A.days.length; i++) { if (A.days[i] <= d1) i1 = i; else break; }
+  if (i1 < 0) i1 = 0;
+  for (var j = A.days.length - 1; j >= 0; j--) { if (A.days[j] <= d2) { i2 = j; break; } }
+  if (i2 <= i1 + 1) return full;
+  return {
+    days: A.days.slice(i1, i2 + 1),
+    values: A.values.map(function (v) { return v.slice(i1, i2 + 1); })
+  };
+}
+
 function renderCompare() {
   $("cmpBody").classList.remove("hidden");
   var A = cmpState.aligned;
-  var labels = A.days.map(function (d) { return fmtDate(keyToMs(d)); });
+  $("cmpPeriod").textContent =
+    "공통 기간: " + fmtDate(keyToMs(A.days[0])) + " ~ " + fmtDate(keyToMs(A.days[A.days.length - 1]));
+  renderCmpChart();
+  renderCmpSummary();
+  renderCmpCrisis();
+  renderCmpCorr();
+}
+
+function renderCmpChart() {
+  var A = cmpState.aligned;
+  var V = getView();
+  var isLog = $("cmpLog").checked;
+  var labels = V.days.map(function (d) { return fmtDate(keyToMs(d)); });
 
   var datasets = A.symbols.map(function (sym, i) {
     return {
       label: cmpLabel(sym),
-      data: normalize100(A.values[i]),
+      data: normalize100(V.values[i]),
       borderColor: CMP_COLORS[i % CMP_COLORS.length],
       borderWidth: 1.5, pointRadius: 0, tension: 0, fill: false
     };
@@ -308,27 +338,47 @@ function renderCompare() {
         tooltip: {
           callbacks: {
             label: function (ctx) {
-              return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) +
-                " (" + fmtPct(ctx.parsed.y / 100 - 1) + ")";
+              return ctx.dataset.label + ": " + fmtPct(ctx.parsed.y / 100 - 1);
             }
           }
         }
       },
       scales: {
         x: { ticks: { color: "#8b97b0", maxTicksLimit: 8, maxRotation: 0 }, grid: { color: "#222b40" } },
-        y: { ticks: { color: "#8b97b0" }, grid: { color: "#222b40" } }
+        y: {
+          type: isLog ? "logarithmic" : "linear",
+          ticks: {
+            color: "#8b97b0",
+            // 로그 축에서는 기준선 100 대비 배수로 읽는 것이 직관적이다
+            callback: function (v) {
+              if (v >= 100) return (v / 100).toFixed(v >= 1000 ? 0 : 1) + "배";
+              return (v / 100).toFixed(2) + "배";
+            }
+          },
+          grid: {
+            color: function (ctx) { return ctx.tick && ctx.tick.value === 100 ? "#5a6580" : "#222b40"; }
+          }
+        }
       }
     }
   });
 
-  $("cmpPeriod").textContent =
-    "공통 기간: " + fmtDate(keyToMs(A.days[0])) + " ~ " + fmtDate(keyToMs(A.days[A.days.length - 1])) +
-    " (시작 시점을 100으로 환산)";
-
-  renderCmpSummary();
-  renderCmpCrisis();
-  renderCmpCorr();
+  // 확대 상태 표시
+  if (cmpState.view) {
+    $("cmpViewLabel").textContent = "확대: " + cmpState.view.name;
+    $("cmpResetView").classList.remove("hidden");
+  } else {
+    $("cmpViewLabel").textContent = "";
+    $("cmpResetView").classList.add("hidden");
+  }
 }
+
+$("cmpLog").onchange = function () { if (cmpState.aligned) renderCmpChart(); };
+$("cmpResetView").onclick = function () {
+  cmpState.view = null;
+  renderCmpChart();
+  renderCmpCrisis();
+};
 
 function renderCmpSummary() {
   var A = cmpState.aligned;
@@ -380,11 +430,32 @@ function renderCmpCrisis() {
     }
     if (!any) continue;
     var typeCol = cw[3] === "회복" ? "var(--good)" : "var(--sub)";
-    html += "<tr><td style='text-align:left'>" + cw[0] +
+    var isActive = cmpState.view && cmpState.view.name === cw[0];
+    html += "<tr class='crisisRow" + (isActive ? " active" : "") + "' data-w='" + w + "'>" +
+      "<td style='text-align:left'>" + cw[0] +
       "<br><small style='color:" + typeCol + "'>" + cw[1].slice(2) + " ~ " + cw[2].slice(2) + "</small></td>" +
       cells.join("") + "</tr>";
   }
   $("cmpCrisis").innerHTML = html + "</tbody>";
+
+  // 행 클릭 → 해당 구간만 확대해서 재정규화
+  Array.prototype.forEach.call($("cmpCrisis").querySelectorAll(".crisisRow"), function (tr) {
+    tr.onclick = function () {
+      var cw2 = CRISIS_WINDOWS[+tr.getAttribute("data-w")];
+      if (cmpState.view && cmpState.view.name === cw2[0]) {
+        cmpState.view = null; // 같은 행을 다시 누르면 해제
+      } else {
+        cmpState.view = {
+          name: cw2[0],
+          t1: new Date(cw2[1] + "T00:00:00Z").getTime(),
+          t2: new Date(cw2[2] + "T00:00:00Z").getTime()
+        };
+      }
+      renderCmpChart();
+      renderCmpCrisis();
+      $("cmpChart").scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+  });
 }
 
 function renderCmpCorr() {
