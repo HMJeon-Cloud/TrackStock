@@ -26,11 +26,12 @@
   button.primary { background: var(--accent); color: #14181f; font-weight: bold; cursor: pointer; border: none; }
   button.chip { font-size: 12px; padding: 6px 10px; cursor: pointer; }
   button.chip:hover { border-color: var(--accent); }
+  label.opt { font-size: 12px; color: var(--sub); cursor: pointer; }
   #searchBox { position: relative; flex: 1; min-width: 220px; }
   #searchInput { width: 100%; }
   #searchResults { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; z-index: 30; max-height: 280px; overflow-y: auto; display: none; margin-top: 3px; }
   #searchResults div.item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
-  #searchResults div.item:hover, #searchResults div.item.sel { background: #253048; }
+  #searchResults div.item:hover { background: #253048; }
   #searchResults .sym { color: var(--accent); font-weight: bold; margin-right: 6px; }
   #searchResults .exch { color: var(--sub); font-size: 11px; float: right; }
   #searchResults .grp { padding: 5px 12px; font-size: 11px; color: var(--sub); background: #131a28; }
@@ -39,44 +40,49 @@
   th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th { color: var(--sub); font-weight: normal; font-size: 12px; position: sticky; top: 0; background: var(--card); z-index: 2; }
   td:first-child, th:first-child { text-align: left; }
-  .tableWrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+  .tableWrap { overflow-x: auto; max-height: 430px; overflow-y: auto; }
   .pos { color: var(--up); } .neg { color: var(--down); }
   .evtTag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; white-space: nowrap; }
   .badge { display: inline-block; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--sub); }
   .badge b { display: block; font-size: 16px; color: var(--txt); margin-top: 2px; }
   .hidden { display: none; }
-  #status { color: var(--sub); font-size: 13px; margin: 8px 0; }
-  #status.err { color: var(--up); }
+  #status, #cmpStatus { color: var(--sub); font-size: 13px; margin: 8px 0; }
+  #status.err, #cmpStatus.err { color: var(--up); }
   .mentalNote { font-size: 12px; color: var(--sub); line-height: 1.7; margin-top: 8px; }
   .avgHighlight { color: var(--good); font-weight: bold; }
   #eventList { margin-top: 10px; font-size: 12px; line-height: 2; }
-  /* --- 장바구니 비교 --- */
-  .cartChip { display: inline-flex; align-items: center; gap: 6px; background: var(--card2);
-    border: 1px solid var(--line); border-radius: 20px; padding: 5px 10px 5px 8px; font-size: 12px; margin: 2px; }
+  #fxInfo { font-size: 12px; color: var(--good); }
+  /* 읽는 법 */
+  details.howto { margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; background: #131a28; }
+  details.howto summary { cursor: pointer; padding: 8px 12px; font-size: 12px; color: var(--accent); list-style: none; user-select: none; }
+  details.howto summary::-webkit-details-marker { display: none; }
+  details.howto summary::before { content: "▸ "; }
+  details.howto[open] summary::before { content: "▾ "; }
+  details.howto .body { padding: 0 14px 12px; font-size: 12px; color: var(--sub); line-height: 1.85; }
+  details.howto .body b { color: var(--txt); }
+  details.howto .body ul { margin: 4px 0 4px 16px; }
+  /* 장바구니 */
+  .cartChip { display: inline-flex; align-items: center; gap: 6px; background: var(--card2); border: 1px solid var(--line); border-radius: 20px; padding: 5px 10px 5px 8px; font-size: 12px; margin: 2px; }
   .cartChip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   .cartChip b { cursor: pointer; color: var(--sub); font-size: 15px; line-height: 1; padding-left: 2px; }
   .cartChip b:hover { color: var(--up); }
   .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; }
   #cmpSearchBox { position: relative; flex: 1; min-width: 200px; }
   #cmpInput { width: 100%; }
-  #cmpResults { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2);
-    border: 1px solid var(--line); border-radius: 8px; z-index: 30; max-height: 260px;
-    overflow-y: auto; display: none; margin-top: 3px; }
+  #cmpResults { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; z-index: 30; max-height: 260px; overflow-y: auto; display: none; margin-top: 3px; }
   #cmpResults .item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
   #cmpResults .item:hover { background: #253048; }
   #cmpResults .exch { color: var(--sub); font-size: 11px; float: right; }
-  #cmpStatus { color: var(--sub); font-size: 13px; margin: 8px 0; }
-  #cmpStatus.err { color: var(--up); }
   tr.crisisRow { cursor: pointer; }
   tr.crisisRow:hover td { background: #202a40; }
-  tr.crisisRow.active td { background: #2c3a5c; box-shadow: inset 0 0 0 1px var(--accent); }
-  h3 { font-size: 13px; color: var(--txt); margin: 18px 0 8px; }
+  tr.crisisRow.active td { background: #2c3a5c; }
+  h3 { font-size: 13px; color: var(--txt); margin: 20px 0 8px; }
   h3 small { color: var(--sub); font-weight: normal; font-size: 11px; margin-left: 6px; }
   @media (max-width: 640px) { .chartWrap { height: 300px; } th, td { padding: 6px 5px; font-size: 12px; } }
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.4</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.5</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="card">
@@ -112,13 +118,26 @@
 
   <div class="card">
     <h2 id="chartTitle">가격 차트</h2>
+    <div id="fxLine" class="row hidden" style="margin-bottom:8px">
+      <span id="fxInfo"></span>
+    </div>
     <div class="row" style="margin-bottom:8px">
-      <label style="font-size:12px;color:var(--sub)"><input type="checkbox" id="logScale"> 로그 스케일</label>
-      <label style="font-size:12px;color:var(--sub)"><input type="checkbox" id="showEvents" checked> 이벤트 선 표시</label>
-      <label style="font-size:12px;color:var(--sub)"><input type="checkbox" id="showLabels"> 차트에 이벤트 이름 표시</label>
+      <label class="opt" id="krwWrap"><input type="checkbox" id="krwToggle"> 원화(KRW)로 환산</label>
+      <label class="opt"><input type="checkbox" id="logScale"> 로그 스케일</label>
+      <label class="opt"><input type="checkbox" id="showEvents" checked> 이벤트 선</label>
+      <label class="opt"><input type="checkbox" id="showLabels"> 이벤트 이름</label>
     </div>
     <div class="chartWrap"><canvas id="mainChart"></canvas></div>
     <div id="eventList"></div>
+    <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
+      노란 선이 <b>종가 흐름</b>, 세로 점선이 그 시점에 있었던 <b>사건</b>입니다. 색은 사건의 종류(전쟁·위기·금리·팬데믹·정치·회복)를 뜻합니다.
+      <ul>
+        <li><b>차트 위에 마우스를 올리면</b> 그날의 가격과, 앞뒤 10일 안에 있었던 사건이 함께 뜹니다.</li>
+        <li><b>로그 스케일</b>을 켜면 세로 이동 거리가 같을 때 상승률도 같아집니다. 가격이 몇 배씩 오른 종목의 초기 구간을 볼 때 켜세요. 끄면(기본) 절대 금액 차이가 그대로 보입니다.</li>
+        <li><b>원화 환산</b>은 미국 주식에만 나타납니다. 켜면 달러 주가에 그날그날 환율을 곱해, 한국 투자자가 실제로 체감한 원화 수익률로 모든 표가 다시 계산됩니다. 달러가 올랐다면 원화 수익률이 달러 수익률보다 높게 나옵니다.</li>
+      </ul>
+      <b>주의:</b> 사건 점선은 "이때 이런 일이 있었다"는 표시일 뿐, 그 사건이 가격 변화의 원인이라는 뜻은 아닙니다.
+    </div></details>
   </div>
 
   <div class="card">
@@ -130,23 +149,57 @@
     </div>
     <div id="avgSummary" class="row" style="margin-top:10px"></div>
     <div class="mentalNote" id="avgNote"></div>
+    <details class="howto"><summary>이 지표 읽는 법</summary><div class="body">
+      평단가를 넣으면 <b>과거에 실제로 있었던 하락폭을 내 평단가에 그대로 적용</b>합니다.
+      <ul>
+        <li><b>역대 최대 낙폭 재현 시</b> — 이 종목이 과거에 겪은 가장 큰 하락이 지금 다시 온다면 내 매수가가 얼마까지 내려가는지. 이 숫자를 미리 보고 "여기까지는 버틴다"를 정해두는 것이 이 화면의 목적입니다.</li>
+        <li><b>최악의 하루 재현 시</b> — 단 하루 만에 빠질 수 있는 최대폭. 폭락 당일의 공포에 대비하는 숫자입니다.</li>
+        <li><b>10%+ / 20%+ 하락 횟수</b> — 그 정도 하락이 몇 번이나 있었는지. 횟수가 많다는 건 <b>하락이 이 종목의 정상 작동 범위</b>라는 뜻입니다.</li>
+      </ul>
+      <b>주의:</b> 과거 최대 낙폭이 미래의 하한선은 아닙니다. 더 깊은 하락도 가능하며, 이 수치는 "최소한 이 정도는 각오해야 한다"는 기준선으로 쓰세요.
+    </div></details>
   </div>
 
   <div class="card">
     <h2>연도별 핵심 지표 <small>연초 가격 · 최고/최저 · 최대 일일 상승/하락</small></h2>
     <div class="tableWrap"><table id="yearTable"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      한 해를 한 줄로 압축한 표입니다.
+      <ul>
+        <li><b>연초가</b> — 그 해 첫 거래일의 종가. 연간수익은 (그 해 마지막 종가 ÷ 연초가)로 계산합니다.</li>
+        <li><b>최고가·최저가</b> — 종가가 아니라 <b>장중 고가·저가</b> 기준이라, 연초가보다 낮은 최저가가 나올 수 있습니다.</li>
+        <li><b>최대 일일상승/하락</b> — 그 해에 하루 만에 움직인 가장 큰 폭입니다.</li>
+      </ul>
+      <b>이렇게 쓰세요:</b> 연간수익이 플러스인 해에도 최저가는 한참 아래인 경우가 흔합니다. <b>결과가 좋았던 해에도 도중에는 무서웠다</b>는 사실을 확인하는 표입니다.
+    </div></details>
   </div>
 
   <div class="card">
     <h2>고점 대비 하락 (Drawdown) <small>10% 이상 하락한 구간과 당시 이슈</small></h2>
     <div class="tableWrap"><table id="ddTable"></table></div>
-    <div class="mentalNote">※ 회복일: 하락 전 고점 가격을 다시 회복한 날. "진행중"은 아직 전고점을 회복하지 못한 상태.</div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      전고점을 찍은 뒤 바닥까지 얼마나 빠졌고, 원래 자리로 돌아오는 데 얼마나 걸렸는지를 낙폭 순으로 정렬한 표입니다.
+      <ul>
+        <li><b>낙폭</b> — 고점 종가 대비 저점 종가의 하락률. 큰 순서로 정렬돼 있습니다.</li>
+        <li><b>회복일</b> — 하락 전 고점 가격을 다시 넘어선 날. <span class="neg">진행중</span>은 아직 전고점을 회복하지 못했다는 뜻입니다.</li>
+        <li><b>하락기간</b> — 고점에서 저점까지 걸린 날짜. 회복까지 걸린 시간은 회복일에서 따로 확인하세요. 떨어지는 데 3개월, 회복에 3년이 걸리는 일도 흔합니다.</li>
+        <li><b>당시 이슈</b> — 그 하락~회복 구간 안에 있었던 사건들. 여러 개가 붙어 있으면 악재가 겹친 구간입니다.</li>
+      </ul>
+      <b>이렇게 쓰세요:</b> 평단가를 입력하면 오른쪽에 <span class="avgHighlight">내 평단가 적용 시</span> 열이 생깁니다. 각 하락이 지금 재현될 때 내 매수가가 도달할 가격이니, <b>미리 보고 마음의 준비를 해두는 용도</b>입니다.
+    </div></details>
   </div>
 
   <div class="card">
     <h2>저점 대비 상승 (Rally) <small>바닥에서 얼마나 올랐나</small></h2>
     <div class="tableWrap"><table id="rallyTable"></table></div>
-    <div class="mentalNote">※ 하락의 반대편 데이터. 공포에 팔았다면 이 상승을 전부 놓쳤다는 뜻.</div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      위 하락 표의 <b>정확히 반대편</b>입니다. 각 바닥에서 다음 고점까지 얼마나 올랐는지를 보여줍니다.
+      <ul>
+        <li>저점 날짜를 위 하락 표의 저점 날짜와 맞춰 보세요. <b>가장 무서웠던 날이 가장 큰 상승의 출발점</b>이었던 경우가 반복해서 나타납니다.</li>
+        <li><b>기간</b>이 길수록 그 상승을 누리려면 그만큼 들고 있어야 했다는 뜻입니다.</li>
+      </ul>
+      <b>주의:</b> 이 표는 지나고 나서야 알 수 있는 저점을 기준으로 합니다. 실시간으로 바닥을 맞힐 수 있다는 뜻이 아니라, <b>공포 구간에서 팔면 무엇을 놓치는지</b>를 보여주는 자료로 읽으세요.
+    </div></details>
   </div>
 
 </div>
@@ -170,25 +223,76 @@
   <div id="cmpStatus"></div>
 
   <div id="cmpBody" class="hidden">
-    <h3>정규화 수익률 곡선 <small id="cmpPeriod"></small></h3>
+    <h3>투자 결과 곡선 <small id="cmpPeriod"></small></h3>
     <div class="row" style="margin-bottom:8px">
-      <label style="font-size:12px;color:var(--sub)"><input type="checkbox" id="cmpLog" checked> 로그 스케일</label>
+      <select id="cmpMode">
+        <option value="amount" selected>평가금액(원)</option>
+        <option value="pct">수익률(%)</option>
+      </select>
+      <label class="opt" id="cmpPrincipalWrap">투자원금
+        <input id="cmpPrincipal" type="number" step="100000" value="10000000" style="width:130px;margin-left:4px">원
+      </label>
+      <label class="opt"><input type="checkbox" id="cmpKrw" checked> 원화 환산</label>
+      <label class="opt"><input type="checkbox" id="cmpLog" checked> 로그 스케일</label>
+      <label class="opt"><input type="checkbox" id="cmpShowEvents" checked> 이벤트 선</label>
+      <label class="opt"><input type="checkbox" id="cmpShowLabels"> 이벤트 이름</label>
       <span id="cmpViewLabel" style="font-size:12px;color:var(--accent)"></span>
       <button class="chip hidden" id="cmpResetView">전체 기간으로</button>
     </div>
     <div class="chartWrap"><canvas id="cmpChart"></canvas></div>
-    <div class="mentalNote">※ 로그 스케일에서는 <b>세로 이동 거리가 같으면 상승률도 같습니다.</b> 수익률 규모가 크게 다른 자산을 비교할 때는 켜 두세요. 범례를 클릭하면 해당 자산만 숨길 수 있고, 아래 <b>사건별 성과 표의 행을 클릭</b>하면 그 구간만 확대해서 다시 100 기준으로 볼 수 있습니다.</div>
+    <div id="cmpEventList"></div>
+    <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
+      <b>같은 날 같은 금액을 각 자산에 넣었다면 지금 얼마가 되었을까</b>를 그린 그래프입니다. 모든 선이 같은 지점에서 출발하므로 높이 차이가 곧 성과 차이입니다.
+      <ul>
+        <li><b>평가금액(원)</b> — 입력한 투자원금이 각 자산에서 얼마가 되었는지 실제 금액으로 봅니다. 원금을 바꾸면 곡선 전체가 비례해서 움직입니다.</li>
+        <li><b>수익률(%)</b> — 같은 곡선을 퍼센트로 보는 방식입니다. 원금과 무관하게 비율만 비교하고 싶을 때 쓰세요.</li>
+        <li><b>원화 환산</b> — 켜면 미국 자산에 그날의 환율을 곱해 <b>전부 원화 기준</b>으로 통일합니다. 원화 자산과 달러 자산을 한 그래프에서 비교하려면 켜 두어야 합니다. 이때 미국 자산의 성과에는 환율 변동이 포함됩니다.</li>
+        <li><b>로그 스케일</b> — 한 자산만 몇십 배 오르면 나머지가 바닥에 눌려 보이지 않습니다. 켜면 <b>세로 이동 거리가 같을 때 수익률도 같아져</b> 규모가 다른 자산도 함께 비교됩니다.</li>
+        <li><b>범례 클릭</b>으로 특정 자산을 숨기면 나머지 축이 자동으로 다시 잡힙니다.</li>
+        <li><b>아래 사건별 성과 표의 행을 클릭</b>하면 그 구간만 확대해 다시 같은 출발점에서 비교합니다. 위기 때 무엇이 버텼는지 보는 가장 빠른 방법입니다.</li>
+      </ul>
+      <b>주의:</b> 세금·거래비용·배당은 반영되지 않았습니다. 배당은 Yahoo의 조정 종가에 포함되는 경우와 아닌 경우가 있어 배당주 비교는 실제보다 낮게 보일 수 있습니다.
+    </div></details>
 
     <h3>자산별 요약 <small>위기 평균성과 = 아래 '하락' 구간들의 평균 수익률</small></h3>
     <div class="tableWrap"><table id="cmpSummary"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      각 자산의 성격을 다섯 숫자로 요약했습니다.
+      <ul>
+        <li><b>총수익 / 연평균(CAGR)</b> — 전체 기간 누적 수익과, 그것을 연 단위 복리로 환산한 값입니다. 기간이 다른 자산을 비교할 땐 CAGR을 보세요.</li>
+        <li><b>최대낙폭</b> — 이 기간 중 고점에서 가장 깊이 빠진 폭. <b>이 자산을 보유하려면 감당해야 했던 고통의 크기</b>입니다.</li>
+        <li><b>연변동성</b> — 가격이 흔들린 정도(연 환산 표준편차). 숫자가 클수록 하루하루 출렁임이 큽니다. 대략 20% 미만은 안정적, 40% 이상은 매우 변동적으로 봅니다.</li>
+        <li><b>위기 평균성과</b> — <b>이 표의 핵심입니다.</b> 아래 사건별 표에서 '하락'으로 분류된 구간들의 평균 수익률로, 이 값이 <span class="pos">양수</span>인 자산이 위기 때 실제로 버텨준 헷지자산입니다.</li>
+      </ul>
+      <b>이렇게 쓰세요:</b> 총수익이 높은 자산이 좋은 자산이 아니라, <b>총수익은 낮아도 위기 평균성과가 양수인 자산</b>이 포트폴리오를 지켜줍니다. 두 성격을 섞는 것이 헷지의 출발점입니다.
+    </div></details>
 
-    <h3>사건별 성과 <small>같은 사건에서 자산들이 어떻게 갈렸는가</small></h3>
+    <h3>사건별 성과 <small>행을 클릭하면 그 구간만 확대됩니다</small></h3>
     <div class="tableWrap"><table id="cmpCrisis"></table></div>
-    <div class="mentalNote">※ 헷지자산의 조건은 "많이 오르는 것"이 아니라 "내 주식이 무너질 때 덜 무너지거나 오르는 것". 위 표에서 파란색(하락) 사건 행에 빨간색(상승)으로 표시된 자산이 그 사건의 헷지였습니다.</div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      역사적 사건 구간마다 각 자산이 몇 % 움직였는지 나란히 놓은 표입니다. <b>이 앱에서 헷지 판단에 가장 직접적인 자료입니다.</b>
+      <ul>
+        <li>날짜 아래 색이 <span style="color:var(--sub)">회색</span>이면 하락 국면, <span style="color:var(--good)">초록</span>이면 회복 국면입니다.</li>
+        <li><b>하락 국면 행에서 <span class="pos">붉은색(상승)</span>으로 표시된 자산</b>이 그 사건의 헷지였습니다. 내 주식이 <span class="neg">파랗게</span> 빠질 때 홀로 붉은 자산을 찾으세요.</li>
+        <li><b>행을 클릭</b>하면 위 차트가 그 구간만 확대되어, 며칠에 걸쳐 어떻게 갈렸는지 흐름까지 볼 수 있습니다. 같은 행을 다시 누르면 해제됩니다.</li>
+        <li>"-" 표시는 그 자산의 데이터 기간이 해당 사건을 포함하지 않는다는 뜻입니다. 조회 기간을 늘리면 채워집니다.</li>
+      </ul>
+      <b>가장 중요한 해석:</b> 모든 위기에 통하는 헷지자산은 없습니다. 같은 자산이 어떤 위기에선 방어에 성공하고 다른 위기에선 함께 무너집니다. <b>"어떤 종류의 위기에 무엇이 작동했는가"</b>를 사건별로 나눠서 기억하세요.
+    </div></details>
 
     <h3>상관계수 행렬 <small>일간 수익률 기준 · 1에 가까울수록 같이 움직임</small></h3>
     <div class="tableWrap"><table id="cmpCorr"></table></div>
-    <div class="mentalNote">※ <span style="color:var(--good)">초록(음수)</span>은 반대로 움직인다는 뜻으로 헷지 효과가 있고, <span style="color:var(--up)">빨강(양수)</span>은 같이 움직여 분산 효과가 작다는 뜻입니다. 다만 상관계수는 <b>평상시 평균</b>이라, 위기 때만 동조화되는 자산도 있으니 위의 사건별 성과와 함께 보세요.</div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      두 자산이 평소 얼마나 같은 방향으로 움직이는지를 -1에서 +1 사이 숫자로 나타냅니다.
+      <ul>
+        <li><b>+1에 가까움</b>(<span class="pos">빨강</span>) — 거의 항상 같이 오르고 같이 내립니다. 둘 다 담아도 분산 효과가 거의 없습니다.</li>
+        <li><b>0 근처</b> — 서로 무관하게 움직입니다. 분산 효과가 있습니다.</li>
+        <li><b>-1에 가까움</b>(<span style="color:var(--good)">초록</span>) — 반대로 움직입니다. 헷지 효과가 가장 큽니다.</li>
+        <li>대각선의 1.00은 자기 자신과의 상관이라 항상 1입니다.</li>
+      </ul>
+      <b>이렇게 쓰세요:</b> 대략 0.7 이상이면 사실상 같은 자산으로 보고, 0.3 미만이거나 음수인 조합을 찾으세요.<br>
+      <b>가장 중요한 주의:</b> 상관계수는 <b>평상시를 포함한 전체 평균</b>입니다. 평소엔 무관하다가 <b>진짜 위기에만 함께 폭락하는 자산</b>이 존재하며, 그런 자산은 정작 필요할 때 헷지가 되지 않습니다. 그래서 이 표만 믿지 말고 반드시 <b>위의 사건별 성과와 함께</b> 판단해야 합니다. 한국·미국 시장은 휴장일이 달라 양쪽 모두 개장한 날만 계산에 넣었습니다.
+    </div></details>
   </div>
 </div>
 
@@ -253,18 +357,14 @@ function drawdownEpisodes(rows, threshold) {
   var peakI = 0, troughI = 0, dd = 0;
   for (var i = 1; i < rows.length; i++) {
     if (rows[i].c >= rows[peakI].c) {
-      if (dd <= -threshold) {
-        eps.push({ peakI: peakI, troughI: troughI, recoverI: i, dd: dd });
-      }
+      if (dd <= -threshold) eps.push({ peakI: peakI, troughI: troughI, recoverI: i, dd: dd });
       peakI = i; troughI = i; dd = 0;
     } else {
       var cur = rows[i].c / rows[peakI].c - 1;
       if (cur < dd) { dd = cur; troughI = i; }
     }
   }
-  if (dd <= -threshold) {
-    eps.push({ peakI: peakI, troughI: troughI, recoverI: null, dd: dd });
-  }
+  if (dd <= -threshold) eps.push({ peakI: peakI, troughI: troughI, recoverI: null, dd: dd });
   return eps;
 }
 
@@ -275,9 +375,7 @@ function ralliesFromEpisodes(rows, eps) {
     var endLimit = (k + 1 < eps.length) ? eps[k + 1].peakI : rows.length - 1;
     if (endLimit <= startI) continue;
     var hiI = startI;
-    for (var i = startI; i <= endLimit; i++) {
-      if (rows[i].c > rows[hiI].c) hiI = i;
-    }
+    for (var i = startI; i <= endLimit; i++) if (rows[i].c > rows[hiI].c) hiI = i;
     var gain = rows[hiI].c / rows[startI].c - 1;
     if (gain > 0.0001) rallies.push({ fromI: startI, toI: hiI, gain: gain });
   }
@@ -292,19 +390,18 @@ function matchEvents(events, t1, t2) {
   return out;
 }
 
-// 타임스탬프에 가장 가까운 행 인덱스 (이진 탐색)
-function nearestIndex(rows, ts) {
-  var lo = 0, hi = rows.length - 1;
-  if (ts <= rows[0].t) return 0;
-  if (ts >= rows[hi].t) return hi;
+// 정렬된 타임스탬프 배열에서 ts에 가장 가까운 인덱스
+function nearestTs(tsArr, ts) {
+  var lo = 0, hi = tsArr.length - 1;
+  if (ts <= tsArr[0]) return 0;
+  if (ts >= tsArr[hi]) return hi;
   while (lo < hi - 1) {
     var mid = (lo + hi) >> 1;
-    if (rows[mid].t < ts) lo = mid; else hi = mid;
+    if (tsArr[mid] < ts) lo = mid; else hi = mid;
   }
-  return (ts - rows[lo].t <= rows[hi].t - ts) ? lo : hi;
+  return (ts - tsArr[lo] <= tsArr[hi] - ts) ? lo : hi;
 }
 
-// 한글/영문 종목명 검색 (사전 기반)
 function searchDict(dict, q) {
   var qq = q.trim().toLowerCase().replace(/\s+/g, "");
   if (!qq) return [];
@@ -314,8 +411,7 @@ function searchDict(dict, q) {
     var hay = (sym + " " + name + " " + alias).toLowerCase().replace(/\s+/g, "");
     var pos = hay.indexOf(qq);
     if (pos < 0) continue;
-    // 정확 일치 > 앞부분 일치 > 부분 일치 순으로 점수화
-    var score = 100;
+    var score;
     if (name.toLowerCase().replace(/\s+/g, "") === qq || sym.toLowerCase() === qq) score = 0;
     else if (name.toLowerCase().replace(/\s+/g, "").indexOf(qq) === 0 || sym.toLowerCase().indexOf(qq) === 0) score = 10;
     else score = 50 + pos;
@@ -323,6 +419,38 @@ function searchDict(dict, q) {
   }
   out.sort(function (a, b) { return a.score - b.score; });
   return out.slice(0, 8);
+}
+
+/* ---------- 환율 변환 ---------- */
+// 환율 시계열을 조회용 구조로 변환
+function buildFx(rows) {
+  var days = [], rates = [];
+  for (var i = 0; i < rows.length; i++) {
+    days.push(Math.floor(rows[i].t / 86400000));
+    rates.push(rows[i].c);
+  }
+  return { days: days, rates: rates };
+}
+// 해당 시점의 환율 (없으면 직전 영업일 환율, 그보다 이전이면 최초 환율)
+function fxAt(fx, t) {
+  var d = Math.floor(t / 86400000);
+  if (d <= fx.days[0]) return fx.rates[0];
+  var lo = 0, hi = fx.days.length - 1;
+  if (d >= fx.days[hi]) return fx.rates[hi];
+  while (lo < hi - 1) {
+    var mid = (lo + hi) >> 1;
+    if (fx.days[mid] <= d) lo = mid; else hi = mid;
+  }
+  return fx.rates[lo];
+}
+// 달러 시계열을 원화로 환산
+function convertRows(rows, fx) {
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = fxAt(fx, rows[i].t);
+    out.push({ t: rows[i].t, c: rows[i].c * r, h: rows[i].h * r, l: rows[i].l * r });
+  }
+  return out;
 }
 
 /* ================= 상수: 주요 이벤트 (연 1회 수동 업데이트) ================= */
@@ -362,19 +490,82 @@ var EVENTS = EVENTS_RAW.map(function (e) {
   return { ts: new Date(e[0] + "T00:00:00+09:00").getTime(), type: e[1], name: e[2], date: e[0] };
 });
 
+/* 차트에 이벤트 세로선/라벨 그리기 (개별종목·장바구니 공용) */
+function drawEventsOnChart(chart, tsArr, showLines, showLabels) {
+  if (!showLines || !tsArr || tsArr.length < 2) return;
+  var xs = chart.scales.x, ys = chart.scales.y, ctx = chart.ctx;
+  var t0 = tsArr[0], t1 = tsArr[tsArr.length - 1];
+  var pts = [];
+  for (var i = 0; i < EVENTS.length; i++) {
+    if (EVENTS[i].ts < t0 || EVENTS[i].ts > t1) continue;
+    pts.push({ e: EVENTS[i], x: xs.getPixelForValue(nearestTs(tsArr, EVENTS[i].ts)) });
+  }
+  pts.sort(function (a, b) { return a.x - b.x; });
+
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.lineWidth = 1;
+  for (var j = 0; j < pts.length; j++) {
+    ctx.strokeStyle = EVENT_TYPES[pts[j].e.type] || "#999";
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(pts[j].x, ys.top);
+    ctx.lineTo(pts[j].x, ys.bottom);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  if (showLabels) {
+    ctx.font = "10px sans-serif";
+    ctx.textBaseline = "middle";
+    var laneCount = 3, laneH = (ys.bottom - ys.top) / laneCount;
+    var laneLastX = [-999, -999, -999], MIN_GAP = 13;
+    for (var k = 0; k < pts.length; k++) {
+      var lane = -1;
+      for (var L = 0; L < laneCount; L++) {
+        if (pts[k].x - laneLastX[L] >= MIN_GAP) { lane = L; break; }
+      }
+      if (lane < 0) continue;
+      laneLastX[lane] = pts[k].x;
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = EVENT_TYPES[pts[k].e.type] || "#999";
+      ctx.save();
+      ctx.translate(pts[k].x + 4, ys.top + lane * laneH + 6);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(pts[k].e.name, 0, 0);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+/* 기간 내 이벤트 칩 목록 HTML */
+function eventListHtml(t0, t1) {
+  var inRange = matchEvents(EVENTS, t0, t1);
+  if (!inRange.length) return '<span style="color:var(--sub)">이 기간에 등록된 주요 이벤트가 없습니다.</span>';
+  return '<span style="color:var(--sub)">이 기간의 주요 이벤트 (차트의 점선):</span><br>' +
+    inRange.map(function (e) {
+      var c = EVENT_TYPES[e.type] || "#999";
+      return '<span class="evtTag" style="border:1px solid ' + c + ';color:' + c + '">' +
+        e.date.slice(2).replace(/-/g, ".") + " " + e.name + "</span>";
+    }).join(" ");
+}
+
 /* ================= UI ================= */
-var state = { rows: null, meta: null, symbol: null, chart: null, eps: null };
+var state = {
+  rowsRaw: null, rows: null, meta: null, symbol: null,
+  chart: null, eps: null, fx: null, displayCur: "USD"
+};
 
 function $(id) { return document.getElementById(id); }
 function fmtDate(t) {
   var d = new Date(t);
   return d.getFullYear() + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + String(d.getDate()).padStart(2, "0");
 }
-function isKRW() { return state.meta && state.meta.currency === "KRW"; }
 function fmtPrice(v) {
   if (v == null || !isFinite(v)) return "-";
-  if (isKRW()) return Math.round(v).toLocaleString("ko-KR");
-  var digits = v < 10 ? 3 : 2;
+  if (state.displayCur === "KRW") return Math.round(v).toLocaleString("ko-KR");
+  var digits = Math.abs(v) < 10 ? 3 : 2;
   return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: digits });
 }
 function fmtPct(v) {
@@ -392,32 +583,25 @@ function setStatus(msg, isErr) {
   el.className = isErr ? "err" : "";
 }
 
-/* ---------- 검색: 사전(즉시) + Yahoo(보조) ---------- */
+/* ---------- 검색 ---------- */
 var searchTimer = null, lastDictResults = [];
 
 $("searchInput").addEventListener("input", function () {
   var q = this.value.trim();
   clearTimeout(searchTimer);
   if (q.length < 1) { hideResults(); return; }
-
-  // 1) 사전 검색은 즉시 (네트워크 불필요 → 한글 완벽 지원)
   lastDictResults = searchDict(TICKER_DICT, q);
   renderResults(lastDictResults, []);
-
-  // 2) 영문/티커일 때만 Yahoo 보조 검색 (한글은 Yahoo가 색인하지 않음)
   if (/^[a-zA-Z0-9.\-^=]+$/.test(q) && q.length >= 2) {
     searchTimer = setTimeout(function () { doYahooSearch(q); }, 350);
   }
 });
-
 $("searchInput").addEventListener("focus", function () {
   if (this.value.trim() && lastDictResults.length) $("searchResults").style.display = "block";
 });
-
 document.addEventListener("click", function (e) {
   if (!$("searchBox").contains(e.target)) hideResults();
 });
-
 function hideResults() { $("searchResults").style.display = "none"; }
 
 function doYahooSearch(q) {
@@ -429,7 +613,7 @@ function doYahooSearch(q) {
       var extra = (data.quotes || []).filter(function (it) { return !dictSyms[it.symbol]; });
       renderResults(lastDictResults, extra);
     })
-    .catch(function () { /* 보조 검색 실패는 무시 */ });
+    .catch(function () {});
 }
 
 function renderResults(dictRes, yahooRes) {
@@ -461,15 +645,26 @@ function renderResults(dictRes, yahooRes) {
   });
 }
 
-// 입력값을 티커로 해석: 사전 최상위 결과 우선, 없으면 입력값 그대로
 function resolveSymbol(input) {
   var q = input.trim();
   if (!q) return "";
   var hits = searchDict(TICKER_DICT, q);
   if (hits.length && hits[0].score <= 10) return hits[0].symbol;
-  // 한글이 포함됐는데 사전에 없으면 → 사전 최상위라도 사용
   if (/[가-힣]/.test(q) && hits.length) return hits[0].symbol;
   return q;
+}
+
+/* ---------- 환율 시계열 캐시 (개별종목·장바구니 공용) ---------- */
+var FX_CACHE = {};
+function loadFx(range) {
+  if (FX_CACHE[range]) return Promise.resolve(FX_CACHE[range]);
+  return fetch("/api/chart?symbol=" + encodeURIComponent("KRW=X") + "&range=" + range)
+    .then(function (r) { return r.json(); })
+    .then(function (json) {
+      var fx = buildFx(parseChart(json).rows);
+      FX_CACHE[range] = fx;
+      return fx;
+    });
 }
 
 /* ---------- 데이터 로드 ---------- */
@@ -491,6 +686,7 @@ function load() {
   }
   var range = $("rangeSel").value;
   setStatus("데이터 불러오는 중... (" + symbol + ")");
+
   fetch("/api/chart?symbol=" + encodeURIComponent(symbol) + "&range=" + range)
     .then(function (r) {
       return r.json().then(function (j) {
@@ -501,14 +697,61 @@ function load() {
     .then(function (json) {
       var parsed = parseChart(json);
       if (parsed.rows.length < 30) throw new Error("데이터가 너무 적습니다 (" + parsed.rows.length + "건)");
-      state.rows = parsed.rows;
+      state.rowsRaw = parsed.rows;
       state.meta = parsed.meta;
       state.symbol = symbol;
-      setStatus("");
-      render();
+      state.fx = null;
+
+      var needFx = (parsed.meta.currency || "USD") !== "KRW";
+      if (!needFx) {
+        $("krwWrap").classList.add("hidden");
+        $("krwToggle").checked = false;
+        $("fxLine").classList.add("hidden");
+        setStatus("");
+        applyCurrency(); render();
+        return;
+      }
+      $("krwWrap").classList.remove("hidden");
+      setStatus("환율 데이터 불러오는 중...");
+      return loadFx(range)
+        .then(function (fx) { state.fx = fx; })
+        .catch(function () {
+          state.fx = null;
+          $("krwWrap").classList.add("hidden");
+        })
+        .then(function () {
+          setStatus("");
+          applyCurrency(); render();
+        });
     })
     .catch(function (e) { setStatus("오류: " + e.message, true); });
 }
+
+// 표시 통화 결정 → state.rows 확정
+function applyCurrency() {
+  var useKrw = !!(state.fx && $("krwToggle").checked);
+  if (useKrw) {
+    state.rows = convertRows(state.rowsRaw, state.fx);
+    state.displayCur = "KRW";
+  } else {
+    state.rows = state.rowsRaw;
+    state.displayCur = state.meta.currency || "USD";
+  }
+}
+
+// 환산 토글: 입력해 둔 평단가도 같은 기준으로 환산해 준다
+$("krwToggle").onchange = function () {
+  if (!state.rowsRaw) return;
+  var avgEl = $("avgPrice");
+  var avg = parseFloat(avgEl.value);
+  var lastT = state.rowsRaw[state.rowsRaw.length - 1].t;
+  var rate = state.fx ? fxAt(state.fx, lastT) : null;
+  if (isFinite(avg) && avg > 0 && rate) {
+    avgEl.value = this.checked ? Math.round(avg * rate) : +(avg / rate).toFixed(2);
+  }
+  applyCurrency();
+  render();
+};
 
 /* ---------- 렌더링 ---------- */
 function render() {
@@ -516,7 +759,23 @@ function render() {
   var name = state.meta.shortName || state.meta.longName || state.symbol;
   var last = state.rows[state.rows.length - 1];
   $("chartTitle").textContent = name + " (" + state.symbol + ") — 현재가 " +
-    fmtPrice(last.c) + " " + (state.meta.currency || "");
+    fmtPrice(last.c) + " " + state.displayCur;
+
+  // 달러 · 환율 · 원화 3중 표기
+  if (state.fx) {
+    var lastT = state.rowsRaw[state.rowsRaw.length - 1].t;
+    var rate = fxAt(state.fx, lastT);
+    var usd = state.rowsRaw[state.rowsRaw.length - 1].c;
+    var cur = state.meta.currency || "USD";
+    $("fxLine").classList.remove("hidden");
+    $("fxInfo").innerHTML =
+      cur + " " + usd.toLocaleString("en-US", { maximumFractionDigits: 2 }) +
+      ' <span style="color:var(--sub)">×</span> 환율 ' + rate.toLocaleString("ko-KR", { maximumFractionDigits: 1 }) +
+      '원 <span style="color:var(--sub)">=</span> <b>' + Math.round(usd * rate).toLocaleString("ko-KR") + "원</b>" +
+      ' <span style="color:var(--sub);font-size:11px">(' + fmtDate(lastT) + " 기준)</span>";
+  } else {
+    $("fxLine").classList.add("hidden");
+  }
 
   renderChart();
   renderYearTable();
@@ -526,79 +785,32 @@ function render() {
   renderAvg();
 
   $("avgUnit").style.display = "inline-block";
-  $("avgUnit").textContent = "단위: " + (state.meta.currency || "USD");
+  $("avgUnit").textContent = "단위: " + state.displayCur;
 }
 
-// 이벤트 세로선 + 겹치지 않는 라벨 배치
-var eventLinePlugin = {
-  id: "eventLines",
+var mainEventPlugin = {
+  id: "mainEvents",
   afterDatasetsDraw: function (chart) {
-    if (!$("showEvents").checked || !state.rows) return;
-    var rows = state.rows;
-    var xs = chart.scales.x, ys = chart.scales.y, ctx = chart.ctx;
-    var t0 = rows[0].t, t1 = rows[rows.length - 1].t;
-
-    var pts = [];
-    for (var i = 0; i < EVENTS.length; i++) {
-      var e = EVENTS[i];
-      if (e.ts < t0 || e.ts > t1) continue;
-      pts.push({ e: e, x: xs.getPixelForValue(nearestIndex(rows, e.ts)) });
-    }
-    pts.sort(function (a, b) { return a.x - b.x; });
-
-    ctx.save();
-    // 1) 세로선은 전부 그림
-    ctx.setLineDash([3, 4]);
-    ctx.lineWidth = 1;
-    for (var j = 0; j < pts.length; j++) {
-      ctx.strokeStyle = EVENT_TYPES[pts[j].e.type] || "#999";
-      ctx.globalAlpha = 0.45;
-      ctx.beginPath();
-      ctx.moveTo(pts[j].x, ys.top);
-      ctx.lineTo(pts[j].x, ys.bottom);
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-
-    // 2) 라벨은 체크박스 ON일 때만, 3개 레인에 분산 배치 (겹침 방지)
-    if ($("showLabels").checked) {
-      ctx.font = "10px sans-serif";
-      ctx.textBaseline = "middle";
-      var laneCount = 3;
-      var laneH = (ys.bottom - ys.top) / laneCount;
-      var laneLastX = [-999, -999, -999];
-      var MIN_GAP = 13; // 세로 텍스트 폭 + 여유
-      for (var k = 0; k < pts.length; k++) {
-        var lane = -1;
-        for (var L = 0; L < laneCount; L++) {
-          if (pts[k].x - laneLastX[L] >= MIN_GAP) { lane = L; break; }
-        }
-        if (lane < 0) continue; // 너무 빽빽하면 라벨 생략 (선은 이미 그려짐)
-        laneLastX[lane] = pts[k].x;
-        ctx.globalAlpha = 0.95;
-        ctx.fillStyle = EVENT_TYPES[pts[k].e.type] || "#999";
-        ctx.save();
-        ctx.translate(pts[k].x + 4, ys.top + lane * laneH + 6);
-        ctx.rotate(Math.PI / 2);
-        ctx.fillText(pts[k].e.name, 0, 0);
-        ctx.restore();
-      }
-    }
-    ctx.restore();
+    if (!state.rows) return;
+    drawEventsOnChart(
+      chart,
+      state.rows.map(function (r) { return r.t; }),
+      $("showEvents").checked,
+      $("showLabels").checked
+    );
   }
 };
 
 function renderChart() {
   var rows = state.rows;
-  var labels = rows.map(function (r) { return fmtDate(r.t); });
-  var data = rows.map(function (r) { return r.c; });
   if (state.chart) state.chart.destroy();
   state.chart = new Chart($("mainChart"), {
     type: "line",
     data: {
-      labels: labels,
+      labels: rows.map(function (r) { return fmtDate(r.t); }),
       datasets: [{
-        data: data, borderColor: "#ffc94d", borderWidth: 1.4,
+        data: rows.map(function (r) { return r.c; }),
+        borderColor: "#ffc94d", borderWidth: 1.4,
         pointRadius: 0, tension: 0, fill: false
       }]
     },
@@ -609,9 +821,8 @@ function renderChart() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: function (ctx) { return fmtPrice(ctx.parsed.y); },
+            label: function (ctx) { return fmtPrice(ctx.parsed.y) + " " + state.displayCur; },
             afterBody: function (items) {
-              // 해당 날짜 ±10일 이내 이벤트를 툴팁에 표시
               var t = rows[items[0].dataIndex].t;
               var near = matchEvents(EVENTS, t - 10 * 86400000, t + 10 * 86400000);
               return near.length ? near.map(function (e) { return "◆ " + e.name; }) : [];
@@ -628,22 +839,10 @@ function renderChart() {
         }
       }
     },
-    plugins: [eventLinePlugin]
+    plugins: [mainEventPlugin]
   });
-  renderEventList();
+  $("eventList").innerHTML = eventListHtml(rows[0].t, rows[rows.length - 1].t);
 }
-
-function renderEventList() {
-  var rows = state.rows;
-  var inRange = matchEvents(EVENTS, rows[0].t, rows[rows.length - 1].t);
-  var html = '<span style="color:var(--sub)">이 기간의 주요 이벤트 (차트의 점선):</span><br>';
-  html += inRange.map(function (e) {
-    return '<span class="evtTag" style="border:1px solid ' + (EVENT_TYPES[e.type] || "#999") +
-      ';color:' + (EVENT_TYPES[e.type] || "#999") + '">' + e.date.slice(2).replace(/-/g, ".") + " " + e.name + "</span>";
-  }).join(" ");
-  $("eventList").innerHTML = html;
-}
-
 $("logScale").onchange = function () { if (state.rows) renderChart(); };
 $("showEvents").onchange = function () { if (state.chart) state.chart.update(); };
 $("showLabels").onchange = function () { if (state.chart) state.chart.update(); };
@@ -725,7 +924,6 @@ function renderAvg() {
     renderDdTable(); renderRallyTable();
     return;
   }
-
   var rows = state.rows, eps = state.eps;
   var worstDd = 0, worstDaily = 0;
   for (var i = 0; i < eps.length; i++) if (eps[i].dd < worstDd) worstDd = eps[i].dd;
@@ -735,8 +933,7 @@ function renderAvg() {
   }
   var ddCount20 = eps.filter(function (e) { return e.dd <= -0.2; }).length;
   var recovered = eps.filter(function (e) { return e.recoverI != null; }).length;
-  var last = rows[rows.length - 1].c;
-  var curPnl = last / avg - 1;
+  var curPnl = rows[rows.length - 1].c / avg - 1;
 
   box.innerHTML =
     '<span class="badge">현재 수익률<b class="' + pctCls(curPnl) + '">' + fmtPct(curPnl) + "</b></span>" +
@@ -746,8 +943,7 @@ function renderAvg() {
     '<span class="badge">20%+ 하락 횟수<b>' + ddCount20 + "회</b></span>";
 
   note.innerHTML = "이 종목은 지난 기간 동안 <b>" + eps.length + "번</b>의 10% 이상 하락을 겪었고, 그중 <b>" +
-    recovered + "번</b>은 전고점을 회복했습니다. " +
-    "하락은 <b>예외가 아니라 일상</b>입니다. 아래 표의 '내 평단가 적용 시' 열에서 각 하락이 재현될 때의 내 가격을 미리 확인해 두세요.";
+    recovered + "번</b>은 전고점을 회복했습니다. 하락은 <b>예외가 아니라 일상</b>입니다.";
 
   renderDdTable();
   renderRallyTable();

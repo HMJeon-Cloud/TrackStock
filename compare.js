@@ -1,7 +1,8 @@
 "use strict";
 /* ============================================================
-   StockMind — 장바구니 비교 모듈 (Phase 3)
-   index.html의 전역 함수(parseChart, fmtPct, $ 등)를 재사용한다.
+   StockMind — 장바구니 비교 모듈
+   index.html의 전역 함수(parseChart, convertRows, fxAt, loadFx,
+   drawEventsOnChart, eventListHtml, fmtPct, $ 등)를 재사용한다.
    ============================================================ */
 
 var CMP_COLORS = ["#ffc94d", "#4dc3ff", "#3ddc97", "#ff5b5b", "#c47dff", "#ff9d4d", "#7dd3fc", "#f9a8d4"];
@@ -42,19 +43,19 @@ function alignSeries(list) {
   if (end <= start) return null;
 
   var keySet = {};
-  for (var i2 = 0; i2 < maps.length; i2++) {
-    for (var k in maps[i2]) {
+  for (var a = 0; a < maps.length; a++) {
+    for (var k in maps[a]) {
       var kk = +k;
       if (kk >= start && kk <= end) keySet[kk] = 1;
     }
   }
-  var days = Object.keys(keySet).map(Number).sort(function (a, b) { return a - b; });
+  var days = Object.keys(keySet).map(Number).sort(function (x, y) { return x - y; });
 
   var values = [], real = [];
-  for (var a = 0; a < maps.length; a++) {
+  for (var b = 0; b < maps.length; b++) {
     var vals = [], reals = [], lastV = null;
-    for (var b = 0; b < days.length; b++) {
-      var v = maps[a][days[b]];
+    for (var c = 0; c < days.length; c++) {
+      var v = maps[b][days[c]];
       if (v != null) { lastV = v; reals.push(true); } else { reals.push(false); }
       vals.push(lastV);
     }
@@ -155,8 +156,20 @@ function windowReturn(days, vals, t1, t2) {
   return vals[i2] / vals[i1] - 1;
 }
 
+// 금액 표기 (억/만 단위)
+function fmtMoney(v) {
+  if (!isFinite(v)) return "-";
+  var abs = Math.abs(v);
+  if (abs >= 100000000) return (v / 100000000).toFixed(abs >= 1000000000 ? 0 : 1) + "억";
+  if (abs >= 10000) return Math.round(v / 10000).toLocaleString("ko-KR") + "만";
+  return Math.round(v).toLocaleString("ko-KR");
+}
+
 /* ================= 상태 & UI ================= */
-var cmpState = { cart: ["005930.KS", "GLD", "TLT", "KRW=X"], cache: {}, chart: null, aligned: null };
+var cmpState = {
+  cart: ["005930.KS", "GLD", "TLT", "KRW=X"],
+  cache: {}, results: null, aligned: null, chart: null, view: null, mixedCur: false
+};
 
 function cmpLabel(sym) {
   for (var i = 0; i < TICKER_DICT.length; i++) {
@@ -271,19 +284,41 @@ $("cmpRun").onclick = function () {
 
   chain
     .then(function () {
-      var aligned = alignSeries(results);
-      if (!aligned || aligned.days.length < 30) throw new Error("공통 기간이 너무 짧습니다.");
-      cmpState.aligned = aligned;
-      cmpState.metas = results.map(function (r) { return r.meta; });
+      // 원화가 아닌 자산이 하나라도 있으면 환율 데이터를 함께 받아둔다
+      var needFx = results.some(function (r) { return (r.meta.currency || "USD") !== "KRW"; });
+      cmpState.mixedCur = needFx;
+      if (!needFx) return null;
+      setCmpStatus("환율 데이터 불러오는 중...");
+      return loadFx(range).catch(function () { return null; });
+    })
+    .then(function (fx) {
+      cmpState.fx = fx || null;
+      cmpState.results = results;
+      cmpState.view = null;
+      if (!cmpState.fx) $("cmpKrw").checked = false;
+      rebuildAligned();
       setCmpStatus("");
       renderCompare();
     })
     .catch(function (e) { setCmpStatus("오류: " + e.message, true); });
 };
 
+// 환산 설정에 따라 정렬 데이터를 다시 만든다 (재조회 없음)
+function rebuildAligned() {
+  var useKrw = !!(cmpState.fx && $("cmpKrw").checked);
+  var list = cmpState.results.map(function (r) {
+    var isForeign = (r.meta.currency || "USD") !== "KRW";
+    if (useKrw && isForeign) return { symbol: r.symbol, rows: convertRows(r.rows, cmpState.fx) };
+    return { symbol: r.symbol, rows: r.rows };
+  });
+  var aligned = alignSeries(list);
+  if (!aligned || aligned.days.length < 30) throw new Error("공통 기간이 너무 짧습니다.");
+  cmpState.aligned = aligned;
+}
+
 /* ---------- 렌더링 ---------- */
 
-// 현재 확대 구간(cmpState.view)에 해당하는 부분 시계열을 잘라낸다.
+// 현재 확대 구간(cmpState.view)에 해당하는 부분 시계열
 function getView() {
   var A = cmpState.aligned;
   var full = { days: A.days, values: A.values };
@@ -303,24 +338,47 @@ function getView() {
 function renderCompare() {
   $("cmpBody").classList.remove("hidden");
   var A = cmpState.aligned;
+  var curNote = "";
+  if (cmpState.mixedCur) {
+    curNote = $("cmpKrw").checked
+      ? " · 전 자산 원화(KRW) 환산"
+      : " · 각 자산 원래 통화 기준(수익률 비교만 유효)";
+  }
   $("cmpPeriod").textContent =
-    "공통 기간: " + fmtDate(keyToMs(A.days[0])) + " ~ " + fmtDate(keyToMs(A.days[A.days.length - 1]));
+    "공통 기간: " + fmtDate(keyToMs(A.days[0])) + " ~ " + fmtDate(keyToMs(A.days[A.days.length - 1])) + curNote;
   renderCmpChart();
   renderCmpSummary();
   renderCmpCrisis();
   renderCmpCorr();
 }
 
+var cmpEventPlugin = {
+  id: "cmpEvents",
+  afterDatasetsDraw: function (chart) {
+    if (!cmpState.aligned) return;
+    var V = getView();
+    drawEventsOnChart(
+      chart,
+      V.days.map(keyToMs),
+      $("cmpShowEvents").checked,
+      $("cmpShowLabels").checked
+    );
+  }
+};
+
 function renderCmpChart() {
   var A = cmpState.aligned;
   var V = getView();
   var isLog = $("cmpLog").checked;
-  var labels = V.days.map(function (d) { return fmtDate(keyToMs(d)); });
+  var isAmount = $("cmpMode").value === "amount";
+  var principal = parseFloat($("cmpPrincipal").value);
+  if (!isFinite(principal) || principal <= 0) principal = 10000000;
 
   var datasets = A.symbols.map(function (sym, i) {
+    var n = normalize100(V.values[i]);
     return {
       label: cmpLabel(sym),
-      data: normalize100(V.values[i]),
+      data: isAmount ? n.map(function (v) { return principal * v / 100; }) : n,
       borderColor: CMP_COLORS[i % CMP_COLORS.length],
       borderWidth: 1.5, pointRadius: 0, tension: 0, fill: false
     };
@@ -329,7 +387,7 @@ function renderCmpChart() {
   if (cmpState.chart) cmpState.chart.destroy();
   cmpState.chart = new Chart($("cmpChart"), {
     type: "line",
-    data: { labels: labels, datasets: datasets },
+    data: { labels: V.days.map(function (d) { return fmtDate(keyToMs(d)); }), datasets: datasets },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
@@ -338,7 +396,12 @@ function renderCmpChart() {
         tooltip: {
           callbacks: {
             label: function (ctx) {
-              return ctx.dataset.label + ": " + fmtPct(ctx.parsed.y / 100 - 1);
+              var y = ctx.parsed.y;
+              if (isAmount) {
+                return ctx.dataset.label + ": " + Math.round(y).toLocaleString("ko-KR") + "원 (" +
+                  fmtPct(y / principal - 1) + ")";
+              }
+              return ctx.dataset.label + ": " + fmtPct(y / 100 - 1);
             }
           }
         }
@@ -349,21 +412,23 @@ function renderCmpChart() {
           type: isLog ? "logarithmic" : "linear",
           ticks: {
             color: "#8b97b0",
-            // 로그 축에서는 기준선 100 대비 배수로 읽는 것이 직관적이다
-            callback: function (v) {
-              if (v >= 100) return (v / 100).toFixed(v >= 1000 ? 0 : 1) + "배";
-              return (v / 100).toFixed(2) + "배";
-            }
+            callback: function (v) { return isAmount ? fmtMoney(v) : fmtPct(v / 100 - 1); }
           },
+          // 원금선(수익률 0%)을 밝게 강조
           grid: {
-            color: function (ctx) { return ctx.tick && ctx.tick.value === 100 ? "#5a6580" : "#222b40"; }
+            color: function (ctx) {
+              var baseline = isAmount ? principal : 100;
+              return (ctx.tick && Math.abs(ctx.tick.value - baseline) < baseline * 0.001) ? "#5a6580" : "#222b40";
+            }
           }
         }
       }
-    }
+    },
+    plugins: [cmpEventPlugin]
   });
 
-  // 확대 상태 표시
+  $("cmpEventList").innerHTML = eventListHtml(keyToMs(V.days[0]), keyToMs(V.days[V.days.length - 1]));
+
   if (cmpState.view) {
     $("cmpViewLabel").textContent = "확대: " + cmpState.view.name;
     $("cmpResetView").classList.remove("hidden");
@@ -371,9 +436,19 @@ function renderCmpChart() {
     $("cmpViewLabel").textContent = "";
     $("cmpResetView").classList.add("hidden");
   }
+  $("cmpPrincipalWrap").style.opacity = isAmount ? "1" : "0.4";
 }
 
 $("cmpLog").onchange = function () { if (cmpState.aligned) renderCmpChart(); };
+$("cmpMode").onchange = function () { if (cmpState.aligned) renderCmpChart(); };
+$("cmpPrincipal").addEventListener("input", function () { if (cmpState.aligned) renderCmpChart(); });
+$("cmpShowEvents").onchange = function () { if (cmpState.chart) cmpState.chart.update(); };
+$("cmpShowLabels").onchange = function () { if (cmpState.chart) cmpState.chart.update(); };
+$("cmpKrw").onchange = function () {
+  if (!cmpState.results) return;
+  try { rebuildAligned(); renderCompare(); }
+  catch (e) { setCmpStatus("오류: " + e.message, true); }
+};
 $("cmpResetView").onclick = function () {
   cmpState.view = null;
   renderCmpChart();
@@ -385,7 +460,6 @@ function renderCmpSummary() {
   var html = "<thead><tr><th>자산</th><th>총수익</th><th>연평균(CAGR)</th><th>최대낙폭</th><th>연변동성</th><th>위기 평균성과</th></tr></thead><tbody>";
   for (var i = 0; i < A.symbols.length; i++) {
     var m = seriesMetrics(A.values[i], A.days, A.real[i]);
-    // 위기(하락) 구간 평균 수익률 = 헷지 성격 지표
     var sum = 0, cnt = 0;
     for (var w = 0; w < CRISIS_WINDOWS.length; w++) {
       if (CRISIS_WINDOWS[w][3] !== "하락") continue;
@@ -438,12 +512,11 @@ function renderCmpCrisis() {
   }
   $("cmpCrisis").innerHTML = html + "</tbody>";
 
-  // 행 클릭 → 해당 구간만 확대해서 재정규화
   Array.prototype.forEach.call($("cmpCrisis").querySelectorAll(".crisisRow"), function (tr) {
     tr.onclick = function () {
       var cw2 = CRISIS_WINDOWS[+tr.getAttribute("data-w")];
       if (cmpState.view && cmpState.view.name === cw2[0]) {
-        cmpState.view = null; // 같은 행을 다시 누르면 해제
+        cmpState.view = null;
       } else {
         cmpState.view = {
           name: cw2[0],
@@ -471,7 +544,6 @@ function renderCmpCorr() {
       if (r === c) { html += "<td style='color:var(--sub)'>1.00</td>"; continue; }
       var v = pairCorrelation(A.values[r], A.real[r], A.values[c], A.real[c]);
       if (v == null) { html += "<td>-</td>"; continue; }
-      // 음의 상관 = 헷지 효과 → 초록, 양의 상관 = 같이 움직임 → 붉은색
       var alpha = Math.min(Math.abs(v), 1) * 0.35;
       var bg = v < 0 ? "rgba(61,220,151," + alpha + ")" : "rgba(255,91,91," + alpha + ")";
       html += "<td style='background:" + bg + "'>" + v.toFixed(2) + "</td>";
