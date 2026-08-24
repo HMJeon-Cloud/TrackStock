@@ -82,7 +82,7 @@
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.5</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.6</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="card">
@@ -123,6 +123,13 @@
     </div>
     <div class="row" style="margin-bottom:8px">
       <label class="opt" id="krwWrap"><input type="checkbox" id="krwToggle"> 원화(KRW)로 환산</label>
+      <span id="fxCtrl" class="hidden">
+        <select id="fxMode" style="font-size:12px;padding:5px 8px">
+          <option value="daily">일별 실제 환율(자동)</option>
+          <option value="fixed">고정 환율</option>
+        </select>
+        <input id="fxFixed" type="number" step="0.1" class="hidden" style="width:100px;font-size:12px;padding:5px 8px">
+      </span>
       <label class="opt"><input type="checkbox" id="logScale"> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="showEvents" checked> 이벤트 선</label>
       <label class="opt"><input type="checkbox" id="showLabels"> 이벤트 이름</label>
@@ -135,6 +142,7 @@
         <li><b>차트 위에 마우스를 올리면</b> 그날의 가격과, 앞뒤 10일 안에 있었던 사건이 함께 뜹니다.</li>
         <li><b>로그 스케일</b>을 켜면 세로 이동 거리가 같을 때 상승률도 같아집니다. 가격이 몇 배씩 오른 종목의 초기 구간을 볼 때 켜세요. 끄면(기본) 절대 금액 차이가 그대로 보입니다.</li>
         <li><b>원화 환산</b>은 미국 주식에만 나타납니다. 켜면 달러 주가에 그날그날 환율을 곱해, 한국 투자자가 실제로 체감한 원화 수익률로 모든 표가 다시 계산됩니다. 달러가 올랐다면 원화 수익률이 달러 수익률보다 높게 나옵니다.</li>
+        <li><b>환율 적용 방식</b> — <b>일별 실제 환율</b>(기본)은 매일의 실제 환율을 씁니다. <b>고정 환율</b>을 고르고 숫자를 직접 넣으면 전 기간에 그 환율 하나만 적용하는데, 이렇게 하면 환율 변동 효과가 사라져 <b>순수한 주가 등락만</b> 원화로 볼 수 있습니다. 두 방식의 차이가 곧 환율이 내 수익에 기여한 몫입니다.</li>
       </ul>
       <b>주의:</b> 사건 점선은 "이때 이런 일이 있었다"는 표시일 뿐, 그 사건이 가격 변화의 원인이라는 뜻은 아닙니다.
     </div></details>
@@ -143,10 +151,14 @@
   <div class="card">
     <h2>내 평단가 기준 시나리오 <small>과거가 반복된다면 내 계좌는 어디까지 갈까</small></h2>
     <div class="row">
-      <input id="avgPrice" type="number" step="any" placeholder="내 평단가 입력" style="width:180px">
+      <input id="avgPrice" type="number" step="any" placeholder="내 평단가 입력" style="width:170px">
+      <span id="avgFxWrap" class="hidden" style="font-size:12px;color:var(--sub)">내 환전 환율
+        <input id="avgFx" type="number" step="0.1" style="width:105px;font-size:12px;padding:5px 8px;margin-left:4px">원
+      </span>
       <button class="primary" id="applyAvg">적용</button>
       <span id="avgUnit" class="badge" style="display:none"></span>
     </div>
+    <div id="avgFxNote" style="font-size:12px;color:var(--good);margin-top:8px"></div>
     <div id="avgSummary" class="row" style="margin-top:10px"></div>
     <div class="mentalNote" id="avgNote"></div>
     <details class="howto"><summary>이 지표 읽는 법</summary><div class="body">
@@ -156,6 +168,7 @@
         <li><b>최악의 하루 재현 시</b> — 단 하루 만에 빠질 수 있는 최대폭. 폭락 당일의 공포에 대비하는 숫자입니다.</li>
         <li><b>10%+ / 20%+ 하락 횟수</b> — 그 정도 하락이 몇 번이나 있었는지. 횟수가 많다는 건 <b>하락이 이 종목의 정상 작동 범위</b>라는 뜻입니다.</li>
       </ul>
+      <b>내 환전 환율</b> — 미국 주식은 환전 시점과 매수 시점이 달라 자동 환율이 실제와 어긋납니다. 이 칸에 <b>내가 실제로 환전한 환율</b>을 넣으면 원화 평단가가 그 값으로 계산되고, 원화 환산을 켜고 끌 때도 이 환율이 쓰입니다. 비워 두면 최신 환율이 기본값으로 들어갑니다. 원화 환산이 켜진 상태라면 원화 평단가를 직접 입력해도 됩니다.<br>
       <b>주의:</b> 과거 최대 낙폭이 미래의 하한선은 아닙니다. 더 깊은 하락도 가능하며, 이 수치는 "최소한 이 정도는 각오해야 한다"는 기준선으로 쓰세요.
     </div></details>
   </div>
@@ -225,20 +238,45 @@
   <div id="cmpBody" class="hidden">
     <h3>투자 결과 곡선 <small id="cmpPeriod"></small></h3>
     <div class="row" style="margin-bottom:8px">
+      <label class="opt">투자 시작일
+        <input id="cmpStart" type="date" style="font-size:12px;padding:5px 8px;margin-left:4px">
+      </label>
+      <button class="chip" data-preset="all">전체</button>
+      <button class="chip" data-preset="1y">1년 전</button>
+      <button class="chip" data-preset="3y">3년 전</button>
+      <button class="chip" data-preset="5y">5년 전</button>
+      <button class="chip" data-preset="covid">코로나 저점</button>
+      <button class="chip" data-preset="peak">최악의 타이밍</button>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <select id="cmpInvest">
+        <option value="lump" selected>거치식 (한 번에)</option>
+        <option value="dca">적립식 (매월)</option>
+      </select>
       <select id="cmpMode">
         <option value="amount" selected>평가금액(원)</option>
         <option value="pct">수익률(%)</option>
       </select>
-      <label class="opt" id="cmpPrincipalWrap">투자원금
+      <label class="opt" id="cmpPrincipalWrap"><span id="cmpPrincipalLabel">투자원금</span>
         <input id="cmpPrincipal" type="number" step="100000" value="10000000" style="width:130px;margin-left:4px">원
       </label>
+    </div>
+    <div class="row" style="margin-bottom:8px">
       <label class="opt"><input type="checkbox" id="cmpKrw" checked> 원화 환산</label>
+      <span id="cmpFxCtrl">
+        <select id="cmpFxMode" style="font-size:12px;padding:5px 8px">
+          <option value="daily">일별 실제 환율(자동)</option>
+          <option value="fixed">고정 환율</option>
+        </select>
+        <input id="cmpFxFixed" type="number" step="0.1" class="hidden" style="width:100px;font-size:12px;padding:5px 8px">
+      </span>
       <label class="opt"><input type="checkbox" id="cmpLog" checked> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="cmpShowEvents" checked> 이벤트 선</label>
       <label class="opt"><input type="checkbox" id="cmpShowLabels"> 이벤트 이름</label>
       <span id="cmpViewLabel" style="font-size:12px;color:var(--accent)"></span>
       <button class="chip hidden" id="cmpResetView">전체 기간으로</button>
     </div>
+    <div id="cmpInvestSummary" class="row" style="margin-bottom:8px"></div>
     <div class="chartWrap"><canvas id="cmpChart"></canvas></div>
     <div id="cmpEventList"></div>
     <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
@@ -251,7 +289,17 @@
         <li><b>범례 클릭</b>으로 특정 자산을 숨기면 나머지 축이 자동으로 다시 잡힙니다.</li>
         <li><b>아래 사건별 성과 표의 행을 클릭</b>하면 그 구간만 확대해 다시 같은 출발점에서 비교합니다. 위기 때 무엇이 버텼는지 보는 가장 빠른 방법입니다.</li>
       </ul>
-      <b>주의:</b> 세금·거래비용·배당은 반영되지 않았습니다. 배당은 Yahoo의 조정 종가에 포함되는 경우와 아닌 경우가 있어 배당주 비교는 실제보다 낮게 보일 수 있습니다.
+      <b>투자 시작일</b>을 바꾸면 그날 투자했다고 가정하고 전부 다시 계산합니다. 프리셋 버튼도 있습니다.
+      <ul>
+        <li><b>최악의 타이밍</b> — 장바구니 첫 자산의 역대 최고점 날짜로 이동합니다. <b>가장 비싼 날 샀어도 지금은 어떤가</b>를 확인하는 버튼으로, 고점 매수를 후회하는 마음을 다스리는 데 가장 유용합니다.</li>
+        <li><b>코로나 저점</b> — 2020년 3월 23일. 최고의 타이밍에 샀다면 어땠을지를 봅니다. 위 '최악의 타이밍'과 번갈아 보면 진입 시점이 장기 수익률에 미치는 영향의 실제 크기를 가늠할 수 있습니다.</li>
+      </ul>
+      <b>거치식 / 적립식</b>도 고를 수 있습니다.
+      <ul>
+        <li><b>거치식</b> — 시작일에 원금을 한 번에 넣습니다.</li>
+        <li><b>적립식</b> — 매월 첫 거래일마다 같은 금액을 넣습니다. 회색 점선이 <b>누적 투입원금</b>이라, 선이 점선 위에 있으면 이익입니다. 떨어질 때 더 많은 수량을 사게 되므로 <b>V자 하락장에서는 적립식이, 계속 오르는 장에서는 거치식이 유리</b>합니다. 하락이 무서울 때 이 둘을 비교해 보세요.</li>
+      </ul>
+      <b>주의:</b> 세금·거래비용·배당은 반영되지 않았습니다. 배당은 Yahoo의 조정 종가에 포함되는 경우와 아닌 경우가 있어 배당주 비교는 실제보다 낮게 보일 수 있습니다. 적립식의 CAGR은 투입 시점이 제각각이라 의미가 없어 표에서 생략합니다.
     </div></details>
 
     <h3>자산별 요약 <small>위기 평균성과 = 아래 '하락' 구간들의 평균 수익률</small></h3>
@@ -730,28 +778,61 @@ function load() {
 // 표시 통화 결정 → state.rows 확정
 function applyCurrency() {
   var useKrw = !!(state.fx && $("krwToggle").checked);
+  if (state.fx) {
+    $("fxCtrl").classList.toggle("hidden", !useKrw);
+    $("fxFixed").classList.toggle("hidden", $("fxMode").value !== "fixed");
+  }
   if (useKrw) {
-    state.rows = convertRows(state.rowsRaw, state.fx);
+    if ($("fxMode").value === "fixed") {
+      var fr = parseFloat($("fxFixed").value);
+      if (!isFinite(fr) || fr <= 0) fr = fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t);
+      state.rows = state.rowsRaw.map(function (r) {
+        return { t: r.t, c: r.c * fr, h: r.h * fr, l: r.l * fr };
+      });
+      state.fxModeUsed = "고정 " + fr.toLocaleString("ko-KR") + "원";
+    } else {
+      state.rows = convertRows(state.rowsRaw, state.fx);
+      state.fxModeUsed = "일별 실제 환율";
+    }
     state.displayCur = "KRW";
   } else {
     state.rows = state.rowsRaw;
     state.displayCur = state.meta.currency || "USD";
+    state.fxModeUsed = null;
   }
 }
 
-// 환산 토글: 입력해 둔 평단가도 같은 기준으로 환산해 준다
+$("fxMode").onchange = function () {
+  if (!state.rowsRaw) return;
+  if (this.value === "fixed" && !$("fxFixed").value) {
+    $("fxFixed").value = Math.round(fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t) * 10) / 10;
+  }
+  applyCurrency(); render();
+};
+$("fxFixed").addEventListener("change", function () {
+  if (state.rowsRaw) { applyCurrency(); render(); }
+});
+
+// 환산 토글: 입력해 둔 평단가는 '내 환전 환율' 기준으로 바꿔 준다
 $("krwToggle").onchange = function () {
   if (!state.rowsRaw) return;
   var avgEl = $("avgPrice");
   var avg = parseFloat(avgEl.value);
-  var lastT = state.rowsRaw[state.rowsRaw.length - 1].t;
-  var rate = state.fx ? fxAt(state.fx, lastT) : null;
+  var rate = parseFloat($("avgFx").value);
+  if (!isFinite(rate) || rate <= 0) {
+    rate = state.fx ? fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t) : null;
+  }
   if (isFinite(avg) && avg > 0 && rate) {
     avgEl.value = this.checked ? Math.round(avg * rate) : +(avg / rate).toFixed(2);
   }
   applyCurrency();
   render();
 };
+
+// 내 환전 환율을 바꾸면 원화 평단가를 다시 계산
+$("avgFx").addEventListener("change", function () {
+  if (state.rowsRaw) renderAvg();
+});
 
 /* ---------- 렌더링 ---------- */
 function render() {
@@ -767,14 +848,19 @@ function render() {
     var rate = fxAt(state.fx, lastT);
     var usd = state.rowsRaw[state.rowsRaw.length - 1].c;
     var cur = state.meta.currency || "USD";
+    if (!$("fxFixed").value) $("fxFixed").value = Math.round(rate * 10) / 10;
+    if (!$("avgFx").value) $("avgFx").value = Math.round(rate * 10) / 10;
+    $("avgFxWrap").classList.remove("hidden");
     $("fxLine").classList.remove("hidden");
     $("fxInfo").innerHTML =
       cur + " " + usd.toLocaleString("en-US", { maximumFractionDigits: 2 }) +
       ' <span style="color:var(--sub)">×</span> 환율 ' + rate.toLocaleString("ko-KR", { maximumFractionDigits: 1 }) +
       '원 <span style="color:var(--sub)">=</span> <b>' + Math.round(usd * rate).toLocaleString("ko-KR") + "원</b>" +
-      ' <span style="color:var(--sub);font-size:11px">(' + fmtDate(lastT) + " 기준)</span>";
+      ' <span style="color:var(--sub);font-size:11px">(' + fmtDate(lastT) + " 기준" +
+      (state.fxModeUsed ? " · 적용: " + state.fxModeUsed : "") + ")</span>";
   } else {
     $("fxLine").classList.add("hidden");
+    $("avgFxWrap").classList.add("hidden");
   }
 
   renderChart();
@@ -917,7 +1003,26 @@ $("avgPrice").addEventListener("keydown", function (e) { if (e.key === "Enter") 
 
 function renderAvg() {
   var avg = parseFloat($("avgPrice").value);
-  var box = $("avgSummary"), note = $("avgNote");
+  var box = $("avgSummary"), note = $("avgNote"), fxNote = $("avgFxNote");
+
+  // 내 환전 환율 기준 안내 (외화 종목일 때만)
+  fxNote.innerHTML = "";
+  if (state.fx && isFinite(avg) && avg > 0) {
+    var myFx = parseFloat($("avgFx").value);
+    if (isFinite(myFx) && myFx > 0) {
+      var cur0 = state.meta.currency || "USD";
+      if (state.displayCur === "KRW") {
+        fxNote.innerHTML = "내 원화 평단가 <b>" + Math.round(avg).toLocaleString("ko-KR") + "원</b>" +
+          ' <span style="color:var(--sub)">= ' + cur0 + " " + (avg / myFx).toFixed(2) +
+          " × 환전환율 " + myFx.toLocaleString("ko-KR") + "원</span>";
+      } else {
+        fxNote.innerHTML = "내 평단가 " + cur0 + " " + avg + " × 환전환율 " +
+          myFx.toLocaleString("ko-KR") + "원 = <b>" + Math.round(avg * myFx).toLocaleString("ko-KR") + "원</b>" +
+          ' <span style="color:var(--sub)">(원화 환산을 켜면 이 값이 평단가가 됩니다)</span>';
+      }
+    }
+  }
+
   if (!isFinite(avg) || avg <= 0) {
     box.innerHTML = "";
     note.textContent = "평단가를 입력하면 과거 최악의 하락이 재현될 때 내 계좌가 어디까지 가는지 보여줍니다.";

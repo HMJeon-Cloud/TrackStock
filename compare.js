@@ -156,6 +156,43 @@ function windowReturn(days, vals, t1, t2) {
   return vals[i2] / vals[i1] - 1;
 }
 
+// 매월 첫 거래일마다 일정액을 투입하는 적립식(DCA) 시뮬레이션
+// 반환: {values: 평가금액[], invested: 누적투입액[]}
+function dcaSeries(days, vals, monthlyAmt) {
+  var units = 0, invested = 0, out = [], inv = [], lastMonth = null;
+  for (var i = 0; i < vals.length; i++) {
+    var d = new Date(days[i] * 86400000);
+    var mk = d.getUTCFullYear() * 12 + d.getUTCMonth();
+    if (lastMonth === null || mk > lastMonth) {
+      units += monthlyAmt / vals[i];
+      invested += monthlyAmt;
+      lastMonth = mk;
+    }
+    out.push(units * vals[i]);
+    inv.push(invested);
+  }
+  return { values: out, invested: inv };
+}
+
+// 날짜(ms) 이상인 첫 인덱스 (없으면 0)
+function indexOnOrAfter(days, t) {
+  var d = dayKey(t);
+  for (var i = 0; i < days.length; i++) if (days[i] >= d) return i;
+  return 0;
+}
+
+// YYYY-MM-DD 문자열 <-> dayKey
+function dayKeyToDateStr(dk) {
+  return new Date(dk * 86400000).toISOString().slice(0, 10);
+}
+
+// 시계열에서 최고점 인덱스 (최악의 진입 시점 찾기용)
+function peakIndex(vals) {
+  var hi = 0;
+  for (var i = 1; i < vals.length; i++) if (vals[i] > vals[hi]) hi = i;
+  return hi;
+}
+
 // 금액 표기 (억/만 단위)
 function fmtMoney(v) {
   if (!isFinite(v)) return "-";
@@ -306,14 +343,45 @@ $("cmpRun").onclick = function () {
 // 환산 설정에 따라 정렬 데이터를 다시 만든다 (재조회 없음)
 function rebuildAligned() {
   var useKrw = !!(cmpState.fx && $("cmpKrw").checked);
+  var fixedMode = $("cmpFxMode").value === "fixed";
+  var fixedRate = parseFloat($("cmpFxFixed").value);
+  if (cmpState.fx && (!isFinite(fixedRate) || fixedRate <= 0)) {
+    fixedRate = fxAt(cmpState.fx, cmpState.fx.days[cmpState.fx.days.length - 1] * 86400000);
+  }
   var list = cmpState.results.map(function (r) {
     var isForeign = (r.meta.currency || "USD") !== "KRW";
-    if (useKrw && isForeign) return { symbol: r.symbol, rows: convertRows(r.rows, cmpState.fx) };
-    return { symbol: r.symbol, rows: r.rows };
+    if (!useKrw || !isForeign) return { symbol: r.symbol, rows: r.rows };
+    if (fixedMode) {
+      return {
+        symbol: r.symbol,
+        rows: r.rows.map(function (x) {
+          return { t: x.t, c: x.c * fixedRate, h: x.h * fixedRate, l: x.l * fixedRate };
+        })
+      };
+    }
+    return { symbol: r.symbol, rows: convertRows(r.rows, cmpState.fx) };
   });
   var aligned = alignSeries(list);
   if (!aligned || aligned.days.length < 30) throw new Error("공통 기간이 너무 짧습니다.");
   cmpState.aligned = aligned;
+
+  // 투자 시작일 입력의 허용 범위 갱신
+  var el = $("cmpStart");
+  el.min = dayKeyToDateStr(aligned.days[0]);
+  el.max = dayKeyToDateStr(aligned.days[aligned.days.length - 1]);
+  if (!el.value || el.value < el.min || el.value > el.max) el.value = el.min;
+  cmpState.startIdx = indexOnOrAfter(aligned.days, new Date(el.value + "T00:00:00Z").getTime());
+}
+
+// 투자 시작일 이후 구간만 잘라낸 시계열
+function investedRange() {
+  var A = cmpState.aligned;
+  var s = cmpState.startIdx || 0;
+  return {
+    days: A.days.slice(s),
+    values: A.values.map(function (v) { return v.slice(s); }),
+    real: A.real.map(function (v) { return v.slice(s); })
+  };
 }
 
 /* ---------- 렌더링 ---------- */
@@ -321,7 +389,8 @@ function rebuildAligned() {
 // 현재 확대 구간(cmpState.view)에 해당하는 부분 시계열
 function getView() {
   var A = cmpState.aligned;
-  var full = { days: A.days, values: A.values };
+  var R = investedRange();
+  var full = { days: R.days, values: R.values };
   if (!cmpState.view) return full;
   var d1 = dayKey(cmpState.view.t1), d2 = dayKey(cmpState.view.t2);
   var i1 = -1, i2 = -1;
@@ -344,8 +413,10 @@ function renderCompare() {
       ? " · 전 자산 원화(KRW) 환산"
       : " · 각 자산 원래 통화 기준(수익률 비교만 유효)";
   }
+  var R0 = investedRange();
   $("cmpPeriod").textContent =
-    "공통 기간: " + fmtDate(keyToMs(A.days[0])) + " ~ " + fmtDate(keyToMs(A.days[A.days.length - 1])) + curNote;
+    "투자 " + fmtDate(keyToMs(R0.days[0])) + " ~ " + fmtDate(keyToMs(R0.days[R0.days.length - 1])) +
+    " (데이터 " + fmtDate(keyToMs(A.days[0])) + "부터)" + curNote;
   renderCmpChart();
   renderCmpSummary();
   renderCmpCrisis();
@@ -371,18 +442,38 @@ function renderCmpChart() {
   var V = getView();
   var isLog = $("cmpLog").checked;
   var isAmount = $("cmpMode").value === "amount";
+  var isDca = $("cmpInvest").value === "dca";
   var principal = parseFloat($("cmpPrincipal").value);
   if (!isFinite(principal) || principal <= 0) principal = 10000000;
 
-  var datasets = A.symbols.map(function (sym, i) {
-    var n = normalize100(V.values[i]);
-    return {
+  var datasets = [], investedLine = null;
+  A.symbols.forEach(function (sym, i) {
+    var data;
+    if (isDca) {
+      var d = dcaSeries(V.days, V.values[i], principal);
+      investedLine = d.invested;
+      data = isAmount ? d.values : d.values.map(function (v, k) { return v / d.invested[k] * 100; });
+    } else {
+      var n = normalize100(V.values[i]);
+      data = isAmount ? n.map(function (v) { return principal * v / 100; }) : n;
+    }
+    datasets.push({
       label: cmpLabel(sym),
-      data: isAmount ? n.map(function (v) { return principal * v / 100; }) : n,
+      data: data,
       borderColor: CMP_COLORS[i % CMP_COLORS.length],
       borderWidth: 1.5, pointRadius: 0, tension: 0, fill: false
-    };
+    });
   });
+
+  // 적립식 + 금액 모드에서는 누적 투입원금을 회색 점선으로 함께 표시
+  if (isDca && isAmount && investedLine) {
+    datasets.push({
+      label: "누적 투입원금",
+      data: investedLine,
+      borderColor: "#8b97b0", borderWidth: 1.2, borderDash: [5, 4],
+      pointRadius: 0, tension: 0, fill: false
+    });
+  }
 
   if (cmpState.chart) cmpState.chart.destroy();
   cmpState.chart = new Chart($("cmpChart"), {
@@ -397,9 +488,13 @@ function renderCmpChart() {
           callbacks: {
             label: function (ctx) {
               var y = ctx.parsed.y;
+              if (ctx.dataset.label === "누적 투입원금") {
+                return "누적 투입원금: " + Math.round(y).toLocaleString("ko-KR") + "원";
+              }
               if (isAmount) {
+                var invAt = isDca && investedLine ? investedLine[ctx.dataIndex] : principal;
                 return ctx.dataset.label + ": " + Math.round(y).toLocaleString("ko-KR") + "원 (" +
-                  fmtPct(y / principal - 1) + ")";
+                  fmtPct(y / invAt - 1) + ")";
               }
               return ctx.dataset.label + ": " + fmtPct(y / 100 - 1);
             }
@@ -414,11 +509,13 @@ function renderCmpChart() {
             color: "#8b97b0",
             callback: function (v) { return isAmount ? fmtMoney(v) : fmtPct(v / 100 - 1); }
           },
-          // 원금선(수익률 0%)을 밝게 강조
           grid: {
             color: function (ctx) {
-              var baseline = isAmount ? principal : 100;
-              return (ctx.tick && Math.abs(ctx.tick.value - baseline) < baseline * 0.001) ? "#5a6580" : "#222b40";
+              // 본전선 강조 (거치식 금액모드는 원금, 수익률모드는 0%)
+              if (!ctx.tick) return "#222b40";
+              var baseline = isAmount ? (isDca ? null : principal) : 100;
+              if (baseline == null) return "#222b40";
+              return Math.abs(ctx.tick.value - baseline) < baseline * 0.001 ? "#5a6580" : "#222b40";
             }
           }
         }
@@ -436,19 +533,93 @@ function renderCmpChart() {
     $("cmpViewLabel").textContent = "";
     $("cmpResetView").classList.add("hidden");
   }
-  $("cmpPrincipalWrap").style.opacity = isAmount ? "1" : "0.4";
+  $("cmpPrincipalLabel").textContent = isDca ? "매월 투자액" : "투자원금";
+  renderInvestSummary();
+}
+
+// 투자 결과 한 줄 요약 배지
+function renderInvestSummary() {
+  var A = cmpState.aligned;
+  var R = investedRange();
+  var isDca = $("cmpInvest").value === "dca";
+  var principal = parseFloat($("cmpPrincipal").value);
+  if (!isFinite(principal) || principal <= 0) principal = 10000000;
+
+  var best = null, worst = null, invested = principal;
+  for (var i = 0; i < A.symbols.length; i++) {
+    var val;
+    if (isDca) {
+      var d = dcaSeries(R.days, R.values[i], principal);
+      val = d.values[d.values.length - 1];
+      invested = d.invested[d.invested.length - 1];
+    } else {
+      val = principal * R.values[i][R.values[i].length - 1] / R.values[i][0];
+    }
+    var ret = val / invested - 1;
+    if (!best || ret > best.ret) best = { sym: A.symbols[i], ret: ret, val: val };
+    if (!worst || ret < worst.ret) worst = { sym: A.symbols[i], ret: ret, val: val };
+  }
+  var months = Math.round((R.days[R.days.length - 1] - R.days[0]) / 30.44);
+  $("cmpInvestSummary").innerHTML =
+    '<span class="badge">투자 기간<b>' + fmtDate(keyToMs(R.days[0])) + " ~ (" + months + "개월)</b></span>" +
+    '<span class="badge">총 투입원금<b>' + Math.round(invested).toLocaleString("ko-KR") + "원</b></span>" +
+    '<span class="badge">최고 성과<b class="' + pctCls(best.ret) + '">' + cmpLabel(best.sym) + " " +
+      Math.round(best.val).toLocaleString("ko-KR") + "원 (" + fmtPct(best.ret) + ")</b></span>" +
+    '<span class="badge">최저 성과<b class="' + pctCls(worst.ret) + '">' + cmpLabel(worst.sym) + " " +
+      Math.round(worst.val).toLocaleString("ko-KR") + "원 (" + fmtPct(worst.ret) + ")</b></span>";
 }
 
 $("cmpLog").onchange = function () { if (cmpState.aligned) renderCmpChart(); };
-$("cmpMode").onchange = function () { if (cmpState.aligned) renderCmpChart(); };
-$("cmpPrincipal").addEventListener("input", function () { if (cmpState.aligned) renderCmpChart(); });
+$("cmpMode").onchange = function () { if (cmpState.aligned) renderCompare(); };
+$("cmpInvest").onchange = function () { if (cmpState.aligned) renderCompare(); };
+$("cmpPrincipal").addEventListener("input", function () { if (cmpState.aligned) renderCompare(); });
 $("cmpShowEvents").onchange = function () { if (cmpState.chart) cmpState.chart.update(); };
 $("cmpShowLabels").onchange = function () { if (cmpState.chart) cmpState.chart.update(); };
-$("cmpKrw").onchange = function () {
+
+// 투자 시작일 변경
+$("cmpStart").addEventListener("change", function () {
+  if (!cmpState.aligned) return;
+  cmpState.startIdx = indexOnOrAfter(cmpState.aligned.days, new Date(this.value + "T00:00:00Z").getTime());
+  cmpState.view = null;
+  renderCompare();
+});
+
+// 투자 시작일 프리셋
+Array.prototype.forEach.call(document.querySelectorAll("button[data-preset]"), function (btn) {
+  btn.onclick = function () {
+    if (!cmpState.aligned) { setCmpStatus("먼저 비교를 실행해 주세요.", true); return; }
+    var A = cmpState.aligned;
+    var lastDay = A.days[A.days.length - 1];
+    var p = btn.getAttribute("data-preset"), targetIdx = 0;
+    if (p === "all") targetIdx = 0;
+    else if (p === "1y") targetIdx = indexOnOrAfter(A.days, keyToMs(lastDay - 365));
+    else if (p === "3y") targetIdx = indexOnOrAfter(A.days, keyToMs(lastDay - 1096));
+    else if (p === "5y") targetIdx = indexOnOrAfter(A.days, keyToMs(lastDay - 1826));
+    else if (p === "covid") targetIdx = indexOnOrAfter(A.days, new Date("2020-03-23T00:00:00Z").getTime());
+    else if (p === "peak") targetIdx = peakIndex(A.values[0]); // 첫 자산의 역대 최고점 = 최악의 진입
+    if (targetIdx >= A.days.length - 30) targetIdx = 0;
+    cmpState.startIdx = targetIdx;
+    $("cmpStart").value = dayKeyToDateStr(A.days[targetIdx]);
+    cmpState.view = null;
+    renderCompare();
+  };
+});
+
+function refreshCurrency() {
   if (!cmpState.results) return;
+  $("cmpFxFixed").classList.toggle("hidden", $("cmpFxMode").value !== "fixed");
+  $("cmpFxCtrl").classList.toggle("hidden", !$("cmpKrw").checked);
   try { rebuildAligned(); renderCompare(); }
   catch (e) { setCmpStatus("오류: " + e.message, true); }
+}
+$("cmpKrw").onchange = refreshCurrency;
+$("cmpFxMode").onchange = function () {
+  if (this.value === "fixed" && !$("cmpFxFixed").value && cmpState.fx) {
+    $("cmpFxFixed").value = Math.round(cmpState.fx.rates[cmpState.fx.rates.length - 1] * 10) / 10;
+  }
+  refreshCurrency();
 };
+$("cmpFxFixed").addEventListener("change", refreshCurrency);
 $("cmpResetView").onclick = function () {
   cmpState.view = null;
   renderCmpChart();
@@ -457,9 +628,26 @@ $("cmpResetView").onclick = function () {
 
 function renderCmpSummary() {
   var A = cmpState.aligned;
-  var html = "<thead><tr><th>자산</th><th>총수익</th><th>연평균(CAGR)</th><th>최대낙폭</th><th>연변동성</th><th>위기 평균성과</th></tr></thead><tbody>";
+  var R = investedRange();
+  var isDca = $("cmpInvest").value === "dca";
+  var principal = parseFloat($("cmpPrincipal").value);
+  if (!isFinite(principal) || principal <= 0) principal = 10000000;
+
+  var html = "<thead><tr><th>자산</th><th>현재 평가금액</th><th>총수익</th><th>연평균(CAGR)</th>" +
+    "<th>최대낙폭</th><th>연변동성</th><th>위기 평균성과</th></tr></thead><tbody>";
   for (var i = 0; i < A.symbols.length; i++) {
-    var m = seriesMetrics(A.values[i], A.days, A.real[i]);
+    var m = seriesMetrics(R.values[i], R.days, R.real[i]);
+    var evalAmt, totalRet, cagrCell;
+    if (isDca) {
+      var dd2 = dcaSeries(R.days, R.values[i], principal);
+      evalAmt = dd2.values[dd2.values.length - 1];
+      totalRet = evalAmt / dd2.invested[dd2.invested.length - 1] - 1;
+      cagrCell = "<td style='color:var(--sub)'>-</td>";
+    } else {
+      evalAmt = principal * R.values[i][R.values[i].length - 1] / R.values[i][0];
+      totalRet = m.total;
+      cagrCell = '<td class="' + pctCls(m.cagr) + '">' + fmtPct(m.cagr) + "</td>";
+    }
     var sum = 0, cnt = 0;
     for (var w = 0; w < CRISIS_WINDOWS.length; w++) {
       if (CRISIS_WINDOWS[w][3] !== "하락") continue;
@@ -471,8 +659,9 @@ function renderCmpSummary() {
     var avgCrisis = cnt ? sum / cnt : null;
     var col = CMP_COLORS[i % CMP_COLORS.length];
     html += "<tr><td><i class='dot' style='background:" + col + "'></i>" + cmpLabel(A.symbols[i]) + "</td>" +
-      '<td class="' + pctCls(m.total) + '">' + fmtPct(m.total) + "</td>" +
-      '<td class="' + pctCls(m.cagr) + '">' + fmtPct(m.cagr) + "</td>" +
+      "<td>" + Math.round(evalAmt).toLocaleString("ko-KR") + "원</td>" +
+      '<td class="' + pctCls(totalRet) + '" style="font-weight:bold">' + fmtPct(totalRet) + "</td>" +
+      cagrCell +
       '<td class="neg">' + fmtPct(m.mdd) + "</td>" +
       "<td>" + (m.vol * 100).toFixed(1) + "%</td>" +
       (avgCrisis == null ? "<td>-</td>"
