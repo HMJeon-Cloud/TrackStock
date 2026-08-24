@@ -93,13 +93,15 @@
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.8</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v1.0</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
   <button class="active" data-tab="single">개별 종목 분석</button>
   <button data-tab="compare">장바구니 비교</button>
   <button data-tab="sim">포트폴리오 시뮬레이터</button>
+  <button data-tab="insight">인사이트</button>
+  <button id="shareBtn" style="margin-left:auto;border-bottom:none;font-size:12px" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
 </div>
 
 <div id="tab-single">
@@ -482,6 +484,95 @@
   </div>
 </div>
 </div><!-- /tab-sim -->
+
+<div id="tab-insight" class="hidden">
+<div class="card">
+  <h2>인사이트 <small id="insTitle">개별 종목 탭에서 분석한 종목을 기준으로 계산합니다</small></h2>
+
+  <div id="insEmpty" class="mentalNote">
+    먼저 <b>개별 종목 분석</b> 탭에서 종목을 조회해 주세요. 통계를 내려면 최소 1년 이상의 데이터가 필요하며,
+    조회 기간을 <b>20년 또는 전체</b>로 설정할수록 결과가 정확해집니다.
+  </div>
+
+  <div id="insBody" class="hidden">
+    <h3>지금 어디쯤인가 <small>현재 위치를 과거 낙폭들 속에 놓고 봅니다</small></h3>
+    <div id="insPosBadges" class="row"></div>
+    <details class="howto"><summary>이 숫자 읽는 법</summary><div class="body">
+      <ul>
+        <li><b>전고점 대비</b> — 조회 기간 중 가장 높았던 가격에서 지금 몇 % 아래인지입니다. 계좌가 마이너스가 아니어도 이 값은 마이너스일 수 있습니다.</li>
+        <li><b>역대 낙폭 순위</b> — 지금의 하락이 과거 하락들과 비교해 몇 번째로 깊은지입니다. <b>순위가 낮을수록(=숫자가 클수록) 흔히 겪던 수준</b>이라는 뜻입니다. "5위/12회"라면 이보다 깊은 하락을 이미 네 번 겪고도 살아남았다는 의미입니다.</li>
+        <li><b>회복 중앙값</b> — 과거 저점에서 전고점을 되찾기까지 걸린 날짜의 중앙값입니다. 평균 대신 중앙값을 쓰는 이유는, 유난히 오래 걸린 한두 번이 평균을 왜곡하기 때문입니다.</li>
+      </ul>
+    </div></details>
+
+    <h3>보유기간별 손실 확률 <small>"아무 날에나 샀다면" 을 전 구간에서 시뮬레이션</small></h3>
+    <div class="tableWrap"><table id="insHolding"></table></div>
+    <details class="howto"><summary>이 표 읽는 법 — 이 앱에서 가장 중요한 표입니다</summary><div class="body">
+      조회 기간 안의 <b>모든 거래일을 각각 매수일로 가정</b>해 N년 뒤 결과를 전부 계산한 표입니다.
+      1년 행의 표본이 4,000개라면, 4,000번의 서로 다른 "1년 투자"를 다 해본 결과라는 뜻입니다.
+      <ul>
+        <li><b>손실 확률</b> — 그 보유기간 투자 중 손실로 끝난 비율입니다. 배경이 붉을수록 손실 확률이 높습니다. <b>위에서 아래로 색이 옅어진다면, 오래 들고 있을수록 안전해졌다는 뜻</b>입니다.</li>
+        <li><b>중앙값 수익</b> — 딱 가운데 성적입니다. 평균은 대박 한 번에 끌려 올라가므로, 전형적인 결과를 보려면 중앙값을 보세요.</li>
+        <li><b>최악의 경우 / 하위 10%</b> — 운이 나빴을 때의 성적입니다. <b>이 숫자를 견딜 수 있는지가 곧 이 종목을 보유할 수 있는지</b>입니다.</li>
+        <li><b>표본</b> — 계산에 쓰인 매수일 개수. 보유기간이 길수록 표본이 줄어들고, 표본이 적으면(수백 개 이하) 우연의 영향이 커지니 참고만 하세요.</li>
+      </ul>
+      <b>여기서 읽어야 할 것:</b> 같은 종목인데 보유기간만 늘렸을 뿐인데 손실 확률이 달라진다면, 결과를 가른 것은 <b>언제 샀는가가 아니라 얼마나 오래 들고 있었는가</b>입니다.<br>
+      <b>반대의 경우도 봐야 합니다:</b> 손실 확률이 줄지 않는 종목도 있습니다. 그런 종목에서는 장기 보유가 해답이 아닙니다. 검색창에 <b>니케이225</b>를 넣고 기간을 <b>전체</b>로 조회해 보세요.
+    </div></details>
+
+    <h3>가장 많이 오른 며칠을 놓친다면 <small>시장에서 잠깐 나가 있는 것의 대가</small></h3>
+    <div class="tableWrap"><table id="insTopDays"></table></div>
+    <h3 style="margin-top:14px">최고 상승일 TOP 10 <small>그날 시장은 어떤 상태였나</small></h3>
+    <div class="tableWrap"><table id="insTopList"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      전 기간을 그대로 보유한 경우와, <b>가장 많이 오른 날 며칠만 빼고</b> 보유한 경우를 비교합니다.
+      며칠 빠졌다고 수익이 크게 줄어든다면, 그 소수의 날이 전체 수익의 대부분을 만들었다는 뜻입니다.
+      <ul>
+        <li><b>1,000만원이</b> 열에서 금액 차이를 보면 체감이 빠릅니다.</li>
+        <li>아래 TOP 10 목록의 <b>당시 상태</b> 열을 보세요. 큰 상승일이 <span style="color:var(--up)">하락 중</span>에 몰려 있다면, <b>가장 무서웠던 시기에 가장 큰 반등이 나왔다</b>는 뜻입니다.</li>
+      </ul>
+      <b>이렇게 해석하세요:</b> 폭락이 무서워 잠시 팔고 나가면, 그 반등일들도 함께 놓치기 쉽습니다. 이 표는 그 대가가 얼마인지 금액으로 보여줍니다.<br>
+      <b>다만 이건 매수·보유가 항상 옳다는 증명이 아닙니다.</b> 같은 방식으로 <b>최악의 하락일</b>을 피했다면 수익이 크게 늘어난다는 계산도 성립합니다. 이 표가 말하는 건 "타이밍을 맞히면 좋다"가 아니라, <b>타이밍을 틀렸을 때의 손실이 생각보다 크다</b>는 쪽입니다.
+    </div></details>
+
+    <h3>자동 요약 <small>위 계산에서 나온 사실만 문장으로</small></h3>
+    <div id="insSentences" style="font-size:13px;line-height:2;padding:12px 14px;background:#131a28;border:1px solid var(--line);border-radius:8px"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="chip" id="insCopy">문장 복사</button>
+      <span id="insCopyMsg" style="font-size:12px;color:var(--good)"></span>
+    </div>
+    <textarea id="insCopySrc" class="hidden" style="width:100%;height:150px;margin-top:8px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px"></textarea>
+
+    <h3>반례 대조: 일본 니케이225 <small>같은 계산을 34년 회복이 걸린 시장에 적용하면</small></h3>
+    <div class="row">
+      <button class="chip" id="insCompareJP">니케이225와 나란히 비교</button>
+      <span id="insJPStatus" style="font-size:12px;color:var(--sub)"></span>
+    </div>
+    <div id="insJPBox" class="hidden" style="margin-top:10px">
+      <div class="tableWrap"><table id="insJP"></table></div>
+      <div id="insJPNote" class="mentalNote"></div>
+    </div>
+    <details class="howto"><summary>왜 이 비교가 필요한가</summary><div class="body">
+      위 <b>보유기간별 손실 확률</b> 표에서 "오래 들고 있을수록 안전해진다"는 흐름을 보셨다면, 그것이
+      <b>모든 시장에서 성립하는 법칙인지</b> 아니면 <b>이 종목·이 기간에서만 나타난 결과인지</b> 확인해야 합니다.
+      <ul>
+        <li>일본 니케이225는 1989년 12월 고점을 회복하는 데 <b>약 34년</b>이 걸렸습니다. 그 사이에 산 사람은 보유기간을 아무리 늘려도 손실을 벗어나지 못했습니다.</li>
+        <li>버튼을 누르면 <b>같은 계산식</b>을 니케이225 전체 기간에 적용해 두 손실 확률을 나란히 보여줍니다. 숫자가 아래로 갈수록 낮아지지 <b>않는</b> 시장이 실재한다는 것을 직접 확인하는 것이 목적입니다.</li>
+      </ul>
+      <b>이 표의 결론은 "장기투자가 틀렸다"가 아닙니다.</b> "장기 보유가 손실을 없애준다"는 명제가 <b>시장과 기간에 따라 달라지는 조건부 사실</b>이라는 것입니다. 조건을 알고 쓰는 것과 법칙으로 믿는 것은 전혀 다릅니다.
+    </div></details>
+
+    <div class="mentalNote" style="margin-top:16px;padding:12px 14px;background:#1a1420;border:1px solid #3a2a30;border-radius:8px">
+      <b style="color:var(--up)">이 탭의 통계를 믿기 전에 반드시 알아야 할 두 가지</b>
+      <ul style="margin:6px 0 0 16px">
+        <li><b>생존 편향</b> — 지금 조회 가능한 종목은 살아남았기 때문에 데이터가 존재합니다. 같은 기간 상장폐지되거나 사라진 회사는 애초에 계산에 들어오지 않습니다. 따라서 "버티면 회복한다"는 결론은 <b>구조적으로 낙관 쪽으로 기울어</b> 있습니다. 개별 종목일수록 이 편향이 큽니다.</li>
+        <li><b>시장 특수성</b> — 한국·미국 시장만 보면 "장기 보유하면 회복한다"가 법칙처럼 보입니다. 일본 니케이225는 1989년 고점을 회복하는 데 <b>34년</b>이 걸렸습니다. 검색창에 <b>니케이225</b>를 넣고 <b>전체</b> 기간으로 이 탭을 다시 열어 보세요. 같은 계산이 정반대 결과를 냅니다.</li>
+      </ul>
+      두 사례를 모두 본 다음에 판단하는 것이, 한쪽만 보고 확신하는 것보다 낫습니다.
+    </div>
+  </div>
+</div>
+</div><!-- /tab-insight -->
 
 <script src="tickers.js"></script>
 <script>
@@ -1011,6 +1102,11 @@ function render() {
 
   $("avgUnit").style.display = "inline-block";
   $("avgUnit").textContent = "단위: " + state.displayCur;
+
+  // 인사이트 탭이 열려 있으면 같은 데이터로 함께 갱신
+  if (typeof renderInsight === "function" && !$("tab-insight").classList.contains("hidden")) {
+    renderInsight();
+  }
 }
 
 var mainEventPlugin = {
@@ -1194,22 +1290,104 @@ function renderAvg() {
 }
 
 /* ---------- 탭 전환 ---------- */
-Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (btn) {
-  btn.onclick = function () {
-    var target = btn.getAttribute("data-tab");
-    Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
-      b.classList.toggle("active", b === btn);
-    });
-    ["single", "compare", "sim"].forEach(function (t) {
-      $("tab-" + t).classList.toggle("hidden", t !== target);
-    });
-    // 시뮬레이터 탭은 장바구니를 공유하므로 열 때마다 비중 입력칸을 맞춘다
-    if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+var TABS = ["single", "compare", "sim", "insight"];
+var currentTab = "single";
+
+function switchTab(target) {
+  if (TABS.indexOf(target) < 0) target = "single";
+  currentTab = target;
+  Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
+    b.classList.toggle("active", b.getAttribute("data-tab") === target);
+  });
+  TABS.forEach(function (t) {
+    $("tab-" + t).classList.toggle("hidden", t !== target);
+  });
+  // 시뮬레이터는 장바구니를 공유하므로 열 때마다 비중 입력칸을 맞춘다
+  if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
+  if (target === "insight" && typeof renderInsight === "function") renderInsight();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (btn) {
+  btn.onclick = function () { switchTab(btn.getAttribute("data-tab")); };
 });
+
+/* ---------- 설정 공유 (URL 해시) ---------- */
+function buildShareHash() {
+  var p = [];
+  function add(k, v) { if (v !== "" && v != null) p.push(k + "=" + encodeURIComponent(v)); }
+  add("t", currentTab);
+  if (state.symbol) add("s", state.symbol);
+  add("r", $("rangeSel").value);
+  if ($("krwToggle").checked) add("krw", "1");
+  if (cmpState.cart.length) add("c", cmpState.cart.join(","));
+  var ws = cmpState.cart.map(function (x) { return (simState.weights[x] != null ? simState.weights[x] : ""); });
+  if (ws.some(function (x) { return x !== ""; })) add("w", ws.join(","));
+  add("sd", $("simStart").value);
+  add("si", $("simInit").value);
+  add("sm", $("simMonthly").value);
+  add("sr", $("simRebal").value);
+  return "#" + p.join("&");
+}
+
+function applyShareHash() {
+  var raw = location.hash.replace(/^#/, "");
+  if (!raw) return;
+  var q = {};
+  raw.split("&").forEach(function (kv) {
+    var i = kv.indexOf("=");
+    if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+  });
+  if (q.c) {
+    cmpState.cart = q.c.split(",").filter(Boolean);
+    if (typeof renderChips === "function") renderChips();
+  }
+  if (q.w && cmpState.cart.length) {
+    q.w.split(",").forEach(function (v, i) {
+      if (v !== "" && cmpState.cart[i]) simState.weights[cmpState.cart[i]] = +v;
+    });
+  }
+  if (q.r) $("rangeSel").value = q.r;
+  if (q.krw === "1") $("krwToggle").checked = true;
+  if (q.sd) $("simStart").value = q.sd;
+  if (q.si) $("simInit").value = q.si;
+  if (q.sm) $("simMonthly").value = q.sm;
+  if (q.sr) $("simRebal").value = q.sr;
+  if (q.s) {
+    $("searchInput").value = q.s;
+    load();
+  }
+  if (q.t) switchTab(q.t);
+}
+
+$("shareBtn").onclick = function () {
+  var url = location.origin + location.pathname + buildShareHash();
+  history.replaceState(null, "", buildShareHash());
+  var ok = false;
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = url;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+  } catch (e) { ok = false; }
+  if (!ok && navigator.clipboard) {
+    navigator.clipboard.writeText(url);
+    ok = true;
+  }
+  setStatus(ok ? "설정 링크를 복사했습니다. 이 링크를 열면 같은 화면이 재현됩니다."
+               : "복사 실패. 주소창의 URL을 직접 복사해 주세요.");
+  setTimeout(function () { setStatus(""); }, 4000);
+};
+
+// 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
+window.addEventListener("load", applyShareHash);
 </script>
 <script src="compare.js"></script>
 <script src="sim.js"></script>
+<script src="insight.js"></script>
 </body>
 </html>
