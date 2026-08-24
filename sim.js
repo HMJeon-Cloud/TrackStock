@@ -77,6 +77,43 @@ function oneHot(n, i) {
   return w;
 }
 
+// 현재 설정을 사람이 읽는 문장으로 풀어쓴다 (시뮬레이터 해석의 출발점)
+function describeSim(I, R) {
+  var parts = R.symbols.map(function (s, i) {
+    return cmpLabel(s) + " " + Math.round(I.w[i] * 100) + "%";
+  }).join(" / ");
+  var html = "<b>" + fmtDate(keyToMs(R.days[0])) + "</b>에 <b>" +
+    Math.round(I.init).toLocaleString("ko-KR") + "원</b>을 <b>" + parts + "</b> 비율로 나눠 삽니다.";
+  if (I.monthly > 0) {
+    html += "<br>이후 <b>매월 첫 거래일마다 " + Math.round(I.monthly).toLocaleString("ko-KR") +
+      "원</b>을 같은 비율로 추가 매수합니다.";
+  } else {
+    html += "<br>추가 매수는 하지 않고 " + fmtDate(keyToMs(R.days[R.days.length - 1])) + "까지 그대로 둡니다.";
+  }
+  if (I.rebal > 0) {
+    html += "<br><b>" + rebalLabel(I.rebal) + "</b> — 가격이 움직여 비율이 틀어지면, 많이 오른 것을 팔고 " +
+      "덜 오른 것을 사서 위 비율로 되돌립니다.";
+  } else {
+    html += "<br><b>리밸런싱은 하지 않습니다</b> — 한 번 산 뒤로는 비율이 저절로 바뀌는 대로 둡니다.";
+  }
+  return html;
+}
+
+// 포트폴리오 지수에서 낙폭 구간 상위 N개를 뽑는다
+function worstEpisodes(days, idxVals, topN) {
+  var rows = days.map(function (d, i) { return { t: keyToMs(d), c: idxVals[i] }; });
+  var eps = drawdownEpisodes(rows, 0.05);
+  eps.sort(function (a, b) { return a.dd - b.dd; });
+  return eps.slice(0, topN).map(function (e) {
+    return {
+      dd: e.dd,
+      t1: rows[e.peakI].t,
+      t2: rows[e.troughI].t,
+      recovered: e.recoverI != null ? rows[e.recoverI].t : null
+    };
+  });
+}
+
 /* ================= 상태 & UI ================= */
 var simState = { results: null, aligned: null, chart: null, weights: {}, idx: null, startIdx: 0 };
 
@@ -327,34 +364,58 @@ function renderSim() {
   var mNo = seriesMetrics(idxNoRebal.values, R.days, allTrue);
   var finalNo = actualNoRebal.values[actualNoRebal.values.length - 1];
 
+  var shortPeriod = m.years < 1;
+  var ddImprove = m.mdd - mNo.mdd; // 양수면 낙폭이 얕아진 것
+
+  $("simDesc").innerHTML = describeSim(I, R);
+
   $("simBadges").innerHTML =
-    '<span class="badge">최종 평가금액<b>' + Math.round(finalVal).toLocaleString("ko-KR") + "원</b></span>" +
-    '<span class="badge">총 투입원금<b>' + Math.round(totalInv).toLocaleString("ko-KR") + "원</b></span>" +
-    '<span class="badge">총수익률<b class="' + pctCls(finalVal / totalInv - 1) + '">' + fmtPct(finalVal / totalInv - 1) + "</b></span>" +
-    '<span class="badge">연평균(CAGR)<b class="' + pctCls(m.cagr) + '">' + fmtPct(m.cagr) + "</b></span>" +
-    '<span class="badge">최대낙폭<b class="neg">' + fmtPct(m.mdd) + "</b></span>" +
-    '<span class="badge">연변동성<b>' + (m.vol * 100).toFixed(1) + "%</b></span>" +
+    '<span class="badge" title="지금 이 포트폴리오를 전부 팔면 손에 쥐는 돈">최종 평가금액<b>' +
+      Math.round(finalVal).toLocaleString("ko-KR") + "원</b></span>" +
+    '<span class="badge" title="초기 투자금 + 매월 추가금을 모두 더한 실제로 넣은 돈">총 투입원금<b>' +
+      Math.round(totalInv).toLocaleString("ko-KR") + "원</b></span>" +
+    '<span class="badge" title="(최종 평가금액 ÷ 총 투입원금) - 1">총수익률<b class="' + pctCls(finalVal / totalInv - 1) + '">' +
+      fmtPct(finalVal / totalInv - 1) + "</b></span>" +
+    '<span class="badge" title="복리 기준 연 환산 수익률">연평균(CAGR)<b class="' +
+      (shortPeriod ? "" : pctCls(m.cagr)) + '" style="' + (shortPeriod ? "color:var(--sub)" : "") + '">' +
+      fmtPct(m.cagr) + (shortPeriod ? " ⚠" : "") + "</b></span>" +
+    '<span class="badge" title="기간 중 고점에서 가장 깊이 빠진 폭. 버텨야 했던 고통의 크기">최대낙폭<b class="neg">' +
+      fmtPct(m.mdd) + "</b></span>" +
+    '<span class="badge" title="가격이 흔들린 정도(연 환산). 클수록 출렁임이 큼">연변동성<b>' +
+      (m.vol * 100).toFixed(1) + "%</b></span>" +
     (I.rebal > 0
-      ? '<span class="badge">리밸런싱 효과<b class="' + pctCls(finalVal - finalNo) + '">' +
-        (finalVal >= finalNo ? "+" : "") + Math.round(finalVal - finalNo).toLocaleString("ko-KR") + "원</b></span>" +
-        '<span class="badge">낙폭 개선<b class="' + pctCls(m.mdd - mNo.mdd) + '">' +
-        ((m.mdd - mNo.mdd) * 100).toFixed(1) + "%p</b></span>"
+      ? '<span class="badge" title="리밸런싱을 한 결과와 안 한 결과의 최종 금액 차이">리밸런싱 효과<b class="' +
+          pctCls(finalVal - finalNo) + '">' +
+          (finalVal >= finalNo ? "+" : "") + Math.round(finalVal - finalNo).toLocaleString("ko-KR") + "원</b></span>" +
+        '<span class="badge" title="리밸런싱으로 최대낙폭이 얼마나 얕아졌는지">낙폭 개선<b style="color:' +
+          (ddImprove >= 0 ? "var(--good)" : "var(--up)") + '">' +
+          (ddImprove >= 0 ? "+" : "") + (ddImprove * 100).toFixed(1) + "%p</b></span>"
       : "");
 
-  renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal);
+  $("simWarn").innerHTML = shortPeriod
+    ? "⚠ 투자 기간이 <b>" + (m.years * 12).toFixed(0) + "개월</b>로 1년이 안 됩니다. " +
+      "<b>연평균(CAGR)은 이 짧은 성과를 1년으로 부풀린 값</b>이라 신뢰할 수 없습니다. " +
+      "총수익률만 보시고, 의미 있는 비교를 하려면 시작일을 몇 년 앞으로 옮겨 주세요."
+    : "";
+
+  renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal, shortPeriod);
   renderSimCrisis(I, R, idx);
+  renderSimWorst(I, R, idx);
 }
 
-function renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal) {
+function renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal, shortPeriod) {
+  var mixLabel = R.symbols.map(function (s, i) {
+    return Math.round(I.w[i] * 100) + "%";
+  }).join("/");
   var rows = [];
   rows.push({
-    name: "내 포트폴리오 (" + rebalLabel(I.rebal) + ")",
+    name: "내 포트폴리오 (" + mixLabel + " · " + rebalLabel(I.rebal) + ")",
     val: actual.values[actual.values.length - 1],
     idx: idx.values, hi: true
   });
   if (I.rebal > 0) {
     rows.push({
-      name: "동일 배분 · 리밸런싱 없음",
+      name: "같은 비율 (" + mixLabel + ") · 리밸런싱만 안 한 경우",
       val: actualNoRebal.values[actualNoRebal.values.length - 1],
       idx: idxNoRebal.values
     });
@@ -362,7 +423,7 @@ function renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal)
   R.symbols.forEach(function (sym, i) {
     var w1 = oneHot(R.symbols.length, i);
     rows.push({
-      name: cmpLabel(sym) + " 100%",
+      name: cmpLabel(sym) + " 100% (이 종목에만 전부 넣었다면)",
       val: portfolioSim(R.days, R.values, w1, 0, I.init, I.monthly).values.slice(-1)[0],
       idx: portfolioSim(R.days, R.values, w1, 0, 1, 0).values,
       color: CMP_COLORS[i % CMP_COLORS.length]
@@ -388,10 +449,13 @@ function renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal)
       (r.hi ? "<b>" + r.name + "</b>" : r.name) + "</td>" +
       "<td>" + Math.round(r.val).toLocaleString("ko-KR") + "원</td>" +
       '<td class="' + pctCls(r.val / totalInv - 1) + '" style="font-weight:bold">' + fmtPct(r.val / totalInv - 1) + "</td>" +
-      '<td class="' + pctCls(mm.cagr) + '">' + fmtPct(mm.cagr) + "</td>" +
+      (shortPeriod
+        ? '<td style="color:var(--sub)">' + fmtPct(mm.cagr) + " ⚠</td>"
+        : '<td class="' + pctCls(mm.cagr) + '">' + fmtPct(mm.cagr) + "</td>") +
       '<td class="neg">' + fmtPct(mm.mdd) + "</td>" +
       "<td>" + (mm.vol * 100).toFixed(1) + "%</td>" +
-      (avgCrisis == null ? "<td>-</td>"
+      (avgCrisis == null
+        ? '<td style="color:var(--sub)">-</td>'
         : '<td class="' + pctCls(avgCrisis) + '" style="font-weight:bold">' + fmtPct(avgCrisis) + "</td>") +
       "</tr>";
   });
@@ -399,6 +463,7 @@ function renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal)
 }
 
 function renderSimCrisis(I, R, idx) {
+  var found = false;
   var html = "<thead><tr><th>사건</th><th>내 포트폴리오</th>";
   R.symbols.forEach(function (sym, i) {
     html += "<th><i class='dot' style='background:" + CMP_COLORS[i % CMP_COLORS.length] + "'></i>" +
@@ -412,6 +477,7 @@ function renderSimCrisis(I, R, idx) {
     var t2 = new Date(cw[2] + "T00:00:00Z").getTime();
     var pr = windowReturn(R.days, idx.values, t1, t2);
     if (pr == null) continue;
+    found = true;
     var cells = R.symbols.map(function (sym, i) {
       var rr = windowReturn(R.days, R.values[i], t1, t2);
       return rr == null ? "<td>-</td>" : '<td class="' + pctCls(rr) + '">' + fmtPct(rr) + "</td>";
@@ -422,7 +488,48 @@ function renderSimCrisis(I, R, idx) {
       '<td class="' + pctCls(pr) + '" style="font-weight:bold;background:#202a40">' + fmtPct(pr) + "</td>" +
       cells.join("") + "</tr>";
   }
+  if (!found) {
+    var first = CRISIS_WINDOWS[0][1], last = CRISIS_WINDOWS[CRISIS_WINDOWS.length - 1][2];
+    $("simCrisis").innerHTML =
+      '<tbody><tr><td style="text-align:left;white-space:normal;color:var(--sub);line-height:1.8">' +
+      "투자 시작일(<b>" + fmtDate(keyToMs(R.days[0])) + "</b>) 이후에는 이 앱에 등록된 역사적 사건이 없습니다.<br>" +
+      "등록된 사건은 <b>" + first + " ~ " + last + "</b> 사이에 있으니, 이 표를 보시려면 " +
+      "<b>시작일을 그 이전으로 앞당겨</b> 다시 실행해 주세요. " +
+      '아래 <b style="color:var(--accent)">내 포트폴리오 최악의 하락 구간</b> 표는 시작일과 무관하게 항상 볼 수 있습니다.' +
+      "</td></tr></tbody>";
+    return;
+  }
   $("simCrisis").innerHTML = html + "</tbody>";
+}
+
+// 포트폴리오가 실제로 겪은 최악의 하락 구간 (시작일과 무관하게 항상 표시)
+function renderSimWorst(I, R, idx) {
+  var eps = worstEpisodes(R.days, idx.values, 3);
+  if (!eps.length) {
+    $("simWorst").innerHTML =
+      '<tbody><tr><td style="text-align:left;color:var(--sub)">5% 이상 하락한 구간이 없습니다. 매우 조용한 기간이었습니다.</td></tr></tbody>';
+    return;
+  }
+  var html = "<thead><tr><th>구간</th><th>내 포트폴리오</th>";
+  R.symbols.forEach(function (sym, i) {
+    html += "<th><i class='dot' style='background:" + CMP_COLORS[i % CMP_COLORS.length] + "'></i>" +
+      cmpLabel(sym) + "</th>";
+  });
+  html += "<th>전고점 회복</th></tr></thead><tbody>";
+
+  eps.forEach(function (ep, n) {
+    var cells = R.symbols.map(function (sym, i) {
+      var rr = windowReturn(R.days, R.values[i], ep.t1, ep.t2);
+      return rr == null ? "<td>-</td>" : '<td class="' + pctCls(rr) + '">' + fmtPct(rr) + "</td>";
+    });
+    var days = Math.round((ep.t2 - ep.t1) / 86400000);
+    html += "<tr><td style='text-align:left'>" + (n + 1) + "위 하락<br>" +
+      "<small style='color:var(--sub)'>" + fmtDate(ep.t1) + " ~ " + fmtDate(ep.t2) + " (" + days + "일)</small></td>" +
+      '<td class="' + pctCls(ep.dd) + '" style="font-weight:bold;background:#202a40">' + fmtPct(ep.dd) + "</td>" +
+      cells.join("") +
+      "<td>" + (ep.recovered ? fmtDate(ep.recovered) : '<span class="neg">진행중</span>') + "</td></tr>";
+  });
+  $("simWorst").innerHTML = html + "</tbody>";
 }
 
 function rebalLabel(m) {
