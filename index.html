@@ -76,15 +76,33 @@
   tr.crisisRow { cursor: pointer; }
   tr.crisisRow:hover td { background: #202a40; }
   tr.crisisRow.active td { background: #2c3a5c; }
+  /* 탭 */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0;
+    padding: 10px 16px; font-size: 14px; color: var(--sub); cursor: pointer; white-space: nowrap; }
+  .tabs button:hover { color: var(--txt); }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
+  /* 비중 슬라이더 */
+  .wRow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1e2637; }
+  .wName { min-width: 110px; font-size: 13px; }
+  .wInput { flex: 1; min-width: 100px; accent-color: var(--accent); padding: 0; background: none; border: none; }
+  .wNum { width: 68px; font-size: 13px; padding: 5px 8px; text-align: right; }
   h3 { font-size: 13px; color: var(--txt); margin: 20px 0 8px; }
   h3 small { color: var(--sub); font-weight: normal; font-size: 11px; margin-left: 6px; }
   @media (max-width: 640px) { .chartWrap { height: 300px; } th, td { padding: 6px 5px; font-size: 12px; } }
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.6</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v0.7</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
+<div class="tabs">
+  <button class="active" data-tab="single">개별 종목 분석</button>
+  <button data-tab="compare">장바구니 비교</button>
+  <button data-tab="sim">포트폴리오 시뮬레이터</button>
+</div>
+
+<div id="tab-single">
 <div class="card">
   <div class="row">
     <div id="searchBox">
@@ -217,6 +235,9 @@
 
 </div>
 
+</div><!-- /tab-single -->
+
+<div id="tab-compare" class="hidden">
 <div class="card" id="compareCard">
   <h2>장바구니 비교 <small>내 종목이 무너질 때 무엇이 버텼는가 — 헷지자산 탐색</small></h2>
   <div class="row">
@@ -343,6 +364,87 @@
     </div></details>
   </div>
 </div>
+
+</div><!-- /tab-compare -->
+
+<div id="tab-sim" class="hidden">
+<div class="card">
+  <h2>포트폴리오 시뮬레이터 <small>비중을 나눠 과거에 대입하고 결과를 학습</small></h2>
+  <div class="mentalNote" style="margin-top:0;margin-bottom:10px">
+    <b>장바구니 비교</b> 탭의 종목을 그대로 사용합니다. 종목을 바꾸려면 그 탭에서 담거나 빼세요.
+  </div>
+  <div id="simAssets"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="chip" id="simEqual">균등 분배</button>
+    <button class="chip" id="simApplyWeights">비중 적용</button>
+    <span id="simWeightSum" class="badge"></span>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label class="opt">시작일 <input id="simStart" type="date" style="font-size:12px;padding:5px 8px;margin-left:4px"></label>
+    <label class="opt">초기 투자금 <input id="simInit" type="number" step="100000" value="10000000" style="width:130px;margin-left:4px">원</label>
+    <label class="opt">매월 추가 <input id="simMonthly" type="number" step="100000" value="0" style="width:120px;margin-left:4px">원</label>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <select id="simRebal">
+      <option value="0">리밸런싱 없음</option>
+      <option value="1">매월 리밸런싱</option>
+      <option value="3">분기 리밸런싱</option>
+      <option value="6">반기 리밸런싱</option>
+      <option value="12" selected>연 1회 리밸런싱</option>
+    </select>
+    <select id="simRange">
+      <option value="5y">5년</option>
+      <option value="10y" selected>10년</option>
+      <option value="20y">20년</option>
+    </select>
+    <button class="primary" id="simRun">시뮬레이션 실행</button>
+  </div>
+  <div id="simStatus"></div>
+
+  <div id="simBody" class="hidden">
+    <div id="simBadges" class="row" style="margin-top:12px"></div>
+    <h3>포트폴리오 가치 곡선</h3>
+    <div class="row" style="margin-bottom:8px">
+      <label class="opt"><input type="checkbox" id="simShowAssets"> 개별 자산 100% 곡선도 표시</label>
+      <label class="opt"><input type="checkbox" id="simLog" checked> 로그 스케일</label>
+      <label class="opt"><input type="checkbox" id="simShowEvents" checked> 이벤트 선</label>
+    </div>
+    <div class="chartWrap"><canvas id="simChart"></canvas></div>
+    <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
+      설정한 비중대로 실제 투자했다면 계좌가 어떻게 움직였을지를 그린 그래프입니다.
+      <ul>
+        <li><b>굵은 노란 선</b>이 내 포트폴리오입니다. <b>회색 굵은 점선</b>은 같은 비중으로 시작만 하고 <b>한 번도 리밸런싱하지 않은 경우</b>로, 두 선의 벌어짐이 곧 리밸런싱이 만든 차이입니다.</li>
+        <li><b>가는 점선</b>은 누적 투입원금입니다(매월 추가금을 넣었을 때만 표시). 노란 선이 이 점선 위에 있으면 이익입니다.</li>
+        <li><b>개별 자산 100% 곡선</b>을 켜면 "한 종목에 몰빵했다면"과 비교됩니다. 포트폴리오 선이 최고 자산보다 낮은 건 정상이며, <b>대신 훨씬 덜 흔들렸다</b>는 점을 아래 최대낙폭에서 확인하세요.</li>
+      </ul>
+      <b>핵심:</b> 이 시뮬레이터의 목적은 최고 수익 조합을 찾는 것이 아닙니다. 그건 과거를 알고 나서야 가능한 일입니다. <b>같은 하락장에서 비중에 따라 내 계좌가 얼마나 다르게 반응하는지</b>를 몸으로 익히는 것이 목적입니다.
+    </div></details>
+
+    <h3>전략 비교 <small>같은 돈, 같은 기간, 다른 배분</small></h3>
+    <div class="tableWrap"><table id="simCompare"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      내 배분을 <b>리밸런싱 없는 같은 배분</b> 및 <b>각 자산 100% 몰빵</b>과 나란히 비교합니다. 강조된 첫 줄이 내 포트폴리오입니다.
+      <ul>
+        <li><b>총수익만 보지 마세요.</b> 총수익 1위는 대개 가장 많이 오른 단일 자산이고, 그 자산의 최대낙폭은 대체로 가장 깊습니다.</li>
+        <li><b>최대낙폭</b>과 <b>연변동성</b>이 낮은데 수익이 크게 뒤지지 않는 조합이 실제로 <b>끝까지 들고 갈 수 있는</b> 포트폴리오입니다. 수익률 1등 포트폴리오라도 중간에 못 버티고 팔면 실현 수익은 0입니다.</li>
+        <li><b>위기 평균성과</b>가 덜 마이너스일수록 하락장에서 마음이 편합니다.</li>
+      </ul>
+      <b>리밸런싱 효과</b>는 위 배지에서 금액과 낙폭 개선폭(%p)으로 확인할 수 있습니다. 오른 자산을 팔아 떨어진 자산을 사는 행위라, 오르내림이 반복되는 구간에서는 수익을 더하고 한 자산이 계속 오르기만 하는 구간에서는 수익을 깎습니다. <b>대신 거의 항상 낙폭은 줄여 줍니다.</b>
+    </div></details>
+
+    <h3>사건별 성과 <small>위기 때 내 포트폴리오는 어떻게 버텼나</small></h3>
+    <div class="tableWrap"><table id="simCrisis"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      각 사건 구간에서 <b>내 포트폴리오(강조 열)</b>가 개별 자산들 사이 어디쯤에 있었는지 보여줍니다.
+      <ul>
+        <li>포트폴리오 값이 가장 많이 빠진 자산과 가장 잘 버틴 자산 <b>사이에</b> 위치하는 것이 정상입니다. 그 위치가 목표에 가까운지 보고 비중을 조정하세요.</li>
+        <li>헷지 비중을 늘리면 하락 구간 숫자가 개선되지만 회복 구간 숫자는 나빠집니다. <b>이 맞교환이 배분의 본질</b>이고, 여기서 자신이 감당 가능한 지점을 찾는 것이 목표입니다.</li>
+      </ul>
+      <b>주의:</b> 세금·거래비용·배당·슬리피지가 반영되지 않았습니다. 특히 리밸런싱은 실제로는 매매비용과 양도세가 발생하므로, 표에 나온 리밸런싱 이득은 실전보다 과대평가된 값입니다. 과거 성과는 미래를 보장하지 않습니다.
+    </div></details>
+  </div>
+</div>
+</div><!-- /tab-sim -->
 
 <script src="tickers.js"></script>
 <script>
@@ -1053,7 +1155,24 @@ function renderAvg() {
   renderDdTable();
   renderRallyTable();
 }
+
+/* ---------- 탭 전환 ---------- */
+Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (btn) {
+  btn.onclick = function () {
+    var target = btn.getAttribute("data-tab");
+    Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
+      b.classList.toggle("active", b === btn);
+    });
+    ["single", "compare", "sim"].forEach(function (t) {
+      $("tab-" + t).classList.toggle("hidden", t !== target);
+    });
+    // 시뮬레이터 탭은 장바구니를 공유하므로 열 때마다 비중 입력칸을 맞춘다
+    if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+});
 </script>
 <script src="compare.js"></script>
+<script src="sim.js"></script>
 </body>
 </html>
