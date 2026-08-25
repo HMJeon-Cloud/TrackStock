@@ -93,7 +93,7 @@
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v1.2</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v1.3</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -708,7 +708,9 @@ function searchDict(dict, q) {
     if (score === null) continue;
     out.push({ symbol: sym, name: name, score: score });
   }
-  out.sort(function (x, y) { return x.score - y.score || x.symbol.length - y.symbol.length; });
+  // 점수가 같으면 사전에 적힌 순서를 유지한다 (Array.sort는 안정 정렬).
+  // 티커 길이로 재정렬하면 "구글" 검색 시 GOOGL보다 GOOG가 앞서는 문제가 생긴다.
+  out.sort(function (x, y) { return x.score - y.score; });
   return out.slice(0, 8);
 }
 
@@ -937,12 +939,27 @@ function renderResults(dictRes, yahooRes) {
   });
 }
 
+/* 입력값을 실제 조회할 티커로 해석한다.
+   주의: 사전 앞부분 일치로 덮어쓰면 안 된다.
+   사용자가 GOOG(구글 클래스 C)를 입력했는데 GOOGL(클래스 A)로 바꿔 조회하면
+   전혀 다른 종목을 보여주면서도 그 사실을 알 수 없다. */
+function looksLikeTicker(q) {
+  return /^[A-Za-z0-9][A-Za-z0-9.\-^=]{0,11}$/.test(q);
+}
+
 function resolveSymbol(input) {
   var q = input.trim();
   if (!q) return "";
   var hits = searchDict(TICKER_DICT, q);
-  if (hits.length && hits[0].score <= 10) return hits[0].symbol;
-  if (/[가-힣]/.test(q) && hits.length) return hits[0].symbol;
+
+  // 티커 정확 일치(0) 또는 종목명 정확 일치(1)만 무조건 신뢰한다
+  if (hits.length && hits[0].score <= 1) return hits[0].symbol;
+
+  // 티커처럼 생긴 입력은 사용자가 적은 그대로 조회한다 (앞부분 일치로 바꾸지 않음)
+  if (looksLikeTicker(q)) return q;
+
+  // 그 외(한글명, 여러 단어 등)는 사전 최상위 후보를 사용
+  if (hits.length) return hits[0].symbol;
   return q;
 }
 
@@ -992,13 +1009,18 @@ function load() {
   loadSymbol(symbol);
 }
 
-function loadSymbol(symbol) {
+function loadSymbol(symbol, noRetry) {
   var range = $("rangeSel").value;
   setStatus("데이터 불러오는 중... (" + symbol + ")");
 
   fetch("/api/chart?symbol=" + encodeURIComponent(symbol) + "&range=" + range)
     .then(function (r) {
       return r.json().then(function (j) {
+        if (r.status === 404 && !noRetry) {
+          var e = new Error(j.error || "not found");
+          e.notFound = true;
+          throw e;
+        }
         if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
         return j;
       });
@@ -1033,7 +1055,25 @@ function loadSymbol(symbol) {
           applyCurrency(); render();
         });
     })
-    .catch(function (e) { setStatus("오류: " + e.message, true); });
+    .catch(function (e) {
+      // 티커가 아니라 이름을 입력했을 수 있으므로 검색 API로 한 번 더 시도한다
+      if (e.notFound) {
+        setStatus("'" + symbol + "' 검색 중...");
+        fetch("/api/search?q=" + encodeURIComponent(symbol))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            var qs = (d.quotes || []).filter(function (x) { return x.symbol; });
+            if (!qs.length || qs[0].symbol === symbol) throw new Error("no result");
+            $("searchInput").value = qs[0].symbol;
+            loadSymbol(qs[0].symbol, true);
+          })
+          .catch(function () {
+            setStatus("'" + symbol + "' 종목을 찾을 수 없습니다. 티커나 영문 종목명을 확인해 주세요.", true);
+          });
+        return;
+      }
+      setStatus("오류: " + e.message, true);
+    });
 }
 
 // 표시 통화 결정 → state.rows 확정
