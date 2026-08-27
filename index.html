@@ -93,7 +93,7 @@
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v1.3</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v1.4</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -150,6 +150,7 @@
         </select>
         <input id="fxFixed" type="number" step="0.1" class="hidden" style="width:100px;font-size:12px;padding:5px 8px">
       </span>
+      <label class="opt"><input type="checkbox" id="showMA"> 이동평균선 (20/60/240일)</label>
       <label class="opt"><input type="checkbox" id="logScale"> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="showEvents" checked> 이벤트 선</label>
       <label class="opt"><input type="checkbox" id="showLabels"> 이벤트 이름</label>
@@ -160,11 +161,79 @@
       노란 선이 <b>종가 흐름</b>, 세로 점선이 그 시점에 있었던 <b>사건</b>입니다. 색은 사건의 종류(전쟁·위기·금리·팬데믹·정치·회복)를 뜻합니다.
       <ul>
         <li><b>차트 위에 마우스를 올리면</b> 그날의 가격과, 앞뒤 10일 안에 있었던 사건이 함께 뜹니다.</li>
+        <li><b>이동평균선</b>을 켜면 20일(파랑)·60일(초록)·240일(보라) 평균선이 겹쳐집니다. 각각 1개월·3개월·1년 추세를 뜻하며, 자세한 해석은 아래 <b>전문가 지표</b> 카드의 학습 가이드에 있습니다.</li>
         <li><b>로그 스케일</b>을 켜면 세로 이동 거리가 같을 때 상승률도 같아집니다. 가격이 몇 배씩 오른 종목의 초기 구간을 볼 때 켜세요. 끄면(기본) 절대 금액 차이가 그대로 보입니다.</li>
         <li><b>원화 환산</b>은 미국 주식에만 나타납니다. 켜면 달러 주가에 그날그날 환율을 곱해, 한국 투자자가 실제로 체감한 원화 수익률로 모든 표가 다시 계산됩니다. 달러가 올랐다면 원화 수익률이 달러 수익률보다 높게 나옵니다.</li>
         <li><b>환율 적용 방식</b> — <b>일별 실제 환율</b>(기본)은 매일의 실제 환율을 씁니다. <b>고정 환율</b>을 고르고 숫자를 직접 넣으면 전 기간에 그 환율 하나만 적용하는데, 이렇게 하면 환율 변동 효과가 사라져 <b>순수한 주가 등락만</b> 원화로 볼 수 있습니다. 두 방식의 차이가 곧 환율이 내 수익에 기여한 몫입니다.</li>
       </ul>
       <b>주의:</b> 사건 점선은 "이때 이런 일이 있었다"는 표시일 뿐, 그 사건이 가격 변화의 원인이라는 뜻은 아닙니다.
+    </div></details>
+  </div>
+
+  <div class="card hidden" id="metricsCard">
+    <h2>전문가 지표 <small>증권사 리포트와 전문가들이 보는 숫자들</small></h2>
+    <div class="row" style="margin-bottom:10px">
+      <label class="opt">무위험 수익률(연)
+        <input id="rfRate" type="number" step="0.1" value="3.0" style="width:80px;margin-left:4px">%
+      </label>
+      <span style="font-size:11px;color:var(--sub)">— 샤프·소르티노 계산 기준. 보통 예금금리나 국채금리를 넣습니다.</span>
+    </div>
+    <div id="metricsBadges" class="row"></div>
+    <div id="metricsNote" class="mentalNote"></div>
+    <details class="howto"><summary>학습 가이드 — 이 지표들을 전문가처럼 읽는 법</summary><div class="body">
+      <b>■ RSI (상대강도지수, 14일)</b><br>
+      최근 14거래일 동안 오른 폭과 내린 폭의 비율입니다. <b>70 이상이면 과열</b>(단기간 급하게 올랐다),
+      <b>30 이하면 침체</b>(급하게 떨어졌다)로 읽습니다. 주의: 과열이 곧 하락 신호는 아닙니다.
+      강한 상승장에서는 RSI가 70 위에 몇 달씩 머물기도 합니다. "RSI 30 이하 = 매수"처럼 기계적으로 쓰면 떨어지는 칼을 잡게 됩니다.
+      전문가들은 방향 판단이 아니라 <b>"지금 시장이 얼마나 한쪽으로 쏠려 있는가"를 재는 온도계</b>로 씁니다.<br><br>
+
+      <b>■ 이동평균선 (20/60/240일)</b><br>
+      최근 N일 종가의 평균을 이은 선입니다. 차트에서 켜 보세요. 20일선은 약 1개월(단기 추세),
+      60일선은 약 3개월(중기), 240일선은 약 1년(장기 추세)입니다.
+      주가가 240일선 <b>위</b>에 있으면 장기 상승 추세, <b>아래</b>면 하락 추세로 보는 것이 관례입니다.
+      <b>240일선 이격</b>은 현재가가 이 선에서 얼마나 떨어져 있는지로, 이격이 크게 벌어지면(±20% 이상)
+      평균으로 되돌아가려는 힘이 커진다고 봅니다. 다만 이것도 확률적 경향이지 법칙이 아닙니다.<br><br>
+
+      <b>■ 52주 최고/최저 대비</b><br>
+      뉴스에서 "52주 신고가"라고 부르는 그 지표입니다. 최고가 대비 -5% 이내면 신고가 부근,
+      -30% 아래면 깊은 조정 중입니다. 이 앱의 Drawdown 표와 함께 보면 지금 위치가 과거 어떤 국면과 비슷한지 가늠할 수 있습니다.<br><br>
+
+      <b>■ 샤프 비율 (Sharpe Ratio)</b><br>
+      <b>"감수한 위험 1단위당 얼마나 벌었나"</b>입니다. (연수익률 − 무위험수익률) ÷ 연변동성으로 계산합니다.
+      수익률이 같아도 덜 흔들리면서 벌었으면 샤프가 높습니다. 관례상 <b>1 이상이면 우수, 0.5~1 양호, 0 미만이면
+      예금보다 못한 장사</b>였다는 뜻입니다. 펀드·ETF를 고를 때 수익률 대신 이걸 비교하는 것이 전문가들의 기본기입니다.<br><br>
+
+      <b>■ 소르티노 비율 (Sortino Ratio)</b><br>
+      샤프의 개선판입니다. 샤프는 위로 튀는 변동까지 "위험"으로 벌점을 주지만, 투자자가 실제로 두려워하는 건
+      하락뿐이므로 소르티노는 <b>하락 변동성만 분모</b>에 넣습니다. 급등이 잦은 자산은 샤프보다 소르티노가 높게 나옵니다.<br><br>
+
+      <b>■ MDD (Maximum Drawdown, 최대 낙폭)</b><br>
+      이 앱 전체의 중심 지표입니다. 고점에서 저점까지 가장 깊이 빠진 폭으로, <b>이 자산을 들고 가려면 견뎌야 했던
+      최대 고통</b>입니다. 전문가들이 전략을 평가할 때 수익률보다 먼저 보는 숫자이며,
+      "CAGR ÷ MDD"(칼마 비율)로 전략의 효율을 재기도 합니다. 내가 견딜 수 있는 MDD를 먼저 정하고
+      그 안에서 자산을 고르는 것이 순서입니다.<br><br>
+
+      <b>■ PER / PBR — 이 앱에 없는 이유와 보는 법</b><br>
+      <b>PER(주가수익비율)</b> = 시가총액 ÷ 연간 순이익. "이 회사가 버는 돈의 몇 년치 가격에 거래되나"입니다.
+      PER 10이면 지금 이익이 유지될 때 본전까지 10년. 낮을수록 싸다고 말하지만, <b>이익이 줄어드는 회사는
+      PER이 낮아 보이는 함정</b>(저PER 트랩)이 있고, 성장주는 미래 이익을 당겨와 PER이 높게 형성됩니다.
+      같은 업종끼리 비교해야 의미가 있습니다.<br>
+      <b>PBR(주가순자산비율)</b> = 시가총액 ÷ 순자산(자본). PBR 1 미만은 "회사를 통째로 사서 청산해도 남는" 가격이라는
+      뜻이지만, 실제로는 그 자산의 질이 나쁘거나 수익성이 낮다는 시장의 평가인 경우가 많습니다.
+      은행·지주회사가 만성적으로 PBR 1 미만인 이유입니다.<br>
+      이 두 지표는 주가가 아니라 <b>재무제표(이익·자본) 데이터</b>가 필요합니다. 이 앱이 쓰는 무료 주가 API에는
+      재무 데이터가 포함되지 않고, 이를 제공하는 API는 인증이 필요해 안정적으로 붙일 수 없습니다.
+      네이버금융(국내)이나 증권사 앱의 종목 정보 탭에서 확인하시고, 이 앱의 가격 분석과 <b>교차로</b> 보시면 됩니다:
+      가격이 반토막 났는데 PER도 역사적 저점이라면 근거 있는 관심, 가격은 쌌는데 이익이 더 빨리 줄어 PER이 오히려
+      높아졌다면 싼 게 아닙니다.<br><br>
+
+      <b>■ 종합하는 법</b><br>
+      전문가들은 지표 하나로 판단하지 않습니다. 이 앱 기준으로는:
+      ① 인사이트 탭에서 보유기간별 손실 확률로 <b>시간 지평</b>을 정하고
+      ② MDD로 <b>견딜 수 있는 크기</b>를 확인하고
+      ③ 샤프·변동성으로 <b>효율</b>을 비교하고
+      ④ RSI·이격도·52주 위치로 <b>지금이 쏠린 국면인지</b> 보고
+      ⑤ PER/PBR은 외부에서 확인해 <b>가격과 가치를 교차 검증</b>하는 순서입니다.
     </div></details>
   </div>
 
@@ -214,7 +283,7 @@
       전고점을 찍은 뒤 바닥까지 얼마나 빠졌고, 원래 자리로 돌아오는 데 얼마나 걸렸는지를 낙폭 순으로 정렬한 표입니다.
       <ul>
         <li><b>낙폭</b> — 고점 종가 대비 저점 종가의 하락률. 큰 순서로 정렬돼 있습니다.</li>
-        <li><b>회복일</b> — 하락 전 고점 가격을 다시 넘어선 날. <span class="neg">진행중</span>은 아직 전고점을 회복하지 못했다는 뜻입니다.</li>
+        <li><b>회복일</b> — 하락 전 고점 가격을 다시 넘어선 날. 아직 회복하지 못한 구간은 상태를 셋으로 나눠 보여줍니다: <span class="neg">▼ 하락 진행중</span>(현재가가 저점 부근), <span class="pos">△ 반등 중</span>(저점에서 올라왔지만 갈 길이 남음), <span class="pos">▲ 회복 임박</span>(전고점까지 70% 이상 회복). 저점 대비 상승폭과 전고점까지 남은 거리도 함께 표시됩니다.</li>
         <li><b>하락기간</b> — 고점에서 저점까지 걸린 날짜. 회복까지 걸린 시간은 회복일에서 따로 확인하세요. 떨어지는 데 3개월, 회복에 3년이 걸리는 일도 흔합니다.</li>
         <li><b>당시 이슈</b> — 그 하락~회복 구간 안에 있었던 사건들. 여러 개가 붙어 있으면 악재가 겹친 구간입니다.</li>
       </ul>
@@ -654,6 +723,31 @@ function ralliesFromEpisodes(rows, eps) {
     if (gain > 0.0001) rallies.push({ fromI: startI, toI: hiI, gain: gain });
   }
   return rallies;
+}
+
+/* 회복되지 않은 하락 구간의 현재 상태를 세분화해서 표시한다.
+   "진행중" 한 단어는 하락 중인지 반등 중인지 알 수 없어 사용자를 헷갈리게 한다. */
+function ongoingStatus(peakC, troughC, curC) {
+  var bounce = curC / troughC - 1;      // 저점에서 얼마나 올라왔나
+  var toPeak = peakC / curC - 1;        // 전고점까지 얼마나 남았나
+  var span = peakC - troughC;
+  var progress = span > 0 ? (curC - troughC) / span : 0; // 회복 진행률 0~1
+
+  if (bounce <= 0.02) {
+    return { label: "하락 진행중", cls: "neg", icon: "▼",
+      detail: "저점 부근 (전고점까지 " + fmtPct(toPeak) + " 필요)" };
+  }
+  if (progress >= 0.7) {
+    return { label: "회복 임박", cls: "pos", icon: "▲",
+      detail: "저점 대비 " + fmtPct(bounce) + " · 전고점까지 " + fmtPct(toPeak) };
+  }
+  return { label: "반등 중", cls: "pos", icon: "△",
+    detail: "저점 대비 " + fmtPct(bounce) + " · 전고점까지 " + fmtPct(toPeak) };
+}
+function ongoingStatusHtml(peakC, troughC, curC) {
+  var s = ongoingStatus(peakC, troughC, curC);
+  return '<span class="' + s.cls + '" style="font-weight:bold">' + s.icon + " " + s.label + "</span>" +
+    "<br><small style='color:var(--sub)'>" + s.detail + "</small>";
 }
 
 function matchEvents(events, t1, t2) {
@@ -1167,6 +1261,7 @@ function render() {
   renderChart();
   renderYearTable();
   state.eps = drawdownEpisodes(state.rows, 0.10);
+  if (typeof renderMetrics === "function") renderMetrics();
   renderDdTable();
   renderRallyTable();
   renderAvg();
@@ -1195,25 +1290,41 @@ var mainEventPlugin = {
 
 function renderChart() {
   var rows = state.rows;
+  var showMA = $("showMA").checked && typeof smaSeries === "function";
+  var datasets = [{
+    label: "종가",
+    data: rows.map(function (r) { return r.c; }),
+    borderColor: "#ffc94d", borderWidth: 1.4,
+    pointRadius: 0, tension: 0, fill: false
+  }];
+  if (showMA) {
+    var closes = rows.map(function (r) { return r.c; });
+    [[20, "#4dc3ff", "20일선"], [60, "#3ddc97", "60일선"], [240, "#c47dff", "240일선"]].forEach(function (m) {
+      if (closes.length > m[0]) {
+        datasets.push({
+          label: m[2], data: smaSeries(closes, m[0]),
+          borderColor: m[1], borderWidth: 1, pointRadius: 0, tension: 0, fill: false, spanGaps: false
+        });
+      }
+    });
+  }
   if (state.chart) state.chart.destroy();
   state.chart = new Chart($("mainChart"), {
     type: "line",
     data: {
       labels: rows.map(function (r) { return fmtDate(r.t); }),
-      datasets: [{
-        data: rows.map(function (r) { return r.c; }),
-        borderColor: "#ffc94d", borderWidth: 1.4,
-        pointRadius: 0, tension: 0, fill: false
-      }]
+      datasets: datasets
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { display: false },
+        legend: { display: showMA, labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
-            label: function (ctx) { return fmtPrice(ctx.parsed.y) + " " + state.displayCur; },
+            label: function (ctx) {
+              return (ctx.dataset.label || "") + ": " + fmtPrice(ctx.parsed.y) + " " + state.displayCur;
+            },
             afterBody: function (items) {
               var t = rows[items[0].dataIndex].t;
               var near = matchEvents(EVENTS, t - 10 * 86400000, t + 10 * 86400000);
@@ -1236,6 +1347,7 @@ function renderChart() {
   $("eventList").innerHTML = eventListHtml(rows[0].t, rows[rows.length - 1].t);
 }
 $("logScale").onchange = function () { if (state.rows) renderChart(); };
+$("showMA").onchange = function () { if (state.rows) renderChart(); };
 $("showEvents").onchange = function () { if (state.chart) state.chart.update(); };
 $("showLabels").onchange = function () { if (state.chart) state.chart.update(); };
 
@@ -1271,7 +1383,8 @@ function renderDdTable() {
     html += '<tr><td class="neg" style="font-weight:bold">' + fmtPct(ep.dd) + "</td>" +
       "<td>" + fmtPrice(pk.c) + "<br><small style='color:var(--sub)'>" + fmtDate(pk.t) + "</small></td>" +
       "<td>" + fmtPrice(tr.c) + "<br><small style='color:var(--sub)'>" + fmtDate(tr.t) + "</small></td>" +
-      "<td>" + (ep.recoverI != null ? fmtDate(rows[ep.recoverI].t) : '<span class="neg">진행중</span>') + "</td>" +
+      "<td>" + (ep.recoverI != null ? fmtDate(rows[ep.recoverI].t)
+        : ongoingStatusHtml(pk.c, tr.c, rows[rows.length - 1].c)) + "</td>" +
       "<td>" + days + "일</td>" +
       (hasAvg ? '<td class="avgHighlight">' + fmtPrice(avg * (1 + ep.dd)) + "</td>" : "") +
       "<td style='text-align:left;white-space:normal;max-width:230px'>" + (evts.map(evtTag).join("") || "-") + "</td></tr>";
@@ -1359,6 +1472,10 @@ function renderAvg() {
   renderDdTable();
   renderRallyTable();
 }
+
+$("rfRate").addEventListener("change", function () {
+  if (state.rows && typeof renderMetrics === "function") renderMetrics();
+});
 
 /* ---------- 탭 전환 ---------- */
 var TABS = ["single", "compare", "sim", "insight"];
@@ -1457,6 +1574,7 @@ $("shareBtn").onclick = function () {
 // 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
 window.addEventListener("load", applyShareHash);
 </script>
+<script src="metrics.js"></script>
 <script src="compare.js"></script>
 <script src="sim.js"></script>
 <script src="insight.js"></script>

@@ -109,6 +109,8 @@ function worstEpisodes(days, idxVals, topN) {
       dd: e.dd,
       t1: rows[e.peakI].t,
       t2: rows[e.troughI].t,
+      peakV: rows[e.peakI].c,
+      troughV: rows[e.troughI].c,
       recovered: e.recoverI != null ? rows[e.recoverI].t : null
     };
   });
@@ -527,7 +529,8 @@ function renderSimWorst(I, R, idx) {
       "<small style='color:var(--sub)'>" + fmtDate(ep.t1) + " ~ " + fmtDate(ep.t2) + " (" + days + "일)</small></td>" +
       '<td class="' + pctCls(ep.dd) + '" style="font-weight:bold;background:#202a40">' + fmtPct(ep.dd) + "</td>" +
       cells.join("") +
-      "<td>" + (ep.recovered ? fmtDate(ep.recovered) : '<span class="neg">진행중</span>') + "</td></tr>";
+      "<td>" + (ep.recovered ? fmtDate(ep.recovered)
+        : ongoingStatusHtml(ep.peakV, ep.troughV, idx.values[idx.values.length - 1])) + "</td></tr>";
   });
   $("simWorst").innerHTML = html + "</tbody>";
 }
