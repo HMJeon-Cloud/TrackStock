@@ -22,13 +22,21 @@ function kNum(s) {
   return isFinite(n) ? n : null;
 }
 
-/* 재무제표 행 찾기 (제목 앞부분 일치) */
+/* 재무제표 행 찾기.
+   정확히 일치하는 제목을 먼저 찾고, 없을 때만 앞부분 일치를 쓴다.
+   (앞부분 일치만 쓰면 "EBIT"가 "EBITDA"에 걸리는 문제가 생긴다) */
 function findRow(fin, prefix) {
   if (!fin || !fin.rows) return null;
   var norm = prefix.replace(/\s/g, "");
-  for (var i = 0; i < fin.rows.length; i++) {
-    var t = (fin.rows[i].title || "").replace(/\s/g, "");
-    if (t === norm || t.indexOf(norm) === 0) return fin.rows[i];
+  var i, t;
+  for (i = 0; i < fin.rows.length; i++) {
+    t = (fin.rows[i].title || "").replace(/\s/g, "");
+    if (t === norm) return fin.rows[i];
+  }
+  for (i = 0; i < fin.rows.length; i++) {
+    t = (fin.rows[i].title || "").replace(/\s/g, "");
+    // "ROE(%)", "EPS(원)"처럼 단위가 괄호로 붙는 경우만 허용
+    if (t.indexOf(norm) === 0 && /^[(（]/.test(t.slice(norm.length))) return fin.rows[i];
   }
   return null;
 }
@@ -207,9 +215,14 @@ function renderFund() {
     ["고가", v("highPrice")], ["저가", v("lowPrice")],
     ["거래량", v("accumulatedTradingVolume")], ["거래대금", v("accumulatedTradingValue")],
     ["시가총액", v("marketValue")], ["외국인 보유율", v("foreignRate")],
-    ["52주 최고", v("highPriceOf52Weeks")], ["52주 최저", v("lowPriceOf52Weeks")]
+    ["52주 최고", v("highPriceOf52Weeks")], ["52주 최저", v("lowPriceOf52Weeks")],
+    ["전일", v("basePrice")], ["업종", v("industryGroupKor")],
+    ["배당 지급일", v("dividendAt")], ["배당락일", v("exDividendAt")],
+    ["액면 변경", v("faceValueDivisionRate")]
   ];
-  var quoteHtml = quote.filter(function (q) { return q[1] != null; }).map(function (q) {
+  var quoteHtml = quote.filter(function (q) {
+    return q[1] != null && q[1] !== "N/A" && q[1] !== "-";
+  }).map(function (q) {
     return '<span class="badge">' + q[0] + "<b>" + q[1] + "</b></span>";
   }).join("");
   if (quoteHtml) $("fundQuote").innerHTML = quoteHtml;
@@ -236,6 +249,21 @@ function renderFund() {
     }
   }
 
+  // 해외 응답에는 ROE 행이 없는 경우가 많다. EPS÷BPS로 추정할 수 있으면 추정치를 쓴다.
+  var roeEstimated = false;
+  if (roe == null && eps != null && bps != null && bps !== 0) {
+    roe = eps / bps * 100;
+    roeEstimated = true;
+    roeLabel = "EPS÷BPS 추정";
+  }
+  // ROA는 해외에서 자주 제공된다 (자산 대비 수익성)
+  var roa = null, roaLabel = "";
+  var roaRow = findRow(finA, "ROA") || findRow(finQ, "ROA");
+  var roaSrc = findRow(finA, "ROA") ? finA : finQ;
+  if (roaRow && roaSrc) {
+    var cf2 = roaSrc.periods.filter(function (p) { return !p.forecast && roaRow.values[p.key] != null; });
+    if (cf2.length) { roa = kNum(roaRow.values[cf2[cf2.length - 1].key]); roaLabel = cf2[cf2.length - 1].title; }
+  }
   var pj = judgePer(per, indPer), bj = judgePbr(pbr), rj = judgeRoe(roe);
   var html = "";
   html += badge("PER", per == null ? null : per.toFixed(2) + "배", pj,
@@ -245,7 +273,10 @@ function renderFund() {
   if (cnsEps != null) html += badge("추정 EPS", Math.round(cnsEps).toLocaleString("ko-KR") + "원", ["전망치", "var(--sub)"], "애널리스트 전망 주당순이익");
   html += badge("PBR", pbr == null ? null : pbr.toFixed(2) + "배", bj, "주가 ÷ 주당순자산. 회사가 가진 재산 대비 주가가 몇 배인지");
   html += badge("BPS", bps == null ? null : Math.round(bps).toLocaleString("ko-KR") + "원", null, "주당순자산. 회사를 청산하면 1주당 돌아오는 장부상 재산");
-  html += badge("ROE", roe == null ? null : roe.toFixed(1) + "%", rj, "자기자본이익률. 주주 돈으로 1년에 몇 % 이익을 냈는지" + (roeLabel ? " · " + roeLabel + " 기준" : ""));
+  html += badge("ROE" + (roeEstimated ? "(추정)" : ""), roe == null ? null : roe.toFixed(1) + "%", rj,
+    "자기자본이익률. 주주 돈으로 1년에 몇 % 이익을 냈는지" + (roeLabel ? " · " + roeLabel : ""));
+  html += badge("ROA", roa == null ? null : roa.toFixed(1) + "%", null,
+    "총자산이익률. 빌린 돈까지 포함한 전체 자산으로 몇 % 이익을 냈는지" + (roaLabel ? " · " + roaLabel + " 기준" : ""));
   html += badge("배당수익률", divY == null ? null : divY.toFixed(2) + "%", null, "주가 대비 연간 배당금 비율" + (div ? " · 주당 " + div : ""));
   if (!html.replace(/<[^>]+>/g, "").replace(/[-\s]/g, "")) {
     html = '<span style="font-size:12px;color:var(--sub)">이 종목은 재무 기반 지표가 제공되지 않습니다. ' +
@@ -278,6 +309,7 @@ function badge(label, value, judge, tip) {
 
 function renderFinanceTable() {
   var d = fundState.data;
+  function v0(k) { return d.info && d.info[k] ? d.info[k].value : null; }
   var fin = d.finance && d.finance[fundState.view];
   var box = $("fundFinance");
   if (!fin || !fin.periods || !fin.periods.length) {
@@ -285,11 +317,17 @@ function renderFinanceTable() {
       (d.market === "WORLD" ? " (해외 종목은 미제공)" : "") + ".</td></tr></tbody>";
     return;
   }
+  // 국내와 해외가 주는 항목이 달라 둘을 합쳐 두고, 있는 것만 그린다
   var WANT = [
-    ["매출액", "eok"], ["영업이익", "eok"], ["영업이익률", "pct"], ["당기순이익", "eok"], ["순이익률", "pct"],
-    ["ROE", "pct"], ["부채비율", "pct"], ["EPS", "won"], ["PER", "bae"], ["BPS", "won"], ["PBR", "bae"],
-    ["주당배당금", "won"], ["시가배당률", "pct"], ["EV/EBITDA", "bae"]
+    ["매출액", "eok"], ["매출총이익", "eok"], ["영업이익", "eok"], ["영업이익률", "pct"],
+    ["EBITDA", "eok"], ["EBIT", "eok"], ["세전손익", "eok"], ["세후손익", "eok"],
+    ["당기순이익", "eok"], ["순이익률", "pct"],
+    ["ROE", "pct"], ["ROA", "pct"], ["부채비율", "pct"],
+    ["EPS", "won"], ["PER", "bae"], ["BPS", "won"], ["PBR", "bae"], ["EV/EBITDA", "bae"],
+    ["주당배당금", "won"], ["시가배당률", "pct"], ["배당수익률", "pct"]
   ];
+  var isWorld = (fundState.data.market !== "KR");
+  var cur = isWorld ? (kNum(v0("closePrice")) != null ? "USD" : "USD") : "원";
   var periods = fin.periods.slice(-6);
   var html = "<thead><tr><th style='text-align:left'>항목</th>";
   periods.forEach(function (p) {
@@ -307,9 +345,9 @@ function renderFinanceTable() {
       var num = kNum(raw);
       var txt;
       if (num == null) txt = "-";
-      else if (w[1] === "eok") txt = fmtEok(num);
+      else if (w[1] === "eok") txt = isWorld ? fmtEok(num / 100) + " USD" : fmtEok(num);
       else if (w[1] === "pct") txt = num.toFixed(1) + "%";
-      else if (w[1] === "won") txt = Math.round(num).toLocaleString("ko-KR");
+      else if (w[1] === "won") txt = isWorld ? num.toFixed(2) : Math.round(num).toLocaleString("ko-KR");
       else txt = num.toFixed(2);
       var cls = (w[1] === "eok" || w[1] === "pct") && w[0] !== "부채비율" ? (num < 0 ? "neg" : "") : "";
       html += "<td class='" + cls + "'" + (p.forecast ? " style='color:var(--sub)'" : "") + ">" + txt + "</td>";
@@ -318,6 +356,12 @@ function renderFinanceTable() {
   });
   if (!shown) html += "<tr><td colspan='" + (periods.length + 1) + "' style='color:var(--sub)'>표시할 항목이 없습니다.</td></tr>";
   box.innerHTML = html + "</tbody>";
+  var un = $("fundFinanceUnit");
+  if (un) {
+    un.innerHTML = isWorld
+      ? "금액 단위: 억 USD (원본은 백만 USD 기준) · 비율 항목은 % · 배수 항목은 배"
+      : "금액 단위: 억원 · 비율 항목은 % · 배수 항목은 배 · 노란색은 증권사 전망치";
+  }
 }
 
 /* 투자자별 매매동향 — 응답 키 이름이 바뀔 수 있어 정규식으로 유연하게 찾는다 */
