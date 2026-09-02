@@ -131,7 +131,8 @@ function syncSimAssets() {
   var cart = cmpState.cart;
   if (!cart.length) {
     box.innerHTML = '<span style="color:var(--sub);font-size:12px">' +
-      '먼저 <b>장바구니 비교</b> 탭에서 종목을 담아 주세요. 이 탭은 같은 장바구니를 사용합니다.</span>';
+      '장바구니가 비어 있습니다. <b>개별 종목 분석</b> 탭에서 종목을 분석한 뒤 🛒 버튼으로 담거나, ' +
+      '<b>장바구니 비교</b> 탭의 검색창으로 담아 주세요. 세 탭이 같은 장바구니를 함께 씁니다.</span>';
     $("simWeightSum").textContent = "";
     return;
   }
@@ -244,6 +245,7 @@ $("simStart").addEventListener("change", function () {
   });
 });
 $("simShowEvents").onchange = function () { if (simState.chart) simState.chart.update(); };
+$("simResetZoom").onclick = function () { if (typeof resetChartZoom === "function") resetChartZoom(simState.chart); };
 $("simApplyWeights").onclick = function () { if (simState.aligned) renderSim(); };
 
 /* ---------- 렌더링 ---------- */
@@ -332,6 +334,7 @@ function renderSim() {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
+        zoom: typeof buildZoomOptions === "function" ? buildZoomOptions() : undefined,
         legend: { labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {

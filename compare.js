@@ -204,7 +204,7 @@ function fmtMoney(v) {
 
 /* ================= 상태 & UI ================= */
 var cmpState = {
-  cart: ["005930.KS", "GLD", "TLT", "KRW=X"],
+  cart: [],
   cache: {}, results: null, aligned: null, chart: null, view: null, mixedCur: false
 };
 
@@ -216,9 +216,12 @@ function cmpLabel(sym) {
 }
 
 function renderChips() {
+  if (typeof syncCartBtn === "function") setTimeout(syncCartBtn, 0);
   var box = $("cmpChips");
   if (!cmpState.cart.length) {
-    box.innerHTML = '<span style="color:var(--sub);font-size:12px">비교할 종목을 2개 이상 추가하세요.</span>';
+    box.innerHTML = '<span style="color:var(--sub);font-size:12px">장바구니가 비어 있습니다. ' +
+      '위 검색창으로 담거나, <b>개별 종목 분석</b> 탭에서 종목을 분석한 뒤 🛒 버튼으로 담으세요. ' +
+      '(비교하려면 2개 이상)</span>';
     return;
   }
   box.innerHTML = cmpState.cart.map(function (s, i) {
@@ -280,10 +283,38 @@ $("cmpInput").addEventListener("keydown", function (e) {
 document.addEventListener("click", function (e) {
   if (!$("cmpSearchBox").contains(e.target)) $("cmpResults").style.display = "none";
 });
-$("cmpAddCurrent").onclick = function () {
-  if (!state.symbol) { setCmpStatus("먼저 위에서 종목을 분석해 주세요.", true); return; }
-  addToCart(state.symbol);
+/* 개별 종목 분석 탭의 장바구니 버튼 — 담기/빼기 토글 */
+$("addCartBtn").onclick = function () {
+  if (!state.symbol) { setStatus("먼저 종목을 분석해 주세요.", true); return; }
+  var i = cmpState.cart.indexOf(state.symbol);
+  if (i >= 0) {
+    cmpState.cart.splice(i, 1);
+    renderChips();
+    setStatus("장바구니에서 뺐습니다: " + cmpLabel(state.symbol));
+  } else {
+    if (cmpState.cart.length >= 8) { setStatus("장바구니는 최대 8개까지입니다.", true); return; }
+    addToCart(state.symbol);
+    setStatus("장바구니에 담았습니다: " + cmpLabel(state.symbol) +
+      " (현재 " + cmpState.cart.length + "개)");
+  }
+  syncCartBtn();
 };
+
+/* 버튼 상태를 장바구니와 동기화 */
+function syncCartBtn() {
+  var btn = $("addCartBtn"), cnt = $("cartCount");
+  if (!btn) return;
+  var n = cmpState.cart.length;
+  cnt.textContent = n;
+  cnt.classList.toggle("hidden", n === 0);
+  var inCart = state.symbol && cmpState.cart.indexOf(state.symbol) >= 0;
+  btn.classList.toggle("added", !!inCart);
+  btn.title = !state.symbol
+    ? "종목을 분석하면 장바구니에 담을 수 있습니다"
+    : (inCart ? "장바구니에서 빼기 — " + cmpLabel(state.symbol)
+              : "장바구니에 담기 — " + cmpLabel(state.symbol)) +
+      " (담긴 종목 " + n + "개)";
+}
 
 /* ---------- 데이터 로드 (순차 요청) ---------- */
 function fetchSeries(symbol, range) {
@@ -483,6 +514,7 @@ function renderCmpChart() {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
+        zoom: typeof buildZoomOptions === "function" ? buildZoomOptions() : undefined,
         legend: { labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
@@ -569,6 +601,7 @@ function renderInvestSummary() {
       Math.round(worst.val).toLocaleString("ko-KR") + "원 (" + fmtPct(worst.ret) + ")</b></span>";
 }
 
+$("cmpResetZoom").onclick = function () { if (typeof resetChartZoom === "function") resetChartZoom(cmpState.chart); };
 $("cmpLog").onchange = function () { if (cmpState.aligned) renderCmpChart(); };
 $("cmpMode").onchange = function () { if (cmpState.aligned) renderCompare(); };
 $("cmpInvest").onchange = function () { if (cmpState.aligned) renderCompare(); };

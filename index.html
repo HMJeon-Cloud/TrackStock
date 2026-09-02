@@ -85,6 +85,12 @@
   .tabs button:hover { color: var(--txt); }
   .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
   /* 비중 슬라이더 */
+  .cartBtn { position: relative; font-size: 17px; padding: 8px 12px; line-height: 1; cursor: pointer; }
+  .cartBtn:hover { border-color: var(--accent); }
+  .cartBtn.added { background: var(--accent); border-color: var(--accent); }
+  .cartCount { position: absolute; top: -6px; right: -6px; background: var(--up); color: #fff;
+    font-size: 10px; font-weight: bold; border-radius: 9px; min-width: 16px; height: 16px;
+    line-height: 16px; text-align: center; padding: 0 4px; }
   .wRow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1e2637; }
   .wName { min-width: 110px; font-size: 13px; }
   .wInput { flex: 1; min-width: 100px; accent-color: var(--accent); padding: 0; background: none; border: none; }
@@ -95,14 +101,13 @@
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.0</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.1</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
   <button class="active" data-tab="single">개별 종목 분석</button>
   <button data-tab="compare">장바구니 비교</button>
   <button data-tab="sim">포트폴리오 시뮬레이터</button>
-  <button data-tab="insight">인사이트</button>
   <button id="shareBtn" style="margin-left:auto;border-bottom:none;font-size:12px" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
 </div>
 
@@ -120,6 +125,7 @@
       <option value="max">전체</option>
     </select>
     <button class="primary" id="loadBtn">분석</button>
+    <button id="addCartBtn" class="cartBtn">🛒<span id="cartCount" class="cartCount hidden">0</span></button>
   </div>
   <div class="row" style="margin-top:10px" id="presets">
     <button class="chip" data-s="005930.KS">삼성전자</button>
@@ -418,6 +424,89 @@
 
 </div>
 
+<div class="card">
+  <h2>인사이트 <small id="insTitle">위 종목의 과거 데이터로 계산한 사실들</small></h2>
+
+  <div id="insEmpty" class="mentalNote">
+    먼저 <b>개별 종목 분석</b> 탭에서 종목을 조회해 주세요. 통계를 내려면 최소 1년 이상의 데이터가 필요하며,
+    조회 기간을 <b>20년 또는 전체</b>로 설정할수록 결과가 정확해집니다.
+  </div>
+
+  <div id="insBody" class="hidden">
+    <h3>지금 어디쯤인가 <small>현재 위치를 과거 낙폭들 속에 놓고 봅니다</small></h3>
+    <div id="insPosBadges" class="row"></div>
+    <details class="howto"><summary>이 숫자 읽는 법</summary><div class="body">
+      <ul>
+        <li><b>전고점 대비</b> — 조회 기간 중 가장 높았던 가격에서 지금 몇 % 아래인지입니다. 계좌가 마이너스가 아니어도 이 값은 마이너스일 수 있습니다.</li>
+        <li><b>역대 낙폭 순위</b> — 지금의 하락이 과거 하락들과 비교해 몇 번째로 깊은지입니다. <b>순위가 낮을수록(=숫자가 클수록) 흔히 겪던 수준</b>이라는 뜻입니다. "5위/12회"라면 이보다 깊은 하락을 이미 네 번 겪고도 살아남았다는 의미입니다.</li>
+        <li><b>회복 중앙값</b> — 과거 저점에서 전고점을 되찾기까지 걸린 날짜의 중앙값입니다. 평균 대신 중앙값을 쓰는 이유는, 유난히 오래 걸린 한두 번이 평균을 왜곡하기 때문입니다.</li>
+      </ul>
+    </div></details>
+
+    <h3>보유기간별 손실 확률 <small>"아무 날에나 샀다면" 을 전 구간에서 시뮬레이션</small></h3>
+    <div class="tableWrap"><table id="insHolding"></table></div>
+    <div id="insHoldNote" class="mentalNote"></div>
+    <details class="howto"><summary>이 표 읽는 법 — 이 앱에서 가장 중요한 표입니다</summary><div class="body">
+      조회 기간 안의 <b>모든 거래일을 각각 매수일로 가정</b>해 N년 뒤 결과를 전부 계산한 표입니다.
+      1년 행의 표본이 4,000개라면, 4,000번의 서로 다른 "1년 투자"를 다 해본 결과라는 뜻입니다.
+      <ul>
+        <li><b>손실 확률</b> — 그 보유기간 투자 중 손실로 끝난 비율입니다. 배경이 붉을수록 손실 확률이 높습니다. <b>위에서 아래로 색이 옅어진다면, 오래 들고 있을수록 안전해졌다는 뜻</b>입니다.</li>
+        <li><b>중앙값 수익</b> — 딱 가운데 성적입니다. 평균은 대박 한 번에 끌려 올라가므로, 전형적인 결과를 보려면 중앙값을 보세요.</li>
+        <li><b>최악의 경우 / 하위 10%</b> — 운이 나빴을 때의 성적입니다. <b>이 숫자를 견딜 수 있는지가 곧 이 종목을 보유할 수 있는지</b>입니다.</li>
+        <li><b>표본</b> — 계산에 쓰인 매수일 개수. 보유기간이 길수록 표본이 줄어들고, 표본이 적으면(수백 개 이하) 우연의 영향이 커지니 참고만 하세요.</li>
+      </ul>
+      <b>여기서 읽어야 할 것:</b> 같은 종목인데 보유기간만 늘렸을 뿐인데 손실 확률이 달라진다면, 결과를 가른 것은 <b>언제 샀는가가 아니라 얼마나 오래 들고 있었는가</b>입니다.<br>
+      <b>반대의 경우도 봐야 합니다:</b> 손실 확률이 잘 줄지 않는 종목·지수도 있습니다. 그런 대상에서는 장기 보유가 해답이 아닙니다. 검색창에 <b>니케이225</b>나 <b>코스피</b>를 넣고 기간을 <b>전체</b>로 조회해 같은 표를 비교해 보세요.
+    </div></details>
+
+    <h3>가장 많이 오른 며칠을 놓친다면 <small>시장에서 잠깐 나가 있는 것의 대가</small></h3>
+    <div class="tableWrap"><table id="insTopDays"></table></div>
+    <h3 style="margin-top:14px">최고 상승일 TOP 10 <small>그날 시장은 어떤 상태였나</small></h3>
+    <div class="tableWrap"><table id="insTopList"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      전 기간을 그대로 보유한 경우와, <b>가장 많이 오른 날 며칠만 빼고</b> 보유한 경우를 비교합니다.
+      며칠 빠졌다고 수익이 크게 줄어든다면, 그 소수의 날이 전체 수익의 대부분을 만들었다는 뜻입니다.
+      <ul>
+        <li><b>1,000만원이</b> 열에서 금액 차이를 보면 체감이 빠릅니다.</li>
+        <li>아래 TOP 10 목록의 <b>당시 상태</b> 열을 보세요. 큰 상승일이 <span style="color:var(--up)">하락 중</span>에 몰려 있다면, <b>가장 무서웠던 시기에 가장 큰 반등이 나왔다</b>는 뜻입니다.</li>
+      </ul>
+      <b>이렇게 해석하세요:</b> 폭락이 무서워 잠시 팔고 나가면, 그 반등일들도 함께 놓치기 쉽습니다. 이 표는 그 대가가 얼마인지 금액으로 보여줍니다.<br>
+      <b>다만 이건 매수·보유가 항상 옳다는 증명이 아닙니다.</b> 같은 방식으로 <b>최악의 하락일</b>을 피했다면 수익이 크게 늘어난다는 계산도 성립합니다. 이 표가 말하는 건 "타이밍을 맞히면 좋다"가 아니라, <b>타이밍을 틀렸을 때의 손실이 생각보다 크다</b>는 쪽입니다.
+    </div></details>
+
+    <h3>가장 많이 떨어진 10일 <small>급등의 반대편</small></h3>
+    <div class="tableWrap"><table id="insWorstList"></table></div>
+    <div id="insCluster" class="mentalNote"></div>
+    <details class="howto"><summary>이 표 읽는 법 — 위 표와 반드시 함께 보세요</summary><div class="body">
+      바로 위 표만 보면 "무조건 들고 있어야 한다"로 읽히기 쉽습니다. 그래서 <b>정반대 계산</b>을 나란히 놓았습니다.
+      <ul>
+        <li><b>최악의 하락 5·10·20·30일을 피했다면</b> 수익이 얼마나 늘어나는지 보세요. 급등일을 놓쳤을 때 줄어드는 폭만큼, 아니 대개 그보다 더 크게 늘어납니다. 즉 <b>"타이밍은 소용없다"는 결론은 이 데이터에서 나오지 않습니다.</b></li>
+        <li>진짜 결론은 <b>급등일과 급락일이 서로 붙어 있다</b>는 것입니다. 위 표의 <b>붙어 있는 날 수</b>를 보세요. 최고 상승일 대부분이 최고 하락일과 며칠 안에 몰려 있습니다.</li>
+        <li>이것을 <b>변동성 군집</b>이라고 합니다. 시장이 요동칠 때는 폭락과 폭등이 같은 국면에서 번갈아 나옵니다. 그래서 <b>급락만 골라 피하고 급등만 골라 잡는 것은 실무적으로 거의 불가능</b>합니다. 폭락이 무서워 나가면 바로 뒤의 폭등도 함께 놓치게 되는 구조입니다.</li>
+      </ul>
+      <b>정리하면:</b> 이 두 표는 "장기보유가 정답"이라고 말하지 않습니다. <b>"들락거리려면 급락과 급등을 둘 다 맞혀야 하는데, 둘이 며칠 간격으로 붙어 있다"</b>는 사실을 보여줄 뿐입니다. 그 난이도를 감안해 스스로 판단하시라는 자료입니다.
+    </div></details>
+
+    <h3>자동 요약 <small>위 계산에서 나온 사실만 문장으로</small></h3>
+    <div id="insSentences" style="font-size:13px;line-height:2;padding:12px 14px;background:#131a28;border:1px solid var(--line);border-radius:8px"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="chip" id="insCopy">문장 복사</button>
+      <span id="insCopyMsg" style="font-size:12px;color:var(--good)"></span>
+    </div>
+    <textarea id="insCopySrc" class="hidden" style="width:100%;height:150px;margin-top:8px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px"></textarea>
+
+    <div class="mentalNote" style="margin-top:16px;padding:12px 14px;background:#1a1420;border:1px solid #3a2a30;border-radius:8px">
+      <b style="color:var(--up)">이 탭의 통계를 믿기 전에 반드시 알아야 할 두 가지</b>
+      <ul style="margin:6px 0 0 16px">
+        <li><b>생존 편향</b> — 지금 조회 가능한 종목은 살아남았기 때문에 데이터가 존재합니다. 같은 기간 상장폐지되거나 사라진 회사는 애초에 계산에 들어오지 않습니다. 따라서 "버티면 회복한다"는 결론은 <b>구조적으로 낙관 쪽으로 기울어</b> 있습니다. 개별 종목일수록 이 편향이 큽니다.</li>
+        <li><b>조회 기간 의존성</b> — 이 탭의 모든 숫자는 <b>지금 조회한 기간 안에서만</b> 계산됩니다. 상승장만 들어간 기간을 고르면 손실 확률이 실제보다 훨씬 낮게 나옵니다. 기간을 <b>전체</b>로 바꿔 다시 보고, 숫자가 얼마나 달라지는지 확인하세요. 크게 달라진다면 그 통계는 기간이 만든 것이지 종목의 성질이 아닙니다.</li>
+        <li><b>반례를 직접 확인하세요</b> — "오래 들고 있으면 손실 확률이 0에 수렴한다"가 모든 시장에서 성립하는 법칙은 아닙니다. 검색창에 <b>니케이225</b>, <b>코스피</b> 등을 넣고 기간을 <b>전체</b>로 조회해 이 탭을 다시 열어 보세요. 손실 확률이 잘 줄지 않는 사례를 직접 보면, 지금 보고 있는 숫자가 <b>법칙이 아니라 조건부 결과</b>라는 것이 분명해집니다.</li>
+      </ul>
+      여러 사례를 본 다음에 판단하는 것이, 한쪽만 보고 확신하는 것보다 낫습니다.
+    </div>
+  </div>
+</div>
+
 </div><!-- /tab-single -->
 
 <div id="tab-compare" class="hidden">
@@ -428,7 +517,6 @@
       <input id="cmpInput" placeholder="비교할 종목 추가 (예: 금, 미국채20년, 달러)" autocomplete="off">
       <div id="cmpResults"></div>
     </div>
-    <button class="chip" id="cmpAddCurrent">위 분석 종목 담기</button>
     <select id="cmpRange">
       <option value="5y">5년</option>
       <option value="10y" selected>10년</option>
@@ -668,90 +756,6 @@
 </div>
 </div><!-- /tab-sim -->
 
-<div id="tab-insight" class="hidden">
-<div class="card">
-  <h2>인사이트 <small id="insTitle">개별 종목 탭에서 분석한 종목을 기준으로 계산합니다</small></h2>
-
-  <div id="insEmpty" class="mentalNote">
-    먼저 <b>개별 종목 분석</b> 탭에서 종목을 조회해 주세요. 통계를 내려면 최소 1년 이상의 데이터가 필요하며,
-    조회 기간을 <b>20년 또는 전체</b>로 설정할수록 결과가 정확해집니다.
-  </div>
-
-  <div id="insBody" class="hidden">
-    <h3>지금 어디쯤인가 <small>현재 위치를 과거 낙폭들 속에 놓고 봅니다</small></h3>
-    <div id="insPosBadges" class="row"></div>
-    <details class="howto"><summary>이 숫자 읽는 법</summary><div class="body">
-      <ul>
-        <li><b>전고점 대비</b> — 조회 기간 중 가장 높았던 가격에서 지금 몇 % 아래인지입니다. 계좌가 마이너스가 아니어도 이 값은 마이너스일 수 있습니다.</li>
-        <li><b>역대 낙폭 순위</b> — 지금의 하락이 과거 하락들과 비교해 몇 번째로 깊은지입니다. <b>순위가 낮을수록(=숫자가 클수록) 흔히 겪던 수준</b>이라는 뜻입니다. "5위/12회"라면 이보다 깊은 하락을 이미 네 번 겪고도 살아남았다는 의미입니다.</li>
-        <li><b>회복 중앙값</b> — 과거 저점에서 전고점을 되찾기까지 걸린 날짜의 중앙값입니다. 평균 대신 중앙값을 쓰는 이유는, 유난히 오래 걸린 한두 번이 평균을 왜곡하기 때문입니다.</li>
-      </ul>
-    </div></details>
-
-    <h3>보유기간별 손실 확률 <small>"아무 날에나 샀다면" 을 전 구간에서 시뮬레이션</small></h3>
-    <div class="tableWrap"><table id="insHolding"></table></div>
-    <div id="insHoldNote" class="mentalNote"></div>
-    <details class="howto"><summary>이 표 읽는 법 — 이 앱에서 가장 중요한 표입니다</summary><div class="body">
-      조회 기간 안의 <b>모든 거래일을 각각 매수일로 가정</b>해 N년 뒤 결과를 전부 계산한 표입니다.
-      1년 행의 표본이 4,000개라면, 4,000번의 서로 다른 "1년 투자"를 다 해본 결과라는 뜻입니다.
-      <ul>
-        <li><b>손실 확률</b> — 그 보유기간 투자 중 손실로 끝난 비율입니다. 배경이 붉을수록 손실 확률이 높습니다. <b>위에서 아래로 색이 옅어진다면, 오래 들고 있을수록 안전해졌다는 뜻</b>입니다.</li>
-        <li><b>중앙값 수익</b> — 딱 가운데 성적입니다. 평균은 대박 한 번에 끌려 올라가므로, 전형적인 결과를 보려면 중앙값을 보세요.</li>
-        <li><b>최악의 경우 / 하위 10%</b> — 운이 나빴을 때의 성적입니다. <b>이 숫자를 견딜 수 있는지가 곧 이 종목을 보유할 수 있는지</b>입니다.</li>
-        <li><b>표본</b> — 계산에 쓰인 매수일 개수. 보유기간이 길수록 표본이 줄어들고, 표본이 적으면(수백 개 이하) 우연의 영향이 커지니 참고만 하세요.</li>
-      </ul>
-      <b>여기서 읽어야 할 것:</b> 같은 종목인데 보유기간만 늘렸을 뿐인데 손실 확률이 달라진다면, 결과를 가른 것은 <b>언제 샀는가가 아니라 얼마나 오래 들고 있었는가</b>입니다.<br>
-      <b>반대의 경우도 봐야 합니다:</b> 손실 확률이 잘 줄지 않는 종목·지수도 있습니다. 그런 대상에서는 장기 보유가 해답이 아닙니다. 검색창에 <b>니케이225</b>나 <b>코스피</b>를 넣고 기간을 <b>전체</b>로 조회해 같은 표를 비교해 보세요.
-    </div></details>
-
-    <h3>가장 많이 오른 며칠을 놓친다면 <small>시장에서 잠깐 나가 있는 것의 대가</small></h3>
-    <div class="tableWrap"><table id="insTopDays"></table></div>
-    <h3 style="margin-top:14px">최고 상승일 TOP 10 <small>그날 시장은 어떤 상태였나</small></h3>
-    <div class="tableWrap"><table id="insTopList"></table></div>
-    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
-      전 기간을 그대로 보유한 경우와, <b>가장 많이 오른 날 며칠만 빼고</b> 보유한 경우를 비교합니다.
-      며칠 빠졌다고 수익이 크게 줄어든다면, 그 소수의 날이 전체 수익의 대부분을 만들었다는 뜻입니다.
-      <ul>
-        <li><b>1,000만원이</b> 열에서 금액 차이를 보면 체감이 빠릅니다.</li>
-        <li>아래 TOP 10 목록의 <b>당시 상태</b> 열을 보세요. 큰 상승일이 <span style="color:var(--up)">하락 중</span>에 몰려 있다면, <b>가장 무서웠던 시기에 가장 큰 반등이 나왔다</b>는 뜻입니다.</li>
-      </ul>
-      <b>이렇게 해석하세요:</b> 폭락이 무서워 잠시 팔고 나가면, 그 반등일들도 함께 놓치기 쉽습니다. 이 표는 그 대가가 얼마인지 금액으로 보여줍니다.<br>
-      <b>다만 이건 매수·보유가 항상 옳다는 증명이 아닙니다.</b> 같은 방식으로 <b>최악의 하락일</b>을 피했다면 수익이 크게 늘어난다는 계산도 성립합니다. 이 표가 말하는 건 "타이밍을 맞히면 좋다"가 아니라, <b>타이밍을 틀렸을 때의 손실이 생각보다 크다</b>는 쪽입니다.
-    </div></details>
-
-    <h3>가장 많이 떨어진 10일 <small>급등의 반대편</small></h3>
-    <div class="tableWrap"><table id="insWorstList"></table></div>
-    <div id="insCluster" class="mentalNote"></div>
-    <details class="howto"><summary>이 표 읽는 법 — 위 표와 반드시 함께 보세요</summary><div class="body">
-      바로 위 표만 보면 "무조건 들고 있어야 한다"로 읽히기 쉽습니다. 그래서 <b>정반대 계산</b>을 나란히 놓았습니다.
-      <ul>
-        <li><b>최악의 하락 5·10·20·30일을 피했다면</b> 수익이 얼마나 늘어나는지 보세요. 급등일을 놓쳤을 때 줄어드는 폭만큼, 아니 대개 그보다 더 크게 늘어납니다. 즉 <b>"타이밍은 소용없다"는 결론은 이 데이터에서 나오지 않습니다.</b></li>
-        <li>진짜 결론은 <b>급등일과 급락일이 서로 붙어 있다</b>는 것입니다. 위 표의 <b>붙어 있는 날 수</b>를 보세요. 최고 상승일 대부분이 최고 하락일과 며칠 안에 몰려 있습니다.</li>
-        <li>이것을 <b>변동성 군집</b>이라고 합니다. 시장이 요동칠 때는 폭락과 폭등이 같은 국면에서 번갈아 나옵니다. 그래서 <b>급락만 골라 피하고 급등만 골라 잡는 것은 실무적으로 거의 불가능</b>합니다. 폭락이 무서워 나가면 바로 뒤의 폭등도 함께 놓치게 되는 구조입니다.</li>
-      </ul>
-      <b>정리하면:</b> 이 두 표는 "장기보유가 정답"이라고 말하지 않습니다. <b>"들락거리려면 급락과 급등을 둘 다 맞혀야 하는데, 둘이 며칠 간격으로 붙어 있다"</b>는 사실을 보여줄 뿐입니다. 그 난이도를 감안해 스스로 판단하시라는 자료입니다.
-    </div></details>
-
-    <h3>자동 요약 <small>위 계산에서 나온 사실만 문장으로</small></h3>
-    <div id="insSentences" style="font-size:13px;line-height:2;padding:12px 14px;background:#131a28;border:1px solid var(--line);border-radius:8px"></div>
-    <div class="row" style="margin-top:8px">
-      <button class="chip" id="insCopy">문장 복사</button>
-      <span id="insCopyMsg" style="font-size:12px;color:var(--good)"></span>
-    </div>
-    <textarea id="insCopySrc" class="hidden" style="width:100%;height:150px;margin-top:8px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px"></textarea>
-
-    <div class="mentalNote" style="margin-top:16px;padding:12px 14px;background:#1a1420;border:1px solid #3a2a30;border-radius:8px">
-      <b style="color:var(--up)">이 탭의 통계를 믿기 전에 반드시 알아야 할 두 가지</b>
-      <ul style="margin:6px 0 0 16px">
-        <li><b>생존 편향</b> — 지금 조회 가능한 종목은 살아남았기 때문에 데이터가 존재합니다. 같은 기간 상장폐지되거나 사라진 회사는 애초에 계산에 들어오지 않습니다. 따라서 "버티면 회복한다"는 결론은 <b>구조적으로 낙관 쪽으로 기울어</b> 있습니다. 개별 종목일수록 이 편향이 큽니다.</li>
-        <li><b>조회 기간 의존성</b> — 이 탭의 모든 숫자는 <b>지금 조회한 기간 안에서만</b> 계산됩니다. 상승장만 들어간 기간을 고르면 손실 확률이 실제보다 훨씬 낮게 나옵니다. 기간을 <b>전체</b>로 바꿔 다시 보고, 숫자가 얼마나 달라지는지 확인하세요. 크게 달라진다면 그 통계는 기간이 만든 것이지 종목의 성질이 아닙니다.</li>
-        <li><b>반례를 직접 확인하세요</b> — "오래 들고 있으면 손실 확률이 0에 수렴한다"가 모든 시장에서 성립하는 법칙은 아닙니다. 검색창에 <b>니케이225</b>, <b>코스피</b> 등을 넣고 기간을 <b>전체</b>로 조회해 이 탭을 다시 열어 보세요. 손실 확률이 잘 줄지 않는 사례를 직접 보면, 지금 보고 있는 숫자가 <b>법칙이 아니라 조건부 결과</b>라는 것이 분명해집니다.</li>
-      </ul>
-      여러 사례를 본 다음에 판단하는 것이, 한쪽만 보고 확신하는 것보다 낫습니다.
-    </div>
-  </div>
-</div>
-</div><!-- /tab-insight -->
 
 <script src="tickers.js"></script>
 <script>
@@ -1442,6 +1446,7 @@ function render() {
   state.eps = drawdownEpisodes(state.rows, 0.10);
   if (typeof renderMetrics === "function") renderMetrics();
   if (typeof renderTechnical === "function") renderTechnical();
+  if (typeof syncCartBtn === "function") syncCartBtn();
   renderDdTable();
   renderRallyTable();
   renderAvg();
@@ -1450,9 +1455,7 @@ function render() {
   $("avgUnit").textContent = "단위: " + state.displayCur;
 
   // 인사이트 탭이 열려 있으면 같은 데이터로 함께 갱신
-  if (typeof renderInsight === "function" && !$("tab-insight").classList.contains("hidden")) {
-    renderInsight();
-  }
+  if (typeof renderInsight === "function") renderInsight();
 }
 
 var mainEventPlugin = {
@@ -1660,7 +1663,7 @@ $("rfRate").addEventListener("change", function () {
 });
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["single", "compare", "sim", "insight"];
+var TABS = ["single", "compare", "sim"];
 var currentTab = "single";
 
 function switchTab(target) {
@@ -1674,7 +1677,6 @@ function switchTab(target) {
   });
   // 시뮬레이터는 장바구니를 공유하므로 열 때마다 비중 입력칸을 맞춘다
   if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
-  if (target === "insight" && typeof renderInsight === "function") renderInsight();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
