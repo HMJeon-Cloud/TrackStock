@@ -182,13 +182,13 @@ var GUIDE_METHODS = [
     who: "큰 하락장을 아예 피하고 싶은 사람. 자주 사고파는 것을 감수할 수 있는 사람.",
     idea: "주가가 <b>장기 이동평균선(240일선) 위</b>에 있으면 상승 추세, 아래면 하락 추세로 봅니다. 위에 있을 때만 들고, 아래로 내려오면 팝니다. 큰 폭락은 대부분 240일선 아래에서 일어나므로 이를 피하는 것이 목표입니다. 대신 잦은 거짓 신호로 자잘한 손실이 쌓입니다.",
     steps: [
-      { t: "차트에 이동평균선을 켜고 현재가와 240일선 위치를 봅니다", d: "20일(파랑)·60일(초록)·240일(보라). 주가가 세 선 위에 정렬되면 강한 상승 추세, 아래로 정렬되면 하락 추세입니다.", go: { tab: "single", sub: "analysis", id: "chartCard" }, label: "메인 차트 (이동평균선 체크)" },
+      { t: "차트에 이동평균선을 켜고 현재가와 240일선 위치를 봅니다", d: "20일(파랑)·60일(초록)·240일(보라). 주가 > 20일선 > 60일선 > 240일선 순으로 위에서 아래로 놓이면(정배열) 강한 상승 추세, 그 반대(역배열)면 하락 추세입니다.", go: { tab: "single", sub: "analysis", id: "chartCard" }, label: "메인 차트 (이동평균선 체크)" },
       { t: "전문가 지표에서 240일선 이격도를 확인합니다", d: "이격이 +20% 넘으면 과열(평균으로 되돌아올 힘), -20% 아래면 과매도. 추세 안에서 진입 시점을 고를 때 씁니다.", go: { tab: "single", sub: "analysis", id: "metricsCard" }, label: "전문가 지표" },
-      { t: "52주 최고·최저 대비 위치를 봅니다", d: "52주 신고가 부근에서 이동평균 정배열이면 전형적인 추세 추종 진입 구간입니다.", go: { tab: "single", sub: "analysis", id: "metricsCard" }, label: "52주 위치" },
+      { t: "52주 최고·최저 대비 위치를 봅니다", d: "52주 신고가 부근에서 이동평균이 정배열(주가가 모든 평균선 위)이면 전형적인 추세 추종 진입 구간입니다.", go: { tab: "single", sub: "analysis", id: "metricsCard" }, label: "52주 위치" },
       { t: "낙폭 표에서 추세가 꺾인 뒤 얼마나 더 빠졌는지 봅니다", d: "이 방법이 통했는지는 '240일선 이탈 후 추가 하락폭'으로 판단합니다. 큰 낙폭 대부분이 이탈 후에 나왔다면 유효한 자산입니다.", go: { tab: "single", sub: "analysis", id: "ddCard" }, label: "Drawdown 표" }
     ],
     rule: "예시 규칙: 월말 종가가 240일선 위면 보유, 아래면 전량 현금(또는 단기채). 월 1회만 확인해 잦은 신호를 걸러냅니다. 신호가 틀려 손실이 나도 규칙을 바꾸지 않습니다.",
-    trap: "횡보장에서 <b>샀다 팔았다 반복하며 손실이 누적</b>됩니다(휩소). 2년에 한 번꼴로 오는 진짜 폭락을 피한 이익으로 그 손실을 메우는 구조라, 몇 년은 지수보다 못할 각오가 필요합니다. 세금·수수료도 큽니다."
+    trap: "옆으로 기는 장(횡보장)에서는 신호가 켜졌다 꺼졌다를 반복해 <b>샀다 팔았다 하며 잔손실이 쌓입니다</b>(이를 휩소라 부릅니다). 2년에 한 번꼴로 오는 진짜 폭락을 피한 이익으로 그 손실을 메우는 구조라, 몇 년은 지수보다 못할 각오가 필요합니다. 세금·수수료도 큽니다."
   },
   {
     id: "meanrev",
@@ -219,7 +219,7 @@ var GUIDE_METHODS = [
     idea: "수익률만 보면 가장 많이 오른 것이 항상 이깁니다. 하지만 그 과정에서 <b>얼마나 흔들렸는지</b>를 나누면 순위가 뒤집힙니다. 샤프 비율(전체 변동성 대비)과 소르티노(하락 변동성 대비)로 '효율'을 비교하면, 실제로 끝까지 들고 갈 수 있는 자산이 드러납니다.",
     steps: [
       { t: "전문가 지표에서 샤프·소르티노를 확인합니다", d: "1 이상 우수, 0.5~1 양호, 0 미만은 예금보다 못한 장사. 무위험 수익률은 현재 예금금리를 넣으세요.", go: { tab: "single", sub: "analysis", id: "metricsCard" }, label: "전문가 지표" },
-      { t: "장바구니에 후보를 담고 자산별 요약 표를 비교합니다", d: "총수익·CAGR·최대낙폭·연변동성이 한 표에 나옵니다. CAGR ÷ 최대낙폭(칼마 비율)을 머릿속으로 계산해 보세요.", go: { tab: "compare", id: "cmpSummary", needSymbol: false }, label: "자산별 요약" },
+      { t: "장바구니에 후보를 담고 자산별 요약 표를 비교합니다", d: "총수익·CAGR·최대낙폭·연변동성이 한 표에 나옵니다. CAGR ÷ 최대낙폭(칼마 비율: 고통 1%당 얻은 연수익)을 머릿속으로 계산해 보세요. 예: CAGR 12%, 낙폭 30%면 0.4.", go: { tab: "compare", id: "cmpSummary", needSymbol: false }, label: "자산별 요약" },
       { t: "시뮬레이터 전략 비교 표를 봅니다", d: "각 자산 100%와 섞은 포트폴리오의 수익·낙폭·변동성을 나란히. 수익 1위가 낙폭도 1위인 것을 확인하세요.", go: { tab: "sim", id: "simCompare", needSymbol: false }, label: "전략 비교" }
     ],
     rule: "예시 규칙: 후보 중 최대낙폭이 내 한계 안에 드는 것만 남기고, 그중 샤프 비율이 가장 높은 것을 고릅니다. 수익률은 마지막에 봅니다.",
@@ -275,13 +275,138 @@ var GUIDE_METHODS = [
       { t: "낙폭 표로 배당주도 얼마나 빠지는지 확인합니다", d: "배당주라고 안 빠지지 않습니다. 배당 3%를 받으려다 -30%를 견뎌야 할 수 있습니다.", go: { tab: "single", sub: "analysis", id: "ddCard" }, label: "Drawdown 표" },
       { t: "SCHD 같은 배당 ETF를 검색해 비교합니다", d: "개별 배당주보다 ETF가 배당 삭감 위험을 분산합니다. 장바구니에 담아 SPY와 낙폭·변동성을 비교해 보세요.", go: { tab: "compare", id: "compareCard", needSymbol: false }, label: "장바구니 비교" }
     ],
-    rule: "예시 규칙: 배당수익률 3% 이상 · 배당성향 60% 이하 · 5년 연속 배당 유지. 이 앱의 가격 데이터는 배당을 포함하지 않으므로 실제 총수익은 표시보다 배당만큼 높습니다.",
-    trap: "<b>배당수익률이 갑자기 높아진 종목은 주가가 폭락한 것</b>일 수 있습니다(배당 함정). 배당수익률 8% 이상은 의심부터 하세요. 이 앱의 차트는 배당 재투자를 반영하지 않습니다."
+    rule: "예시 규칙: 배당수익률 3% 이상 · 배당성향 60% 이하 · 5년 연속 배당 유지. 차트의 <b>배당 재투자 반영</b>을 켜면 배당까지 포함한 총수익으로 낙폭·수익률이 다시 계산되니, 배당주는 반드시 켜고 비교하세요.",
+    trap: "<b>배당수익률이 갑자기 높아진 종목은 주가가 폭락한 것</b>일 수 있습니다(배당 함정). 배당수익률 8% 이상은 의심부터 하세요. 배당은 회사가 언제든 줄이거나 없앨 수 있으며, 배당락일에 주가는 배당금만큼 떨어집니다."
   }
 ];
 
+/* ---------- 나에게 맞는 방법 찾기 (읽는 순서 안내) ----------
+   답에 따라 "먼저 읽어볼 방법"에 표시를 붙인다. 추천이 아니라 읽는 순서다. */
+var FINDER_Q = [
+  { id: "dd", q: "내 계좌가 얼마까지 떨어져도 팔지 않고 버틸 수 있나요?",
+    opts: [["-10% 정도", "low"], ["-20~30%", "mid"], ["-50%도 견딤", "high"]] },
+  { id: "horizon", q: "이 돈은 언제 쓸 돈인가요?",
+    opts: [["3년 안", "short"], ["3~10년", "mid"], ["10년 이상·노후", "long"]] },
+  { id: "time", q: "투자에 쓸 수 있는 시간은?",
+    opts: [["거의 없음, 자동으로", "none"], ["한 달에 한 번 점검", "monthly"], ["매일 볼 수 있음", "daily"]] },
+  { id: "what", q: "무엇에 관심이 있나요?",
+    opts: [["개별 회사", "stock"], ["ETF·지수", "etf"], ["아직 모름", "unknown"]] }
+];
+var finderAns = {};
+
+/* 각 답이 어떤 방법에 점수를 주는지 */
+function finderScore() {
+  var s = {};
+  GUIDE_METHODS.forEach(function (m) { s[m.id] = 0; });
+  var a = finderAns;
+  if (a.dd === "low") { s.portfolio += 3; s.hedge += 2; s.riskadj += 2; s.trend += 1; }
+  if (a.dd === "mid") { s.portfolio += 2; s.longterm += 2; s.mdd += 1; s.dividend += 1; }
+  if (a.dd === "high") { s.mdd += 3; s.longterm += 2; s.value += 1; }
+  if (a.horizon === "short") { s.portfolio += 2; s.riskadj += 2; s.hedge += 1; }
+  if (a.horizon === "mid") { s.longterm += 2; s.portfolio += 1; s.mdd += 1; }
+  if (a.horizon === "long") { s.longterm += 3; s.mdd += 2; s.dividend += 2; s.value += 1; }
+  if (a.time === "none") { s.longterm += 3; s.portfolio += 2; s.dividend += 1; }
+  if (a.time === "monthly") { s.trend += 2; s.portfolio += 1; s.mdd += 1; s.riskadj += 1; }
+  if (a.time === "daily") { s.meanrev += 2; s.trend += 1; s.value += 1; }
+  if (a.what === "stock") { s.value += 3; s.mdd += 1; s.dividend += 1; }
+  if (a.what === "etf") { s.portfolio += 2; s.longterm += 2; s.riskadj += 1; }
+  if (a.what === "unknown") { s.longterm += 1; s.portfolio += 1; s.mdd += 1; }
+  return s;
+}
+
+function renderFinder() {
+  var box = $("finderBox");
+  var html = "";
+  FINDER_Q.forEach(function (q) {
+    html += '<div class="fq"><div class="fqT">' + q.q + "</div><div class='row'>";
+    q.opts.forEach(function (o) {
+      html += '<button class="chip' + (finderAns[q.id] === o[1] ? " active" : "") + '" data-q="' + q.id + '" data-v="' + o[1] + '">' + o[0] + "</button>";
+    });
+    html += "</div></div>";
+  });
+  box.innerHTML = html;
+  Array.prototype.forEach.call(box.querySelectorAll("[data-q]"), function (b) {
+    b.onclick = function () {
+      finderAns[b.getAttribute("data-q")] = b.getAttribute("data-v");
+      renderFinder();
+      renderFinderResult();
+    };
+  });
+}
+
+function renderFinderResult() {
+  var box = $("finderResult");
+  var answered = FINDER_Q.filter(function (q) { return finderAns[q.id]; }).length;
+  if (answered < FINDER_Q.length) {
+    box.innerHTML = '<small style="color:var(--sub)">' + answered + "/" + FINDER_Q.length + " 답변 — 모두 고르면 먼저 읽어볼 방법을 표시합니다.</small>";
+    Array.prototype.forEach.call(document.querySelectorAll(".guideItem .gFirst"), function (el) { el.remove(); });
+    return;
+  }
+  var s = finderScore();
+  var ranked = GUIDE_METHODS.slice().sort(function (a, b) { return s[b.id] - s[a.id]; }).slice(0, 3);
+  box.innerHTML = '<div class="gRule" style="margin-top:8px"><b>먼저 읽어볼 방법 (답변 기준 읽는 순서)</b>' +
+    "<ol style='margin:6px 0 0 18px;padding:0'>" +
+    ranked.map(function (m) { return "<li><a href='#' data-go='" + m.id + "'>" + m.icon + " " + m.title + "</a> <small style='color:var(--sub)'>" + m.tag + "</small></li>"; }).join("") +
+    "</ol><small style='color:var(--sub)'>이것은 <b>읽는 순서</b>이지 이 방법이 당신에게 맞다는 판단이 아닙니다. 답을 바꿔 보며 순서가 어떻게 달라지는지 보세요.</small></div>";
+  Array.prototype.forEach.call(box.querySelectorAll("[data-go]"), function (a) {
+    a.onclick = function (e) { e.preventDefault(); showGuide(a.getAttribute("data-go")); };
+  });
+  // 목록 항목에 표시
+  Array.prototype.forEach.call(document.querySelectorAll(".guideItem"), function (b) {
+    var old = b.querySelector(".gFirst"); if (old) old.remove();
+    var idx = ranked.findIndex(function (m) { return m.id === b.getAttribute("data-m"); });
+    if (idx >= 0) {
+      var tag = document.createElement("span");
+      tag.className = "gFirst"; tag.textContent = (idx + 1) + "순위";
+      b.appendChild(tag);
+    }
+  });
+}
+
+/* ---------- 용어 사전 (초보자용, 한 줄 정의) ---------- */
+var GLOSSARY = [
+  ["종가 · 시가 · 고가 · 저가", "하루 거래에서 마지막 가격·첫 가격·가장 높았던 가격·가장 낮았던 가격. 차트와 표는 대부분 종가 기준입니다."],
+  ["전고점", "지금까지 중 가장 높았던 가격. '전고점 대비 -20%'는 최고점에서 20% 떨어져 있다는 뜻."],
+  ["낙폭 · 최대낙폭(MDD)", "고점에서 저점까지 떨어진 폭. 최대낙폭은 그중 가장 깊었던 것. 이 앱에서 가장 중요한 숫자."],
+  ["회복", "떨어졌던 가격이 다시 전고점을 넘는 것. '회복까지 300일'은 그만큼 기다려야 본전이었다는 뜻."],
+  ["CAGR(연평균 수익률)", "총수익을 '1년에 몇 %씩 복리로 불었나'로 환산한 값. 기간이 다른 투자를 비교할 때 씁니다."],
+  ["변동성", "가격이 얼마나 출렁이는지. 높을수록 하루하루 등락이 큽니다. 위험의 크기로 씁니다."],
+  ["거치식 · 적립식", "거치식은 한 번에 넣기, 적립식은 매달 나눠 넣기. 적립식은 평균 매수가가 자동으로 분산됩니다."],
+  ["리밸런싱", "비율이 틀어지면(주식이 올라 70%가 됐다면) 팔고 사서 원래 비율(60%)로 되돌리는 것."],
+  ["상관계수", "두 자산이 같이 움직이는 정도. 1이면 똑같이, 0이면 무관하게, -1이면 반대로. 분산 효과는 0 이하일 때 큽니다."],
+  ["헷지", "내 주력 자산이 떨어질 때 오르거나 버티는 자산을 함께 들고 있는 것. 보험과 비슷합니다."],
+  ["ETF", "여러 종목을 묶어 하나처럼 사고파는 상품. S&P500 ETF를 사면 미국 대형주 500개를 한 번에 사는 셈."],
+  ["지수", "시장 전체의 평균 점수. 코스피·S&P500·나스닥100 등. 지수 자체는 살 수 없고 ETF로 삽니다."],
+  ["티커", "종목의 영문 약자. 삼성전자는 005930, 엔비디아는 NVDA. 검색창에 한글로 쳐도 됩니다."],
+  ["원화 환산", "달러로 거래되는 자산을 그날 환율로 원화로 바꿔 보는 것. 환율 변동까지 포함한 '내 계좌' 기준."],
+  ["컨센서스", "증권사 애널리스트들의 평균 전망(목표주가·이익 추정). 자주 빗나갑니다."],
+  ["배당 · 배당락", "회사가 이익 일부를 주주에게 현금으로 주는 것. 배당락일에는 주가가 배당금만큼 떨어집니다."],
+  ["총수익", "가격 상승 + 배당을 합친 수익. 배당주는 가격만 보면 실제보다 나빠 보입니다."],
+  ["손절", "정해둔 손실선에서 파는 것. 더 큰 손실을 막는 안전장치이며, 지지선 살짝 아래에 두는 게 관례."],
+  ["분할 매수", "한 번에 다 사지 않고 여러 번 나눠 사는 것. 바닥을 맞힐 수 없다는 전제에서 나온 방법."],
+  ["생존 편향", "살아남은 종목만 데이터에 남아 결과가 실제보다 좋아 보이는 착시. 상장폐지된 종목은 통계에 없습니다."]
+];
+function renderGlossary() {
+  var box = $("glossary");
+  box.innerHTML = GLOSSARY.map(function (g) {
+    return "<div class='glItem'><b>" + g[0] + "</b><span>" + g[1] + "</span></div>";
+  }).join("");
+}
+
 /* ---------- 렌더링 ---------- */
 var guideState = { current: null };
+
+/* 상세를 닫고 목록으로 (뒤로가기 버튼·브라우저 뒤로가기 공용) */
+function closeGuide(fromHistory) {
+  $("guideList").classList.remove("collapsed");
+  $("guideDetail").classList.add("hidden");
+  guideState.current = null;
+  Array.prototype.forEach.call(document.querySelectorAll(".guideItem"), function (b) { b.classList.remove("active"); });
+  if (!fromHistory) {
+    var top = $("guideCard").getBoundingClientRect().top + window.scrollY - ($("topbar").offsetHeight + 8);
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }
+}
 
 function renderGuideList() {
   var box = $("guideList");
@@ -295,10 +420,15 @@ function renderGuideList() {
   });
 }
 
-function showGuide(id) {
+function showGuide(id, fromHistory) {
   var m = null;
   for (var i = 0; i < GUIDE_METHODS.length; i++) if (GUIDE_METHODS[i].id === id) m = GUIDE_METHODS[i];
   if (!m) return;
+  if (!fromHistory && guideState.current !== id) {
+    // 떠나는 화면(목록 또는 다른 항목)을 저장하고 새 항목을 히스토리에 쌓는다 → 뒤로가기로 돌아올 수 있다
+    history.replaceState(viewState(), "");
+    history.pushState({ tab: "guide", sub: currentSub, y: 0, guide: id }, "");
+  }
   guideState.current = id;
   Array.prototype.forEach.call(document.querySelectorAll(".guideItem"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-m") === id);
@@ -326,7 +456,7 @@ function showGuide(id) {
         : "") + "</li>";
   });
   html += "</ol></div>";
-  html += '<div class="gSec gRule"><b>규칙으로 만들면</b><p>' + m.rule + "</p></div>";
+  html += '<div class="gSec gRule"><b>규칙으로 만든다면 (가상의 예시 · 실제 적용 전 반드시 본인 상황에 맞게 조정)</b><p>' + m.rule + "</p></div>";
   html += '<div class="gSec gTrap"><b>함정 · 반드시 알아둘 것</b><p>' + m.trap + "</p></div>";
 
   var panel = $("guideDetail");
@@ -338,12 +468,9 @@ function showGuide(id) {
   // 모바일에서는 목록과 상세가 위아래로 쌓여 겹쳐 보이므로, 상세를 볼 때 목록을 접는다
   if (window.innerWidth <= 640) $("guideList").classList.add("collapsed");
   $("guideBack").onclick = function () {
-    $("guideList").classList.remove("collapsed");
-    panel.classList.add("hidden");
-    guideState.current = null;
-    Array.prototype.forEach.call(document.querySelectorAll(".guideItem"), function (b) { b.classList.remove("active"); });
-    var top = $("guideCard").getBoundingClientRect().top + window.scrollY - ($("topbar").offsetHeight + 8);
-    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    // 브라우저 뒤로가기와 같은 동작이 되도록 히스토리를 한 칸 되돌린다
+    if (history.state && history.state.guide) history.back();
+    else closeGuide(false);
   };
   // 도입부의 면책 안내는 항목을 골라도 계속 보이게 유지한다
 
@@ -363,3 +490,6 @@ function showGuide(id) {
 }
 
 renderGuideList();
+renderFinder();
+renderFinderResult();
+renderGlossary();
