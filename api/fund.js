@@ -60,13 +60,14 @@ export default async function handler(req, res) {
 
   const parsed = parseSymbol(symbol);
   if (parsed.market === "NONE") {
-    return res.status(200).json({ symbol, market: "NONE", note: "지수·환율·원자재·암호화폐는 재무 데이터가 없습니다." });
+    return res.status(200).json({ symbol, market: "NONE", ok: false, reason: "NOT_A_COMPANY" });
   }
 
   let code = parsed.code;
+  let out0name = null;
   const market = parsed.market;
 
-  // 해외 종목: 자동완성으로 로이터 코드(AAPL.O 등) 해석
+  // 해외 종목: 자동완성으로 로이터 코드(AAPL.O 등)를 얻는다
   if (market === "WORLD") {
     try {
       const q = symbol.toUpperCase().replace(/-/g, ".");
@@ -77,50 +78,99 @@ export default async function handler(req, res) {
       const hit = items.find((it) => {
         const rc = (it.reutersCode || "").toUpperCase();
         return rc === q || rc.split(".")[0] === q;
-      });
+      }) || items.find((it) => it.reutersCode);
       if (!hit || !hit.reutersCode) {
-        return res.status(200).json({
-          symbol, market: "WORLD", ok: false,
-          note: "네이버 증권에서 이 해외 종목의 재무 데이터를 찾지 못했습니다.",
-        });
+        return res.status(200).json({ symbol, market: "WORLD", ok: false, reason: "WORLD_NOT_FOUND" });
       }
       code = hit.reutersCode;
+      out0name = hit.name || null;
     } catch (e) {
-      return res.status(200).json({ symbol, market: "WORLD", ok: false, note: "해외 종목 검색 실패: " + e.message });
+      return res.status(200).json({ symbol, market: "WORLD", ok: false, reason: "WORLD_NOT_FOUND", detail: e.message });
     }
   }
 
   const out = { symbol, code, market, ok: true, info: {}, finance: null, trend: null, industry: null, consensus: null };
 
-  // 1) 통합 스냅샷 (시세 + 투자지표)
-  try {
-    const integ = await getJson(BASE + "/api/stock/" + encodeURIComponent(code) + "/integration");
-    (integ.totalInfos || []).forEach((r) => {
-      if (r && r.code) out.info[r.code] = { key: r.key, value: r.value };
+  /* 알려진 지표 키만 골라내는 범용 추출기.
+     해외 엔드포인트는 응답 모양이 국내와 달라 여러 형태를 모두 받아들인다. */
+  const WANT_KEYS = [
+    "lastClosePrice", "closePrice", "openPrice", "highPrice", "lowPrice",
+    "accumulatedTradingVolume", "accumulatedTradingValue", "marketValue", "marketCap",
+    "foreignRate", "highPriceOf52Weeks", "lowPriceOf52Weeks",
+    "per", "eps", "cnsPer", "cnsEps", "pbr", "bps", "roe", "dividendYieldRatio", "dividend",
+    "epsTtm", "perTtm", "beta", "sharesOutstanding", "payoutRatio",
+  ];
+  function harvest(node, into, depth) {
+    if (!node || depth > 4) return;
+    if (Array.isArray(node)) {
+      // [{code,key,value}, ...] 형태
+      node.forEach((r) => {
+        if (r && typeof r === "object" && r.code && "value" in r) {
+          into[r.code] = { key: r.key || r.code, value: r.value };
+        } else harvest(r, into, depth + 1);
+      });
+      return;
+    }
+    if (typeof node !== "object") return;
+    WANT_KEYS.forEach((k) => {
+      if (node[k] != null && (typeof node[k] === "string" || typeof node[k] === "number")) {
+        if (into[k] == null) into[k] = { key: k, value: node[k] };
+      }
     });
-    out.name = integ.stockName || integ.itemName || null;
-    out.industry = integ.industryCompareInfo || null;
-    out.consensus = integ.consensusInfo || null;
-    out.dealTrend = integ.dealTrendInfos || null;
-  } catch (e) {
-    return res.status(200).json({ symbol, code, market, ok: false, note: "투자지표 조회 실패: " + e.message });
+    Object.keys(node).forEach((k) => {
+      const v = node[k];
+      if (v && typeof v === "object") harvest(v, into, depth + 1);
+    });
   }
 
-  // 2) 재무제표 (국내만, 실패해도 나머지는 반환)
-  if (market === "KR") {
-    for (const p of ["quarter", "annual"]) {
-      try {
-        const f = await getJson(BASE + "/api/stock/" + code + "/finance/" + p);
-        out.finance = out.finance || {};
-        out.finance[p] = slimFinance(f.financeInfo);
-      } catch (e) {
-        out.finance = out.finance || {};
-        out.finance[p] = null;
-      }
-    }
-    // 3) 투자자별 매매동향 (엔드포인트 형태가 바뀔 수 있어 실패 시 null)
+  // 1) 통합 스냅샷 (시세 + 투자지표)
+  const enc = encodeURIComponent(code);
+  const snapPaths = market === "KR"
+    ? ["/api/stock/" + enc + "/integration"]
+    : [
+        "/api/worldstock/stock/" + enc + "/integration",
+        "/api/worldstock/stock/" + enc + "/basic",
+        "/api/worldstock/stock/" + enc + "/totalInfo",
+        "/front-api/v1/worldstock/stock/" + enc + "/summary",
+      ];
+
+  let snapOk = false;
+  for (const p of snapPaths) {
     try {
-      out.trend = await getJson(BASE + "/api/stock/" + code + "/trend?pageSize=10&page=1");
+      const j = await getJson(BASE + p);
+      const body = j && j.result ? j.result : j;
+      harvest(body, out.info, 0);
+      if (!out.name) out.name = body.stockName || body.itemName || body.name || out0name || null;
+      if (!out.industry) out.industry = body.industryCompareInfo || null;
+      if (!out.consensus) out.consensus = body.consensusInfo || null;
+      if (!out.dealTrend) out.dealTrend = body.dealTrendInfos || null;
+      if (Object.keys(out.info).length) { snapOk = true; break; }
+    } catch (e) { /* 다음 후보 */ }
+  }
+  if (!snapOk) {
+    return res.status(200).json({
+      symbol, code, market, ok: false,
+      reason: market === "WORLD" ? "WORLD_PARTIAL" : "FETCH_FAILED",
+      name: out0name
+    });
+  }
+
+  // 2) 재무제표 — 국내는 확실, 해외는 제공되면 표시 (실패해도 나머지는 반환)
+  const finBase = market === "KR" ? "/api/stock/" + enc + "/finance/" : "/api/worldstock/stock/" + enc + "/finance/";
+  out.finance = {};
+  for (const p of ["quarter", "annual"]) {
+    try {
+      const f = await getJson(BASE + finBase + p);
+      out.finance[p] = slimFinance((f && f.financeInfo) || (f && f.result && f.result.financeInfo));
+    } catch (e) {
+      out.finance[p] = null;
+    }
+  }
+
+  // 3) 투자자별 매매동향 (국내 전용)
+  if (market === "KR") {
+    try {
+      out.trend = await getJson(BASE + "/api/stock/" + enc + "/trend?pageSize=10&page=1");
     } catch (e) {
       out.trend = null;
     }
