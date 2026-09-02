@@ -70,6 +70,51 @@ function judgeRoe(roe) {
   return ["낮음", "var(--sub)"];
 }
 
+/* 네이버 데이터가 없어도, 이미 받아둔 Yahoo 차트 데이터(메타 + 시계열)로
+   보여줄 수 있는 것은 최대한 보여준다. 추가 요청 없이 계산되는 값들이다. */
+function renderFallbackQuote() {
+  var m = state.meta || {}, rows = state.rowsRaw && state.rowsRaw.length ? state.rowsRaw : state.rows;
+  if (!rows || !rows.length) return false;
+  var cur = m.currency || "USD";
+  var u = cur === "KRW" ? "원" : " " + cur;
+  function px(v) { return v == null ? null : fmtPrice(v) + u; }
+
+  // 값은 전부 차트와 같은 시계열에서 뽑는다 (메타의 실시간가와 섞으면 표시가 어긋난다)
+  var last = rows[rows.length - 1];
+  var prev = rows.length > 1 ? rows[rows.length - 2] : null;
+  var chg = prev ? last.c / prev.c - 1 : null;
+
+  // 52주 고저는 메타에 있으면 쓰고, 없으면 시계열에서 계산
+  var hi52 = m.fiftyTwoWeekHigh, lo52 = m.fiftyTwoWeekLow;
+  if (hi52 == null || lo52 == null) {
+    var s = Math.max(0, rows.length - 252), H = -Infinity, L = Infinity;
+    for (var i = s; i < rows.length; i++) { if (rows[i].h > H) H = rows[i].h; if (rows[i].l < L) L = rows[i].l; }
+    hi52 = H; lo52 = L;
+  }
+  var vol = last.v || m.regularMarketVolume;
+
+  var items = [
+    ["종가 (" + fmtDate(last.t) + ")", px(last.c)],
+    ["전일 종가", px(prev ? prev.c : null)],
+    ["전일 대비", chg == null ? null : '<span class="' + pctCls(chg) + '">' + fmtPct(chg) + "</span>"],
+    ["시가", px(last.o)],
+    ["고가", px(last.h)],
+    ["저가", px(last.l)],
+    ["거래량", vol ? Math.round(vol).toLocaleString("ko-KR") : null],
+    ["52주 최고", px(hi52)],
+    ["52주 최저", px(lo52)],
+    ["52주 최고 대비", hi52 ? '<span class="' + pctCls(last.c / hi52 - 1) + '">' + fmtPct(last.c / hi52 - 1) + "</span>" : null],
+    ["52주 최저 대비", lo52 ? '<span class="' + pctCls(last.c / lo52 - 1) + '">' + fmtPct(last.c / lo52 - 1) + "</span>" : null],
+    ["거래소", m.exchangeName || m.fullExchangeName || null],
+    ["통화", cur],
+    ["상장/데이터 시작", m.firstTradeDate ? fmtDate(m.firstTradeDate * 1000) : fmtDate(rows[0].t)]
+  ];
+  $("fundQuote").innerHTML = items.filter(function (x) { return x[1] != null; }).map(function (x) {
+    return '<span class="badge">' + x[0] + "<b>" + x[1] + "</b></span>";
+  }).join("");
+  return true;
+}
+
 /* 조회 불가 사유를 초보자가 이해할 수 있는 문장으로 바꾼다.
    HTTP 상태코드 같은 기술적 문구를 그대로 노출하지 않는다. */
 function fundMessage(d) {
@@ -79,11 +124,12 @@ function fundMessage(d) {
       "PER·PBR·ROE를 계산할 수 없습니다.<br>" +
       "<small>대신 위쪽 <b>전문가 지표</b>(RSI·샤프·MDD)와 <b>지지·저항선</b>, <b>캔들 차트</b>는 정상적으로 사용할 수 있습니다.</small>";
   }
-  if (reason === "WORLD_UNSUPPORTED" || (d && d.market === "WORLD")) {
-    return "<b>해외 종목은 재무 데이터를 제공하지 않습니다.</b> 이 앱의 기업 정보는 네이버 증권 자료를 쓰는데, " +
-      "국내 상장 종목만 안정적으로 제공됩니다.<br>" +
-      "<small>미국 종목의 PER·PBR·ROE는 <b>네이버 증권 해외주식</b>, <b>Yahoo Finance</b>, 증권사 앱의 종목 정보에서 확인하실 수 있습니다. " +
-      "이 앱의 가격 기반 분석(낙폭·지지저항·캔들·RSI·샤프 등)은 해외 종목도 모두 정상 작동합니다.</small>";
+  if (reason === "WORLD_PARTIAL" || reason === "WORLD_NOT_FOUND" || reason === "WORLD_UNSUPPORTED" ||
+      (d && d.market === "WORLD")) {
+    return "이 해외 종목은 <b>재무 지표(PER·PBR·ROE·배당)를 가져오지 못했습니다.</b> " +
+      "아래 시세는 이 앱이 차트에 쓰는 것과 같은 데이터로 채웠습니다.<br>" +
+      "<small>PER·PBR 등이 필요하시면 <b>네이버 증권 해외주식</b>이나 증권사 앱의 종목 정보에서 확인하고, " +
+      "이 앱의 낙폭·지지저항·캔들·RSI·샤프 분석과 교차로 보시면 됩니다.</small>";
   }
   return "<b>기업 정보를 불러오지 못했습니다.</b> 잠시 후 다시 시도해 주세요.<br>" +
     "<small>가격 기반 분석은 정상 작동합니다.</small>";
@@ -105,7 +151,19 @@ function loadFund(symbol) {
     .then(function (d) {
       if (fundState.symbol !== symbol) return; // 다른 종목으로 바뀜
       if (!d || !d.ok) {
+        // 네이버 지표가 없어도 Yahoo 데이터로 시세는 채운다
+        var drew = renderFallbackQuote();
         $("fundStatus").innerHTML = fundMessage(d);
+        if (drew) {
+          $("fundBody").classList.remove("hidden");
+          $("fundMetrics").innerHTML =
+            '<span style="font-size:12px;color:var(--sub)">PER·PBR·ROE·배당 등 재무 기반 지표는 이 종목에서 제공되지 않습니다. ' +
+            '위쪽 <b>전문가 지표</b> 카드의 RSI·샤프·소르티노·MDD는 가격만으로 계산되므로 정상 표시됩니다.</span>';
+          $("fundConsensus").innerHTML = "";
+          $("fundFinance").innerHTML = "<tbody><tr><td style='color:var(--sub)'>재무제표 미제공</td></tr></tbody>";
+          $("fundTrend").innerHTML = "<tbody><tr><td style='color:var(--sub)'>투자자별 매매동향은 국내 종목만 제공됩니다.</td></tr></tbody>";
+          $("fundSource").textContent = "시세 출처: Yahoo Finance (이 앱이 차트에 쓰는 것과 동일한 데이터)";
+        }
         return;
       }
       fundState.data = d;
@@ -134,9 +192,11 @@ function renderFund() {
     ["시가총액", v("marketValue")], ["외국인 보유율", v("foreignRate")],
     ["52주 최고", v("highPriceOf52Weeks")], ["52주 최저", v("lowPriceOf52Weeks")]
   ];
-  $("fundQuote").innerHTML = quote.filter(function (q) { return q[1] != null; }).map(function (q) {
+  var quoteHtml = quote.filter(function (q) { return q[1] != null; }).map(function (q) {
     return '<span class="badge">' + q[0] + "<b>" + q[1] + "</b></span>";
   }).join("");
+  if (quoteHtml) $("fundQuote").innerHTML = quoteHtml;
+  else renderFallbackQuote();   // 지표만 오고 시세가 비었으면 Yahoo 값으로 채운다
 
   /* --- 2. 투자지표 --- */
   var per = n("per"), eps = n("eps"), pbr = n("pbr"), bps = n("bps");
