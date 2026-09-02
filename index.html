@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StockMind — 하락장 멘탈 방어 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <style>
   :root {
     --bg: #0f1420; --card: #171e2e; --card2: #1d2638;
@@ -93,7 +95,7 @@
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v1.4</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.0</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -150,7 +152,9 @@
         </select>
         <input id="fxFixed" type="number" step="0.1" class="hidden" style="width:100px;font-size:12px;padding:5px 8px">
       </span>
+      <button class="chip" id="chartResetZoom" title="확대를 원래대로 되돌립니다">↺ 확대 초기화</button>
       <label class="opt"><input type="checkbox" id="showMA"> 이동평균선 (20/60/240일)</label>
+      <label class="opt"><input type="checkbox" id="showLevels"> 지지/저항선</label>
       <label class="opt"><input type="checkbox" id="logScale"> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="showEvents" checked> 이벤트 선</label>
       <label class="opt"><input type="checkbox" id="showLabels"> 이벤트 이름</label>
@@ -161,12 +165,120 @@
       노란 선이 <b>종가 흐름</b>, 세로 점선이 그 시점에 있었던 <b>사건</b>입니다. 색은 사건의 종류(전쟁·위기·금리·팬데믹·정치·회복)를 뜻합니다.
       <ul>
         <li><b>차트 위에 마우스를 올리면</b> 그날의 가격과, 앞뒤 10일 안에 있었던 사건이 함께 뜹니다.</li>
+        <li><b>확대/축소</b> — 차트 위에서 <b>마우스 휠</b>을 굴리면 커서가 있는 지점을 중심으로 확대·축소됩니다. 확대 상태에서 <b>드래그</b>하면 좌우로 이동하고, y축은 보이는 구간에 맞춰 자동으로 다시 잡힙니다. <b>↺ 확대 초기화</b> 버튼으로 전체 보기로 돌아옵니다. 모바일에서는 두 손가락 벌리기로 확대됩니다.</li>
         <li><b>이동평균선</b>을 켜면 20일(파랑)·60일(초록)·240일(보라) 평균선이 겹쳐집니다. 각각 1개월·3개월·1년 추세를 뜻하며, 자세한 해석은 아래 <b>전문가 지표</b> 카드의 학습 가이드에 있습니다.</li>
         <li><b>로그 스케일</b>을 켜면 세로 이동 거리가 같을 때 상승률도 같아집니다. 가격이 몇 배씩 오른 종목의 초기 구간을 볼 때 켜세요. 끄면(기본) 절대 금액 차이가 그대로 보입니다.</li>
         <li><b>원화 환산</b>은 미국 주식에만 나타납니다. 켜면 달러 주가에 그날그날 환율을 곱해, 한국 투자자가 실제로 체감한 원화 수익률로 모든 표가 다시 계산됩니다. 달러가 올랐다면 원화 수익률이 달러 수익률보다 높게 나옵니다.</li>
         <li><b>환율 적용 방식</b> — <b>일별 실제 환율</b>(기본)은 매일의 실제 환율을 씁니다. <b>고정 환율</b>을 고르고 숫자를 직접 넣으면 전 기간에 그 환율 하나만 적용하는데, 이렇게 하면 환율 변동 효과가 사라져 <b>순수한 주가 등락만</b> 원화로 볼 수 있습니다. 두 방식의 차이가 곧 환율이 내 수익에 기여한 몫입니다.</li>
       </ul>
       <b>주의:</b> 사건 점선은 "이때 이런 일이 있었다"는 표시일 뿐, 그 사건이 가격 변화의 원인이라는 뜻은 아닙니다.
+    </div></details>
+  </div>
+
+  <div class="card" id="techCard">
+    <h2>기간 수익률 & 지지·저항선 <small>지금 어디쯤 왔고, 어디서 막히고 받쳐지는가</small></h2>
+    <div id="periodReturns" class="row" style="margin-bottom:12px"></div>
+    <h3 style="margin-top:6px">자동 탐지된 지지선 · 저항선</h3>
+    <div class="tableWrap"><table id="levelsTable"></table></div>
+    <div id="levelsNote" class="mentalNote"></div>
+    <details class="howto"><summary>학습 가이드 — 지지선과 저항선</summary><div class="body">
+      <b>■ 개념을 한 문장으로</b><br>
+      <b>지지선</b>은 주가가 떨어지다가 <b>여러 번 멈추고 되돌아 올라간 가격대</b>, <b>저항선</b>은 오르다가 <b>여러 번 막히고 되돌아 내려온 가격대</b>입니다.
+      그 가격에서 "이 정도면 싸다"고 사는 사람들(지지)과 "이 정도면 팔자"는 사람들(저항)이 반복해서 나타났다는 흔적입니다.<br><br>
+      <b>■ 이 앱이 찾는 방법</b><br>
+      최근 250거래일(약 1년)에서 좌우 6일 안에 가장 높았던 날(스윙 고점)과 가장 낮았던 날(스윙 저점)을 전부 찾고, 서로 1.5% 안에 있는 것들을 하나의 가격대로 묶습니다.
+      <b>터치 횟수</b>가 많을수록 시장이 그 가격을 여러 번 "의식"했다는 뜻이라 신뢰도가 높습니다. 위 차트에서 <b>지지/저항선</b>을 켜면 점선으로 겹쳐 보입니다.<br><br>
+      <b>■ 초보자가 실제로 쓰는 법</b><br>
+      <ul>
+        <li><b>지지선 근처에서 산다</b> — 떨어지다 멈출 확률이 다른 곳보다 높기 때문입니다. 단, 지지선이 <b>깨지면</b>(종가가 지지선 아래로 마감) 그 아래 다음 지지선까지 열려 있다고 봅니다. 그래서 "지지선 살짝 아래에 손절선"을 두는 것이 정석입니다.</li>
+        <li><b>저항선 근처에서는 추격매수하지 않는다</b> — 막힐 확률이 높은 곳입니다. 저항선을 <b>돌파하면</b>(거래량 동반 종가 마감) 그 저항선은 새로운 지지선이 됩니다. 이걸 '역할 전환'이라 부릅니다.</li>
+        <li><b>터치 횟수 1회짜리는 참고만</b> — 우연일 수 있습니다. 2~3회 이상이 의미 있습니다.</li>
+      </ul>
+      <b>■ 함정</b><br>
+      지지·저항은 <b>확률적 경향</b>이지 벽이 아닙니다. 실적 발표나 큰 뉴스 앞에서는 쉽게 뚫립니다. 그리고 많은 사람이 같은 선을 보고 있어서 <b>"지지선 살짝 아래까지 찔렀다가 급반등"</b>(손절 물량 털기)이 자주 일어납니다. 지지선을 0.5~1% 깨졌다고 바로 팔지 말고 <b>종가 기준</b>으로 판단하세요.<br>
+      <b>52주 최저·최고, 이동평균선(240일선)</b>도 사실상 지지·저항으로 작용하는 경우가 많으니 아래 전문가 지표와 함께 보세요.
+    </div></details>
+  </div>
+
+  <div class="card hidden" id="candleCard">
+    <h2>캔들 차트 <small>최근 흐름을 하루 단위로 읽기</small></h2>
+    <div class="row" style="margin-bottom:8px">
+      <select id="candleDays">
+        <option value="60">최근 60일</option>
+        <option value="120" selected>최근 120일</option>
+        <option value="250">최근 250일</option>
+      </select>
+      <button class="chip" id="candleResetZoom">↺ 확대 초기화</button>
+      <span style="font-size:11px;color:var(--sub)"><span style="color:var(--up)">■</span> 양봉(종가&gt;시가) <span style="color:var(--down)">■</span> 음봉(종가&lt;시가) · 노란선 20일 이동평균 · 아래 옅은 막대 거래량</span>
+    </div>
+    <div class="chartWrap"><canvas id="candleChart"></canvas></div>
+    <div id="candleRecent" class="row" style="margin-top:10px"></div>
+    <details class="howto"><summary>학습 가이드 — 캔들 보는 법</summary><div class="body">
+      <b>■ 캔들 하나가 담는 정보 4가지</b><br>
+      캔들 하나 = 하루입니다. <b>몸통</b>(두꺼운 부분)의 위아래 끝이 <b>시가와 종가</b>, <b>꼬리</b>(가는 선)의 끝이 그날 <b>최고가와 최저가</b>입니다.
+      한국에서는 종가가 시가보다 높으면 <span style="color:var(--up)"><b>빨간 양봉</b></span>, 낮으면 <span style="color:var(--down)"><b>파란 음봉</b></span>입니다. (미국은 초록/빨강으로 반대라 해외 차트 볼 때 주의)<br><br>
+      <b>■ 몸통과 꼬리로 읽는 심리</b><br>
+      <ul>
+        <li><b>몸통이 길다</b> = 하루 종일 한 방향으로 밀렸다. 장대양봉은 강한 매수, 장대음봉은 강한 매도. 특히 <b>거래량이 함께 크면</b> 진짜 힘이 실린 것입니다.</li>
+        <li><b>몸통이 거의 없다 (도지)</b> = 시가≈종가. 사려는 힘과 팔려는 힘이 팽팽했다는 뜻. 추세 끝에 나오면 방향 전환 신호로 봅니다.</li>
+        <li><b>아래꼬리가 길다 (망치형)</b> = 장중에 크게 떨어졌다가 <b>다시 끌어올렸다</b>. 하락 끝에 나오면 "여기서 사는 사람이 있다"는 신호. 위 지지선과 겹치면 더 의미 있습니다.</li>
+        <li><b>윗꼬리가 길다 (유성형)</b> = 장중에 크게 올랐다가 <b>밀려 내려왔다</b>. 상승 끝에 나오면 "여기선 파는 사람이 많다"는 신호. 저항선과 겹치면 더 의미 있습니다.</li>
+      </ul>
+      차트 위에 마우스를 올리면 그날의 시·고·저·종가와 <b>모양 판정</b>이 뜹니다. 아래 배지는 최근 5일 요약입니다.<br><br>
+      <b>■ 거래량을 함께 보는 이유</b><br>
+      캔들 아래 옅은 막대가 거래량입니다. <b>가격 움직임은 거래량이 뒷받침될 때만 믿을 만합니다.</b> 거래량 없이 오른 장대양봉은 소수의 매수로 만들어진 것이라 쉽게 무너지고, 거래량 터지며 나온 장대음봉은 큰손이 빠져나가는 신호일 수 있습니다.<br><br>
+      <b>■ 초보자 주의</b><br>
+      캔들 패턴 하나로 매매하면 안 됩니다. 캔들은 <b>"어디서(지지/저항) 어떤 모양이 나왔나"</b>로 읽어야 합니다. 지지선에서 망치형 + 거래량 증가처럼 <b>세 가지가 겹칠 때</b>만 신호로 취급하고, 하나만 보고 판단하지 마세요. 그리고 이 앱의 목적대로 — 하루 캔들보다 <b>10년 낙폭 표</b>가 훨씬 중요합니다.
+    </div></details>
+  </div>
+
+  <div class="card hidden" id="fundCard">
+    <h2>기업 정보 & 투자지표 <small>가격 뒤에 있는 회사의 실체</small></h2>
+    <div id="fundStatus" style="font-size:12px;color:var(--sub);line-height:1.8"></div>
+    <div id="fundBody" class="hidden">
+      <h3 style="margin-top:4px">오늘의 시세</h3>
+      <div id="fundQuote" class="row"></div>
+      <h3>투자지표 <small>마우스를 올리면 뜻이 뜹니다</small></h3>
+      <div id="fundMetrics" class="row"></div>
+      <div id="fundConsensus" class="mentalNote"></div>
+      <h3>실적 추이
+        <button class="chip active" id="fundViewQ" style="margin-left:8px">분기</button>
+        <button class="chip" id="fundViewA">연간</button>
+      </h3>
+      <div class="tableWrap"><table id="fundFinance"></table></div>
+      <h3>투자자별 매매동향 <small>순매수 수량(주) · 외국인·기관·개인</small></h3>
+      <div class="tableWrap"><table id="fundTrend"></table></div>
+      <div id="fundSource" style="font-size:11px;color:var(--sub);margin-top:8px"></div>
+    </div>
+    <details class="howto"><summary>학습 가이드 — ROE · PER · PBR · EV/EBITDA를 초보자가 읽는 법</summary><div class="body">
+      네 지표는 전부 <b>"이 회사가 얼마나 잘 벌고, 그 대가로 시장이 얼마를 매기고 있나"</b>를 묻는 질문입니다. 하나씩 일상 언어로 풀면 이렇습니다.<br><br>
+      <b>■ ROE (자기자본이익률) — "내 돈으로 몇 % 벌었나"</b><br>
+      순이익 ÷ 자기자본. 주주가 맡긴 돈 100원으로 1년에 15원을 벌면 ROE 15%입니다. <b>이 회사가 장사를 잘하는지 보는 첫 번째 숫자</b>입니다.
+      관례상 <b>15% 이상 우수, 8~15% 양호, 그 아래는 낮음</b>으로 봅니다. 워런 버핏이 가장 중시하는 지표로 유명하죠.
+      <b>함정:</b> 빚을 많이 내면 자기자본이 작아져 ROE가 높아 보입니다. 그래서 <b>부채비율</b>과 반드시 같이 보세요. 부채비율이 200%를 넘는데 ROE만 높으면 위험 신호입니다.<br><br>
+      <b>■ PER (주가수익비율) — "버는 돈의 몇 년치 가격인가"</b><br>
+      주가 ÷ 주당순이익(EPS). PER 10이면 지금 이익이 유지될 때 <b>10년이면 투자금을 회수</b>한다는 뜻입니다. 낮을수록 "싸다", 높을수록 "비싸다"고 말합니다.
+      <b>그런데 절대 기준은 없습니다.</b> 성장이 빠른 회사는 미래 이익을 당겨와 PER 30~50이 정상이고, 성장이 멈춘 회사는 PER 5도 비쌀 수 있습니다.
+      그래서 <b>같은 업종끼리</b> 비교하고(위 배지에 업종 PER 표시), <b>추정 PER</b>(내년 이익 전망 기준)과 함께 봐야 합니다.
+      <b>함정:</b> 이익이 줄어드는 회사는 PER이 낮아 보입니다(저PER 트랩). "PER 5인데 왜 아무도 안 사지?" 싶으면 이익이 곧 줄어들 거라고 시장이 보는 겁니다. 적자면 PER 자체가 계산되지 않습니다.<br><br>
+      <b>■ PBR (주가순자산비율) — "회사 재산의 몇 배 가격인가"</b><br>
+      주가 ÷ 주당순자산(BPS). 회사가 가진 재산(자본)을 주식 수로 나눈 것이 BPS이고, 주가가 그 몇 배인지가 PBR입니다.
+      <b>PBR 1 미만</b>은 "회사를 통째로 사서 청산해도 남는" 가격이라는 뜻입니다. 이론상 싸지만, 실제로는 <b>그 재산으로 돈을 못 번다는 시장의 평가</b>인 경우가 많습니다.
+      은행·건설·지주회사가 만성 PBR 1 미만인 이유입니다. 반대로 PBR이 5를 넘으면 장부상 재산보다 브랜드·기술 같은 무형가치를 시장이 크게 쳐준다는 뜻입니다.
+      <b>ROE와 짝으로 보세요.</b> ROE가 높은 회사는 PBR이 높아도 정당하고, ROE가 낮은데 PBR이 낮은 건 싼 게 아니라 그럴 만한 겁니다.<br><br>
+      <b>■ EV/EBITDA — "빚까지 포함해 회사 통째 가격이 영업현금의 몇 배인가"</b><br>
+      EV(기업가치) = 시가총액 + 순차입금. EBITDA = 영업이익 + 감가상각비(현금이 안 나가는 비용을 다시 더한 것). 이 둘의 비율입니다.
+      PER은 빚을 무시하지만 EV/EBITDA는 <b>빚까지 포함해서 회사를 통째로 사는 가격</b>을 봅니다. 그래서 부채가 많은 업종(통신·에너지·항공)이나 국가 간 비교에서 PER보다 공정합니다.
+      관례상 <b>8배 미만이면 싼 편, 15배 이상이면 비싼 편</b>으로 봅니다. 실적 표에 값이 있으면 표시되고, 없으면 네이버증권 &gt; 종목분석 &gt; 투자지표에서 확인할 수 있습니다.<br><br>
+      <b>■ EPS와 BPS는 재료, PER와 PBR은 요리</b><br>
+      EPS(주당순이익)와 BPS(주당순자산)는 회사 자체의 숫자이고, 여기에 주가를 나눈 것이 PER·PBR입니다.
+      즉 <b>주가가 오르면 회사는 그대로인데 PER·PBR만 올라갑니다.</b> "PER이 높아졌다"는 말이 회사가 나빠졌다는 뜻이 아니라 <b>비싸졌다</b>는 뜻인 이유입니다.<br><br>
+      <b>■ 투자자별 매매동향 읽기</b><br>
+      외국인·기관은 정보와 자금이 많아 이들이 <b>연속으로 순매수</b>하는 종목은 뭔가 근거가 있다고 봅니다. 반대로 외국인·기관이 팔고 <b>개인만 사는</b> 종목은 조심합니다.
+      다만 하루 이틀은 의미 없고 <b>5~10일 이상 방향이 유지될 때</b>만 참고하세요. 외국인 보유율이 꾸준히 올라가는 것도 긍정 신호입니다.<br><br>
+      <b>■ 네 지표를 한 번에 읽는 순서</b><br>
+      ① <b>ROE</b>로 장사를 잘하는 회사인지 → ② <b>부채비율</b>로 빚으로 만든 ROE가 아닌지 → ③ <b>PER·PBR</b>로 그 회사를 지금 비싸게 사는 건 아닌지(업종 비교) → ④ <b>실적 추이</b>로 매출·영업이익이 늘고 있는지(전망치 포함) → ⑤ 이 앱의 <b>낙폭 표</b>로 좋은 회사라도 얼마나 흔들렸는지.
+      <b>좋은 회사와 좋은 주식은 다릅니다.</b> ROE 20%인 훌륭한 회사도 PER 60에 사면 10년을 기다려야 할 수 있습니다.
     </div></details>
   </div>
 
@@ -362,6 +474,7 @@
         </select>
         <input id="cmpFxFixed" type="number" step="0.1" class="hidden" style="width:100px;font-size:12px;padding:5px 8px">
       </span>
+      <button class="chip" id="cmpResetZoom" title="휠 확대를 원래대로">↺ 확대 초기화</button>
       <label class="opt"><input type="checkbox" id="cmpLog" checked> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="cmpShowEvents" checked> 이벤트 선</label>
       <label class="opt"><input type="checkbox" id="cmpShowLabels"> 이벤트 이름</label>
@@ -492,6 +605,7 @@
     <h3>포트폴리오 가치 곡선</h3>
     <div class="row" style="margin-bottom:8px">
       <label class="opt"><input type="checkbox" id="simShowAssets"> 개별 자산 100% 곡선도 표시</label>
+      <button class="chip" id="simResetZoom" title="휠 확대를 원래대로">↺ 확대 초기화</button>
       <label class="opt"><input type="checkbox" id="simLog" checked> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="simShowEvents" checked> 이벤트 선</label>
     </div>
@@ -655,8 +769,10 @@ function parseChart(json) {
     rows.push({
       t: ts[i] * 1000,
       c: c,
+      o: (q.open && q.open[i] != null) ? q.open[i] : c,
       h: (q.high && q.high[i] != null) ? q.high[i] : c,
-      l: (q.low && q.low[i] != null) ? q.low[i] : c
+      l: (q.low && q.low[i] != null) ? q.low[i] : c,
+      v: (q.volume && q.volume[i] != null) ? q.volume[i] : 0
     });
   }
   return { rows: rows, meta: r.meta || {} };
@@ -723,6 +839,63 @@ function ralliesFromEpisodes(rows, eps) {
     if (gain > 0.0001) rallies.push({ fromI: startI, toI: hiI, gain: gain });
   }
   return rallies;
+}
+
+/* ---------- 차트 확대/축소 공용 헬퍼 ----------
+   chartjs-plugin-zoom: 휠 = 커서 위치 중심 확대/축소, 드래그 = 좌우 이동, 핀치 = 모바일 확대.
+   mode "x"는 x축만 확대하므로, 보이는 구간에 맞춰 y축을 다시 맞추는 fitYToVisible을 함께 쓴다. */
+function fitYToVisible(chart) {
+  var xs = chart.scales.x;
+  if (!xs) return;
+  var from = Math.max(0, Math.floor(xs.min));
+  var to = Math.ceil(xs.max);
+  var mn = Infinity, mx = -Infinity;
+  chart.data.datasets.forEach(function (ds, di) {
+    if (!chart.isDatasetVisible(di)) return;
+    if (ds.yAxisID && ds.yAxisID !== "y") return; // 거래량 등 보조축 데이터는 제외
+    var end = Math.min(ds.data.length - 1, to);
+    for (var i = from; i <= end; i++) {
+      var v = ds.data[i];
+      if (v == null) continue;
+      if (Array.isArray(v)) { // 캔들의 [저가, 고가] 구간 막대
+        if (isFinite(v[0]) && v[0] < mn) mn = v[0];
+        if (isFinite(v[1]) && v[1] > mx) mx = v[1];
+        continue;
+      }
+      if (!isFinite(v)) continue;
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+  });
+  if (!isFinite(mn) || !isFinite(mx) || mn >= mx) return;
+  var y = chart.options.scales.y;
+  if (y.type === "logarithmic") { y.min = mn * 0.97; y.max = mx * 1.03; }
+  else { var pad = (mx - mn) * 0.04; y.min = mn - pad; y.max = mx + pad; }
+  chart.update("none");
+}
+
+function resetChartZoom(chart) {
+  if (!chart) return;
+  var y = chart.options.scales.y;
+  delete y.min; delete y.max;
+  if (chart.resetZoom) chart.resetZoom("none");
+  chart.update("none");
+}
+
+function buildZoomOptions() {
+  return {
+    zoom: {
+      wheel: { enabled: true, speed: 0.08 },
+      pinch: { enabled: true },
+      mode: "x",
+      onZoomComplete: function (c) { fitYToVisible(c.chart); }
+    },
+    pan: {
+      enabled: true, mode: "x",
+      onPanComplete: function (c) { fitYToVisible(c.chart); }
+    },
+    limits: { x: { minRange: 10 } }
+  };
 }
 
 /* 회복되지 않은 하락 구간의 현재 상태를 세분화해서 표시한다.
@@ -835,7 +1008,11 @@ function convertRows(rows, fx) {
   var out = [];
   for (var i = 0; i < rows.length; i++) {
     var r = fxAt(fx, rows[i].t);
-    out.push({ t: rows[i].t, c: rows[i].c * r, h: rows[i].h * r, l: rows[i].l * r });
+    out.push({
+      t: rows[i].t, c: rows[i].c * r, h: rows[i].h * r, l: rows[i].l * r,
+      o: rows[i].o != null ? rows[i].o * r : rows[i].c * r,
+      v: rows[i].v || 0
+    });
   }
   return out;
 }
@@ -1106,6 +1283,7 @@ function load() {
 function loadSymbol(symbol, noRetry) {
   var range = $("rangeSel").value;
   setStatus("데이터 불러오는 중... (" + symbol + ")");
+  if (typeof loadFund === "function") loadFund(symbol);
 
   fetch("/api/chart?symbol=" + encodeURIComponent(symbol) + "&range=" + range)
     .then(function (r) {
@@ -1182,7 +1360,8 @@ function applyCurrency() {
       var fr = parseFloat($("fxFixed").value);
       if (!isFinite(fr) || fr <= 0) fr = fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t);
       state.rows = state.rowsRaw.map(function (r) {
-        return { t: r.t, c: r.c * fr, h: r.h * fr, l: r.l * fr };
+        return { t: r.t, c: r.c * fr, h: r.h * fr, l: r.l * fr,
+          o: r.o != null ? r.o * fr : r.c * fr, v: r.v || 0 };
       });
       state.fxModeUsed = "고정 " + fr.toLocaleString("ko-KR") + "원";
     } else {
@@ -1262,6 +1441,7 @@ function render() {
   renderYearTable();
   state.eps = drawdownEpisodes(state.rows, 0.10);
   if (typeof renderMetrics === "function") renderMetrics();
+  if (typeof renderTechnical === "function") renderTechnical();
   renderDdTable();
   renderRallyTable();
   renderAvg();
@@ -1319,6 +1499,7 @@ function renderChart() {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
+        zoom: buildZoomOptions(),
         legend: { display: showMA, labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
@@ -1342,12 +1523,13 @@ function renderChart() {
         }
       }
     },
-    plugins: [mainEventPlugin]
+    plugins: [mainEventPlugin].concat(typeof levelsPlugin !== "undefined" ? [levelsPlugin] : [])
   });
   $("eventList").innerHTML = eventListHtml(rows[0].t, rows[rows.length - 1].t);
 }
 $("logScale").onchange = function () { if (state.rows) renderChart(); };
 $("showMA").onchange = function () { if (state.rows) renderChart(); };
+$("chartResetZoom").onclick = function () { resetChartZoom(state.chart); };
 $("showEvents").onchange = function () { if (state.chart) state.chart.update(); };
 $("showLabels").onchange = function () { if (state.chart) state.chart.update(); };
 
@@ -1575,6 +1757,8 @@ $("shareBtn").onclick = function () {
 window.addEventListener("load", applyShareHash);
 </script>
 <script src="metrics.js"></script>
+<script src="technical.js"></script>
+<script src="company.js"></script>
 <script src="compare.js"></script>
 <script src="sim.js"></script>
 <script src="insight.js"></script>
