@@ -79,11 +79,34 @@
   tr.crisisRow:hover td { background: #202a40; }
   tr.crisisRow.active td { background: #2c3a5c; }
   /* 탭 */
-  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+  /* 상단 고정 헤더 */
+  .topbar { position: sticky; top: 0; z-index: 100; background: var(--bg);
+    margin: -16px -16px 16px; padding: 12px 16px 0; border-bottom: 1px solid var(--line);
+    box-shadow: 0 6px 16px rgba(15,20,32,0.65); }
+  .topbar h1 { font-size: 20px; margin-bottom: 4px; transition: font-size .15s; }
+  .topbar .sub { margin-bottom: 10px; transition: opacity .15s, max-height .15s, margin .15s; }
+  /* 스크롤하면 제목줄을 접어 탭만 남긴다 */
+  .topbar.shrink h1 { font-size: 15px; }
+  .topbar.shrink .sub { opacity: 0; max-height: 0; margin-bottom: 0; overflow: hidden; }
+
+  .tabs { display: flex; gap: 4px; align-items: flex-end; }
   .tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0;
     padding: 10px 16px; font-size: 14px; color: var(--sub); cursor: pointer; white-space: nowrap; }
   .tabs button:hover { color: var(--txt); }
   .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
+
+  /* 드롭다운 서브메뉴 */
+  .tabItem { position: relative; }
+  .tabItem > button .caret { font-size: 10px; margin-left: 4px; opacity: .7; }
+  .submenu { display: none; position: absolute; left: 0; top: 100%; min-width: 190px; z-index: 200;
+    background: var(--card2); border: 1px solid var(--line); border-radius: 0 0 10px 10px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.5); overflow: hidden; padding: 4px 0; }
+  .tabItem:hover .submenu, .tabItem.open .submenu { display: block; }
+  .submenu button { display: block; width: 100%; text-align: left; border: none; border-radius: 0;
+    padding: 10px 14px; font-size: 13px; color: var(--txt); }
+  .submenu button:hover { background: #26314a; color: var(--accent); }
+  .submenu button.active { color: var(--accent); font-weight: bold; background: #202a40; }
+  .submenu button small { display: block; color: var(--sub); font-size: 11px; font-weight: normal; margin-top: 2px; }
   /* 비중 슬라이더 */
   .cartBtn { position: relative; font-size: 17px; padding: 8px 12px; line-height: 1; cursor: pointer; }
   .cartBtn:hover { border-color: var(--accent); }
@@ -101,17 +124,26 @@
 </style>
 </head>
 <body>
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.1</small></h1>
+<header class="topbar" id="topbar">
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.2</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
-  <button class="active" data-tab="single">개별 종목 분석</button>
+  <div class="tabItem" id="singleTabItem">
+    <button class="active" data-tab="single">개별 종목 분석<span class="caret">▾</span></button>
+    <div class="submenu">
+      <button data-sub="analysis" class="active">종목 분석<small>차트 · 지지저항 · 캔들 · 재무 · 지표</small></button>
+      <button data-sub="insight">인사이트<small>보유기간 손실확률 · 급등급락 · 자동요약</small></button>
+    </div>
+  </div>
   <button data-tab="compare">장바구니 비교</button>
   <button data-tab="sim">포트폴리오 시뮬레이터</button>
   <button id="shareBtn" style="margin-left:auto;border-bottom:none;font-size:12px" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
 </div>
+</header>
 
 <div id="tab-single">
+<div id="sub-analysis">
 <div class="card">
   <div class="row">
     <div id="searchBox">
@@ -424,11 +456,14 @@
 
 </div>
 
+</div><!-- /sub-analysis -->
+
+<div id="sub-insight" class="hidden">
 <div class="card">
   <h2>인사이트 <small id="insTitle">위 종목의 과거 데이터로 계산한 사실들</small></h2>
 
   <div id="insEmpty" class="mentalNote">
-    먼저 <b>개별 종목 분석</b> 탭에서 종목을 조회해 주세요. 통계를 내려면 최소 1년 이상의 데이터가 필요하며,
+    먼저 <b>종목 분석</b> 화면에서 종목을 조회해 주세요. 통계를 내려면 최소 1년 이상의 데이터가 필요하며,
     조회 기간을 <b>20년 또는 전체</b>로 설정할수록 결과가 정확해집니다.
   </div>
 
@@ -507,6 +542,7 @@
   </div>
 </div>
 
+</div><!-- /sub-insight -->
 </div><!-- /tab-single -->
 
 <div id="tab-compare" class="hidden">
@@ -1455,7 +1491,7 @@ function render() {
   $("avgUnit").textContent = "단위: " + state.displayCur;
 
   // 인사이트 탭이 열려 있으면 같은 데이터로 함께 갱신
-  if (typeof renderInsight === "function") renderInsight();
+  if (typeof renderInsight === "function" && currentSub === "insight") renderInsight();
 }
 
 var mainEventPlugin = {
@@ -1666,7 +1702,26 @@ $("rfRate").addEventListener("change", function () {
 var TABS = ["single", "compare", "sim"];
 var currentTab = "single";
 
-function switchTab(target) {
+var SUBS = ["analysis", "insight"];
+var currentSub = "analysis";
+
+/* 개별 종목 분석 탭 안의 하위 화면 전환 (종목 분석 / 인사이트) */
+function switchSub(sub, noScroll) {
+  if (SUBS.indexOf(sub) < 0) sub = "analysis";
+  currentSub = sub;
+  $("sub-analysis").classList.toggle("hidden", sub !== "analysis");
+  $("sub-insight").classList.toggle("hidden", sub !== "insight");
+  Array.prototype.forEach.call(document.querySelectorAll(".submenu button[data-sub]"), function (b) {
+    b.classList.toggle("active", b.getAttribute("data-sub") === sub);
+  });
+  if (sub === "insight" && typeof renderInsight === "function") renderInsight();
+  // 숨겨진 동안 만들어진 차트는 크기가 0으로 잡히므로 보일 때 다시 맞춘다
+  resizeVisibleCharts();
+  $("singleTabItem").classList.remove("open");
+  if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function switchTab(target, sub) {
   if (TABS.indexOf(target) < 0) target = "single";
   currentTab = target;
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
@@ -1675,10 +1730,62 @@ function switchTab(target) {
   TABS.forEach(function (t) {
     $("tab-" + t).classList.toggle("hidden", t !== target);
   });
+  if (target === "single") switchSub(sub || currentSub, true);
   // 시뮬레이터는 장바구니를 공유하므로 열 때마다 비중 입력칸을 맞춘다
   if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
+  document.querySelectorAll(".tabItem.open").forEach(function (el) { el.classList.remove("open"); });
+  resizeVisibleCharts();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+/* 화면에 보이는 차트만 크기를 다시 계산한다 */
+function resizeVisibleCharts() {
+  setTimeout(function () {
+    var list = [
+      state.chart,
+      typeof techState !== "undefined" ? techState.candleChart : null,
+      typeof insightState !== "undefined" ? insightState.chart : null,
+      typeof cmpState !== "undefined" ? cmpState.chart : null,
+      typeof simState !== "undefined" ? simState.chart : null
+    ];
+    list.forEach(function (c) {
+      if (!c || !c.canvas) return;
+      if (c.canvas.offsetParent === null) return; // 아직 숨겨져 있으면 건너뛴다
+      try { c.resize(); } catch (e) {}
+    });
+  }, 30);
+}
+
+/* 서브메뉴 클릭 */
+Array.prototype.forEach.call(document.querySelectorAll(".submenu button[data-sub]"), function (btn) {
+  btn.onclick = function (e) {
+    e.stopPropagation();
+    if (currentTab !== "single") switchTab("single", btn.getAttribute("data-sub"));
+    else switchSub(btn.getAttribute("data-sub"));
+  };
+});
+
+/* 터치 기기에서는 hover가 없으므로 탭을 눌러 메뉴를 연다 */
+$("singleTabItem").querySelector("button[data-tab]").addEventListener("click", function (e) {
+  e.stopPropagation();
+  $("singleTabItem").classList.toggle("open");
+});
+document.addEventListener("click", function () {
+  $("singleTabItem").classList.remove("open");
+});
+
+/* 스크롤하면 헤더를 접어 탭만 남긴다 */
+(function () {
+  var bar = $("topbar"), ticking = false;
+  function update() {
+    bar.classList.toggle("shrink", window.scrollY > 40);
+    ticking = false;
+  }
+  window.addEventListener("scroll", function () {
+    if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
+  }, { passive: true });
+  update();
+})();
 
 Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (btn) {
   btn.onclick = function () { switchTab(btn.getAttribute("data-tab")); };
@@ -1689,6 +1796,7 @@ function buildShareHash() {
   var p = [];
   function add(k, v) { if (v !== "" && v != null) p.push(k + "=" + encodeURIComponent(v)); }
   add("t", currentTab);
+  if (currentTab === "single") add("sub", currentSub);
   if (state.symbol) add("s", state.symbol);
   add("r", $("rangeSel").value);
   if ($("krwToggle").checked) add("krw", "1");
@@ -1729,7 +1837,8 @@ function applyShareHash() {
     $("searchInput").value = q.s;
     load();
   }
-  if (q.t) switchTab(q.t);
+  if (q.t) switchTab(q.t, q.sub);
+  else if (q.sub) switchSub(q.sub, true);
 }
 
 $("shareBtn").onclick = function () {
