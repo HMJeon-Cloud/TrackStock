@@ -10,7 +10,7 @@
 function guideGo(spec) {
   var needSymbol = spec.needSymbol !== false && spec.tab === "single";
   if (needSymbol && (!state.rows || !state.rows.length)) {
-    switchTab("single", "analysis");
+    navTo("single", "analysis", { fromGuide: true });
     setTimeout(function () {
       var el = $("searchCard");
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -19,7 +19,7 @@ function guideGo(spec) {
     }, 60);
     return;
   }
-  switchTab(spec.tab, spec.sub);
+  navTo(spec.tab, spec.sub, { fromGuide: true });
   if (!spec.id) return;
   setTimeout(function () {
     var el = $(spec.id);
@@ -37,7 +37,7 @@ function guideLoadPortfolio(assets) {
   cmpState.cart = assets.map(function (a) { return a[0]; });
   assets.forEach(function (a) { simState.weights[a[0]] = a[1]; });
   renderChips();
-  switchTab("sim");
+  navTo("sim", null, { fromGuide: true });
   syncSimAssets();
   setTimeout(function () { $("simRun").click(); }, 100);
 }

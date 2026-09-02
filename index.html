@@ -118,6 +118,11 @@
   .wName { min-width: 110px; font-size: 13px; }
   .wInput { flex: 1; min-width: 100px; accent-color: var(--accent); padding: 0; background: none; border: none; }
   .wNum { width: 68px; font-size: 13px; padding: 5px 8px; text-align: right; }
+  /* 돌아가기 알약 */
+  .backPill { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 300;
+    background: var(--accent); color: #14181f; font-weight: bold; font-size: 13px; border: none;
+    border-radius: 999px; padding: 10px 18px; box-shadow: 0 8px 20px rgba(0,0,0,.5); cursor: pointer; }
+  .backPill:hover { filter: brightness(1.08); }
   /* 투자 방법 안내 */
   .guideWrap { display: grid; grid-template-columns: 260px 1fr; gap: 14px; align-items: start; }
   @media (max-width: 900px) { .guideWrap { grid-template-columns: 1fr; } }
@@ -156,12 +161,13 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.3</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.4</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
+  <button class="active" data-tab="guide">어떻게 투자하면 될까?</button>
   <div class="tabItem" id="singleTabItem">
-    <button class="active" data-tab="single">개별 종목 분석<span class="caret">▾</span></button>
+    <button data-tab="single">개별 종목 분석<span class="caret">▾</span></button>
     <div class="submenu">
       <button data-sub="analysis" class="active">종목 분석<small>차트 · 지지저항 · 캔들 · 재무 · 지표</small></button>
       <button data-sub="insight">인사이트<small>보유기간 손실확률 · 급등급락 · 자동요약</small></button>
@@ -169,12 +175,12 @@
   </div>
   <button data-tab="compare">장바구니 비교</button>
   <button data-tab="sim">포트폴리오 시뮬레이터</button>
-  <button data-tab="guide">어떻게 투자하면 될까?</button>
   <button id="shareBtn" style="margin-left:auto;border-bottom:none;font-size:12px" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
 </div>
 </header>
+<button id="backPill" class="backPill hidden" title="안내 화면의 보던 위치로 돌아갑니다">← 안내로 돌아가기</button>
 
-<div id="tab-single">
+<div id="tab-single" class="hidden">
 <div id="sub-analysis">
 <div class="card" id="searchCard">
   <div class="row">
@@ -824,7 +830,7 @@
 </div>
 </div><!-- /tab-sim -->
 
-<div id="tab-guide" class="hidden">
+<div id="tab-guide">
 <div class="card" id="guideCard">
   <h2>어떻게 투자하면 될까? <small>표와 그래프를 어떤 순서로 보면 되는지</small></h2>
   <div id="guideIntro" class="mentalNote" style="margin-top:0">
@@ -1750,7 +1756,7 @@ $("rfRate").addEventListener("change", function () {
 
 /* ---------- 탭 전환 ---------- */
 var TABS = ["single", "compare", "sim", "guide"];
-var currentTab = "single";
+var currentTab = "guide";
 
 var SUBS = ["analysis", "insight"];
 var currentSub = "analysis";
@@ -1771,8 +1777,8 @@ function switchSub(sub, noScroll) {
   if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function switchTab(target, sub) {
-  if (TABS.indexOf(target) < 0) target = "single";
+function switchTab(target, sub, noScroll) {
+  if (TABS.indexOf(target) < 0) target = "guide";
   currentTab = target;
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-tab") === target);
@@ -1785,8 +1791,44 @@ function switchTab(target, sub) {
   if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
   document.querySelectorAll(".tabItem.open").forEach(function (el) { el.classList.remove("open"); });
   resizeVisibleCharts();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+/* ---------- 브라우저 뒤로가기 연동 ----------
+   화면을 옮길 때마다 "떠나는 화면 + 스크롤 위치"를 히스토리에 기록한다.
+   뒤로가기(웹 버튼·모바일 하드웨어 키)를 누르면 그 화면의 그 위치로 돌아간다. */
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+function viewState() {
+  return { tab: currentTab, sub: currentSub, y: window.scrollY, ts: Date.now() };
+}
+
+/* 사용자 조작으로 화면을 바꿀 때는 항상 이 함수를 거친다 */
+function navTo(tab, sub, opts) {
+  opts = opts || {};
+  history.replaceState(viewState(), "");            // 지금 위치를 현재 항목에 저장
+  history.pushState({ tab: tab, sub: sub || null, y: 0, fromGuide: !!opts.fromGuide }, "");
+  switchTab(tab, sub);
+  toggleBackPill(!!opts.fromGuide);
+}
+
+window.addEventListener("popstate", function (e) {
+  var s = e.state;
+  if (!s || !s.tab) return;
+  switchTab(s.tab, s.sub || undefined, true);
+  toggleBackPill(!!s.fromGuide);
+  // 레이아웃이 잡힌 뒤 저장해 둔 스크롤 위치로 복원 (두 번 시도해 차트 리사이즈 이후에도 맞춘다)
+  var y = s.y || 0;
+  setTimeout(function () { window.scrollTo(0, y); }, 40);
+  setTimeout(function () { window.scrollTo(0, y); }, 220);
+});
+
+/* 안내 탭에서 넘어온 화면에만 뜨는 '돌아가기' 알약 버튼 (모바일 편의) */
+function toggleBackPill(show) {
+  var p = $("backPill");
+  if (p) p.classList.toggle("hidden", !show);
+}
+history.replaceState(viewState(), "");
 
 /* 화면에 보이는 차트만 크기를 다시 계산한다 */
 function resizeVisibleCharts() {
@@ -1810,8 +1852,7 @@ function resizeVisibleCharts() {
 Array.prototype.forEach.call(document.querySelectorAll(".submenu button[data-sub]"), function (btn) {
   btn.onclick = function (e) {
     e.stopPropagation();
-    if (currentTab !== "single") switchTab("single", btn.getAttribute("data-sub"));
-    else switchSub(btn.getAttribute("data-sub"));
+    navTo("single", btn.getAttribute("data-sub"));
   };
 });
 
@@ -1838,8 +1879,9 @@ document.addEventListener("click", function () {
 })();
 
 Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (btn) {
-  btn.onclick = function () { switchTab(btn.getAttribute("data-tab")); };
+  btn.onclick = function () { navTo(btn.getAttribute("data-tab")); };
 });
+$("backPill").onclick = function () { history.back(); };
 
 /* ---------- 설정 공유 (URL 해시) ---------- */
 function buildShareHash() {
@@ -1888,7 +1930,8 @@ function applyShareHash() {
     load();
   }
   if (q.t) switchTab(q.t, q.sub);
-  else if (q.sub) switchSub(q.sub, true);
+  else if (q.sub) switchTab("single", q.sub);
+  history.replaceState(viewState(), "");
 }
 
 $("shareBtn").onclick = function () {
