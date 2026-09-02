@@ -235,13 +235,13 @@ var GUIDE_METHODS = [
     who: "개별 기업에 투자하려는 사람. 차트보다 '이 회사가 장사를 잘하나'가 궁금한 사람.",
     idea: "좋은 회사(ROE 높음, 부채 적음, 이익 증가)를 <b>싼 값(업종 대비 낮은 PER·PBR)</b>에 사서 시장이 가치를 알아줄 때까지 기다립니다. 이 앱의 가격 분석은 '얼마나 흔들렸나'를, 기업 정보 카드는 '그럴 만한 회사인가'를 보여줍니다. 둘을 교차해야 합니다.",
     steps: [
-      { t: "기업 정보 카드에서 ROE와 부채비율을 봅니다", d: "ROE 15% 이상이 우수, 단 부채비율 200% 넘으면 빚으로 만든 ROE일 수 있습니다. <b>재무 데이터는 국내 상장 종목만 제공</b>됩니다.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
+      { t: "기업 정보 카드에서 ROE와 부채비율을 봅니다", d: "ROE 15% 이상이 우수, 단 부채비율 200% 넘으면 빚으로 만든 ROE일 수 있습니다. 해외 종목은 부채비율이 제공되지 않으니 ROA(총자산이익률)로 대신 가늠하세요.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
       { t: "PER·PBR을 업종 평균과 비교합니다", d: "배지에 업종 대비 판정이 뜹니다. 추정 PER(내년 이익 전망)이 현재 PER보다 낮으면 이익이 늘어난다는 뜻입니다.", go: { tab: "single", sub: "analysis", id: "fundMetrics" }, label: "투자지표" },
       { t: "실적 추이에서 매출·영업이익이 늘고 있는지 봅니다", d: "분기/연간 토글. 전망치(노란색)까지 우상향인지, 영업이익률이 유지되는지.", go: { tab: "single", sub: "analysis", id: "fundFinance" }, label: "실적 추이" },
       { t: "낙폭 표로 '좋은 회사도 이만큼 흔들렸다'를 확인합니다", d: "좋은 회사와 좋은 주식은 다릅니다. ROE 20% 회사도 -50%를 겪습니다. 그 낙폭을 견딜 수 있는지가 마지막 관문입니다.", go: { tab: "single", sub: "analysis", id: "ddCard" }, label: "Drawdown 표" }
     ],
     rule: "예시 규칙: ROE 12% 이상 · 부채비율 100% 이하 · 3년 연속 매출 증가 · PER이 업종 평균의 80% 이하. 네 조건을 모두 만족할 때만 관심 목록에 넣고, 낙폭 -20% 이상일 때 분할 매수합니다.",
-    trap: "<b>저PER 트랩:</b> 이익이 곧 줄어들 회사는 PER이 낮아 보입니다. <b>PBR 1 미만</b>은 대개 '그 자산으로 돈을 못 번다'는 평가입니다. 국내 종목만 재무 데이터가 나오며, 해외는 네이버 제공 범위에 따릅니다."
+    trap: "<b>저PER 트랩:</b> 이익이 곧 줄어들 회사는 PER이 낮아 보입니다. <b>PBR 1 미만</b>은 대개 '그 자산으로 돈을 못 번다'는 평가입니다. 업종 PER 비교는 국내 종목만 제공되므로, 해외 종목은 같은 업종 경쟁사를 직접 조회해 비교하세요."
   },
   {
     id: "hedge",
@@ -271,7 +271,7 @@ var GUIDE_METHODS = [
     who: "주가 등락에 흔들리지 않을 명분이 필요한 사람. 은퇴 후 생활비나 재투자 재원을 만들려는 사람.",
     idea: "주가가 빠져도 배당은 들어옵니다. 배당이 있으면 <b>하락장에 팔지 않을 이유</b>가 생기고, 그 배당을 재투자하면 저가 매수가 자동으로 됩니다. 배당수익률과 배당의 지속 가능성(이익 대비 배당 비율)이 핵심입니다.",
     steps: [
-      { t: "기업 정보에서 배당수익률과 주당배당금을 봅니다", d: "실적 표의 '시가배당률·배당성향'도 함께. 배당성향이 80%를 넘으면 배당이 줄어들 위험이 있습니다. <b>기업 정보(PER·PBR·ROE·배당)는 국내 상장 종목만 제공</b>되며, 해외 종목은 가격 기반 분석만 가능합니다.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
+      { t: "기업 정보에서 배당수익률과 주당배당금을 봅니다", d: "실적 표의 '시가배당률·배당성향'도 함께. 배당성향이 80%를 넘으면 배당이 줄어들 위험이 있습니다. 기업 정보는 국내·해외 모두 제공되며, 해외는 ROE가 EPS÷BPS 추정치로 표시됩니다.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
       { t: "낙폭 표로 배당주도 얼마나 빠지는지 확인합니다", d: "배당주라고 안 빠지지 않습니다. 배당 3%를 받으려다 -30%를 견뎌야 할 수 있습니다.", go: { tab: "single", sub: "analysis", id: "ddCard" }, label: "Drawdown 표" },
       { t: "SCHD 같은 배당 ETF를 검색해 비교합니다", d: "개별 배당주보다 ETF가 배당 삭감 위험을 분산합니다. 장바구니에 담아 SPY와 낙폭·변동성을 비교해 보세요.", go: { tab: "compare", id: "compareCard", needSymbol: false }, label: "장바구니 비교" }
     ],
@@ -331,9 +331,20 @@ function showGuide(id) {
 
   var panel = $("guideDetail");
   panel.innerHTML =
+    '<button class="chip gBackToList" id="guideBack">← 투자 방법 목록으로</button>' +
     '<div class="gDisclaimer">⚠ 아래 내용은 <b>투자 추천이 아닙니다.</b> 예시 종목·비중·규칙은 표 읽는 연습용이며, ' +
     "이 방식이 당신에게 맞는지는 이 앱이 판단할 수 없습니다.</div>" + html;
   panel.classList.remove("hidden");
+  // 모바일에서는 목록과 상세가 위아래로 쌓여 겹쳐 보이므로, 상세를 볼 때 목록을 접는다
+  if (window.innerWidth <= 640) $("guideList").classList.add("collapsed");
+  $("guideBack").onclick = function () {
+    $("guideList").classList.remove("collapsed");
+    panel.classList.add("hidden");
+    guideState.current = null;
+    Array.prototype.forEach.call(document.querySelectorAll(".guideItem"), function (b) { b.classList.remove("active"); });
+    var top = $("guideCard").getBoundingClientRect().top + window.scrollY - ($("topbar").offsetHeight + 8);
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  };
   // 도입부의 면책 안내는 항목을 골라도 계속 보이게 유지한다
 
   Array.prototype.forEach.call(panel.querySelectorAll(".gGo"), function (b) {
@@ -343,7 +354,7 @@ function showGuide(id) {
     b.onclick = function () { guideLoadPortfolio(m.presets[+b.getAttribute("data-p")].assets); };
   });
 
-  if (window.innerWidth < 900) {
+  if (window.innerWidth <= 900) {
     setTimeout(function () {
       var top = panel.getBoundingClientRect().top + window.scrollY - ($("topbar").offsetHeight + 12);
       window.scrollTo({ top: top, behavior: "smooth" });

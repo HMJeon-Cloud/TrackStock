@@ -341,16 +341,20 @@ $("cmpRun").onclick = function () {
   if (cart.length < 2) { setCmpStatus("2개 이상의 종목이 필요합니다.", true); return; }
   var range = $("cmpRange").value;
 
-  var results = [];
-  var chain = Promise.resolve();
-  cart.forEach(function (sym, idx) {
-    chain = chain.then(function () {
-      setCmpStatus("불러오는 중... (" + (idx + 1) + "/" + cart.length + ") " + cmpLabel(sym));
-      return fetchSeries(sym, range).then(function (obj) { results.push(obj); });
+  // 종목별 조회를 동시에 보낸다 (순차보다 종목 수만큼 빠르다). 결과 순서는 장바구니 순서를 유지한다.
+  var done = 0;
+  setCmpStatus("불러오는 중... (0/" + cart.length + ")");
+  var chain = Promise.all(cart.map(function (sym) {
+    return fetchSeries(sym, range).then(function (obj) {
+      done++;
+      setCmpStatus("불러오는 중... (" + done + "/" + cart.length + ") " + cmpLabel(sym));
+      return obj;
     });
-  });
+  }));
+  var results = [];
 
   chain
+    .then(function (list) { results = list; })
     .then(function () {
       // 원화가 아닌 자산이 하나라도 있으면 환율 데이터를 함께 받아둔다
       var needFx = results.some(function (r) { return (r.meta.currency || "USD") !== "KRW"; });
@@ -383,7 +387,10 @@ function rebuildAligned() {
   if (cmpState.fx && (!isFinite(fixedRate) || fixedRate <= 0)) {
     fixedRate = fxAt(cmpState.fx, cmpState.fx.days[cmpState.fx.days.length - 1] * 86400000);
   }
-  var list = cmpState.results.map(function (r) {
+  var useDiv = $("cmpDiv").checked;
+  var list = cmpState.results.map(function (r0) {
+    // 배당 재투자 토글: 총수익 기준 시계열로 바꾼 뒤 환산한다
+    var r = useDiv ? { symbol: r0.symbol, meta: r0.meta, rows: toTotalReturn(r0.rows) } : r0;
     var isForeign = (r.meta.currency || "USD") !== "KRW";
     if (!useKrw || !isForeign) return { symbol: r.symbol, rows: r.rows };
     if (fixedMode) {
@@ -538,7 +545,7 @@ function renderCmpChart() {
         }
       },
       scales: {
-        x: { ticks: { color: "#8b97b0", maxTicksLimit: 8, maxRotation: 0 }, grid: { color: "#222b40" } },
+        x: { ticks: { color: "#8b97b0", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "#222b40" } },
         y: {
           type: isLog ? "logarithmic" : "linear",
           ticks: {
@@ -606,6 +613,11 @@ function renderInvestSummary() {
 }
 
 $("cmpResetZoom").onclick = function () { if (typeof resetChartZoom === "function") resetChartZoom(cmpState.chart); };
+$("cmpDiv").onchange = function () {
+  if (!cmpState.results) return;
+  rebuildAligned();
+  renderCompare();
+};
 $("cmpLog").onchange = function () { if (cmpState.aligned) renderCmpChart(); };
 $("cmpMode").onchange = function () { if (cmpState.aligned) renderCompare(); };
 $("cmpInvest").onchange = function () { if (cmpState.aligned) renderCompare(); };

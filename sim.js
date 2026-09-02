@@ -192,16 +192,20 @@ $("simRun").onclick = function () {
   if (cart.length < 1) { setSimStatus("장바구니에 종목이 없습니다.", true); return; }
   var range = $("simRange").value;
 
-  var results = [];
-  var chain = Promise.resolve();
-  cart.forEach(function (sym, idx) {
-    chain = chain.then(function () {
-      setSimStatus("불러오는 중... (" + (idx + 1) + "/" + cart.length + ") " + cmpLabel(sym));
-      return fetchSeries(sym, range).then(function (obj) { results.push(obj); });
+  // 종목별 조회를 동시에 보낸다 (순차보다 종목 수만큼 빠르다). 결과 순서는 장바구니 순서를 유지한다.
+  var done = 0;
+  setSimStatus("불러오는 중... (0/" + cart.length + ")");
+  var chain = Promise.all(cart.map(function (sym) {
+    return fetchSeries(sym, range).then(function (obj) {
+      done++;
+      setSimStatus("불러오는 중... (" + done + "/" + cart.length + ") " + cmpLabel(sym));
+      return obj;
     });
-  });
+  }));
+  var results = [];
 
   chain
+    .then(function (list) { results = list; })
     .then(function () {
       var needFx = results.some(function (r) { return (r.meta.currency || "USD") !== "KRW"; });
       if (!needFx) return null;
@@ -212,7 +216,10 @@ $("simRun").onclick = function () {
       simState.fx = fx || null;
       simState.results = results;
       // 포트폴리오는 통화가 섞이면 계산이 불가능하므로 항상 원화로 통일한다
-      var list = results.map(function (r) {
+      var useDiv = $("simDiv").checked;
+      simState.results = results;
+      var list = results.map(function (r0) {
+        var r = useDiv ? { symbol: r0.symbol, meta: r0.meta, rows: toTotalReturn(r0.rows) } : r0;
         var isForeign = (r.meta.currency || "USD") !== "KRW";
         if (isForeign && simState.fx) return { symbol: r.symbol, rows: convertRows(r.rows, simState.fx) };
         return { symbol: r.symbol, rows: r.rows };
@@ -249,6 +256,7 @@ $("simStart").addEventListener("change", function () {
   });
 });
 $("simShowEvents").onchange = function () { if (simState.chart) simState.chart.update(); };
+$("simDiv").onchange = function () { if (simState.results) $("simRun").click(); };
 $("simResetZoom").onclick = function () { if (typeof resetChartZoom === "function") resetChartZoom(simState.chart); };
 $("simApplyWeights").onclick = function () { if (simState.aligned) renderSim(); };
 
@@ -355,7 +363,7 @@ function renderSim() {
         }
       },
       scales: {
-        x: { ticks: { color: "#8b97b0", maxTicksLimit: 8, maxRotation: 0 }, grid: { color: "#222b40" } },
+        x: { ticks: { color: "#8b97b0", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "#222b40" } },
         y: {
           type: $("simLog").checked ? "logarithmic" : "linear",
           ticks: { color: "#8b97b0", callback: function (v) { return fmtMoney(v); } },

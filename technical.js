@@ -243,7 +243,7 @@ function renderCandles() {
         }
       },
       scales: {
-        x: { ticks: { color: "#8b97b0", maxTicksLimit: 8, maxRotation: 0 }, grid: { color: "#222b40" } },
+        x: { ticks: { color: "#8b97b0", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "#222b40" } },
         y: { position: "left", ticks: { color: "#8b97b0", callback: function (v) { return fmtPrice(v); } }, grid: { color: "#222b40" } },
         y1: { position: "right", max: maxVol * 4, display: false, grid: { display: false } }
       }
