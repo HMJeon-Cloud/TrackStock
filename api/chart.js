@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     encodeURIComponent(symbol) +
     "?range=" + encodeURIComponent(range) +
     "&interval=" + encodeURIComponent(interval) +
-    "&events=div%2Csplit";
+    "&events=div%2Csplit";           // 배당·분할 이벤트 → adjclose(배당 재투자 반영 종가)와 배당 이력을 함께 받는다
 
   const hosts = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
   let notFound = false;
