@@ -4,13 +4,18 @@
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const BASE = "https://m.stock.naver.com";
+const BASE2 = "https://stock.naver.com";
 
 async function getJson(url) {
+  // Referer를 요청 호스트와 맞춘다. 고정하면 다른 호스트 호출이 거부될 수 있다.
+  const origin = url.startsWith("https://stock.naver.com")
+    ? "https://stock.naver.com/" : "https://m.stock.naver.com/";
   const r = await fetch(url, {
     headers: {
       "User-Agent": UA,
       Accept: "application/json",
-      Referer: "https://m.stock.naver.com/",
+      Referer: origin,
+      Origin: origin.slice(0, -1),
       "Accept-Language": "ko-KR,ko;q=0.9",
     },
   });
@@ -99,6 +104,10 @@ export default async function handler(req, res) {
     "foreignRate", "highPriceOf52Weeks", "lowPriceOf52Weeks",
     "per", "eps", "cnsPer", "cnsEps", "pbr", "bps", "roe", "dividendYieldRatio", "dividend",
     "epsTtm", "perTtm", "beta", "sharesOutstanding", "payoutRatio",
+    // 해외 응답에서 관찰될 수 있는 변형 키
+    "peRatio", "pbRatio", "priceEarningRatio", "priceBookRatio", "earningPerShare",
+    "bookValuePerShare", "returnOnEquity", "dividendYield", "dividendPerShare",
+    "marketCapValue", "week52High", "week52Low", "highPrice52Week", "lowPrice52Week",
   ];
   function harvest(node, into, depth) {
     if (!node || depth > 4) return;
@@ -125,43 +134,64 @@ export default async function handler(req, res) {
 
   // 1) 통합 스냅샷 (시세 + 투자지표)
   const enc = encodeURIComponent(code);
+  /* 해외 종목 실제 경로 (네이버 공개 화면 관찰 기록 기준)
+       기본/컨센서스/개요 : /api/securityService/stock/{reutersCode}/basic
+       재무 요약          : /api/securityService/stock/finance/summary?reutersCode={code}
+       개요               : /api/securityService/stock/overview?reutersCode={code}
+     국내는 기존 integration 경로를 그대로 쓴다. */
   const snapPaths = market === "KR"
-    ? ["/api/stock/" + enc + "/integration"]
+    ? [{ h: BASE, p: "/api/stock/" + enc + "/integration" }]
     : [
-        "/api/worldstock/stock/" + enc + "/integration",
-        "/api/worldstock/stock/" + enc + "/basic",
-        "/api/worldstock/stock/" + enc + "/totalInfo",
-        "/front-api/v1/worldstock/stock/" + enc + "/summary",
+        { h: BASE2, p: "/api/securityService/stock/" + enc + "/basic" },
+        { h: BASE2, p: "/api/securityService/stock/finance/summary?reutersCode=" + enc },
+        { h: BASE2, p: "/api/securityService/stock/overview?reutersCode=" + enc },
+        { h: BASE2, p: "/api/securityService/stock/" + enc + "/consensus" },
+        { h: BASE, p: "/api/worldstock/stock/" + enc + "/basic" }
       ];
 
+  const debug = req.query.debug === "1";
+  const tried = [];
   let snapOk = false;
-  for (const p of snapPaths) {
+  for (const s of snapPaths) {
     try {
-      const j = await getJson(BASE + p);
+      const j = await getJson(s.h + s.p);
+      if (debug) tried.push({ url: s.h + s.p, ok: true, keys: Object.keys((j && j.result) || j || {}).slice(0, 25) });
       const body = j && j.result ? j.result : j;
       harvest(body, out.info, 0);
       if (!out.name) out.name = body.stockName || body.itemName || body.name || out0name || null;
-      if (!out.industry) out.industry = body.industryCompareInfo || null;
-      if (!out.consensus) out.consensus = body.consensusInfo || null;
+      if (!out.industry) out.industry = body.industryCompareInfo || body.industry || null;
+      if (!out.consensus) out.consensus = body.consensusInfo || body.consensus || null;
       if (!out.dealTrend) out.dealTrend = body.dealTrendInfos || null;
-      if (Object.keys(out.info).length) { snapOk = true; break; }
-    } catch (e) { /* 다음 후보 */ }
+      if (Object.keys(out.info).length) {
+        snapOk = true;
+        if (market === "KR") break;   // 국내는 한 번에 전부 들어온다
+      }
+    } catch (e) {
+      if (debug) tried.push({ url: s.h + s.p, ok: false, error: e.message });
+    }
   }
+  if (debug) out.debug = { code, tried, harvested: Object.keys(out.info) };
   if (!snapOk) {
     return res.status(200).json({
       symbol, code, market, ok: false,
       reason: market === "WORLD" ? "WORLD_PARTIAL" : "FETCH_FAILED",
-      name: out0name
+      name: out0name,
+      debug: debug ? { code, tried } : undefined
     });
   }
 
-  // 2) 재무제표 — 국내는 확실, 해외는 제공되면 표시 (실패해도 나머지는 반환)
-  const finBase = market === "KR" ? "/api/stock/" + enc + "/finance/" : "/api/worldstock/stock/" + enc + "/finance/";
+  // 2) 재무제표 — 국내와 해외의 경로 형태가 다르다
   out.finance = {};
   for (const p of ["quarter", "annual"]) {
+    const url = market === "KR"
+      ? BASE + "/api/stock/" + enc + "/finance/" + p
+      : BASE2 + "/api/securityService/stock/finance/" + (p === "quarter" ? "quarter" : "annual") +
+        "?reutersCode=" + enc;
     try {
-      const f = await getJson(BASE + finBase + p);
-      out.finance[p] = slimFinance((f && f.financeInfo) || (f && f.result && f.result.financeInfo));
+      const f = await getJson(url);
+      const fi = (f && f.financeInfo) || (f && f.result && f.result.financeInfo) ||
+                 (f && f.result) || f;
+      out.finance[p] = slimFinance(fi);
     } catch (e) {
       out.finance[p] = null;
     }
