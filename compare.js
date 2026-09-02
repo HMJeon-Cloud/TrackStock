@@ -367,8 +367,12 @@ $("cmpRun").onclick = function () {
       rebuildAligned();
       setCmpStatus("");
       renderCompare();
+      if (cmpState.onDone) { var cb = cmpState.onDone; cmpState.onDone = null; setTimeout(cb, 60); }
     })
-    .catch(function (e) { setCmpStatus("오류: " + e.message, true); });
+    .catch(function (e) {
+      cmpState.onDone = null;
+      setCmpStatus("오류: " + e.message, true);
+    });
 };
 
 // 환산 설정에 따라 정렬 데이터를 다시 만든다 (재조회 없음)

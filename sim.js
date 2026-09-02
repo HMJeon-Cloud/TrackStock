@@ -229,8 +229,12 @@ $("simRun").onclick = function () {
 
       setSimStatus("");
       renderSim();
+      if (simState.onDone) { var cb = simState.onDone; simState.onDone = null; setTimeout(cb, 60); }
     })
-    .catch(function (e) { setSimStatus("오류: " + e.message, true); });
+    .catch(function (e) {
+      simState.onDone = null;
+      setSimStatus("오류: " + e.message, true);
+    });
 };
 
 $("simStart").addEventListener("change", function () {

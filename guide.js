@@ -10,17 +10,29 @@
    - 개별 종목 화면인데 아직 조회한 종목이 없으면 접근법의 예시 종목을 자동 조회한 뒤 이동한다.
    - 장바구니/시뮬레이터 화면인데 장바구니가 비었으면 예시 장바구니를 채우고 실행한 뒤 이동한다.
    예시 종목은 표 읽는 법을 익히기 위한 것이며 추천이 아니다. */
-function guideScrollTo(id) {
+/* 대상까지 스크롤하고 잠시 강조한다.
+   <table>은 그림자가 잘 보이지 않으므로 감싸는 .tableWrap 또는 카드에 테두리를 준다.
+   아직 그려지지 않았으면(숨김 상태) 잠깐씩 기다리며 최대 6초까지 재시도한다. */
+function guideScrollTo(id, tries) {
   if (!id) return;
+  tries = tries || 0;
   setTimeout(function () {
     var el = $(id);
-    if (!el || el.offsetParent === null) return;
-    var top = el.getBoundingClientRect().top + window.scrollY - ($("topbar").offsetHeight + 12);
-    window.scrollTo({ top: top, behavior: "smooth" });
-    el.style.transition = "box-shadow .3s";
-    el.style.boxShadow = "0 0 0 2px var(--accent)";
-    setTimeout(function () { el.style.boxShadow = ""; }, 1800);
-  }, 120);
+    if (!el || el.offsetParent === null) {
+      if (tries < 20) guideScrollTo(id, tries + 1);
+      return;
+    }
+    var box = el;
+    if (el.tagName === "TABLE" || el.tagName === "CANVAS") {
+      box = el.closest(".tableWrap") || el.closest(".card") || el;
+    }
+    var top = box.getBoundingClientRect().top + window.scrollY - ($("topbar").offsetHeight + 12);
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    box.style.transition = "box-shadow .3s";
+    box.style.borderRadius = box.style.borderRadius || "8px";
+    box.style.boxShadow = "0 0 0 2px var(--accent)";
+    setTimeout(function () { box.style.boxShadow = ""; }, 2200);
+  }, tries === 0 ? 120 : 300);
 }
 
 function guideExampleNote(symbolLabel) {
@@ -54,20 +66,34 @@ function guideGo(spec, method) {
     renderChips();
     navTo(spec.tab, spec.sub, { fromGuide: true });
     var labels = items.map(function (a) { return cmpLabel(a[0]); }).join(", ");
+    var note = "예시 장바구니(" + labels + ")를 채우고 실행했습니다. 연습용이며 추천이 아닙니다.";
     if (spec.tab === "sim") {
       syncSimAssets();
-      setSimStatus("예시 장바구니(" + labels + ")를 채웠습니다. 연습용이며 추천이 아닙니다.");
+      setSimStatus("예시 장바구니를 불러오는 중...");
+      simState.onDone = function () { setSimStatus(note); guideScrollTo(spec.id); };
       setTimeout(function () { $("simRun").click(); }, 100);
     } else {
-      setCmpStatus("예시 장바구니(" + labels + ")를 채웠습니다. 연습용이며 추천이 아닙니다.");
+      setCmpStatus("예시 장바구니를 불러오는 중...");
+      cmpState.onDone = function () { setCmpStatus(note); guideScrollTo(spec.id); };
       setTimeout(function () { $("cmpRun").click(); }, 100);
     }
-    // 실행 결과가 그려질 시간을 준 뒤 이동
-    setTimeout(function () { guideScrollTo(spec.id); }, 1800);
     return;
   }
 
   navTo(spec.tab, spec.sub, { fromGuide: true });
+
+  // 장바구니는 있는데 아직 비교/시뮬을 실행하지 않아 표가 비어 있으면 자동 실행
+  if (spec.tab === "compare" && cmpState.cart.length >= 1 && $("cmpBody").classList.contains("hidden")) {
+    cmpState.onDone = function () { guideScrollTo(spec.id); };
+    setTimeout(function () { $("cmpRun").click(); }, 100);
+    return;
+  }
+  if (spec.tab === "sim" && cmpState.cart.length >= 1 && $("simBody").classList.contains("hidden")) {
+    syncSimAssets();
+    simState.onDone = function () { guideScrollTo(spec.id); };
+    setTimeout(function () { $("simRun").click(); }, 100);
+    return;
+  }
   guideScrollTo(spec.id);
 }
 
@@ -78,6 +104,7 @@ function guideLoadPortfolio(assets) {
   renderChips();
   navTo("sim", null, { fromGuide: true });
   syncSimAssets();
+  simState.onDone = function () { guideScrollTo("simBadges"); };
   setTimeout(function () { $("simRun").click(); }, 100);
 }
 
@@ -208,7 +235,7 @@ var GUIDE_METHODS = [
     who: "개별 기업에 투자하려는 사람. 차트보다 '이 회사가 장사를 잘하나'가 궁금한 사람.",
     idea: "좋은 회사(ROE 높음, 부채 적음, 이익 증가)를 <b>싼 값(업종 대비 낮은 PER·PBR)</b>에 사서 시장이 가치를 알아줄 때까지 기다립니다. 이 앱의 가격 분석은 '얼마나 흔들렸나'를, 기업 정보 카드는 '그럴 만한 회사인가'를 보여줍니다. 둘을 교차해야 합니다.",
     steps: [
-      { t: "기업 정보 카드에서 ROE와 부채비율을 봅니다", d: "ROE 15% 이상이 우수, 단 부채비율 200% 넘으면 빚으로 만든 ROE일 수 있습니다.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
+      { t: "기업 정보 카드에서 ROE와 부채비율을 봅니다", d: "ROE 15% 이상이 우수, 단 부채비율 200% 넘으면 빚으로 만든 ROE일 수 있습니다. <b>재무 데이터는 국내 상장 종목만 제공</b>됩니다.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
       { t: "PER·PBR을 업종 평균과 비교합니다", d: "배지에 업종 대비 판정이 뜹니다. 추정 PER(내년 이익 전망)이 현재 PER보다 낮으면 이익이 늘어난다는 뜻입니다.", go: { tab: "single", sub: "analysis", id: "fundMetrics" }, label: "투자지표" },
       { t: "실적 추이에서 매출·영업이익이 늘고 있는지 봅니다", d: "분기/연간 토글. 전망치(노란색)까지 우상향인지, 영업이익률이 유지되는지.", go: { tab: "single", sub: "analysis", id: "fundFinance" }, label: "실적 추이" },
       { t: "낙폭 표로 '좋은 회사도 이만큼 흔들렸다'를 확인합니다", d: "좋은 회사와 좋은 주식은 다릅니다. ROE 20% 회사도 -50%를 겪습니다. 그 낙폭을 견딜 수 있는지가 마지막 관문입니다.", go: { tab: "single", sub: "analysis", id: "ddCard" }, label: "Drawdown 표" }
@@ -237,14 +264,14 @@ var GUIDE_METHODS = [
   {
     id: "dividend",
     example: "005930.KS",
-    exampleCart: [["SCHD", 50], ["SPY", 50]],
+    exampleCart: [["SCHD", 40], ["SPY", 40], ["069500.KS", 20]],
     icon: "💰",
     title: "배당 투자",
     tag: "팔지 않고 현금흐름을",
     who: "주가 등락에 흔들리지 않을 명분이 필요한 사람. 은퇴 후 생활비나 재투자 재원을 만들려는 사람.",
     idea: "주가가 빠져도 배당은 들어옵니다. 배당이 있으면 <b>하락장에 팔지 않을 이유</b>가 생기고, 그 배당을 재투자하면 저가 매수가 자동으로 됩니다. 배당수익률과 배당의 지속 가능성(이익 대비 배당 비율)이 핵심입니다.",
     steps: [
-      { t: "기업 정보에서 배당수익률과 주당배당금을 봅니다", d: "실적 표의 '시가배당률·배당성향'도 함께. 배당성향이 80%를 넘으면 배당이 줄어들 위험이 있습니다.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
+      { t: "기업 정보에서 배당수익률과 주당배당금을 봅니다", d: "실적 표의 '시가배당률·배당성향'도 함께. 배당성향이 80%를 넘으면 배당이 줄어들 위험이 있습니다. <b>기업 정보(PER·PBR·ROE·배당)는 국내 상장 종목만 제공</b>되며, 해외 종목은 가격 기반 분석만 가능합니다.", go: { tab: "single", sub: "analysis", id: "fundCard" }, label: "기업 정보" },
       { t: "낙폭 표로 배당주도 얼마나 빠지는지 확인합니다", d: "배당주라고 안 빠지지 않습니다. 배당 3%를 받으려다 -30%를 견뎌야 할 수 있습니다.", go: { tab: "single", sub: "analysis", id: "ddCard" }, label: "Drawdown 표" },
       { t: "SCHD 같은 배당 ETF를 검색해 비교합니다", d: "개별 배당주보다 ETF가 배당 삭감 위험을 분산합니다. 장바구니에 담아 SPY와 낙폭·변동성을 비교해 보세요.", go: { tab: "compare", id: "compareCard", needSymbol: false }, label: "장바구니 비교" }
     ],

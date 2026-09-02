@@ -70,6 +70,25 @@ function judgeRoe(roe) {
   return ["낮음", "var(--sub)"];
 }
 
+/* 조회 불가 사유를 초보자가 이해할 수 있는 문장으로 바꾼다.
+   HTTP 상태코드 같은 기술적 문구를 그대로 노출하지 않는다. */
+function fundMessage(d) {
+  var reason = d && d.reason;
+  if (reason === "NOT_A_COMPANY") {
+    return "<b>이 자산은 기업이 아닙니다.</b> 지수·환율·원자재·암호화폐는 매출이나 이익 같은 재무제표가 존재하지 않아 " +
+      "PER·PBR·ROE를 계산할 수 없습니다.<br>" +
+      "<small>대신 위쪽 <b>전문가 지표</b>(RSI·샤프·MDD)와 <b>지지·저항선</b>, <b>캔들 차트</b>는 정상적으로 사용할 수 있습니다.</small>";
+  }
+  if (reason === "WORLD_UNSUPPORTED" || (d && d.market === "WORLD")) {
+    return "<b>해외 종목은 재무 데이터를 제공하지 않습니다.</b> 이 앱의 기업 정보는 네이버 증권 자료를 쓰는데, " +
+      "국내 상장 종목만 안정적으로 제공됩니다.<br>" +
+      "<small>미국 종목의 PER·PBR·ROE는 <b>네이버 증권 해외주식</b>, <b>Yahoo Finance</b>, 증권사 앱의 종목 정보에서 확인하실 수 있습니다. " +
+      "이 앱의 가격 기반 분석(낙폭·지지저항·캔들·RSI·샤프 등)은 해외 종목도 모두 정상 작동합니다.</small>";
+  }
+  return "<b>기업 정보를 불러오지 못했습니다.</b> 잠시 후 다시 시도해 주세요.<br>" +
+    "<small>가격 기반 분석은 정상 작동합니다.</small>";
+}
+
 /* ================= 상태 & 로딩 ================= */
 var fundState = { data: null, symbol: null, view: "quarter" };
 
@@ -85,15 +104,8 @@ function loadFund(symbol) {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (fundState.symbol !== symbol) return; // 다른 종목으로 바뀜
-      if (!d || d.market === "NONE") {
-        $("fundStatus").textContent = (d && d.note) || "이 자산은 기업 재무 데이터가 없습니다.";
-        return;
-      }
-      if (!d.ok) {
-        $("fundStatus").innerHTML = (d.note || "재무 데이터를 불러올 수 없습니다.") +
-          (d.market === "WORLD"
-            ? "<br><small>해외 종목은 네이버 증권이 제공하는 범위에서만 표시됩니다. 가격 기반 지표(위 카드들)는 정상 작동합니다.</small>"
-            : "");
+      if (!d || !d.ok) {
+        $("fundStatus").innerHTML = fundMessage(d);
         return;
       }
       fundState.data = d;
