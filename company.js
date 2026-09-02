@@ -181,7 +181,24 @@ function renderFund() {
   var d = fundState.data;
   if (!d) return;
   var I = d.info || {};
-  function v(code) { return I[code] ? I[code].value : null; }
+  /* 국내와 해외는 같은 지표라도 필드명이 다를 수 있어 별칭까지 함께 찾는다 */
+  var ALIAS = {
+    per: ["per", "peRatio", "priceEarningRatio", "perTtm"],
+    eps: ["eps", "earningPerShare", "epsTtm"],
+    pbr: ["pbr", "pbRatio", "priceBookRatio"],
+    bps: ["bps", "bookValuePerShare"],
+    roe: ["roe", "returnOnEquity"],
+    dividendYieldRatio: ["dividendYieldRatio", "dividendYield"],
+    dividend: ["dividend", "dividendPerShare"],
+    marketValue: ["marketValue", "marketCap", "marketCapValue"],
+    highPriceOf52Weeks: ["highPriceOf52Weeks", "week52High", "highPrice52Week"],
+    lowPriceOf52Weeks: ["lowPriceOf52Weeks", "week52Low", "lowPrice52Week"]
+  };
+  function v(code) {
+    var keys = ALIAS[code] || [code];
+    for (var i = 0; i < keys.length; i++) if (I[keys[i]] && I[keys[i]].value != null) return I[keys[i]].value;
+    return null;
+  }
   function n(code) { return kNum(v(code)); }
 
   /* --- 1. 시세 요약 --- */
@@ -221,16 +238,24 @@ function renderFund() {
 
   var pj = judgePer(per, indPer), bj = judgePbr(pbr), rj = judgeRoe(roe);
   var html = "";
-  html += badge("PER", per == null ? "-" : per.toFixed(2) + "배", pj,
+  html += badge("PER", per == null ? null : per.toFixed(2) + "배", pj,
     "주가 ÷ 주당순이익. 지금 버는 돈의 몇 년치 가격에 거래되는지" + (indPer ? " · 업종 PER " + indPer.toFixed(1) + "배" : ""));
   if (cnsPer != null) html += badge("추정 PER", cnsPer.toFixed(2) + "배", ["증권사 전망치 기준", "var(--sub)"], "애널리스트들의 올해 이익 전망으로 계산한 PER");
-  html += badge("EPS", eps == null ? "-" : Math.round(eps).toLocaleString("ko-KR") + "원", null, "주당순이익. 1주가 1년에 벌어들이는 이익");
+  html += badge("EPS", eps == null ? null : Math.round(eps).toLocaleString("ko-KR") + "원", null, "주당순이익. 1주가 1년에 벌어들이는 이익");
   if (cnsEps != null) html += badge("추정 EPS", Math.round(cnsEps).toLocaleString("ko-KR") + "원", ["전망치", "var(--sub)"], "애널리스트 전망 주당순이익");
-  html += badge("PBR", pbr == null ? "-" : pbr.toFixed(2) + "배", bj, "주가 ÷ 주당순자산. 회사가 가진 재산 대비 주가가 몇 배인지");
-  html += badge("BPS", bps == null ? "-" : Math.round(bps).toLocaleString("ko-KR") + "원", null, "주당순자산. 회사를 청산하면 1주당 돌아오는 장부상 재산");
-  html += badge("ROE", roe == null ? "-" : roe.toFixed(1) + "%", rj, "자기자본이익률. 주주 돈으로 1년에 몇 % 이익을 냈는지" + (roeLabel ? " · " + roeLabel + " 기준" : ""));
-  html += badge("배당수익률", divY == null ? "-" : divY.toFixed(2) + "%", null, "주가 대비 연간 배당금 비율" + (div ? " · 주당 " + div : ""));
+  html += badge("PBR", pbr == null ? null : pbr.toFixed(2) + "배", bj, "주가 ÷ 주당순자산. 회사가 가진 재산 대비 주가가 몇 배인지");
+  html += badge("BPS", bps == null ? null : Math.round(bps).toLocaleString("ko-KR") + "원", null, "주당순자산. 회사를 청산하면 1주당 돌아오는 장부상 재산");
+  html += badge("ROE", roe == null ? null : roe.toFixed(1) + "%", rj, "자기자본이익률. 주주 돈으로 1년에 몇 % 이익을 냈는지" + (roeLabel ? " · " + roeLabel + " 기준" : ""));
+  html += badge("배당수익률", divY == null ? null : divY.toFixed(2) + "%", null, "주가 대비 연간 배당금 비율" + (div ? " · 주당 " + div : ""));
+  if (!html.replace(/<[^>]+>/g, "").replace(/[-\s]/g, "")) {
+    html = '<span style="font-size:12px;color:var(--sub)">이 종목은 재무 기반 지표가 제공되지 않습니다. ' +
+      '위쪽 <b>전문가 지표</b>의 RSI·샤프·MDD는 가격만으로 계산되어 정상 표시됩니다.</span>';
+  }
   $("fundMetrics").innerHTML = html;
+  if (d.market !== "KR") {
+    $("fundTrend").innerHTML =
+      "<tbody><tr><td style='color:var(--sub)'>투자자별 매매동향은 국내 종목만 제공됩니다.</td></tr></tbody>";
+  }
 
   /* --- 3. 실적 표 --- */
   renderFinanceTable();
@@ -246,6 +271,7 @@ function renderFund() {
 }
 
 function badge(label, value, judge, tip) {
+  if (value == null || value === "-") return "";   // 없는 지표는 표시하지 않는다
   return '<span class="badge" title="' + tip.replace(/"/g, "&quot;") + '">' + label + "<b>" + value +
     (judge ? ' <small style="color:' + judge[1] + '">' + judge[0] + "</small>" : "") + "</b></span>";
 }
