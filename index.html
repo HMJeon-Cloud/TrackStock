@@ -144,6 +144,9 @@
   .gStepT { font-weight: bold; }
   .gStepD { color: var(--sub); font-size: 12px; margin: 2px 0 6px; }
   .gGo { font-size: 12px; }
+  .gDisclaimer { background: #241618; border: 1px solid #4a2428; border-radius: 8px; padding: 8px 12px;
+    font-size: 12px; line-height: 1.7; margin-bottom: 12px; color: var(--txt); }
+  .gDisclaimer b { color: var(--up); }
   .gRule { background: #16241c; border: 1px solid #244a34; border-radius: 8px; padding: 10px 12px; }
   .gRule > b { color: var(--good); }
   .gTrap { background: #241618; border: 1px solid #4a2428; border-radius: 8px; padding: 10px 12px; }
@@ -161,7 +164,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.4</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.5</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -833,11 +836,18 @@
 <div id="tab-guide">
 <div class="card" id="guideCard">
   <h2>어떻게 투자하면 될까? <small>표와 그래프를 어떤 순서로 보면 되는지</small></h2>
-  <div id="guideIntro" class="mentalNote" style="margin-top:0">
-    이 앱에는 표와 그래프가 많습니다. 그래서 오히려 <b>"그래서 뭘 어떻게 하라는 거지?"</b>가 됩니다.<br>
-    아래에서 관심 있는 투자 방식을 고르면 <b>그 방식이 무엇인지 · 이 앱의 어떤 표를 어떤 순서로 보면 되는지 · 어디서 실패하는지</b>를 안내하고,
-    해당 표로 바로 이동하는 버튼을 드립니다. 정답을 주는 화면이 아니라 <b>고민의 순서</b>를 잡아 주는 화면입니다.<br>
-    <small style="color:var(--sub)">처음이라면 <b>낙폭(MDD) 기준 투자</b>와 <b>자산배분 포트폴리오</b>부터 읽어 보세요. 이 앱이 가장 잘 도와주는 두 가지입니다.</small>
+  <div id="guideIntro" class="mentalNote" style="margin-top:0;line-height:1.9">
+    표와 그래프는 많은데, 막상 <b>"그래서 어디부터 봐야 하지?"</b> 싶으실 겁니다.<br>
+    아래에서 관심 있는 투자 방식을 하나 고르면 <b>그 방식이 무엇인지 → 이 앱의 어떤 표를 어떤 순서로 보면 되는지 → 어디서 흔히 실패하는지</b>를
+    안내하고, 해당 표로 바로 이동하는 버튼을 드립니다.
+    <div style="margin:10px 0 6px;padding:10px 12px;background:#241618;border:1px solid #4a2428;border-radius:8px">
+      <b style="color:var(--up)">⚠ 이 화면은 투자 추천이 아닙니다.</b><br>
+      정답을 알려주는 화면도, 종목을 골라 주는 화면도 아닙니다. 어떤 방식이 <b>당신에게 맞는지</b>는 이 앱이 알 수 없고, 알 수 있다고 말하는 사람은 의심하셔야 합니다.
+      여기 나오는 예시 종목·예시 비중·예시 규칙은 <b>표 읽는 법을 익히기 위한 연습용</b>일 뿐이며, 과거 데이터는 미래를 보장하지 않습니다.
+      최종 판단과 책임은 언제나 투자자 본인에게 있습니다.
+    </div>
+    <small style="color:var(--sub)">처음이라면 <b>낙폭(MDD) 기준 투자</b>와 <b>자산배분 포트폴리오</b>부터 읽어 보세요. 이 앱이 가장 잘 설명할 수 있는 두 가지입니다.
+    자동 조회되는 예시 종목은 검색창에서 언제든 다른 종목으로 바꿀 수 있습니다.</small>
   </div>
   <div class="guideWrap">
     <div id="guideList" class="guideList"></div>
@@ -1438,6 +1448,7 @@ function loadSymbol(symbol, noRetry) {
           });
         return;
       }
+      state.onLoaded = null; // 실패하면 대기 중이던 후속 작업도 취소
       setStatus("오류: " + e.message, true);
     });
 }
@@ -1540,6 +1551,8 @@ function render() {
   renderDdTable();
   renderRallyTable();
   renderAvg();
+  // 데이터 로드 완료를 기다리던 작업(안내 탭 자동 조회 등) 실행
+  if (state.onLoaded) { var cb = state.onLoaded; state.onLoaded = null; setTimeout(cb, 80); }
 
   $("avgUnit").style.display = "inline-block";
   $("avgUnit").textContent = "단위: " + state.displayCur;

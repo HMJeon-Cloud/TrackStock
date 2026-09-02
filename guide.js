@@ -6,30 +6,69 @@
    ============================================================ */
 
 /* ---------- 이동 도우미 ----------
-   spec: { tab, sub, id, needSymbol } — needSymbol이면 종목이 없을 때 검색창으로 유도 */
-function guideGo(spec) {
-  var needSymbol = spec.needSymbol !== false && spec.tab === "single";
-  if (needSymbol && (!state.rows || !state.rows.length)) {
-    navTo("single", "analysis", { fromGuide: true });
-    setTimeout(function () {
-      var el = $("searchCard");
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      setStatus("먼저 종목을 검색해 분석하세요. 분석이 끝나면 안내 탭에서 같은 버튼을 다시 누르면 해당 표로 이동합니다.", true);
-      $("searchInput").focus();
-    }, 60);
-    return;
-  }
-  navTo(spec.tab, spec.sub, { fromGuide: true });
-  if (!spec.id) return;
+   spec: { tab, sub, id, needSymbol }
+   - 개별 종목 화면인데 아직 조회한 종목이 없으면 접근법의 예시 종목을 자동 조회한 뒤 이동한다.
+   - 장바구니/시뮬레이터 화면인데 장바구니가 비었으면 예시 장바구니를 채우고 실행한 뒤 이동한다.
+   예시 종목은 표 읽는 법을 익히기 위한 것이며 추천이 아니다. */
+function guideScrollTo(id) {
+  if (!id) return;
   setTimeout(function () {
-    var el = $(spec.id);
-    if (!el) return;
+    var el = $(id);
+    if (!el || el.offsetParent === null) return;
     var top = el.getBoundingClientRect().top + window.scrollY - ($("topbar").offsetHeight + 12);
     window.scrollTo({ top: top, behavior: "smooth" });
     el.style.transition = "box-shadow .3s";
     el.style.boxShadow = "0 0 0 2px var(--accent)";
     setTimeout(function () { el.style.boxShadow = ""; }, 1800);
   }, 120);
+}
+
+function guideExampleNote(symbolLabel) {
+  return "예시로 <b>" + symbolLabel + "</b>을(를) 자동 조회했습니다. 표 읽는 연습용이며 추천이 아닙니다. " +
+    "검색창에서 원하는 종목으로 바꿔 보세요.";
+}
+
+function guideGo(spec, method) {
+  var needSymbol = spec.needSymbol !== false && spec.tab === "single";
+
+  /* 개별 종목 화면 + 종목 없음 → 예시 종목 자동 조회 */
+  if (needSymbol && (!state.rows || !state.rows.length)) {
+    var ex = (method && method.example) || "SPY";
+    navTo("single", spec.sub || "analysis", { fromGuide: true });
+    $("searchInput").value = ex;
+    if (spec.sub === "insight") $("rangeSel").value = "20y"; // 인사이트 통계는 긴 기간이 필요
+    state.onLoaded = function () {
+      if (spec.sub === "insight" && typeof renderInsight === "function") renderInsight();
+      setStatus(guideExampleNote(cmpLabel(ex)));
+      guideScrollTo(spec.id);
+    };
+    loadSymbol(ex);
+    return;
+  }
+
+  /* 장바구니/시뮬레이터 화면 + 장바구니 비어 있음 → 예시 장바구니 */
+  if ((spec.tab === "compare" || spec.tab === "sim") && !cmpState.cart.length && method && method.exampleCart) {
+    var items = method.exampleCart;
+    cmpState.cart = items.map(function (a) { return a[0]; });
+    items.forEach(function (a) { simState.weights[a[0]] = a[1]; });
+    renderChips();
+    navTo(spec.tab, spec.sub, { fromGuide: true });
+    var labels = items.map(function (a) { return cmpLabel(a[0]); }).join(", ");
+    if (spec.tab === "sim") {
+      syncSimAssets();
+      setSimStatus("예시 장바구니(" + labels + ")를 채웠습니다. 연습용이며 추천이 아닙니다.");
+      setTimeout(function () { $("simRun").click(); }, 100);
+    } else {
+      setCmpStatus("예시 장바구니(" + labels + ")를 채웠습니다. 연습용이며 추천이 아닙니다.");
+      setTimeout(function () { $("cmpRun").click(); }, 100);
+    }
+    // 실행 결과가 그려질 시간을 준 뒤 이동
+    setTimeout(function () { guideScrollTo(spec.id); }, 1800);
+    return;
+  }
+
+  navTo(spec.tab, spec.sub, { fromGuide: true });
+  guideScrollTo(spec.id);
 }
 
 /* 프리셋 포트폴리오를 장바구니·시뮬레이터에 적재하고 실행 */
@@ -46,6 +85,8 @@ function guideLoadPortfolio(assets) {
 var GUIDE_METHODS = [
   {
     id: "mdd",
+    example: "SPY",
+    exampleCart: [["SPY", 50], ["TLT", 30], ["GLD", 20]],
     icon: "📉",
     title: "낙폭(MDD) 기준 투자",
     tag: "하락을 기회로 · 이 앱의 본래 목적",
@@ -63,6 +104,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "longterm",
+    example: "SPY",
+    exampleCart: [["SPY", 60], ["TLT", 40]],
     icon: "⏳",
     title: "장기 보유 · 적립식 투자",
     tag: "시간을 내 편으로",
@@ -79,6 +122,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "portfolio",
+    example: "SPY",
+    exampleCart: [["SPY", 60], ["TLT", 40]],
     icon: "🧺",
     title: "자산배분 포트폴리오",
     tag: "떨어질 때 다른 게 받쳐주게",
@@ -102,6 +147,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "trend",
+    example: "QQQ",
+    exampleCart: [["QQQ", 50], ["SPY", 50]],
     icon: "📈",
     title: "추세 추종 (이동평균선)",
     tag: "오르는 것을 타고, 꺾이면 내린다",
@@ -118,6 +165,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "meanrev",
+    example: "005930.KS",
+    exampleCart: [["005930.KS", 50], ["^KS11", 50]],
     icon: "🌡️",
     title: "과열·침체 역이용 (RSI · 지지/저항 · 캔들)",
     tag: "쏠림이 심할 때 반대로",
@@ -134,6 +183,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "riskadj",
+    example: "SPY",
+    exampleCart: [["SPY", 25], ["QQQ", 25], ["TLT", 25], ["GLD", 25]],
     icon: "⚖️",
     title: "위험조정 수익 비교 (샤프 · 소르티노)",
     tag: "같은 수익이면 덜 흔들리는 것을",
@@ -149,6 +200,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "value",
+    example: "005930.KS",
+    exampleCart: [["005930.KS", 50], ["069500.KS", 50]],
     icon: "🏢",
     title: "가치 투자 (PER · PBR · ROE)",
     tag: "가격이 아니라 회사를 산다",
@@ -165,6 +218,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "hedge",
+    example: "SPY",
+    exampleCart: [["SPY", 40], ["TLT", 20], ["GLD", 20], ["KRW=X", 20]],
     icon: "🛡️",
     title: "헷지 자산 찾기",
     tag: "내 종목이 무너질 때 무엇이 버텼나",
@@ -181,6 +236,8 @@ var GUIDE_METHODS = [
   },
   {
     id: "dividend",
+    example: "005930.KS",
+    exampleCart: [["SCHD", 50], ["SPY", 50]],
     icon: "💰",
     title: "배당 투자",
     tag: "팔지 않고 현금흐름을",
@@ -236,19 +293,24 @@ function showGuide(id) {
   html += '<div class="gSec"><b>이 앱에서 이렇게 봅니다</b><ol class="gSteps">';
   m.steps.forEach(function (s, i) {
     html += "<li><div class='gStepT'>" + s.t + "</div><div class='gStepD'>" + s.d + "</div>" +
-      (s.go ? '<button class="chip gGo" data-s="' + i + '">→ ' + s.label + " 보러 가기</button>" : "") + "</li>";
+      (s.go ? '<button class="chip gGo" data-s="' + i + '">→ ' + s.label + " 보러 가기</button>" +
+        (s.go.tab === "single" && s.go.needSymbol !== false && !(state.rows && state.rows.length)
+          ? '<small style="color:var(--sub);margin-left:6px">예시 ' + cmpLabel(m.example) + " 자동 조회</small>" : "")
+        : "") + "</li>";
   });
   html += "</ol></div>";
   html += '<div class="gSec gRule"><b>규칙으로 만들면</b><p>' + m.rule + "</p></div>";
   html += '<div class="gSec gTrap"><b>함정 · 반드시 알아둘 것</b><p>' + m.trap + "</p></div>";
 
   var panel = $("guideDetail");
-  panel.innerHTML = html;
+  panel.innerHTML =
+    '<div class="gDisclaimer">⚠ 아래 내용은 <b>투자 추천이 아닙니다.</b> 예시 종목·비중·규칙은 표 읽는 연습용이며, ' +
+    "이 방식이 당신에게 맞는지는 이 앱이 판단할 수 없습니다.</div>" + html;
   panel.classList.remove("hidden");
-  $("guideIntro").classList.add("hidden");
+  // 도입부의 면책 안내는 항목을 골라도 계속 보이게 유지한다
 
   Array.prototype.forEach.call(panel.querySelectorAll(".gGo"), function (b) {
-    b.onclick = function () { guideGo(m.steps[+b.getAttribute("data-s")].go); };
+    b.onclick = function () { guideGo(m.steps[+b.getAttribute("data-s")].go, m); };
   });
   Array.prototype.forEach.call(panel.querySelectorAll(".gPreset"), function (b) {
     b.onclick = function () { guideLoadPortfolio(m.presets[+b.getAttribute("data-p")].assets); };
