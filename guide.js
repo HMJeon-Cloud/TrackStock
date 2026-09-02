@@ -345,11 +345,16 @@ function renderFinderResult() {
   var s = finderScore();
   var ranked = GUIDE_METHODS.slice().sort(function (a, b) { return s[b.id] - s[a.id]; }).slice(0, 3);
   box.innerHTML = '<div class="gRule" style="margin-top:8px"><b>먼저 읽어볼 방법 (답변 기준 읽는 순서)</b>' +
-    "<ol style='margin:6px 0 0 18px;padding:0'>" +
-    ranked.map(function (m) { return "<li><a href='#' data-go='" + m.id + "'>" + m.icon + " " + m.title + "</a> <small style='color:var(--sub)'>" + m.tag + "</small></li>"; }).join("") +
-    "</ol><small style='color:var(--sub)'>이것은 <b>읽는 순서</b>이지 이 방법이 당신에게 맞다는 판단이 아닙니다. 답을 바꿔 보며 순서가 어떻게 달라지는지 보세요.</small></div>";
-  Array.prototype.forEach.call(box.querySelectorAll("[data-go]"), function (a) {
-    a.onclick = function (e) { e.preventDefault(); showGuide(a.getAttribute("data-go")); };
+    '<ul class="fRank">' +
+    ranked.map(function (m, i) {
+      return '<li><button class="fRankBtn" data-go="' + m.id + '">' +
+        '<span class="fRankNo">' + (i + 1) + "</span>" +
+        '<span class="fRankIcon">' + m.icon + "</span>" +
+        '<span class="fRankT">' + m.title + "<small>" + m.tag + "</small></span></button></li>";
+    }).join("") +
+    "</ul><small style='color:var(--sub)'>이것은 <b>읽는 순서</b>이지 이 방법이 당신에게 맞다는 판단이 아닙니다. 답을 바꿔 보며 순서가 어떻게 달라지는지 보세요.</small></div>";
+  Array.prototype.forEach.call(box.querySelectorAll("[data-go]"), function (b) {
+    b.onclick = function () { showGuide(b.getAttribute("data-go")); };
   });
   // 목록 항목에 표시
   Array.prototype.forEach.call(document.querySelectorAll(".guideItem"), function (b) {
