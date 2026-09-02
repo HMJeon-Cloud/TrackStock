@@ -21,6 +21,7 @@ var TICKER_DICT = [
   ["EURKRW=X", "유로/원 환율", "유로"],
   ["DX-Y.NYB", "달러인덱스", "DXY"],
   ["GLD", "금 ETF (GLD)", "골드 gold"],
+  ["DBC", "원자재 ETF (DBC)", "커머디티 상품 원유 곡물"],
   ["GC=F", "금 선물", "gold futures"],
   ["SLV", "은 ETF (SLV)", "실버 silver"],
   ["USO", "원유 ETF (USO)", "오일 유가"],

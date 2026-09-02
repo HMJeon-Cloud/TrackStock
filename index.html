@@ -118,6 +118,37 @@
   .wName { min-width: 110px; font-size: 13px; }
   .wInput { flex: 1; min-width: 100px; accent-color: var(--accent); padding: 0; background: none; border: none; }
   .wNum { width: 68px; font-size: 13px; padding: 5px 8px; text-align: right; }
+  /* 투자 방법 안내 */
+  .guideWrap { display: grid; grid-template-columns: 260px 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .guideWrap { grid-template-columns: 1fr; } }
+  .guideList { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 96px; }
+  .guideItem { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; cursor: pointer;
+    border-radius: 10px; background: var(--card2); }
+  .guideItem:hover { border-color: var(--accent); }
+  .guideItem.active { background: #2a2416; border-color: var(--accent); }
+  .guideItem .gi { font-size: 20px; width: 26px; text-align: center; }
+  .guideItem .gt { font-size: 13px; font-weight: bold; line-height: 1.3; }
+  .guideItem .gt small { display: block; color: var(--sub); font-weight: normal; font-size: 11px; margin-top: 2px; }
+  .guideDetail { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .guideDetail h2 { font-size: 17px; color: var(--accent); margin-bottom: 12px; }
+  .gSec { margin-bottom: 16px; font-size: 13px; line-height: 1.85; }
+  .gSec > b { display: block; color: var(--accent); font-size: 12px; margin-bottom: 4px; letter-spacing: .3px; }
+  .gSec p { margin: 0; }
+  .gSteps { padding-left: 20px; margin: 0; }
+  .gSteps li { margin-bottom: 12px; }
+  .gStepT { font-weight: bold; }
+  .gStepD { color: var(--sub); font-size: 12px; margin: 2px 0 6px; }
+  .gGo { font-size: 12px; }
+  .gRule { background: #16241c; border: 1px solid #244a34; border-radius: 8px; padding: 10px 12px; }
+  .gRule > b { color: var(--good); }
+  .gTrap { background: #241618; border: 1px solid #4a2428; border-radius: 8px; padding: 10px 12px; }
+  .gTrap > b { color: var(--up); }
+  .gPresets { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin: 6px 0 8px; }
+  .gPreset { text-align: left; padding: 10px 12px; border-radius: 10px; cursor: pointer; line-height: 1.4; }
+  .gPreset:hover { border-color: var(--accent); }
+  .gPreset b { display: block; font-size: 13px; color: var(--accent); }
+  .gPreset small { display: block; color: var(--sub); font-size: 11px; margin: 2px 0 4px; }
+  .gPreset .gAssets { display: block; font-size: 11px; color: var(--txt); }
   h3 { font-size: 13px; color: var(--txt); margin: 20px 0 8px; }
   h3 small { color: var(--sub); font-weight: normal; font-size: 11px; margin-left: 6px; }
   @media (max-width: 640px) { .chartWrap { height: 300px; } th, td { padding: 6px 5px; font-size: 12px; } }
@@ -125,7 +156,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.2</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v2.3</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -138,13 +169,14 @@
   </div>
   <button data-tab="compare">장바구니 비교</button>
   <button data-tab="sim">포트폴리오 시뮬레이터</button>
+  <button data-tab="guide">어떻게 투자하면 될까?</button>
   <button id="shareBtn" style="margin-left:auto;border-bottom:none;font-size:12px" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
 </div>
 </header>
 
 <div id="tab-single">
 <div id="sub-analysis">
-<div class="card">
+<div class="card" id="searchCard">
   <div class="row">
     <div id="searchBox">
       <input id="searchInput" placeholder="종목명 입력 (예: 삼성전자, 엔비디아, 금, 코스피)" autocomplete="off">
@@ -176,7 +208,7 @@
 
 <div id="resultArea" class="hidden">
 
-  <div class="card">
+  <div class="card" id="chartCard">
     <h2 id="chartTitle">가격 차트</h2>
     <div id="fxLine" class="row hidden" style="margin-bottom:8px">
       <span id="fxInfo"></span>
@@ -387,7 +419,7 @@
     </div></details>
   </div>
 
-  <div class="card">
+  <div class="card" id="avgCard">
     <h2>내 평단가 기준 시나리오 <small>과거가 반복된다면 내 계좌는 어디까지 갈까</small></h2>
     <div class="row">
       <input id="avgPrice" type="number" step="any" placeholder="내 평단가 입력" style="width:170px">
@@ -412,7 +444,7 @@
     </div></details>
   </div>
 
-  <div class="card">
+  <div class="card" id="yearCard">
     <h2>연도별 핵심 지표 <small>연초 가격 · 최고/최저 · 최대 일일 상승/하락</small></h2>
     <div class="tableWrap"><table id="yearTable"></table></div>
     <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
@@ -426,7 +458,7 @@
     </div></details>
   </div>
 
-  <div class="card">
+  <div class="card" id="ddCard">
     <h2>고점 대비 하락 (Drawdown) <small>10% 이상 하락한 구간과 당시 이슈</small></h2>
     <div class="tableWrap"><table id="ddTable"></table></div>
     <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
@@ -441,7 +473,7 @@
     </div></details>
   </div>
 
-  <div class="card">
+  <div class="card" id="rallyCard">
     <h2>저점 대비 상승 (Rally) <small>바닥에서 얼마나 올랐나</small></h2>
     <div class="tableWrap"><table id="rallyTable"></table></div>
     <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
@@ -459,7 +491,7 @@
 </div><!-- /sub-analysis -->
 
 <div id="sub-insight" class="hidden">
-<div class="card">
+<div class="card" id="insightCard">
   <h2>인사이트 <small id="insTitle">위 종목의 과거 데이터로 계산한 사실들</small></h2>
 
   <div id="insEmpty" class="mentalNote">
@@ -676,7 +708,7 @@
 </div><!-- /tab-compare -->
 
 <div id="tab-sim" class="hidden">
-<div class="card">
+<div class="card" id="simCard">
   <h2>포트폴리오 시뮬레이터 <small>비중을 나눠 과거에 대입하고 결과를 학습</small></h2>
   <div class="mentalNote" style="margin-top:0;margin-bottom:10px">
     <b>장바구니 비교</b> 탭의 종목을 그대로 사용합니다. 종목을 바꾸려면 그 탭에서 담거나 빼세요.
@@ -791,6 +823,22 @@
   </div>
 </div>
 </div><!-- /tab-sim -->
+
+<div id="tab-guide" class="hidden">
+<div class="card" id="guideCard">
+  <h2>어떻게 투자하면 될까? <small>표와 그래프를 어떤 순서로 보면 되는지</small></h2>
+  <div id="guideIntro" class="mentalNote" style="margin-top:0">
+    이 앱에는 표와 그래프가 많습니다. 그래서 오히려 <b>"그래서 뭘 어떻게 하라는 거지?"</b>가 됩니다.<br>
+    아래에서 관심 있는 투자 방식을 고르면 <b>그 방식이 무엇인지 · 이 앱의 어떤 표를 어떤 순서로 보면 되는지 · 어디서 실패하는지</b>를 안내하고,
+    해당 표로 바로 이동하는 버튼을 드립니다. 정답을 주는 화면이 아니라 <b>고민의 순서</b>를 잡아 주는 화면입니다.<br>
+    <small style="color:var(--sub)">처음이라면 <b>낙폭(MDD) 기준 투자</b>와 <b>자산배분 포트폴리오</b>부터 읽어 보세요. 이 앱이 가장 잘 도와주는 두 가지입니다.</small>
+  </div>
+  <div class="guideWrap">
+    <div id="guideList" class="guideList"></div>
+    <div id="guideDetail" class="guideDetail hidden"></div>
+  </div>
+</div>
+</div><!-- /tab-guide -->
 
 
 <script src="tickers.js"></script>
@@ -1574,15 +1622,17 @@ $("showLabels").onchange = function () { if (state.chart) state.chart.update(); 
 
 function renderYearTable() {
   var ys = yearlyStats(state.rows);
-  var html = "<thead><tr><th>연도</th><th>연초가</th><th>연간수익</th><th>최고가</th><th>최저가</th>" +
+  var html = "<thead><tr><th>연도</th><th>연초가</th><th>연간수익</th><th>최고가 <small>(연초 대비)</small></th><th>최저가 <small>(연초 대비)</small></th>" +
     "<th>최대 일일상승</th><th>최대 일일하락</th></tr></thead><tbody>";
   for (var i = ys.length - 1; i >= 0; i--) {
     var y = ys[i];
     html += "<tr><td>" + y.year + "</td>" +
       "<td>" + fmtPrice(y.first) + "</td>" +
       '<td class="' + pctCls(y.ret) + '">' + fmtPct(y.ret) + "</td>" +
-      "<td>" + fmtPrice(y.high) + " <small style='color:var(--sub)'>" + fmtDate(y.highT) + "</small></td>" +
-      "<td>" + fmtPrice(y.low) + " <small style='color:var(--sub)'>" + fmtDate(y.lowT) + "</small></td>" +
+      "<td>" + fmtPrice(y.high) + ' <b class="' + pctCls(y.high / y.first - 1) + '" style="font-size:11px">' +
+        fmtPct(y.high / y.first - 1) + "</b> <small style='color:var(--sub)'>" + fmtDate(y.highT) + "</small></td>" +
+      "<td>" + fmtPrice(y.low) + ' <b class="' + pctCls(y.low / y.first - 1) + '" style="font-size:11px">' +
+        fmtPct(y.low / y.first - 1) + "</b> <small style='color:var(--sub)'>" + fmtDate(y.lowT) + "</small></td>" +
       '<td class="pos">' + fmtPct(y.maxGain) + " <small style='color:var(--sub)'>" + fmtDate(y.maxGainT) + "</small></td>" +
       '<td class="neg">' + fmtPct(y.maxDrop) + " <small style='color:var(--sub)'>" + fmtDate(y.maxDropT) + "</small></td></tr>";
   }
@@ -1699,7 +1749,7 @@ $("rfRate").addEventListener("change", function () {
 });
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["single", "compare", "sim"];
+var TABS = ["single", "compare", "sim", "guide"];
 var currentTab = "single";
 
 var SUBS = ["analysis", "insight"];
@@ -1873,5 +1923,6 @@ window.addEventListener("load", applyShareHash);
 <script src="compare.js"></script>
 <script src="sim.js"></script>
 <script src="insight.js"></script>
+<script src="guide.js"></script>
 </body>
 </html>
