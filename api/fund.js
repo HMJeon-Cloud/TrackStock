@@ -160,7 +160,10 @@ export default async function handler(req, res) {
       harvest(body, out.info, 0);
       if (!out.name) out.name = body.stockName || body.itemName || body.name || out0name || null;
       if (!out.industry) out.industry = body.industryCompareInfo || body.industry || null;
-      if (!out.consensus) out.consensus = body.consensusInfo || body.consensus || null;
+      if (!out.consensus) {
+        out.consensus = body.consensusInfo || body.consensus ||
+          (body.priceTargetMean != null || body.recommMean != null ? body : null);
+      }
       if (!out.dealTrend) out.dealTrend = body.dealTrendInfos || null;
       if (Object.keys(out.info).length) {
         snapOk = true;
