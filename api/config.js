@@ -16,5 +16,6 @@ export default async function handler(req, res) {
     }
   } catch (e) { /* 저장소 미연결 등 → 폴백 */ }
   res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
-  res.status(200).json({ snapshotBase: base, updated, news: !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET) });
+  res.status(200).json({ snapshotBase: base, updated, news: !!((process.env.NAVER_HUB_KEY_ID && process.env.NAVER_HUB_KEY) ||
+             (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET)) });
 }

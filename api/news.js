@@ -2,7 +2,12 @@
 // /api/news?type=market&cat=main|world|market|fx|rate
 // 네이버 검색 API (developers.naver.com, 공식) 사용. 하루 25,000회, 약관상 서비스 이용 가능.
 // 환경변수 NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 필요. 없으면 ok:false, reason:"NO_KEY".
-const ENDPOINT = "https://openapi.naver.com/v1/search/news.json";
+/* 2026-07-31 부로 개발자센터(openapi.naver.com) 신규 신청이 종료되고 검색 API가
+   NAVER API HUB(네이버 클라우드 플랫폼)로 이관됐다.
+   신규 발급 키는 HUB 방식만 유효하므로 HUB를 기본으로 쓰고,
+   2027-06-30까지 유효한 구 개발자센터 키가 설정돼 있으면 그쪽으로 폴백한다. */
+const HUB_ENDPOINT = "https://naverapihub.apigw.ntruss.com/search/v1/news";
+const LEGACY_ENDPOINT = "https://openapi.naver.com/v1/search/news.json";
 
 const MARKET_QUERY = {
   main: "증시 마감",
@@ -38,10 +43,13 @@ function pressFromUrl(u) {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  // HUB 키 우선, 없으면 구 개발자센터 키 (둘 중 하나만 있으면 된다)
+  const hubId = process.env.NAVER_HUB_KEY_ID, hubKey = process.env.NAVER_HUB_KEY;
   const id = process.env.NAVER_CLIENT_ID, secret = process.env.NAVER_CLIENT_SECRET;
-  if (!id || !secret) {
+  const useHub = !!(hubId && hubKey);
+  if (!useHub && !(id && secret)) {
     return res.status(200).json({ ok: false, reason: "NO_KEY", items: [],
-      note: "네이버 검색 API 키가 설정되지 않았습니다 (NAVER_CLIENT_ID / NAVER_CLIENT_SECRET)." });
+      note: "네이버 검색 API 키가 설정되지 않았습니다. NAVER API HUB 키(NAVER_HUB_KEY_ID / NAVER_HUB_KEY)를 등록해 주세요." });
   }
 
   const type = (req.query.type || "").trim();
@@ -61,11 +69,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = ENDPOINT + "?query=" + encodeURIComponent(query) + "&display=" + size + "&start=1&sort=date";
-    const r = await fetch(url, { headers: { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret } });
+    // HUB는 경로에 확장자가 없고 format 파라미터를 쓰며, 인증 헤더 이름도 다르다
+    const qs = "?query=" + encodeURIComponent(query) + "&display=" + size + "&start=1&sort=date";
+    const url = useHub ? HUB_ENDPOINT + qs + "&format=json" : LEGACY_ENDPOINT + qs;
+    const headers = useHub
+      ? { "X-NCP-APIGW-API-KEY-ID": hubId, "X-NCP-APIGW-API-KEY": hubKey }
+      : { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret };
+    const r = await fetch(url, { headers });
     if (!r.ok) {
       const t = await r.text();
-      return res.status(200).json({ ok: false, reason: "UPSTREAM", items: [], note: "네이버 검색 API 오류 " + r.status + " " + t.slice(0, 120) });
+      // HUB는 오류를 {error:{errorCode,message}} 형태로, 구 방식은 {errorCode,errorMessage}로 준다
+      let detail = t.slice(0, 160);
+      try {
+        const e = JSON.parse(t);
+        detail = (e.error && (e.error.message || e.error.errorCode)) || e.errorMessage || e.errorCode || detail;
+      } catch (_) { /* 본문이 JSON이 아니면 원문 일부를 그대로 */ }
+      const hint = r.status === 401 || r.status === 403
+        ? " (키가 올바른지, HUB Application에 '검색' API가 추가됐는지 확인하세요)"
+        : r.status === 429 ? " (호출 한도 초과 — 잠시 후 다시 시도됩니다)" : "";
+      return res.status(200).json({
+        ok: false, reason: r.status === 429 ? "RATE_LIMIT" : "UPSTREAM", items: [],
+        note: "네이버 검색 API 오류 " + r.status + ": " + detail + hint,
+        mode: useHub ? "hub" : "legacy"
+      });
     }
     const j = await r.json();
     const items = (j.items || []).map((it) => {
@@ -78,7 +104,7 @@ export default async function handler(req, res) {
       };
     }).filter((x) => x.title);
     res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1200");
-    return res.status(200).json({ ok: true, items, query, total: j.total || items.length });
+    return res.status(200).json({ ok: true, items, query, total: j.total || items.length, mode: useHub ? "hub" : "legacy" });
   } catch (e) {
     return res.status(200).json({ ok: false, reason: "ERROR", items: [], note: e.message });
   }
