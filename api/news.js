@@ -1,127 +1,85 @@
-// /api/news?type=stock&symbol=005930.KS        → 종목 뉴스 (국내·해외)
-// /api/news?type=market&cat=main               → 주요 뉴스
-// /api/news?type=market&cat=world              → 해외증시 뉴스
-// /api/news?type=market&cat=focus&sid=401      → 포커스 (401 시황·전망, 404 채권·선물, 429 환율)
-// 네이버 증권 공개 JSON API 프록시. 제목·언론사·시각·링크만 정규화해 돌려준다.
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
-const M = "https://m.stock.naver.com";
-const S = "https://stock.naver.com";
+// /api/news?type=stock&q=삼성전자          → 종목 뉴스 (종목명으로 검색)
+// /api/news?type=market&cat=main|world|market|fx|rate
+// 네이버 검색 API (developers.naver.com, 공식) 사용. 하루 25,000회, 약관상 서비스 이용 가능.
+// 환경변수 NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 필요. 없으면 ok:false, reason:"NO_KEY".
+const ENDPOINT = "https://openapi.naver.com/v1/search/news.json";
 
-async function getJson(url) {
-  const origin = url.startsWith(S) ? S + "/" : M + "/";
-  const r = await fetch(url, {
-    headers: {
-      "User-Agent": UA, Accept: "application/json",
-      Referer: origin, Origin: origin.slice(0, -1), "Accept-Language": "ko-KR,ko;q=0.9",
-    },
-  });
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  const t = await r.text();
-  try { return JSON.parse(t); } catch (e) { throw new Error("JSON 파싱 실패"); }
-}
-
-/* 응답 어디에 있든 "기사 목록처럼 보이는 배열"을 찾는다 */
-function findArticleArray(node, depth) {
-  if (!node || depth > 5) return null;
-  if (Array.isArray(node)) {
-    if (node.length && node.some((x) => x && typeof x === "object" && (x.title || x.subject || x.headline))) return node;
-    for (const x of node) { const f = findArticleArray(x, depth + 1); if (f) return f; }
-    return null;
-  }
-  if (typeof node === "object") {
-    for (const k of Object.keys(node)) { const f = findArticleArray(node[k], depth + 1); if (f) return f; }
-  }
-  return null;
-}
-
-function pick(o, re) {
-  for (const k of Object.keys(o)) if (re.test(k) && o[k] != null && o[k] !== "") return o[k];
-  return null;
-}
+const MARKET_QUERY = {
+  main: "증시 마감",
+  world: "미국 증시 뉴욕증시",
+  market: "코스피 전망",
+  fx: "원달러 환율",
+  rate: "기준금리 연준 한국은행"
+};
 
 function stripHtml(s) {
   return String(s || "").replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").trim();
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&apos;/g, "'").trim();
 }
 
-/* 기사 하나를 {title, press, time, url} 로 정규화 */
-function normalize(o, ctx) {
-  const title = stripHtml(pick(o, /^(title|subject|headline|articleTitle)$/i));
-  if (!title) return null;
-  const press = stripHtml(pick(o, /^(officeName|press|source|provider|mediaName|publisher)$/i)) || "";
-  const time = pick(o, /^(datetime|date|time|publishedAt|regDate|createdAt|localDateTime|writeDate)$/i) || "";
-  let url = pick(o, /^(linkUrl|url|link|articleUrl|originalUrl)$/i);
-  if (!url) {
-    const officeId = pick(o, /^officeId$/i), articleId = pick(o, /^(articleId|aid)$/i);
-    if (officeId && articleId) url = "https://n.news.naver.com/mnews/article/" + officeId + "/" + articleId;
-    else if (articleId && ctx === "world") url = "https://stock.naver.com/news/worldnews/" + articleId;
-  }
-  if (!url) url = "https://search.naver.com/search.naver?where=news&query=" + encodeURIComponent(title);
-  return { title, press, time: String(time), url };
-}
-
-function parseSymbol(symbol) {
-  const m = symbol.match(/^([0-9A-Z]{6})\.(KS|KQ)$/i);
-  if (m) return { code: m[1].toUpperCase(), market: "KR" };
-  if (/^\^|=|-USD$|=F$/.test(symbol)) return { code: null, market: "NONE" };
-  return { code: null, market: "WORLD" };
+function pressFromUrl(u) {
+  try {
+    const host = new URL(u).hostname.replace(/^www\./, "");
+    const MAP = {
+      "yna.co.kr": "연합뉴스", "yonhapnewstv.co.kr": "연합뉴스TV", "news1.kr": "뉴스1", "newsis.com": "뉴시스",
+      "hankyung.com": "한국경제", "mk.co.kr": "매일경제", "sedaily.com": "서울경제", "edaily.co.kr": "이데일리",
+      "mt.co.kr": "머니투데이", "fnnews.com": "파이낸셜뉴스", "asiae.co.kr": "아시아경제", "heraldcorp.com": "헤럴드경제",
+      "chosun.com": "조선일보", "biz.chosun.com": "조선비즈", "joongang.co.kr": "중앙일보", "donga.com": "동아일보",
+      "hani.co.kr": "한겨레", "khan.co.kr": "경향신문", "kbs.co.kr": "KBS", "mbc.co.kr": "MBC", "sbs.co.kr": "SBS",
+      "ytn.co.kr": "YTN", "jtbc.co.kr": "JTBC", "etnews.com": "전자신문", "zdnet.co.kr": "지디넷", "thebell.co.kr": "더벨",
+      "infostockdaily.co.kr": "인포스탁", "newspim.com": "뉴스핌", "etoday.co.kr": "이투데이", "moneys.co.kr": "머니S",
+      "dt.co.kr": "디지털타임스", "ajunews.com": "아주경제", "kmib.co.kr": "국민일보", "seoul.co.kr": "서울신문"
+    };
+    if (MAP[host]) return MAP[host];                       // 정확 일치 우선 (biz.chosun.com ≠ chosun.com)
+    for (const k of Object.keys(MAP)) if (host.endsWith("." + k)) return MAP[k];
+    return host;
+  } catch (e) { return ""; }
 }
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  const id = process.env.NAVER_CLIENT_ID, secret = process.env.NAVER_CLIENT_SECRET;
+  if (!id || !secret) {
+    return res.status(200).json({ ok: false, reason: "NO_KEY", items: [],
+      note: "네이버 검색 API 키가 설정되지 않았습니다 (NAVER_CLIENT_ID / NAVER_CLIENT_SECRET)." });
+  }
+
   const type = (req.query.type || "").trim();
   const size = Math.min(30, Math.max(3, parseInt(req.query.size || "10", 10) || 10));
+  let query = "";
+  if (type === "stock") {
+    query = (req.query.q || "").trim().slice(0, 40);
+    if (!query) return res.status(400).json({ error: "q required" });
+    // 종목명만 넣으면 잡음이 섞이므로 '주가'를 붙여 증권 기사 위주로 좁힌다
+    query = query.replace(/\(.*?\)/g, "").trim() + " 주가";
+  } else if (type === "market") {
+    const cat = (req.query.cat || "main").trim();
+    query = MARKET_QUERY[cat];
+    if (!query) return res.status(400).json({ error: "unknown cat" });
+  } else {
+    return res.status(400).json({ error: "type must be stock|market" });
+  }
 
   try {
-    let raw = null, ctx = "domestic", label = "";
-
-    if (type === "stock") {
-      const symbol = (req.query.symbol || "").trim();
-      if (!symbol) return res.status(400).json({ error: "symbol required" });
-      const p = parseSymbol(symbol);
-      if (p.market === "NONE") return res.status(200).json({ ok: true, items: [], note: "지수·환율·원자재는 종목 뉴스가 없습니다." });
-      if (p.market === "KR") {
-        raw = await getJson(S + "/api/domestic/detail/news?itemCode=" + p.code + "&page=1&pageSize=" + size);
-        label = p.code;
-      } else {
-        // 해외: 자동완성으로 로이터 코드 해석 후 해외 뉴스
-        const q = symbol.toUpperCase().replace(/-/g, ".");
-        const ac = await getJson(M + "/front-api/search/autoComplete?query=" + encodeURIComponent(symbol) + "&target=stock");
-        const items = (ac && ac.result && ac.result.items) || [];
-        const hit = items.find((it) => { const rc = (it.reutersCode || "").toUpperCase(); return rc === q || rc.split(".")[0] === q; })
-          || items.find((it) => it.reutersCode);
-        if (!hit) return res.status(200).json({ ok: true, items: [], note: "해외 종목을 찾지 못했습니다." });
-        raw = await getJson(S + "/api/foreign/worldStock/list?reutersCode=" + encodeURIComponent(hit.reutersCode) + "&page=1&pageSize=" + size);
-        ctx = "world"; label = hit.reutersCode;
-      }
-    } else if (type === "market") {
-      const cat = (req.query.cat || "main").trim();
-      if (cat === "main") {
-        raw = await getJson(S + "/api/domestic/news/list?category=MAINNEWS&page=1&pageSize=" + size);
-      } else if (cat === "world") {
-        raw = await getJson(S + "/api/foreign/news/worldNews?page=1&pageSize=" + size);
-        ctx = "world";
-      } else if (cat === "focus") {
-        const sid = String(req.query.sid || "401").replace(/\D/g, "") || "401";
-        const d = new Date();
-        const ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
-        raw = await getJson(S + "/api/domestic/news/focus?sid=" + sid + "&page=1&pageSize=" + size + "&date=" + ymd + "&enableFallback=true");
-      } else {
-        return res.status(400).json({ error: "unknown cat" });
-      }
-    } else {
-      return res.status(400).json({ error: "type must be stock|market" });
+    const url = ENDPOINT + "?query=" + encodeURIComponent(query) + "&display=" + size + "&start=1&sort=date";
+    const r = await fetch(url, { headers: { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret } });
+    if (!r.ok) {
+      const t = await r.text();
+      return res.status(200).json({ ok: false, reason: "UPSTREAM", items: [], note: "네이버 검색 API 오류 " + r.status + " " + t.slice(0, 120) });
     }
-
-    const arr = findArticleArray(raw, 0) || [];
-    const items = arr.map((o) => normalize(o, ctx)).filter(Boolean).slice(0, size);
+    const j = await r.json();
+    const items = (j.items || []).map((it) => {
+      return {
+        title: stripHtml(it.title),
+        press: pressFromUrl(it.originallink || it.link),
+        time: it.pubDate || "",
+        url: it.link || it.originallink,   // 네이버 뉴스 링크 우선, 없으면 원문
+        origin: it.originallink || ""
+      };
+    }).filter((x) => x.title);
     res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1200");
-    return res.status(200).json({
-      ok: true, items, label,
-      debug: req.query.debug === "1" ? { topKeys: Object.keys(raw || {}), sample: arr[0] || null } : undefined
-    });
+    return res.status(200).json({ ok: true, items, query, total: j.total || items.length });
   } catch (e) {
-    return res.status(200).json({ ok: false, items: [], error: e.message });
+    return res.status(200).json({ ok: false, reason: "ERROR", items: [], note: e.message });
   }
 }
