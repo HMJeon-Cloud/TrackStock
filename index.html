@@ -270,7 +270,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.3</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.4</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -1020,7 +1020,7 @@
   <h3>시장 뉴스</h3>
   <div class="row" id="marketCats" style="margin-bottom:8px"></div>
   <div id="marketNews"></div>
-  <div style="font-size:11px;color:var(--sub);margin-top:10px">출처: 네이버 증권 뉴스 · 10분 캐시 · 기사 저작권은 각 언론사에 있으며 이 앱은 제목과 링크만 표시합니다.</div>
+  <div style="font-size:11px;color:var(--sub);margin-top:10px">출처: 네이버 검색 API(공식) · 10분 캐시 · 기사 저작권은 각 언론사에 있으며 이 앱은 제목과 링크만 표시합니다.</div>
 </div>
 </div><!-- /tab-watch -->
 
@@ -1030,7 +1030,7 @@
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
-  데이터 출처: 가격 Yahoo Finance · 기업정보/뉴스 네이버 증권. 데이터는 지연·오류·누락이 있을 수 있으며 정확성을 보장하지 않습니다.
+  데이터 출처: 가격 Yahoo Finance · 기업정보 네이버 증권 · 뉴스 네이버 검색 API. 데이터는 지연·오류·누락이 있을 수 있으며 정확성을 보장하지 않습니다.
   뉴스 기사의 저작권은 각 언론사에 있으며 이 서비스는 제목과 원문 링크만 표시합니다.
   관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.
 </footer>
@@ -1565,15 +1565,142 @@ function resolveSymbol(input) {
 
 /* ---------- 환율 시계열 캐시 (개별종목·장바구니 공용) ---------- */
 var FX_CACHE = {};
+/* ================= 데이터 계층 =================
+   가격 데이터는 세 곳에서 순서대로 찾는다.
+   ① 브라우저 저장(localStorage): 오늘 받은 것이면 서버를 부르지 않는다
+   ② 정적 스냅샷(Vercel Blob): 매일 새벽 미리 받아둔 파일. 함수 호출도, 외부 API 요청도 없다
+   ③ 실시간 프록시(/api/chart): 위 둘에 없을 때만
+   어느 경로든 결과 형태는 parseChart와 같다: { rows, meta, dividends, source } */
+var DATA = { config: null, manifest: null, ready: null };
+var RANGE_DAYS = { "5y": 5 * 365.25, "10y": 10 * 365.25, "20y": 20 * 365.25, "max": Infinity };
+
+function kstToday() {
+  var d = new Date(Date.now() + 9 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+/* 설정·manifest를 세션에 한 번만 읽는다 (둘 다 엣지/정적 캐시) */
+function dataReady() {
+  if (DATA.ready) return DATA.ready;
+  DATA.ready = fetch("/api/config").then(function (r) { return r.json(); })
+    .then(function (cfg) {
+      DATA.config = cfg || {};
+      if (!DATA.config.snapshotBase) return null;
+      return fetch(DATA.config.snapshotBase + "manifest.json", { cache: "default" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (m) { DATA.manifest = m; return m; });
+    })
+    .catch(function () { DATA.config = DATA.config || {}; return null; });
+  return DATA.ready;
+}
+
+/* 열 형식 스냅샷 → parseChart 결과 형태, 요청한 기간만 잘라서 */
+function snapshotToParsed(snap, range) {
+  var days = RANGE_DAYS[range] || RANGE_DAYS["10y"];
+  var cutoff = isFinite(days) ? (snap.t[snap.t.length - 1] - days * 86400) : -Infinity;
+  var rows = [];
+  for (var i = 0; i < snap.t.length; i++) {
+    if (snap.t[i] < cutoff) continue;
+    var c = snap.c[i];
+    if (c == null || c <= 0) continue;
+    rows.push({ t: snap.t[i] * 1000, c: c, a: snap.a[i] != null ? snap.a[i] : c,
+      o: snap.o[i] != null ? snap.o[i] : c, h: snap.h[i] != null ? snap.h[i] : c,
+      l: snap.l[i] != null ? snap.l[i] : c, v: snap.v[i] || 0 });
+  }
+  var divs = (snap.div || []).filter(function (d) { return d[0] * 1000 >= (rows[0] ? rows[0].t : 0); })
+    .map(function (d) { return { t: d[0] * 1000, amount: d[1] }; });
+  return { rows: rows, meta: snap.meta || {}, dividends: divs, source: "snapshot", updated: snap.updated };
+}
+
+/* localStorage: 종목별로 가장 넓은 기간의 스냅샷 하나만, 오늘 날짜 표시와 함께. 최근 8개만 유지 */
+var LS_PREFIX = "sm.chart.";
+function lsGet(symbol) {
+  try {
+    var raw = localStorage.getItem(LS_PREFIX + symbol);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    return obj && obj.date === kstToday() ? obj : null;
+  } catch (e) { return null; }
+}
+function lsPut(symbol, snap, wide) {
+  try {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(LS_PREFIX) === 0) keys.push(k);
+    }
+    if (keys.length >= 8) {
+      keys.sort(function (a, b) { return (JSON.parse(localStorage.getItem(a)).at || 0) - (JSON.parse(localStorage.getItem(b)).at || 0); });
+      localStorage.removeItem(keys[0]);
+    }
+    localStorage.setItem(LS_PREFIX + symbol, JSON.stringify({ date: kstToday(), at: Date.now(), wide: !!wide, snap: snap }));
+  } catch (e) { /* 용량 초과 등은 무시 */ }
+}
+
+/* Yahoo JSON → 저장용 열 형식 (스냅샷과 같은 모양) */
+function parsedToSnapshot(symbol, p) {
+  var s = { s: symbol, meta: p.meta, t: [], o: [], h: [], l: [], c: [], a: [], v: [], div: [], updated: kstToday() };
+  p.rows.forEach(function (r) {
+    s.t.push(Math.round(r.t / 1000)); s.o.push(r.o); s.h.push(r.h); s.l.push(r.l); s.c.push(r.c); s.a.push(r.a); s.v.push(r.v);
+  });
+  (p.dividends || []).forEach(function (d) { s.div.push([Math.round(d.t / 1000), d.amount]); });
+  return s;
+}
+
+/* 통합 로더 */
+function getChartData(symbol, range) {
+  range = range || "10y";
+  var wantWide = range === "20y" || range === "max";
+
+  // ① 브라우저 저장
+  var ls = lsGet(symbol);
+  if (ls && (ls.wide || !wantWide)) {
+    var p0 = snapshotToParsed(ls.snap, range);
+    p0.source = "local";
+    return Promise.resolve(p0);
+  }
+
+  return dataReady().then(function (manifest) {
+    // ② 정적 스냅샷
+    var entry = manifest && manifest.symbols && manifest.symbols[symbol];
+    if (entry && entry.updated && DATA.config.snapshotBase) {
+      var folder = wantWide ? "charts/" : "charts10/";
+      return fetch(DATA.config.snapshotBase + folder + encodeURIComponent(symbol) + ".json", { cache: "default" })
+        .then(function (r) { if (!r.ok) throw new Error("snapshot " + r.status); return r.json(); })
+        .then(function (snap) {
+          lsPut(symbol, snap, wantWide);
+          return snapshotToParsed(snap, range);
+        })
+        .catch(function () { return liveChart(symbol, range, wantWide); });
+    }
+    // ③ 실시간
+    return liveChart(symbol, range, wantWide);
+  });
+}
+
+function liveChart(symbol, range, wantWide) {
+  return fetch("/api/chart?symbol=" + encodeURIComponent(symbol) + "&range=" + range)
+    .then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok) { var e = new Error(j.error || "HTTP " + r.status); e.status = r.status; throw e; }
+        return j;
+      });
+    })
+    .then(function (json) {
+      var p = parseChart(json);
+      p.source = "live";
+      if (p.rows.length) lsPut(symbol, parsedToSnapshot(symbol, p), wantWide);
+      return p;
+    });
+}
+
 function loadFx(range) {
   if (FX_CACHE[range]) return Promise.resolve(FX_CACHE[range]);
-  return fetch("/api/chart?symbol=" + encodeURIComponent("KRW=X") + "&range=" + range)
-    .then(function (r) { return r.json(); })
-    .then(function (json) {
-      var fx = buildFx(parseChart(json).rows);
-      FX_CACHE[range] = fx;
-      return fx;
-    });
+  return getChartData("KRW=X", range).then(function (p) {
+    var fx = buildFx(p.rows);
+    FX_CACHE[range] = fx;
+    return fx;
+  });
 }
 
 /* ---------- 데이터 로드 ---------- */
@@ -1609,26 +1736,22 @@ function load() {
   loadSymbol(symbol);
 }
 
+function sourceNote() {
+  if (state.dataSource === "snapshot") return "사전 수집 데이터 (" + (state.dataUpdated || "") + " 기준) · 서버 요청 없이 로드됨";
+  if (state.dataSource === "local") return "오늘 받은 데이터를 이 기기에서 재사용 · 서버 요청 없음";
+  return "";
+}
+
 function loadSymbol(symbol, noRetry) {
   var range = $("rangeSel").value;
   setStatus("데이터 불러오는 중... (" + symbol + ")");
   if (typeof loadFund === "function") loadFund(symbol);
 
-  fetch("/api/chart?symbol=" + encodeURIComponent(symbol) + "&range=" + range)
-    .then(function (r) {
-      return r.json().then(function (j) {
-        if (r.status === 404 && !noRetry) {
-          var e = new Error(j.error || "not found");
-          e.notFound = true;
-          throw e;
-        }
-        if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
-        return j;
-      });
-    })
-    .then(function (json) {
-      var parsed = parseChart(json);
+  getChartData(symbol, range)
+    .then(function (parsed) {
       if (parsed.rows.length < 30) throw new Error("데이터가 너무 적습니다 (" + parsed.rows.length + "건)");
+      state.dataSource = parsed.source;
+      state.dataUpdated = parsed.updated || null;
       state.rowsPrice = parsed.rows;                 // 가격 기준 원본
       state.dividends = parsed.dividends || [];
       state.divAvailable = hasDividendEffect(parsed.rows);
@@ -1643,7 +1766,7 @@ function loadSymbol(symbol, noRetry) {
         $("krwWrap").classList.add("hidden");
         $("krwToggle").checked = false;
         $("fxLine").classList.add("hidden");
-        setStatus("");
+        setStatus(sourceNote());
         applyCurrency(); render();
         return;
       }
@@ -1656,13 +1779,13 @@ function loadSymbol(symbol, noRetry) {
           $("krwWrap").classList.add("hidden");
         })
         .then(function () {
-          setStatus("");
+          setStatus(sourceNote());
           applyCurrency(); render();
         });
     })
     .catch(function (e) {
       // 티커가 아니라 이름을 입력했을 수 있으므로 검색 API로 한 번 더 시도한다
-      if (e.notFound) {
+      if ((e.notFound || e.status === 404) && !noRetry) {
         setStatus("'" + symbol + "' 검색 중...");
         fetch("/api/search?q=" + encodeURIComponent(symbol))
           .then(function (r) { return r.json(); })

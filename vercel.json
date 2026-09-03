@@ -1,0 +1,9 @@
+{
+  "crons": [
+    { "path": "/api/cron-snapshot", "schedule": "30 22 * * *" },
+    { "path": "/api/cron-snapshot", "schedule": "30 23 * * *" }
+  ],
+  "functions": {
+    "api/cron-snapshot.js": { "maxDuration": 60 }
+  }
+}

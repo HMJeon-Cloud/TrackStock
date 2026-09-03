@@ -320,20 +320,13 @@ function syncCartBtn() {
 function fetchSeries(symbol, range) {
   var key = symbol + "|" + range;
   if (cmpState.cache[key]) return Promise.resolve(cmpState.cache[key]);
-  return fetch("/api/chart?symbol=" + encodeURIComponent(symbol) + "&range=" + range)
-    .then(function (r) {
-      return r.json().then(function (j) {
-        if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
-        return j;
-      });
-    })
-    .then(function (json) {
-      var parsed = parseChart(json);
-      if (parsed.rows.length < 30) throw new Error(symbol + ": 데이터 부족");
-      var obj = { symbol: symbol, rows: parsed.rows, meta: parsed.meta };
-      cmpState.cache[key] = obj;
-      return obj;
-    });
+  // 통합 로더: 브라우저 저장 → 정적 스냅샷 → 실시간 순으로 찾는다
+  return getChartData(symbol, range).then(function (parsed) {
+    if (parsed.rows.length < 30) throw new Error(symbol + ": 데이터 부족");
+    var obj = { symbol: symbol, rows: parsed.rows, meta: parsed.meta };
+    cmpState.cache[key] = obj;
+    return obj;
+  });
 }
 
 $("cmpRun").onclick = function () {

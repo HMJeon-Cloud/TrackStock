@@ -43,11 +43,10 @@ function fetchQuote(sym) {
   if (watchState.quotes[sym] && Date.now() - watchState.quotes[sym].at < 10 * 60 * 1000) {
     return Promise.resolve(watchState.quotes[sym]);
   }
-  return fetch("/api/chart?symbol=" + encodeURIComponent(sym) + "&range=1y")
-    .then(function (r) { return r.json(); })
-    .then(function (j) {
-      var p = parseChart(j);
-      var rows = p.rows;
+  // 관심 종목 시세는 10년 데이터 중 최근 1년만 쓴다 (스냅샷·브라우저 저장을 그대로 재사용)
+  return getChartData(sym, "10y")
+    .then(function (p) {
+      var rows = p.rows.slice(-260);
       if (rows.length < 2) throw new Error("데이터 부족");
       var last = rows[rows.length - 1], prev = rows[rows.length - 2];
       var hi = -Infinity, lo = Infinity, s = Math.max(0, rows.length - 252);
@@ -79,7 +78,8 @@ function fetchNews(params) {
     .then(function (r) { return r.json(); })
     .then(function (j) {
       var items = (j && j.items) || [];
-      watchState.news[key] = { at: Date.now(), items: items };
+      watchState.news[key] = { at: Date.now(), items: items, reason: j && !j.ok ? (j.reason || "ERROR") : null, note: j && j.note };
+      if (j && !j.ok) watchState.newsReason = { reason: j.reason, note: j.note };
       return items;
     })
     .catch(function () { return []; });
@@ -103,6 +103,13 @@ function tagNews(title) {
 }
 function fmtNewsTime(s) {
   if (!s) return "";
+  // 네이버 검색 API의 pubDate: "Fri, 04 Sep 2026 08:11:00 +0900"
+  var d = new Date(s);
+  if (!isNaN(d.getTime()) && /[A-Za-z]{3},/.test(String(s))) {
+    var k = new Date(d.getTime() + 9 * 3600 * 1000);
+    return String(k.getUTCMonth() + 1).padStart(2, "0") + "." + String(k.getUTCDate()).padStart(2, "0") + " " +
+      String(k.getUTCHours()).padStart(2, "0") + ":" + String(k.getUTCMinutes()).padStart(2, "0");
+  }
   var m = String(s).match(/(\d{4})[.\-\/]?(\d{2})[.\-\/]?(\d{2})[ T]?(\d{2})?:?(\d{2})?/);
   if (!m) return String(s).slice(0, 16);
   return m[2] + "." + m[3] + (m[4] ? " " + m[4] + ":" + (m[5] || "00") : "");
@@ -208,14 +215,13 @@ function renderWatchNews() {
   if (!list.length) { box.innerHTML = ""; return; }
   var html = "";
   list.forEach(function (w) {
-    var key = JSON.stringify({ type: "stock", symbol: w.s, size: 6 });
+    var key = JSON.stringify({ type: "stock", q: cmpLabel(w.s), size: 6 });
     var c = watchState.news[key];
     var items = c ? applyNewsFilter(c.items) : null;
     html += '<div class="newsGroup"><div class="newsGroupTitle">' + cmpLabel(w.s) +
       (c ? ' <small style="color:var(--sub)">' + c.items.length + "건</small>" : "") + "</div>";
     if (!c) html += "<div style='font-size:12px;color:var(--sub);padding:4px 0 8px'>불러오는 중...</div>";
-    else if (!items.length) html += "<div style='font-size:12px;color:var(--sub);padding:4px 0 8px'>" +
-      (watchState.filter ? "이 키워드에 해당하는 기사가 없습니다." : "최근 기사가 없습니다.") + "</div>";
+    else if (!items.length) html += "<div style='font-size:12px;color:var(--sub);padding:4px 0 8px'>" + newsEmptyMsg(c) + "</div>";
     else html += "<ul class='newsList'>" + items.map(function (it) { return newsItemHtml(it, null); }).join("") + "</ul>";
     html += "</div>";
   });
@@ -227,18 +233,28 @@ function loadWatchNews() {
   if (!list.length) return Promise.resolve();
   renderWatchNews();
   return Promise.all(list.map(function (w) {
-    return fetchNews({ type: "stock", symbol: w.s, size: 6 });
+    return fetchNews({ type: "stock", q: cmpLabel(w.s), size: 6 });
   })).then(renderWatchNews);
 }
 
 var MARKET_CATS = [
-  { id: "main", label: "주요 뉴스", p: { type: "market", cat: "main", size: 15 } },
-  { id: "world", label: "해외증시", p: { type: "market", cat: "world", size: 15 } },
-  { id: "f401", label: "시황·전망", p: { type: "market", cat: "focus", sid: "401", size: 15 } },
-  { id: "f429", label: "환율", p: { type: "market", cat: "focus", sid: "429", size: 12 } },
-  { id: "f404", label: "채권·금리", p: { type: "market", cat: "focus", sid: "404", size: 12 } }
+  { id: "main", label: "증시 마감", p: { type: "market", cat: "main", size: 15 } },
+  { id: "world", label: "미국 증시", p: { type: "market", cat: "world", size: 15 } },
+  { id: "market", label: "시황·전망", p: { type: "market", cat: "market", size: 15 } },
+  { id: "fx", label: "환율", p: { type: "market", cat: "fx", size: 12 } },
+  { id: "rate", label: "금리", p: { type: "market", cat: "rate", size: 12 } }
 ];
 var marketCat = "main";
+
+function newsEmptyMsg(c) {
+  if (watchState.filter) return "이 키워드에 해당하는 기사가 없습니다.";
+  if (c && c.reason === "NO_KEY") {
+    return "<b>뉴스 기능이 아직 켜지지 않았습니다.</b> 운영자가 네이버 검색 API 키(무료)를 등록하면 표시됩니다. " +
+      "<small>developers.naver.com → 애플리케이션 등록 → '검색' API 선택 → Vercel 환경변수 NAVER_CLIENT_ID / NAVER_CLIENT_SECRET</small>";
+  }
+  if (c && c.reason) return "기사를 불러오지 못했습니다" + (c.note ? " (" + c.note + ")" : "") + ". 잠시 후 새로고침해 주세요.";
+  return "최근 기사가 없습니다.";
+}
 
 function renderMarketNews() {
   var cat = MARKET_CATS.filter(function (c) { return c.id === marketCat; })[0];
@@ -250,7 +266,7 @@ function renderMarketNews() {
   });
   if (!c) { box.innerHTML = "<div style='font-size:12px;color:var(--sub)'>불러오는 중...</div>"; return; }
   var items = applyNewsFilter(c.items);
-  if (!items.length) { box.innerHTML = "<div style='font-size:12px;color:var(--sub)'>" + (watchState.filter ? "이 키워드에 해당하는 기사가 없습니다." : "기사를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.") + "</div>"; return; }
+  if (!items.length) { box.innerHTML = "<div style='font-size:12px;color:var(--sub)'>" + newsEmptyMsg(c) + "</div>"; return; }
   box.innerHTML = "<ul class='newsList'>" + items.map(function (it) { return newsItemHtml(it, null); }).join("") + "</ul>";
 }
 
