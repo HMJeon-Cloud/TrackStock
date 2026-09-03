@@ -250,7 +250,8 @@ function newsEmptyMsg(c) {
   if (watchState.filter) return "이 키워드에 해당하는 기사가 없습니다.";
   if (c && c.reason === "NO_KEY") {
     return "<b>뉴스 기능이 아직 켜지지 않았습니다.</b> 운영자가 네이버 검색 API 키(무료)를 등록하면 표시됩니다. " +
-      "<small>developers.naver.com → 애플리케이션 등록 → '검색' API 선택 → Vercel 환경변수 NAVER_CLIENT_ID / NAVER_CLIENT_SECRET</small>";
+      "<small>네이버 클라우드 플랫폼 → NAVER API HUB → Application 생성 → '검색' 추가 → " +
+      "발급된 Key ID / Key를 Vercel 환경변수 <b>NAVER_HUB_KEY_ID</b> / <b>NAVER_HUB_KEY</b>로 등록 후 재배포</small>";
   }
   if (c && c.reason) return "기사를 불러오지 못했습니다" + (c.note ? " (" + c.note + ")" : "") + ". 잠시 후 새로고침해 주세요.";
   return "최근 기사가 없습니다.";
