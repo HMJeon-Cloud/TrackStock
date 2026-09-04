@@ -270,7 +270,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.4</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.5</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -1585,14 +1585,56 @@ function dataReady() {
   DATA.ready = fetch("/api/config").then(function (r) { return r.json(); })
     .then(function (cfg) {
       DATA.config = cfg || {};
-      if (!DATA.config.snapshotBase) return null;
+      if (!DATA.config.snapshotBase) {
+        // Blob이 Private이라 공개 URL이 없을 수 있다 → 서버 경유로 시도
+        if (DATA.config.reason === "BLOB_NOT_PUBLIC") {
+          return fetch("/api/snap?manifest=1")
+            .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+            .then(function (m) { DATA.manifest = m; DATA.viaProxy = true; return m; })
+            .catch(function (e) { DATA.reason = "PROXY_FAIL: " + (e && e.message); return null; });
+        }
+        DATA.reason = DATA.config.reason || "NO_BASE";
+        return null;
+      }
       return fetch(DATA.config.snapshotBase + "manifest.json", { cache: "default" })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (m) { DATA.manifest = m; return m; });
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function (m) { DATA.manifest = m; DATA.viaProxy = false; return m; })
+        .catch(function () {
+          // 공개 URL로 못 읽으면(Private 저장소 등) 서버 경유로 한 번 더 시도
+          return fetch("/api/snap?manifest=1")
+            .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+            .then(function (m) { DATA.manifest = m; DATA.viaProxy = true; return m; })
+            .catch(function (e2) { DATA.reason = "MANIFEST_FAIL: " + (e2 && e2.message); return null; });
+        });
     })
-    .catch(function () { DATA.config = DATA.config || {}; return null; });
+    .catch(function (e) {
+      DATA.config = DATA.config || {};
+      DATA.reason = "FETCH_FAIL: " + (e && e.message);
+      return null;
+    });
   return DATA.ready;
 }
+
+/* 콘솔에서 진단: window.smDiag() */
+window.smDiag = function () {
+  return dataReady().then(function () {
+    var m = DATA.manifest;
+    var info = {
+      config: DATA.config,
+      manifestLoaded: !!m,
+      symbolsInManifest: m && m.symbols ? Object.keys(m.symbols).length : 0,
+      reason: DATA.reason || null,
+      lastLoad: { symbol: state.symbol, source: state.dataSource, updated: state.dataUpdated }
+    };
+    if (m && m.symbols) {
+      var sample = Object.keys(m.symbols).slice(0, 3);
+      info.sample = sample.map(function (k) { return k + " → " + JSON.stringify(m.symbols[k]); });
+      if (state.symbol) info.currentEntry = m.symbols[state.symbol] || "(manifest에 없음)";
+    }
+    console.log("[StockMind 진단]", info);
+    return info;
+  });
+};
 
 /* 열 형식 스냅샷 → parseChart 결과 형태, 요청한 기간만 잘라서 */
 function snapshotToParsed(snap, range) {
@@ -1663,16 +1705,29 @@ function getChartData(symbol, range) {
   return dataReady().then(function (manifest) {
     // ② 정적 스냅샷
     var entry = manifest && manifest.symbols && manifest.symbols[symbol];
-    if (entry && entry.updated && DATA.config.snapshotBase) {
+    if (entry && entry.updated) {
       var folder = wantWide ? "charts/" : "charts10/";
-      return fetch(DATA.config.snapshotBase + folder + encodeURIComponent(symbol) + ".json", { cache: "default" })
-        .then(function (r) { if (!r.ok) throw new Error("snapshot " + r.status); return r.json(); })
+      var direct = DATA.config.snapshotBase && !DATA.viaProxy
+        ? DATA.config.snapshotBase + folder + encodeURIComponent(symbol) + ".json"
+        : null;
+      var proxy = "/api/snap?symbol=" + encodeURIComponent(symbol) + (wantWide ? "&wide=1" : "");
+      var first = direct
+        ? fetch(direct, { cache: "default" }).then(function (r) { if (!r.ok) throw new Error("snapshot " + r.status); return r.json(); })
+        : Promise.reject(new Error("no public url"));
+      return first
+        .catch(function () {
+          return fetch(proxy).then(function (r) { if (!r.ok) throw new Error("proxy " + r.status); return r.json(); });
+        })
         .then(function (snap) {
           lsPut(symbol, snap, wantWide);
           return snapshotToParsed(snap, range);
         })
-        .catch(function () { return liveChart(symbol, range, wantWide); });
+        .catch(function (e) {
+          DATA.reason = DATA.reason || ("SNAP_FAIL: " + (e && e.message));
+          return liveChart(symbol, range, wantWide);
+        });
     }
+    if (manifest && manifest.symbols && !entry) DATA.reason = "NOT_IN_MANIFEST";
     // ③ 실시간
     return liveChart(symbol, range, wantWide);
   });
@@ -1739,6 +1794,11 @@ function load() {
 function sourceNote() {
   if (state.dataSource === "snapshot") return "사전 수집 데이터 (" + (state.dataUpdated || "") + " 기준) · 서버 요청 없이 로드됨";
   if (state.dataSource === "local") return "오늘 받은 데이터를 이 기기에서 재사용 · 서버 요청 없음";
+  if (state.dataSource === "live") {
+    // 스냅샷을 못 쓴 이유를 짧게 붙여 준다 (원인 파악용)
+    var why = DATA.reason ? " (" + DATA.reason + ")" : "";
+    return "실시간 조회" + why;
+  }
   return "";
 }
 
