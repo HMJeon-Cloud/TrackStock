@@ -270,7 +270,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.5</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.6</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -363,6 +363,7 @@
       노란 선이 <b>종가 흐름</b>, 세로 점선이 그 시점에 있었던 <b>사건</b>입니다. 색은 사건의 종류(전쟁·위기·금리·팬데믹·정치·회복)를 뜻합니다.
       <ul>
         <li><b>차트 위에 마우스를 올리면</b> 그날의 가격과, 앞뒤 10일 안에 있었던 사건이 함께 뜹니다.</li>
+        <li><b>이 앱의 가격은 "확정된 하루치 종가"입니다.</b> 일봉(하루 한 개의 봉) 데이터만 쓰기 때문에 화면의 가격은 <b>가장 최근 거래일의 종가</b>이며 장중 실시간 가격이 아닙니다. 제목 옆 날짜가 그 기준일입니다. 국내 장은 15:30, 미국 장은 한국시간 06:00경 마감하며 그 뒤에 갱신됩니다.</li>
         <li><b>확대/축소</b> — 차트 위에서 <b>마우스 휠</b>을 굴리면 커서가 있는 지점을 중심으로 확대·축소됩니다. 확대 상태에서 <b>드래그</b>하면 좌우로 이동하고, y축은 보이는 구간에 맞춰 자동으로 다시 잡힙니다. <b>↺ 확대 초기화</b> 버튼으로 전체 보기로 돌아옵니다. 모바일에서는 두 손가락 벌리기로 확대됩니다.</li>
         <li><b>이동평균선</b>을 켜면 20일(파랑)·60일(초록)·240일(보라) 평균선이 겹쳐집니다. 각각 1개월·3개월·1년 추세를 뜻하며, 자세한 해석은 아래 <b>전문가 지표</b> 카드의 학습 가이드에 있습니다.</li>
         <li><b>로그 스케일</b>을 켜면 세로 이동 거리가 같을 때 상승률도 같아집니다. 가격이 몇 배씩 오른 종목의 초기 구간을 볼 때 켜세요. 끄면(기본) 절대 금액 차이가 그대로 보입니다.</li>
@@ -434,7 +435,7 @@
     <h2>기업 정보 & 투자지표 <small>가격 뒤에 있는 회사의 실체 · 국내·해외 모두 지원 (투자자 매매동향·업종 비교는 국내만)</small></h2>
     <div id="fundStatus" style="font-size:12px;color:var(--sub);line-height:1.8"></div>
     <div id="fundBody" class="hidden">
-      <h3 style="margin-top:4px">오늘의 시세</h3>
+      <h3 style="margin-top:4px">시세 <small>국내 종목은 네이버 기준, 해외 종목은 최근 종가 기준</small></h3>
       <div id="fundQuote" class="row"></div>
       <h3>투자지표 <small>마우스를 올리거나 길게 누르면 뜻이 뜹니다</small></h3>
       <div id="fundMetrics" class="row"></div>
@@ -502,7 +503,7 @@
       최근 N일 종가의 평균을 이은 선입니다. 차트에서 켜 보세요. 20일선은 약 1개월(단기 추세),
       60일선은 약 3개월(중기), 240일선은 약 1년(장기 추세)입니다.
       주가가 240일선 <b>위</b>에 있으면 장기 상승 추세, <b>아래</b>면 하락 추세로 보는 것이 관례입니다.
-      <b>240일선 이격</b>은 현재가가 이 선에서 얼마나 떨어져 있는지로, 이격이 크게 벌어지면(±20% 이상)
+      <b>240일선 이격</b>은 최근 종가가 이 선에서 얼마나 떨어져 있는지로, 이격이 크게 벌어지면(±20% 이상)
       평균으로 되돌아가려는 힘이 커진다고 봅니다. 다만 이것도 확률적 경향이지 법칙이 아닙니다.<br><br>
 
       <b>■ 52주 최고/최저 대비</b><br>
@@ -594,7 +595,7 @@
       <ul>
         <li><b>낙폭</b> — 고점 종가 대비 저점 종가의 하락률. 큰 순서로 정렬돼 있습니다.</li>
         <li><b>📰 당시 기사</b> — 저점 전후 2주간의 기사를 네이버 뉴스 검색으로 엽니다. 그때 시장이 무엇을 두려워했는지 보면, 지금의 공포가 얼마나 흔한 종류인지 알 수 있습니다.</li>
-        <li><b>회복일</b> — 하락 전 고점 가격을 다시 넘어선 날. 아직 회복하지 못한 구간은 상태를 셋으로 나눠 보여줍니다: <span class="neg">▼ 하락 진행중</span>(현재가가 저점 부근), <span class="pos">△ 반등 중</span>(저점에서 올라왔지만 갈 길이 남음), <span class="pos">▲ 회복 임박</span>(전고점까지 70% 이상 회복). 저점 대비 상승폭과 전고점까지 남은 거리도 함께 표시됩니다.</li>
+        <li><b>회복일</b> — 하락 전 고점 가격을 다시 넘어선 날. 아직 회복하지 못한 구간은 상태를 셋으로 나눠 보여줍니다: <span class="neg">▼ 하락 진행중</span>(최근 종가가 저점 부근), <span class="pos">△ 반등 중</span>(저점에서 올라왔지만 갈 길이 남음), <span class="pos">▲ 회복 임박</span>(전고점까지 70% 이상 회복). 저점 대비 상승폭과 전고점까지 남은 거리도 함께 표시됩니다.</li>
         <li><b>하락기간</b> — 고점에서 저점까지 걸린 날짜. 회복까지 걸린 시간은 회복일에서 따로 확인하세요. 떨어지는 데 3개월, 회복에 3년이 걸리는 일도 흔합니다.</li>
         <li><b>당시 이슈</b> — 그 하락~회복 구간 안에 있었던 사건들. 여러 개가 붙어 있으면 악재가 겹친 구간입니다.</li>
       </ul>
@@ -1000,7 +1001,8 @@
     <ul>
       <li><b>52주 최고 대비</b>가 -5% 안이면 신고가 부근, -20% 아래면 조정 중입니다. 관심 종목 중 어디가 싸졌는지 훑어보는 용도입니다.</li>
       <li><b>1년 최대낙폭</b>은 최근 1년 안에서 겪은 가장 깊은 하락입니다. 이 숫자가 내 한계보다 크면 비중을 줄여야 할 종목입니다.</li>
-      <li><b>분석</b>은 개별 종목 화면으로, <b>🛒</b>는 장바구니로 보냅니다. 시세는 10분간 캐시됩니다.</li>
+      <li><b>분석</b>은 개별 종목 화면으로, <b>🛒</b>는 장바구니로 보냅니다.</li>
+      <li>표의 가격은 <b>확정된 최근 거래일 종가</b>이며 장중 실시간 가격이 아닙니다. 종목명 아래 날짜가 그 기준일입니다.</li>
     </ul>
   </div></details>
 </div>
@@ -1030,6 +1032,7 @@
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
+  <b>이 앱의 가격은 장중 실시간이 아니라 거래일 단위로 확정된 종가</b>이며, 각 화면에 표시된 기준일 시점의 값입니다.
   데이터 출처: 가격 Yahoo Finance · 기업정보 네이버 증권 · 뉴스 네이버 검색 API. 데이터는 지연·오류·누락이 있을 수 있으며 정확성을 보장하지 않습니다.
   뉴스 기사의 저작권은 각 언론사에 있으며 이 서비스는 제목과 원문 링크만 표시합니다.
   관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.
@@ -1930,8 +1933,8 @@ function render() {
   $("resultArea").classList.remove("hidden");
   var name = state.meta.shortName || state.meta.longName || state.symbol;
   var last = state.rows[state.rows.length - 1];
-  $("chartTitle").textContent = name + " (" + state.symbol + ") — 현재가 " +
-    fmtPrice(last.c) + " " + state.displayCur +
+  $("chartTitle").textContent = name + " (" + state.symbol + ") — 최근 종가 " +
+    fmtPrice(last.c) + " " + state.displayCur + " (" + fmtDate(last.t) + " 기준)" +
     ($("divToggle").checked && state.divAvailable ? " · 배당 재투자(총수익) 기준" : "");
   var dn = $("divNote");
   if (dn) {
@@ -2188,7 +2191,7 @@ function renderAvg() {
   var curPnl = rows[rows.length - 1].c / avg - 1;
 
   box.innerHTML =
-    '<span class="badge">현재 수익률<b class="' + pctCls(curPnl) + '">' + fmtPct(curPnl) + "</b></span>" +
+    '<span class="badge" title="최근 종가 기준. 장중 실시간 가격이 아닙니다">최근 종가 기준 수익률<b class="' + pctCls(curPnl) + '">' + fmtPct(curPnl) + "</b></span>" +
     '<span class="badge">역대 최대 낙폭 재현 시<b class="neg">' + fmtPrice(avg * (1 + worstDd)) + " (" + fmtPct(worstDd) + ")</b></span>" +
     '<span class="badge">최악의 하루 재현 시<b class="neg">' + fmtPrice(avg * (1 + worstDaily)) + " (" + fmtPct(worstDaily) + ")</b></span>" +
     '<span class="badge">10%+ 하락 횟수<b>' + eps.length + "회</b></span>" +

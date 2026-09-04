@@ -170,7 +170,8 @@ function renderInsight() {
 function renderPosition(pos, eps) {
   var atHigh = pos.dd > -0.005;
   $("insPosBadges").innerHTML =
-    '<span class="badge">현재가<b>' + fmtPrice(pos.last.c) + "</b></span>" +
+    '<span class="badge" title="장중 실시간이 아니라 확정된 최근 거래일 종가입니다">최근 종가<b>' +
+      fmtPrice(pos.last.c) + ' <small style="color:var(--sub)">' + fmtDate(pos.last.t) + "</small></b></span>" +
     '<span class="badge">기간 내 최고가<b>' + fmtPrice(pos.peak) +
       ' <span style="font-size:11px;color:var(--sub)">' + fmtDate(pos.peakT) + "</span></b></span>" +
     '<span class="badge">전고점 대비<b class="' + (atHigh ? "" : "neg") + '">' +

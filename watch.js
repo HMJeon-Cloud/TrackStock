@@ -1,7 +1,7 @@
 "use strict";
 /* ============================================================
    StockMind — 관심 종목 & 뉴스 탭
-   - 관심 종목: 기기(localStorage)에 저장. 현재가·전일대비·전고점 대비를 한눈에.
+   - 관심 종목: 기기(localStorage)에 저장. 최근 종가·전일대비·전고점 대비를 한눈에.
    - 뉴스: 관심 종목별 기사 + 시장 뉴스(주요/해외/시황/환율/금리). 제목만 보여주고 클릭하면 원문.
    ============================================================ */
 
@@ -136,7 +136,7 @@ function renderWatchList() {
     $("watchNews").innerHTML = "";
     return;
   }
-  var html = "<thead><tr><th>종목</th><th>현재가</th><th>전일 대비</th><th>1개월</th><th>1년</th>" +
+  var html = "<thead><tr><th>종목</th><th>최근 종가</th><th>전일 대비</th><th>1개월</th><th>1년</th>" +
     "<th>52주 최고 대비</th><th>1년 최대낙폭</th><th></th></tr></thead><tbody>";
   list.forEach(function (w) {
     var q = watchState.quotes[w.s];

@@ -151,7 +151,7 @@ function renderMetrics() {
     '<span class="badge" title="최근 14거래일 상승폭과 하락폭의 비율. 70 이상 과열, 30 이하 침체로 봅니다">RSI(14)<b>' +
       (rsi == null ? "-" : rsi.toFixed(1)) +
       ' <small style="color:' + rl[1] + '">' + rl[0] + "</small></b></span>" +
-    '<span class="badge" title="현재가가 240일(약 1년) 평균가에서 얼마나 떨어져 있는지">240일선 이격<b class="' +
+    '<span class="badge" title="최근 종가가 240일(약 1년) 평균가에서 얼마나 떨어져 있는지">240일선 이격<b class="' +
       pctCls(gap240 || 0) + '">' + (gap240 == null ? "-" : fmtPct(gap240)) + "</b></span>" +
     '<span class="badge" title="최근 52주 최고가 대비 현재 위치">52주 최고 대비<b class="' + pctCls(w52.vsHigh) + '">' +
       fmtPct(w52.vsHigh) + "</b></span>" +

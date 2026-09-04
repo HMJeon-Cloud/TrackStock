@@ -157,12 +157,14 @@ function renderLevelsTable() {
     return;
   }
   var unit = state.displayCur === "KRW" ? "원" : " " + state.displayCur;
-  var html = "<thead><tr><th>구분</th><th>가격대</th><th>현재가 대비</th><th>터치 횟수</th><th>마지막 터치</th></tr></thead><tbody>";
+  var html = "<thead><tr><th>구분</th><th>가격대</th><th>종가 대비</th><th>터치 횟수</th><th>마지막 터치</th></tr></thead><tbody>";
   L.resistance.slice().reverse().forEach(function (lv) {
     html += "<tr><td><b style='color:var(--up)'>저항</b></td><td>" + fmtPrice(lv.price) + unit + "</td>" +
       '<td class="pos">+' + (lv.pct * 100).toFixed(1) + "%</td><td>" + lv.touches + "회</td><td>" + fmtDate(lv.lastT) + "</td></tr>";
   });
-  html += "<tr style='background:#202a40'><td><b>현재가</b></td><td><b>" + fmtPrice(L.cur) + unit + "</b></td><td>-</td><td>-</td><td>-</td></tr>";
+  var lastT = state.rows[state.rows.length - 1].t;
+  html += "<tr style='background:#202a40'><td><b>최근 종가</b><br><small style='color:var(--sub)'>" + fmtDate(lastT) +
+    "</small></td><td><b>" + fmtPrice(L.cur) + unit + "</b></td><td>-</td><td>-</td><td>-</td></tr>";
   L.support.forEach(function (lv) {
     html += "<tr><td><b style='color:var(--good)'>지지</b></td><td>" + fmtPrice(lv.price) + unit + "</td>" +
       '<td class="neg">' + (lv.pct * 100).toFixed(1) + "%</td><td>" + lv.touches + "회</td><td>" + fmtDate(lv.lastT) + "</td></tr>";
