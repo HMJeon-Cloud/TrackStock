@@ -23,16 +23,34 @@ function loadSymbols() {
   return Array.from(new Set(out));
 }
 
+/* Yahoo 일봉 전체 기록 요청.
+   주의: range=max 를 쓰면 Yahoo가 interval=1d 를 무시하고 월봉(1mo)을 돌려준다.
+   전체 기간의 일봉을 받으려면 period1/period2 로 날짜 범위를 직접 지정해야 한다.
+   응답의 meta.dataGranularity 가 "1d" 인지 확인해서 월봉이 오면 버린다. */
 async function fetchYahoo(symbol) {
-  const path = "/v8/finance/chart/" + encodeURIComponent(symbol) + "?range=max&interval=1d&events=div%2Csplit";
-  for (const host of ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]) {
-    try {
-      const r = await fetch("https://" + host + path, { headers: { "User-Agent": UA, Accept: "application/json" } });
-      if (!r.ok) continue;
-      const j = await r.json();
-      const res = j && j.chart && j.chart.result && j.chart.result[0];
-      if (res && res.timestamp && res.timestamp.length) return res;
-    } catch (e) { /* 다음 호스트 */ }
+  const now = Math.floor(Date.now() / 1000);
+  const p1 = now - 25 * 365.25 * 86400;                          // 최근 25년 (앱이 쓰는 최대치)
+  const candidates = [
+    "?period1=" + Math.floor(p1) + "&period2=" + now + "&interval=1d&events=div%2Csplit",
+    "?range=25y&interval=1d&events=div%2Csplit",                 // 예비
+  ];
+  for (const qs of candidates) {
+    const path = "/v8/finance/chart/" + encodeURIComponent(symbol) + qs;
+    for (const host of ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]) {
+      try {
+        const r = await fetch("https://" + host + path, { headers: { "User-Agent": UA, Accept: "application/json" } });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const res = j && j.chart && j.chart.result && j.chart.result[0];
+        if (!res || !res.timestamp || !res.timestamp.length) continue;
+        const gran = res.meta && res.meta.dataGranularity;
+        if (gran && gran !== "1d") continue;                       // 월봉·주봉이면 다음 후보로
+        // 20년 넘는 기간에 봉이 1,000개도 안 되면 일봉이 아니다
+        const span = (res.timestamp[res.timestamp.length - 1] - res.timestamp[0]) / 86400;
+        if (span > 365 * 3 && res.timestamp.length < span / 3) continue;
+        return res;
+      } catch (e) { /* 다음 호스트 */ }
+    }
   }
   return null;
 }

@@ -19,10 +19,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "invalid range/interval" });
   }
 
+  // range=max 는 Yahoo가 interval 을 무시하고 월봉을 주므로, 날짜 범위(period1/period2)로 바꿔 요청한다
+  let rangeQs;
+  if (range === "max") {
+    const now = Math.floor(Date.now() / 1000);
+    rangeQs = "?period1=" + Math.floor(now - 25 * 365.25 * 86400) + "&period2=" + now;
+  } else {
+    rangeQs = "?range=" + encodeURIComponent(range);
+  }
   const path =
     "/v8/finance/chart/" +
     encodeURIComponent(symbol) +
-    "?range=" + encodeURIComponent(range) +
+    rangeQs +
     "&interval=" + encodeURIComponent(interval) +
     "&events=div%2Csplit";           // 배당·분할 이벤트 → adjclose(배당 재투자 반영 종가)와 배당 이력을 함께 받는다
 
