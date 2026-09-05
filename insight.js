@@ -142,7 +142,7 @@ var insightState = { built: false };
 
 function renderInsight() {
   var box = $("insBody"), empty = $("insEmpty");
-  if (!state.rows || state.rows.length < 250) {
+  if (!state.rows || state.rows.length < 60) {
     box.classList.add("hidden");
     empty.classList.remove("hidden");
     // 왜 비어 있는지 알 수 있게 상태를 함께 적는다
@@ -156,7 +156,7 @@ function renderInsight() {
       var spanDays = (r1.t - r0.t) / 86400000;
       var selDays = { "5y": 1826, "10y": 3652, "20y": 7305, "max": Infinity }[sel] || 3652;
       why = name + "(" + state.symbol + ")의 데이터가 " + fmtDate(r0.t) + " ~ " + fmtDate(r1.t) + ", " +
-        state.rows.length + "거래일뿐이라 통계를 낼 수 없습니다 (최소 250거래일 필요). ";
+        state.rows.length + "거래일뿐이라 통계를 낼 수 없습니다 (최소 60거래일 필요). ";
       // 요청한 기간보다 훨씬 짧게 왔다면 상장일이 최근인 것이다
       why += spanDays < selDays * 0.9
         ? "선택한 기간(" + sel + ")보다 데이터가 짧은 것은 이 종목이 " + fmtDate(r0.t) + " 무렵 상장되어 그 이전 기록이 없기 때문입니다. 기간을 늘려도 달라지지 않으며, 1년 이상 거래된 뒤에 다시 보실 수 있습니다."
@@ -191,6 +191,16 @@ function renderInsightBody(box, empty) {
     fmtDate(rows[0].t) + " ~ " + fmtDate(rows[rows.length - 1].t) +
     " · " + totalYears.toFixed(1) + "년 · " + state.displayCur + " 기준";
 
+  var warn = $("insShortWarn");
+  if (warn) {
+    if (totalYears < 3) {
+      warn.innerHTML = "⚠ 데이터가 <b>" + totalYears.toFixed(1) + "년</b>뿐입니다. 아래 통계는 짧은 기간의 우연에 크게 흔들리며, " +
+        "특히 보유기간별 손실 확률은 표본이 적어 참고 수준입니다. 큰 하락장을 한 번도 겪지 않은 기간이면 실제보다 안전해 보입니다.";
+      warn.classList.remove("hidden");
+    } else {
+      warn.classList.add("hidden");
+    }
+  }
   var pos = currentPosition(rows, eps);
   renderPosition(pos, eps);
   var hold = renderHolding(rows, totalYears);
@@ -216,8 +226,9 @@ function renderPosition(pos, eps) {
 }
 
 /* --- A. 보유기간별 손실 확률 --- */
+function yrLabel(y) { return y < 1 ? Math.round(y * 12) + "개월" : y + "년"; }
 function renderHolding(rows, totalYears) {
-  var candidates = [1, 2, 3, 5, 7, 10, 15, 20];
+  var candidates = [0.5, 1, 2, 3, 5, 7, 10, 15, 20];
   var stats = [];
   for (var i = 0; i < candidates.length; i++) {
     if (candidates[i] > totalYears - 0.5) break;
@@ -226,7 +237,7 @@ function renderHolding(rows, totalYears) {
   }
   if (!stats.length) {
     $("insHolding").innerHTML =
-      '<tbody><tr><td style="text-align:left;color:var(--sub)">기간이 짧아 계산할 수 없습니다. 조회 기간을 늘려 주세요.</td></tr></tbody>';
+      '<tbody><tr><td style="text-align:left;color:var(--sub)">데이터가 6개월 미만이라 보유기간별 통계를 낼 수 없습니다. 다른 항목(현재 위치·급등급락)은 계산됩니다.</td></tr></tbody>';
     return [];
   }
 
@@ -235,7 +246,7 @@ function renderHolding(rows, totalYears) {
   stats.forEach(function (s) {
     // 손실 확률에 따라 배경색 농도를 달리해 한눈에 흐름이 보이게 한다
     var alpha = Math.min(s.lossRate * 1.6, 0.45);
-    html += "<tr><td><b>" + s.years + "년</b></td>" +
+    html += "<tr><td><b>" + yrLabel(s.years) + "</b></td>" +
       "<td style='background:rgba(255,91,91," + alpha.toFixed(3) + ");font-weight:bold'>" +
         (s.lossRate * 100).toFixed(1) + "%</td>" +
       '<td class="' + pctCls(s.median) + '">' + fmtPct(s.median) + "</td>" +
@@ -257,14 +268,14 @@ function renderHolding(rows, totalYears) {
       "그래도 같다면 이 종목의 역사 자체가 짧다는 점을 감안하세요.";
   } else if (allSafe.length) {
     var firstSafe = allSafe[0];
-    msg = "<b>" + firstSafe.years + "년</b> 이상 보유한 경우에는 이 기간 안에서 손실로 끝난 사례가 없었습니다. " +
+    msg = "<b>" + yrLabel(firstSafe.years) + "</b> 이상 보유한 경우에는 이 기간 안에서 손실로 끝난 사례가 없었습니다. " +
       "다만 이는 <b>조회한 " + totalYears.toFixed(1) + "년 안에서만</b> 성립하는 사실이며, " +
       "기간을 바꾸면 결과도 달라집니다.";
   }
   // 최장 보유기간의 최악값이 크게 마이너스면 함께 경고
   var longest = stats[stats.length - 1];
   if (longest && longest.min < -0.2) {
-    msg += (msg ? "<br>" : "") + "<b>" + longest.years + "년</b>을 보유하고도 최악의 경우 <b class='neg'>" +
+    msg += (msg ? "<br>" : "") + "<b>" + yrLabel(longest.years) + "</b>을 보유하고도 최악의 경우 <b class='neg'>" +
       fmtPct(longest.min) + "</b>였던 시점이 있습니다. 장기 보유가 손실을 없애주지는 않습니다.";
   }
   $("insHoldNote").innerHTML = msg;
@@ -386,18 +397,18 @@ function renderSentences(name, pos, hold, top, eps, totalYears) {
   // 3) 보유기간별 손실 확률
   if (hold && hold.length) {
     var parts = hold.map(function (s) {
-      return s.years + "년 " + (s.lossRate * 100).toFixed(0) + "%";
+      return yrLabel(s.years) + " " + (s.lossRate * 100).toFixed(0) + "%";
     }).join(", ");
     L.push("이 기간 중 아무 날에나 샀다고 가정하면, 보유기간별 손실 확률은 " + parts + "였습니다.");
     var first = hold[0], last = hold[hold.length - 1];
     if (last.lossRate < first.lossRate) {
-      L.push("같은 종목이라도 " + first.years + "년 보유 시 손실 확률이 " +
-        (first.lossRate * 100).toFixed(0) + "%인 반면 " + last.years + "년 보유 시 " +
+      L.push("같은 종목이라도 " + yrLabel(first.years) + " 보유 시 손실 확률이 " +
+        (first.lossRate * 100).toFixed(0) + "%인 반면 " + yrLabel(last.years) + " 보유 시 " +
         (last.lossRate * 100).toFixed(0) + "%로 낮아졌습니다. 언제 샀는지보다 얼마나 오래 들고 있었는지가 결과를 더 크게 갈랐습니다.");
     } else if (last.lossRate > first.lossRate) {
       L.push("주의: 이 종목은 보유기간을 늘려도 손실 확률이 낮아지지 않았습니다(" +
-        first.years + "년 " + (first.lossRate * 100).toFixed(0) + "% → " +
-        last.years + "년 " + (last.lossRate * 100).toFixed(0) + "%). 장기 보유가 항상 해답은 아니라는 사례입니다.");
+        yrLabel(first.years) + " " + (first.lossRate * 100).toFixed(0) + "% → " +
+        yrLabel(last.years) + " " + (last.lossRate * 100).toFixed(0) + "%). 장기 보유가 항상 해답은 아니라는 사례입니다.");
     }
   }
 
