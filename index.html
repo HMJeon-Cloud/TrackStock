@@ -270,7 +270,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.7</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.8</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -1040,7 +1040,7 @@
   관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.
 </footer>
 
-<script src="tickers.js?v=3.7"></script>
+<script src="tickers.js?v=3.8"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -1661,15 +1661,34 @@ function snapshotToParsed(snap, range) {
 
 /* localStorage: 종목별로 가장 넓은 기간의 스냅샷 하나만, 오늘 날짜 표시와 함께. 최근 8개만 유지 */
 var LS_PREFIX = "sm.chart.";
-function lsGet(symbol) {
+// 캐시 형식이 바뀌면 옛 항목을 한 번 정리한다 (기간 정보가 없는 항목은 신뢰할 수 없다)
+(function () {
+  try {
+    var ver = localStorage.getItem("sm.cacheVer");
+    if (ver !== "2") {
+      var del = [];
+      for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("sm.chart.") === 0) del.push(k); }
+      del.forEach(function (k) { localStorage.removeItem(k); });
+      localStorage.setItem("sm.cacheVer", "2");
+    }
+  } catch (e) {}
+})();
+var RANGE_RANK = { "5y": 1, "10y": 2, "20y": 3, "max": 4 };
+function lsGet(symbol, range) {
   try {
     var raw = localStorage.getItem(LS_PREFIX + symbol);
     if (!raw) return null;
     var obj = JSON.parse(raw);
-    return obj && obj.date === kstToday() ? obj : null;
+    if (!obj || obj.date !== kstToday()) return null;
+    // 저장된 데이터가 요청 기간을 감당할 수 있어야 재사용한다.
+    // (5년으로 받아둔 것을 10년 요청에 돌려주면 통계가 잘린 채 계산된다)
+    var have = RANGE_RANK[obj.range] || (obj.wide ? 4 : 2);
+    var need = RANGE_RANK[range] || 2;
+    if (have < need) return null;
+    return obj;
   } catch (e) { return null; }
 }
-function lsPut(symbol, snap, wide) {
+function lsPut(symbol, snap, wide, range) {
   try {
     var keys = [];
     for (var i = 0; i < localStorage.length; i++) {
@@ -1680,7 +1699,13 @@ function lsPut(symbol, snap, wide) {
       keys.sort(function (a, b) { return (JSON.parse(localStorage.getItem(a)).at || 0) - (JSON.parse(localStorage.getItem(b)).at || 0); });
       localStorage.removeItem(keys[0]);
     }
-    localStorage.setItem(LS_PREFIX + symbol, JSON.stringify({ date: kstToday(), at: Date.now(), wide: !!wide, snap: snap }));
+    // 이미 더 넓은 기간이 저장돼 있으면 좁은 것으로 덮어쓰지 않는다
+    var prev = null;
+    try { prev = JSON.parse(localStorage.getItem(LS_PREFIX + symbol) || "null"); } catch (e2) {}
+    var prevRank = prev && prev.date === kstToday() ? (RANGE_RANK[prev.range] || (prev.wide ? 4 : 2)) : 0;
+    var newRank = RANGE_RANK[range] || (wide ? 4 : 2);
+    if (prevRank > newRank) return;
+    localStorage.setItem(LS_PREFIX + symbol, JSON.stringify({ date: kstToday(), at: Date.now(), wide: !!wide, range: range || (wide ? "max" : "10y"), snap: snap }));
   } catch (e) { /* 용량 초과 등은 무시 */ }
 }
 
@@ -1700,8 +1725,8 @@ function getChartData(symbol, range) {
   var wantWide = range === "20y" || range === "max";
 
   // ① 브라우저 저장
-  var ls = lsGet(symbol);
-  if (ls && (ls.wide || !wantWide)) {
+  var ls = lsGet(symbol, range);
+  if (ls) {
     var p0 = snapshotToParsed(ls.snap, range);
     p0.source = "local";
     return Promise.resolve(p0);
@@ -1724,7 +1749,8 @@ function getChartData(symbol, range) {
           return fetch(proxy).then(function (r) { if (!r.ok) throw new Error("proxy " + r.status); return r.json(); });
         })
         .then(function (snap) {
-          lsPut(symbol, snap, wantWide);
+          // 스냅샷 파일은 요청보다 넓은 기간(10년 또는 전체)이므로 그 폭으로 기록한다
+          lsPut(symbol, snap, wantWide, wantWide ? "max" : "10y");
           return snapshotToParsed(snap, range);
         })
         .catch(function (e) {
@@ -1749,7 +1775,7 @@ function liveChart(symbol, range, wantWide) {
     .then(function (json) {
       var p = parseChart(json);
       p.source = "live";
-      if (p.rows.length) lsPut(symbol, parsedToSnapshot(symbol, p), wantWide);
+      if (p.rows.length) lsPut(symbol, parsedToSnapshot(symbol, p), wantWide, range);
       return p;
     });
 }
@@ -2458,13 +2484,13 @@ $("shareBtn").onclick = function () {
 // 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
 window.addEventListener("load", applyShareHash);
 </script>
-<script src="metrics.js?v=3.7"></script>
-<script src="technical.js?v=3.7"></script>
-<script src="company.js?v=3.7"></script>
-<script src="compare.js?v=3.7"></script>
-<script src="sim.js?v=3.7"></script>
-<script src="insight.js?v=3.7"></script>
-<script src="guide.js?v=3.7"></script>
-<script src="watch.js?v=3.7"></script>
+<script src="metrics.js?v=3.8"></script>
+<script src="technical.js?v=3.8"></script>
+<script src="company.js?v=3.8"></script>
+<script src="compare.js?v=3.8"></script>
+<script src="sim.js?v=3.8"></script>
+<script src="insight.js?v=3.8"></script>
+<script src="guide.js?v=3.8"></script>
+<script src="watch.js?v=3.8"></script>
 </body>
 </html>

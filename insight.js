@@ -146,8 +146,22 @@ function renderInsight() {
     box.classList.add("hidden");
     empty.classList.remove("hidden");
     // 왜 비어 있는지 알 수 있게 상태를 함께 적는다
-    var why = !state.rows ? "아직 조회한 종목이 없습니다."
-      : "조회된 데이터가 " + state.rows.length + "일치뿐이라 통계를 낼 수 없습니다 (최소 250거래일 필요). 기간을 늘려 다시 조회해 주세요.";
+    var why;
+    if (!state.rows) {
+      why = "아직 조회한 종목이 없습니다.";
+    } else {
+      var r0 = state.rows[0], r1 = state.rows[state.rows.length - 1];
+      var name = (state.meta && (state.meta.shortName || state.meta.longName)) || state.symbol;
+      var sel = $("rangeSel") ? $("rangeSel").value : "";
+      var spanDays = (r1.t - r0.t) / 86400000;
+      var selDays = { "5y": 1826, "10y": 3652, "20y": 7305, "max": Infinity }[sel] || 3652;
+      why = name + "(" + state.symbol + ")의 데이터가 " + fmtDate(r0.t) + " ~ " + fmtDate(r1.t) + ", " +
+        state.rows.length + "거래일뿐이라 통계를 낼 수 없습니다 (최소 250거래일 필요). ";
+      // 요청한 기간보다 훨씬 짧게 왔다면 상장일이 최근인 것이다
+      why += spanDays < selDays * 0.9
+        ? "선택한 기간(" + sel + ")보다 데이터가 짧은 것은 이 종목이 " + fmtDate(r0.t) + " 무렵 상장되어 그 이전 기록이 없기 때문입니다. 기간을 늘려도 달라지지 않으며, 1년 이상 거래된 뒤에 다시 보실 수 있습니다."
+        : "기간을 늘려 다시 조회해 주세요.";
+    }
     var el = $("insEmptyWhy");
     if (el) el.textContent = why;
     return;
