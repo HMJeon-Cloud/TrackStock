@@ -270,7 +270,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.6</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v3.7</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -627,6 +627,8 @@
   <div id="insEmpty" class="mentalNote">
     먼저 <b>종목 분석</b> 화면에서 종목을 조회해 주세요. 통계를 내려면 최소 1년 이상의 데이터가 필요하며,
     조회 기간을 <b>20년 또는 전체</b>로 설정할수록 결과가 정확해집니다.
+  
+    <div id="insEmptyWhy" style="margin-top:8px;color:var(--up);font-size:12px"></div>
   </div>
 
   <div id="insBody" class="hidden">
@@ -1038,7 +1040,7 @@
   관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.
 </footer>
 
-<script src="tickers.js"></script>
+<script src="tickers.js?v=3.7"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -2456,13 +2458,13 @@ $("shareBtn").onclick = function () {
 // 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
 window.addEventListener("load", applyShareHash);
 </script>
-<script src="metrics.js"></script>
-<script src="technical.js"></script>
-<script src="company.js"></script>
-<script src="compare.js"></script>
-<script src="sim.js"></script>
-<script src="insight.js"></script>
-<script src="guide.js"></script>
-<script src="watch.js"></script>
+<script src="metrics.js?v=3.7"></script>
+<script src="technical.js?v=3.7"></script>
+<script src="company.js?v=3.7"></script>
+<script src="compare.js?v=3.7"></script>
+<script src="sim.js?v=3.7"></script>
+<script src="insight.js?v=3.7"></script>
+<script src="guide.js?v=3.7"></script>
+<script src="watch.js?v=3.7"></script>
 </body>
 </html>

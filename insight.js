@@ -145,8 +145,26 @@ function renderInsight() {
   if (!state.rows || state.rows.length < 250) {
     box.classList.add("hidden");
     empty.classList.remove("hidden");
+    // 왜 비어 있는지 알 수 있게 상태를 함께 적는다
+    var why = !state.rows ? "아직 조회한 종목이 없습니다."
+      : "조회된 데이터가 " + state.rows.length + "일치뿐이라 통계를 낼 수 없습니다 (최소 250거래일 필요). 기간을 늘려 다시 조회해 주세요.";
+    var el = $("insEmptyWhy");
+    if (el) el.textContent = why;
     return;
   }
+  try {
+    renderInsightBody(box, empty);
+  } catch (e) {
+    // 조용히 실패하지 않도록 화면에 오류를 드러낸다
+    box.classList.add("hidden");
+    empty.classList.remove("hidden");
+    var el2 = $("insEmptyWhy");
+    if (el2) el2.textContent = "인사이트 계산 중 오류: " + (e && e.message) + " — 이 문구를 개발자에게 전달해 주세요.";
+    if (window.console) console.error("[인사이트 오류]", e);
+  }
+}
+
+function renderInsightBody(box, empty) {
   empty.classList.add("hidden");
   box.classList.remove("hidden");
 
