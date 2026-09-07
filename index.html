@@ -274,7 +274,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.1</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.2</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -1045,7 +1045,7 @@
   관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.
 </footer>
 
-<script src="tickers.js?v=4.1"></script>
+<script src="tickers.js?v=4.2"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -1745,11 +1745,11 @@ var LS_PREFIX = "sm.chart.";
 (function () {
   try {
     var ver = localStorage.getItem("sm.cacheVer");
-    if (ver !== "3") {
+    if (ver !== "4") {
       var del = [];
       for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("sm.chart.") === 0) del.push(k); }
       del.forEach(function (k) { localStorage.removeItem(k); });
-      localStorage.setItem("sm.cacheVer", "3");
+      localStorage.setItem("sm.cacheVer", "4");
     }
   } catch (e) {}
 })();
@@ -1815,22 +1815,12 @@ function getChartData(symbol, range) {
   return dataReady().then(function (manifest) {
     // ② 정적 스냅샷
     var entry = manifest && manifest.symbols && manifest.symbols[symbol];
-    if (entry && entry.updated) {
-      var folder = wantWide ? "charts/" : "charts10/";
-      var direct = DATA.config.snapshotBase && !DATA.viaProxy
-        ? DATA.config.snapshotBase + folder + encodeURIComponent(symbol) + ".json"
-        : null;
-      var proxy = "/api/snap?symbol=" + encodeURIComponent(symbol) + (wantWide ? "&wide=1" : "");
-      var first = direct
-        ? fetch(direct, { cache: "default" }).then(function (r) { if (!r.ok) throw new Error("snapshot " + r.status); return r.json(); })
-        : Promise.reject(new Error("no public url"));
-      return first
-        .catch(function () {
-          return fetch(proxy).then(function (r) { if (!r.ok) throw new Error("proxy " + r.status); return r.json(); });
-        })
-        .then(function (snap) {
-          // 스냅샷 파일은 요청보다 넓은 기간(10년 또는 전체)이므로 그 폭으로 기록한다
-          lsPut(symbol, snap, wantWide, wantWide ? "max" : "10y");
+    if (entry && entry.history) {
+      // 과거 전체 파일과 최근 구간 파일을 합친다 (과거 파일은 며칠에 한 번만 갱신되므로)
+      return Promise.all([fetchSnapFile(symbol), fetchRecent()])
+        .then(function (arr) {
+          var snap = mergeRecent(arr[0], arr[1], symbol);
+          lsPut(symbol, snap, true, "max");
           return snapshotToParsed(snap, range);
         })
         .catch(function (e) {
@@ -1842,6 +1832,61 @@ function getChartData(symbol, range) {
     // ③ 실시간
     return liveChart(symbol, range, wantWide);
   });
+}
+
+/* 과거 전체 파일 (공개 URL 우선, 실패 시 서버 경유) */
+function fetchSnapFile(symbol) {
+  var direct = DATA.config.snapshotBase && !DATA.viaProxy
+    ? DATA.config.snapshotBase + "charts/" + encodeURIComponent(symbol) + ".json" : null;
+  var proxy = "/api/snap?symbol=" + encodeURIComponent(symbol);
+  var first = direct
+    ? fetch(direct, { cache: "default" }).then(function (r) { if (!r.ok) throw new Error("snapshot " + r.status); return r.json(); })
+    : Promise.reject(new Error("no public url"));
+  return first.catch(function () {
+    return fetch(proxy).then(function (r) { if (!r.ok) throw new Error("proxy " + r.status); return r.json(); });
+  });
+}
+
+/* 최근 90일 통합 파일 — 세션당 한 번만 받고 그 뒤엔 재사용한다 */
+function fetchRecent() {
+  if (DATA.recentPromise) return DATA.recentPromise;
+  var direct = DATA.config.snapshotBase && !DATA.viaProxy
+    ? DATA.config.snapshotBase + "recent.json" : null;
+  var first = direct
+    ? fetch(direct, { cache: "default" }).then(function (r) { if (!r.ok) throw new Error("recent " + r.status); return r.json(); })
+    : Promise.reject(new Error("no public url"));
+  DATA.recentPromise = first
+    .catch(function () {
+      return fetch("/api/snap?recent=1").then(function (r) { if (!r.ok) throw new Error("proxy " + r.status); return r.json(); });
+    })
+    .catch(function () { return null; });   // 없으면 과거 파일만 쓴다
+  return DATA.recentPromise;
+}
+
+/* 과거 스냅샷 뒤에 최근 구간을 이어 붙인다 (겹치는 날짜는 최근 값으로 대체) */
+function mergeRecent(snap, recent, symbol) {
+  var rec = recent && recent.symbols && recent.symbols[symbol];
+  if (!snap || !snap.t || !snap.t.length) return snap;
+  if (!rec || !rec.t || !rec.t.length) return snap;
+
+  var lastT = snap.t[snap.t.length - 1];
+  var cutIdx = snap.t.length;
+  while (cutIdx > 0 && snap.t[cutIdx - 1] >= rec.t[0]) cutIdx--;   // 겹치는 구간은 잘라낸다
+
+  var out = { s: snap.s, meta: rec.meta || snap.meta, updated: (recent.generated || "").slice(0, 10) || snap.updated };
+  ["t", "o", "h", "l", "c", "a", "v"].forEach(function (k) {
+    out[k] = (snap[k] || []).slice(0, cutIdx).concat(rec[k] || []);
+  });
+  // 배당 이력 합치기 (중복 제거)
+  var seen = {}, div = [];
+  (snap.div || []).concat(rec.div || []).forEach(function (d) {
+    if (!d || seen[d[0]]) return;
+    seen[d[0]] = 1; div.push(d);
+  });
+  div.sort(function (x, y) { return x[0] - y[0]; });
+  out.div = div;
+  if (out.t.length && out.t[out.t.length - 1] < lastT) return snap;  // 이상하면 원본 유지
+  return out;
 }
 
 function liveChart(symbol, range, wantWide) {
@@ -2564,13 +2609,13 @@ $("shareBtn").onclick = function () {
 // 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
 window.addEventListener("load", applyShareHash);
 </script>
-<script src="metrics.js?v=4.1"></script>
-<script src="technical.js?v=4.1"></script>
-<script src="company.js?v=4.1"></script>
-<script src="compare.js?v=4.1"></script>
-<script src="sim.js?v=4.1"></script>
-<script src="insight.js?v=4.1"></script>
-<script src="guide.js?v=4.1"></script>
-<script src="watch.js?v=4.1"></script>
+<script src="metrics.js?v=4.2"></script>
+<script src="technical.js?v=4.2"></script>
+<script src="company.js?v=4.2"></script>
+<script src="compare.js?v=4.2"></script>
+<script src="sim.js?v=4.2"></script>
+<script src="insight.js?v=4.2"></script>
+<script src="guide.js?v=4.2"></script>
+<script src="watch.js?v=4.2"></script>
 </body>
 </html>
