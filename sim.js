@@ -274,8 +274,8 @@ function simInputs() {
   var R = simRange();
   var w = normalizeWeights(R.symbols.map(function (s) { return simState.weights[s] || 0; }));
   var rebal = +$("simRebal").value;
-  var init = parseFloat($("simInit").value);
-  var monthly = parseFloat($("simMonthly").value);
+  var init = numVal("simInit");
+  var monthly = numVal("simMonthly");
   if (!isFinite(init) || init < 0) init = 10000000;
   if (!isFinite(monthly) || monthly < 0) monthly = 0;
   return { R: R, w: w, rebal: rebal, init: init, monthly: monthly };

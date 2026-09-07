@@ -147,6 +147,7 @@
   .glItem b { display: block; color: var(--accent); }
   .glItem span { color: var(--txt); }
   @media (max-width: 640px) { .glList { grid-template-columns: 1fr; } }
+  .moneyHint { font-size: 11px; color: var(--accent); margin-left: 4px; white-space: nowrap; }
   /* 뉴스 */
   .newsList { list-style: none; padding: 0; margin: 0; }
   .newsItem { padding: 9px 0; border-bottom: 1px solid #1e2637; }
@@ -273,7 +274,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.0</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.1</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -1044,10 +1045,85 @@
   관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.
 </footer>
 
-<script src="tickers.js?v=4.0"></script>
+<script src="tickers.js?v=4.1"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
+
+/* ---------- 금액 입력에 천 단위 콤마 ----------
+   type="number"는 콤마를 허용하지 않으므로 text로 바꾸고 직접 서식을 넣는다.
+   값을 읽을 때는 반드시 numVal()을 써서 콤마를 제거한다. */
+function numVal(id) {
+  var el = typeof id === "string" ? $(id) : id;
+  if (!el) return NaN;
+  return parseFloat(String(el.value).replace(/,/g, ""));
+}
+
+function addCommas(str) {
+  var neg = str.charAt(0) === "-";
+  if (neg) str = str.slice(1);
+  var p = str.split(".");
+  p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return (neg ? "-" : "") + p.join(".");
+}
+
+/* 큰 금액을 한글 단위로 읽어 준다 (1,0000,0000 → 1억) */
+function koAmount(n) {
+  if (!isFinite(n) || n === 0) return "";
+  var neg = n < 0; n = Math.abs(Math.round(n));
+  var eok = Math.floor(n / 100000000), man = Math.floor((n % 100000000) / 10000);
+  var out = "";
+  if (eok) out += eok.toLocaleString("ko-KR") + "억";
+  if (man) out += (out ? " " : "") + man.toLocaleString("ko-KR") + "만";
+  if (!out) return "";
+  return (neg ? "-" : "") + out + "원";
+}
+
+/* id 목록에 콤마 서식을 붙인다. hint가 true면 옆에 한글 금액을 표시한다. */
+function setupMoneyInputs(list) {
+  list.forEach(function (cfg) {
+    var el = $(cfg.id);
+    if (!el) return;
+    el.type = "text";
+    el.setAttribute("inputmode", "decimal");
+    el.autocomplete = "off";
+    if (el.value) el.value = addCommas(el.value);
+
+    var hintEl = null;
+    if (cfg.hint) {
+      hintEl = document.createElement("span");
+      hintEl.className = "moneyHint";
+      hintEl.id = cfg.id + "Hint";
+      if (el.parentNode) el.parentNode.insertBefore(hintEl, el.nextSibling);
+    }
+    function refreshHint() {
+      if (!hintEl) return;
+      var v = numVal(el);
+      hintEl.textContent = isFinite(v) && Math.abs(v) >= 10000 ? "(" + koAmount(v) + ")" : "";
+    }
+
+    el.addEventListener("input", function () {
+      // 커서 위치를 유지하기 위해 왼쪽에 남은 숫자 개수를 세어 두고 복원한다
+      var pos = el.selectionStart || 0;
+      var digitsLeft = (el.value.slice(0, pos).match(/[\d.]/g) || []).length;
+      var clean = el.value.replace(/[^\d.\-]/g, "");
+      var parts = clean.split(".");
+      if (parts.length > 2) clean = parts[0] + "." + parts.slice(1).join("");
+      var formatted = clean === "" || clean === "-" ? clean : addCommas(clean);
+      el.value = formatted;
+      var seen = 0, i = 0;
+      for (; i < formatted.length && seen < digitsLeft; i++) if (/[\d.]/.test(formatted.charAt(i))) seen++;
+      try { el.setSelectionRange(i, i); } catch (e) {}
+      refreshHint();
+    });
+    el.addEventListener("blur", function () {
+      var v = numVal(el);
+      if (isFinite(v)) el.value = addCommas(String(v));
+      refreshHint();
+    });
+    refreshHint();
+  });
+}
 
 function parseChart(json) {
   var r = json.chart.result[0];
@@ -1909,7 +1985,7 @@ function applyCurrency() {
   }
   if (useKrw) {
     if ($("fxMode").value === "fixed") {
-      var fr = parseFloat($("fxFixed").value);
+      var fr = numVal("fxFixed");
       if (!isFinite(fr) || fr <= 0) fr = fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t);
       state.rows = state.rowsRaw.map(function (r) {
         return { t: r.t, c: r.c * fr, h: r.h * fr, l: r.l * fr,
@@ -1931,7 +2007,7 @@ function applyCurrency() {
 $("fxMode").onchange = function () {
   if (!state.rowsRaw) return;
   if (this.value === "fixed" && !$("fxFixed").value) {
-    $("fxFixed").value = Math.round(fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t) * 10) / 10;
+    $("fxFixed").value = addCommas(String(Math.round(fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t) * 10) / 10));
   }
   applyCurrency(); render();
 };
@@ -1944,7 +2020,7 @@ $("krwToggle").onchange = function () {
   if (!state.rowsRaw) return;
   var avgEl = $("avgPrice");
   var avg = parseFloat(avgEl.value);
-  var rate = parseFloat($("avgFx").value);
+  var rate = numVal("avgFx");
   if (!isFinite(rate) || rate <= 0) {
     rate = state.fx ? fxAt(state.fx, state.rowsRaw[state.rowsRaw.length - 1].t) : null;
   }
@@ -1990,8 +2066,8 @@ function render() {
     var rate = fxAt(state.fx, lastT);
     var usd = state.rowsRaw[state.rowsRaw.length - 1].c;
     var cur = state.meta.currency || "USD";
-    if (!$("fxFixed").value) $("fxFixed").value = Math.round(rate * 10) / 10;
-    if (!$("avgFx").value) $("avgFx").value = Math.round(rate * 10) / 10;
+    if (!$("fxFixed").value) $("fxFixed").value = addCommas(String(Math.round(rate * 10) / 10));
+    if (!$("avgFx").value) $("avgFx").value = addCommas(String(Math.round(rate * 10) / 10));
     $("avgFxWrap").classList.remove("hidden");
     $("fxLine").classList.remove("hidden");
     $("fxInfo").innerHTML =
@@ -2133,7 +2209,7 @@ function renderDdTable() {
   var name = (state.meta && (state.meta.shortName || state.meta.longName)) || state.symbol || "";
   var rows = state.rows, eps = state.eps;
   var sorted = eps.slice().sort(function (a, b) { return a.dd - b.dd; });
-  var avg = parseFloat($("avgPrice").value);
+  var avg = numVal("avgPrice");
   var hasAvg = isFinite(avg) && avg > 0;
   var html = "<thead><tr><th>낙폭</th><th>고점</th><th>저점</th><th>회복일</th><th>하락기간</th>" +
     (hasAvg ? "<th>내 평단가 적용 시</th>" : "") + "<th>당시 이슈</th></tr></thead><tbody>";
@@ -2159,7 +2235,7 @@ function renderDdTable() {
 function renderRallyTable() {
   var rows = state.rows;
   var rallies = ralliesFromEpisodes(rows, state.eps).sort(function (a, b) { return b.gain - a.gain; });
-  var avg = parseFloat($("avgPrice").value);
+  var avg = numVal("avgPrice");
   var hasAvg = isFinite(avg) && avg > 0;
   var html = "<thead><tr><th>상승폭</th><th>저점</th><th>고점</th><th>기간</th>" +
     (hasAvg ? "<th>내 평단가 적용 시</th>" : "") + "<th>당시 이슈</th></tr></thead><tbody>";
@@ -2184,13 +2260,13 @@ $("applyAvg").onclick = renderAvg;
 $("avgPrice").addEventListener("keydown", function (e) { if (e.key === "Enter") renderAvg(); });
 
 function renderAvg() {
-  var avg = parseFloat($("avgPrice").value);
+  var avg = numVal("avgPrice");
   var box = $("avgSummary"), note = $("avgNote"), fxNote = $("avgFxNote");
 
   // 내 환전 환율 기준 안내 (외화 종목일 때만)
   fxNote.innerHTML = "";
   if (state.fx && isFinite(avg) && avg > 0) {
-    var myFx = parseFloat($("avgFx").value);
+    var myFx = numVal("avgFx");
     if (isFinite(myFx) && myFx > 0) {
       var cur0 = state.meta.currency || "USD";
       if (state.displayCur === "KRW") {
@@ -2239,6 +2315,13 @@ function renderAvg() {
 $("rfRate").addEventListener("change", function () {
   if (state.rows && typeof renderMetrics === "function") renderMetrics();
 });
+
+/* 금액·환율 입력에 콤마 서식 적용 */
+setupMoneyInputs([
+  { id: "simInit", hint: true }, { id: "simMonthly", hint: true },
+  { id: "cmpPrincipal", hint: true }, { id: "avgPrice" },
+  { id: "fxFixed" }, { id: "avgFx" }, { id: "cmpFxFixed" }
+]);
 
 /* ---------- 최근 조회 종목 (기기에만 저장) ---------- */
 var RECENT_KEY = "stockmind.recent";
@@ -2417,8 +2500,8 @@ function buildShareHash() {
   var ws = cmpState.cart.map(function (x) { return (simState.weights[x] != null ? simState.weights[x] : ""); });
   if (ws.some(function (x) { return x !== ""; })) add("w", ws.join(","));
   add("sd", $("simStart").value);
-  add("si", $("simInit").value);
-  add("sm", $("simMonthly").value);
+  add("si", String(numVal("simInit")));
+  add("sm", String(numVal("simMonthly")));
   add("sr", $("simRebal").value);
   return "#" + p.join("&");
 }
@@ -2443,8 +2526,8 @@ function applyShareHash() {
   if (q.r) $("rangeSel").value = q.r;
   if (q.krw === "1") $("krwToggle").checked = true;
   if (q.sd) $("simStart").value = q.sd;
-  if (q.si) $("simInit").value = q.si;
-  if (q.sm) $("simMonthly").value = q.sm;
+  if (q.si) $("simInit").value = addCommas(q.si);
+  if (q.sm) $("simMonthly").value = addCommas(q.sm);
   if (q.sr) $("simRebal").value = q.sr;
   if (q.s) {
     $("searchInput").value = q.s;
@@ -2481,13 +2564,13 @@ $("shareBtn").onclick = function () {
 // 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
 window.addEventListener("load", applyShareHash);
 </script>
-<script src="metrics.js?v=4.0"></script>
-<script src="technical.js?v=4.0"></script>
-<script src="company.js?v=4.0"></script>
-<script src="compare.js?v=4.0"></script>
-<script src="sim.js?v=4.0"></script>
-<script src="insight.js?v=4.0"></script>
-<script src="guide.js?v=4.0"></script>
-<script src="watch.js?v=4.0"></script>
+<script src="metrics.js?v=4.1"></script>
+<script src="technical.js?v=4.1"></script>
+<script src="company.js?v=4.1"></script>
+<script src="compare.js?v=4.1"></script>
+<script src="sim.js?v=4.1"></script>
+<script src="insight.js?v=4.1"></script>
+<script src="guide.js?v=4.1"></script>
+<script src="watch.js?v=4.1"></script>
 </body>
 </html>

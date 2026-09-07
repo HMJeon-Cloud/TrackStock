@@ -376,7 +376,7 @@ $("cmpRun").onclick = function () {
 function rebuildAligned() {
   var useKrw = !!(cmpState.fx && $("cmpKrw").checked);
   var fixedMode = $("cmpFxMode").value === "fixed";
-  var fixedRate = parseFloat($("cmpFxFixed").value);
+  var fixedRate = numVal("cmpFxFixed");
   if (cmpState.fx && (!isFinite(fixedRate) || fixedRate <= 0)) {
     fixedRate = fxAt(cmpState.fx, cmpState.fx.days[cmpState.fx.days.length - 1] * 86400000);
   }
@@ -478,7 +478,7 @@ function renderCmpChart() {
   var isLog = $("cmpLog").checked;
   var isAmount = $("cmpMode").value === "amount";
   var isDca = $("cmpInvest").value === "dca";
-  var principal = parseFloat($("cmpPrincipal").value);
+  var principal = numVal("cmpPrincipal");
   if (!isFinite(principal) || principal <= 0) principal = 10000000;
 
   var datasets = [], investedLine = null;
@@ -578,7 +578,7 @@ function renderInvestSummary() {
   var A = cmpState.aligned;
   var R = investedRange();
   var isDca = $("cmpInvest").value === "dca";
-  var principal = parseFloat($("cmpPrincipal").value);
+  var principal = numVal("cmpPrincipal");
   if (!isFinite(principal) || principal <= 0) principal = 10000000;
 
   var best = null, worst = null, invested = principal;
@@ -657,7 +657,7 @@ function refreshCurrency() {
 $("cmpKrw").onchange = refreshCurrency;
 $("cmpFxMode").onchange = function () {
   if (this.value === "fixed" && !$("cmpFxFixed").value && cmpState.fx) {
-    $("cmpFxFixed").value = Math.round(cmpState.fx.rates[cmpState.fx.rates.length - 1] * 10) / 10;
+    $("cmpFxFixed").value = addCommas(String(Math.round(cmpState.fx.rates[cmpState.fx.rates.length - 1] * 10) / 10));
   }
   refreshCurrency();
 };
@@ -672,7 +672,7 @@ function renderCmpSummary() {
   var A = cmpState.aligned;
   var R = investedRange();
   var isDca = $("cmpInvest").value === "dca";
-  var principal = parseFloat($("cmpPrincipal").value);
+  var principal = numVal("cmpPrincipal");
   if (!isFinite(principal) || principal <= 0) principal = 10000000;
 
   var html = "<thead><tr><th>자산</th><th>현재 평가금액</th><th>총수익</th><th>연평균(CAGR)</th>" +

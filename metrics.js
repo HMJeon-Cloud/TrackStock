@@ -116,7 +116,7 @@ function renderMetrics() {
 
   var rows = state.rows;
   var closes = rows.map(function (r) { return r.c; });
-  var rf = parseFloat($("rfRate").value);
+  var rf = numVal("rfRate");
   if (!isFinite(rf)) rf = 3.0;
   rf = rf / 100;
 
