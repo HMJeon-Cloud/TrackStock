@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StockMind — 하락장 멘탈 방어 대시보드</title>
+<!-- Microsoft Clarity: 익명 사용 통계·히트맵 (개인정보 수집 없음) -->
+<script type="text/javascript">
+  (function (c, l, a, r, i, t, y) {
+    c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
+    t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+    y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+  })(window, document, "clarity", "script", "yi17yfiz78");
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
@@ -274,7 +282,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.2</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.3</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -1042,10 +1050,12 @@
   <b>이 앱의 가격은 장중 실시간이 아니라 거래일 단위로 확정된 종가</b>이며, 각 화면에 표시된 기준일 시점의 값입니다.
   데이터 출처: 가격 Yahoo Finance · 기업정보 네이버 증권 · 뉴스 네이버 검색 API. 데이터는 지연·오류·누락이 있을 수 있으며 정확성을 보장하지 않습니다.
   뉴스 기사의 저작권은 각 언론사에 있으며 이 서비스는 제목과 원문 링크만 표시합니다.
-  관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.
+  관심 종목·최근 조회는 이용자 기기에만 저장되며 서버로 전송되지 않습니다.<br>
+  서비스 개선을 위해 Microsoft Clarity로 <b>익명 사용 통계</b>(방문 화면, 클릭 위치 등)를 수집합니다.
+  이름·연락처 등 개인을 식별하는 정보는 수집하지 않으며, 입력하신 평단가·투자금액은 기기 밖으로 나가지 않습니다.
 </footer>
 
-<script src="tickers.js?v=4.2"></script>
+<script src="tickers.js?v=4.3"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -2609,13 +2619,13 @@ $("shareBtn").onclick = function () {
 // 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
 window.addEventListener("load", applyShareHash);
 </script>
-<script src="metrics.js?v=4.2"></script>
-<script src="technical.js?v=4.2"></script>
-<script src="company.js?v=4.2"></script>
-<script src="compare.js?v=4.2"></script>
-<script src="sim.js?v=4.2"></script>
-<script src="insight.js?v=4.2"></script>
-<script src="guide.js?v=4.2"></script>
-<script src="watch.js?v=4.2"></script>
+<script src="metrics.js?v=4.3"></script>
+<script src="technical.js?v=4.3"></script>
+<script src="company.js?v=4.3"></script>
+<script src="compare.js?v=4.3"></script>
+<script src="sim.js?v=4.3"></script>
+<script src="insight.js?v=4.3"></script>
+<script src="guide.js?v=4.3"></script>
+<script src="watch.js?v=4.3"></script>
 </body>
 </html>
