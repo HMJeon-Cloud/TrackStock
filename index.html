@@ -329,7 +329,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.6</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.7</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -1263,7 +1263,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </footer>
 
-<script src="tickers.js?v=4.6"></script>
+<script src="tickers.js?v=4.7"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -3119,7 +3119,12 @@ function cloudSave(creds, silent) {
       cloud.timer = setTimeout(function () { cloudSave(null, true); }, 12000);
       return j;
     }
-    if (!j.ok) { if (!silent) cloudSetMsg(j.error || j.note || "저장 실패", true); return j; }
+    if (!j.ok) {
+      if (j.reason === "STORE_SUSPENDED") cloud.paused = true;   // 이번 방문 동안 자동 저장 멈춤
+      if (!silent) cloudSetMsg(j.error || j.note || "저장 실패", true);
+      return j;
+    }
+    cloud.paused = false;
     cloudRemember(j.token, creds ? maskLabel(creds.id) : null, j.savedAt);
     if (!silent) cloudSetMsg("저장했습니다. 다른 기기에서 같은 아이디+PIN으로 불러오면 됩니다.");
     return j;
@@ -3154,6 +3159,7 @@ function maskLabel(id) {
 function cloudDirty() {
   if (sessionRestoring) return;
   if (cloud.token && cloudEnabled()) {
+    if (cloud.paused) return;
     clearTimeout(cloud.timer);
     cloud.timer = setTimeout(function () { cloudSave(null, true); }, 15000);
     return;
@@ -3349,14 +3355,14 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=4.6"></script>
-<script src="technical.js?v=4.6"></script>
-<script src="company.js?v=4.6"></script>
-<script src="compare.js?v=4.6"></script>
-<script src="sim.js?v=4.6"></script>
-<script src="insight.js?v=4.6"></script>
-<script src="guide.js?v=4.6"></script>
-<script src="watch.js?v=4.6"></script>
-<script src="holdings.js?v=4.6"></script>
+<script src="metrics.js?v=4.7"></script>
+<script src="technical.js?v=4.7"></script>
+<script src="company.js?v=4.7"></script>
+<script src="compare.js?v=4.7"></script>
+<script src="sim.js?v=4.7"></script>
+<script src="insight.js?v=4.7"></script>
+<script src="guide.js?v=4.7"></script>
+<script src="watch.js?v=4.7"></script>
+<script src="holdings.js?v=4.7"></script>
 </body>
 </html>
