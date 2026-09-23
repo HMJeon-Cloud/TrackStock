@@ -13,7 +13,9 @@ export default async function handler(req, res) {
       const base = "https://" + id + ".public.blob.vercel-storage.com/";
       const probe = await fetch(base + "manifest.json");   // 단순 조회 (Advanced 아님)
       if (!probe.ok) {
-        out.reason = probe.status === 404 ? "NO_MANIFEST" : "BLOB_NOT_PUBLIC";
+        const txt = await probe.text().catch(() => "");
+        out.reason = /suspend|blocked/i.test(txt) ? "BLOB_SUSPENDED"
+          : probe.status === 404 ? "NO_MANIFEST" : "BLOB_NOT_PUBLIC";
         out.probeStatus = probe.status;
       } else {
         const m = await probe.json().catch(() => null);
@@ -31,7 +33,10 @@ export default async function handler(req, res) {
 
   out.news = !!((process.env.NAVER_HUB_KEY_ID && process.env.NAVER_HUB_KEY) ||
                 (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET));
-  out.sync = !!(process.env.USER_SALT && process.env.USER_SALT.length >= 16 && process.env.BLOB_READ_WRITE_TOKEN);
-  res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1800");
+  const hasRedis = !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) &&
+                      (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
+  out.sync = !!(process.env.USER_SALT && process.env.USER_SALT.length >= 16 && (hasRedis || process.env.BLOB_READ_WRITE_TOKEN));
+  out.syncStore = hasRedis ? "redis" : (process.env.BLOB_READ_WRITE_TOKEN ? "blob" : null);
+  res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=10800");
   res.status(200).json(out);
 }

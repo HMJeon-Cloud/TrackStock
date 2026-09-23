@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", want === "charts/" + encodeURIComponent(symbol) + ".json"
       ? "s-maxage=86400, stale-while-revalidate=172800"
-      : "s-maxage=1800, stale-while-revalidate=3600");
+      : "s-maxage=10800, stale-while-revalidate=21600");
     return res.status(200).send(text);
   } catch (e) {
     return res.status(500).json({ error: String(e.message).slice(0, 160) });

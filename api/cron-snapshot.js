@@ -181,7 +181,7 @@ export default async function handler(req, res) {
     }));
   }
   if (recentOk > 0) {
-    await put("recent.json", JSON.stringify(recent), { ...putOpts, cacheControlMaxAge: 1800 });
+    await put("recent.json", JSON.stringify(recent), { ...putOpts, cacheControlMaxAge: 10800 });   // 3시간: 하루 2번만 바뀌므로 캐시 미스(읽기 한도)를 줄인다
     writes++;
     for (const sym of Object.keys(recent.symbols)) {
       entries[sym] = { ...(entries[sym] || {}), updated: today };
@@ -195,7 +195,7 @@ export default async function handler(req, res) {
     recentDays: RECENT_DAYS,
     complete: withHistory === symbols.length,
     symbols: entries,
-  }), { ...putOpts, cacheControlMaxAge: 600 });
+  }), { ...putOpts, cacheControlMaxAge: 10800 });
   writes++;
 
   res.status(200).json({
