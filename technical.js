@@ -118,6 +118,7 @@ var levelsPlugin = {
   id: "srLevels",
   afterDatasetsDraw: function (chart) {
     if (!$("showLevels").checked || !techState.levels) return;
+    if (typeof state !== "undefined" && state.benchRows) return;   // 벤치마크 %모드에서는 가격 레벨이 축과 안 맞는다
     var L = techState.levels, ys = chart.scales.y, ctx = chart.ctx, area = chart.chartArea;
     ctx.save();
     ctx.font = "bold 10px sans-serif";
@@ -245,8 +246,8 @@ function renderCandles() {
         }
       },
       scales: {
-        x: { ticks: { color: "#8b97b0", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "#222b40" } },
-        y: { position: "left", ticks: { color: "#8b97b0", callback: function (v) { return fmtPrice(v); } }, grid: { color: "#222b40" } },
+        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
+        y: { position: "left", ticks: { color: "#a7b6d4", callback: function (v) { return fmtPrice(v); } }, grid: { color: "rgba(96,116,166,0.16)" } },
         y1: { position: "right", max: maxVol * 4, display: false, grid: { display: false } }
       }
     }
@@ -291,6 +292,7 @@ function renderTechnical() {
 
 $("showLevels").onchange = function () { if (state.chart) state.chart.update("none"); };
 $("candleDays").onchange = function () { if (state.rows) renderCandles(); };
-$("candleResetZoom").onclick = function () {
-  if (typeof resetChartZoom === "function") resetChartZoom(techState.candleChart);
-};
+if (typeof chartCtrlHtml === "function") {
+  $("candleChartCtrl").innerHTML = chartCtrlHtml(null);   // 캔들은 기간 선택이 따로 있어 확대 버튼만
+  setupChartCtrl("candleChartCtrl", function () { return techState.candleChart; });
+}

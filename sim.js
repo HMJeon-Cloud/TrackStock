@@ -153,6 +153,7 @@ function syncSimAssets() {
     el.addEventListener("input", function () {
       var sym = el.getAttribute("data-w");
       simState.weights[sym] = +el.value;
+      if (typeof saveSession === "function") saveSession();
       box.querySelector('[data-n="' + sym + '"]').value = el.value;
       updateWeightSum();
     });
@@ -161,6 +162,7 @@ function syncSimAssets() {
     el.addEventListener("input", function () {
       var sym = el.getAttribute("data-n");
       simState.weights[sym] = +el.value || 0;
+      if (typeof saveSession === "function") saveSession();
       box.querySelector('[data-w="' + sym + '"]').value = el.value;
       updateWeightSum();
     });
@@ -257,7 +259,10 @@ $("simStart").addEventListener("change", function () {
 });
 $("simShowEvents").onchange = function () { if (simState.chart) simState.chart.update(); };
 $("simDiv").onchange = function () { if (simState.results) $("simRun").click(); };
-$("simResetZoom").onclick = function () { if (typeof resetChartZoom === "function") resetChartZoom(simState.chart); };
+if (typeof chartCtrlHtml === "function") {
+  $("simChartCtrl").innerHTML = chartCtrlHtml([[63, "3개월"], [126, "6개월"], [252, "1년"], [756, "3년"], [0, "전체"]]);
+  setupChartCtrl("simChartCtrl", function () { return simState.chart; });
+}
 $("simApplyWeights").onclick = function () { if (simState.aligned) renderSim(); };
 
 /* ---------- 렌더링 ---------- */
@@ -314,7 +319,7 @@ function renderSim() {
     datasets.push({
       label: "리밸런싱 안 했다면",
       data: actualNoRebal.values,
-      borderColor: "#8b97b0", borderWidth: 1.2, borderDash: [6, 4],
+      borderColor: "#a7b6d4", borderWidth: 1.2, borderDash: [6, 4],
       pointRadius: 0, tension: 0, fill: false
     });
   }
@@ -363,11 +368,11 @@ function renderSim() {
         }
       },
       scales: {
-        x: { ticks: { color: "#8b97b0", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "#222b40" } },
+        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
         y: {
           type: $("simLog").checked ? "logarithmic" : "linear",
-          ticks: { color: "#8b97b0", callback: function (v) { return fmtMoney(v); } },
-          grid: { color: "#222b40" }
+          ticks: { color: "#a7b6d4", callback: function (v) { return fmtMoney(v); } },
+          grid: { color: "rgba(96,116,166,0.16)" }
         }
       }
     },

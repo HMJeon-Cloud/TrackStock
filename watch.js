@@ -294,6 +294,144 @@ function renderNewsFilters() {
   });
 }
 
+/* ---------- 전 종목 현재 위치 (recent.json 재활용 — 추가 API 호출 없음) ---------- */
+var mapState = { rows: null, filter: "all", sortKey: "vsHi", sortAsc: true };
+
+function classifySymbol(sym) {
+  if (/\.KS$|\.KQ$/.test(sym)) return "kr";
+  if (/^\^/.test(sym)) return "idx";
+  if (/-USD$|=X$|=F$/.test(sym)) return "alt";
+  if (/^(SPY|QQQ|VOO|VTI|IVV|DIA|IWM|GLD|SLV|TLT|IEF|SHY|BND|AGG|SCHD|JEPI|VNQ|EFA|EEM|ARKK|SOXX|SMH|XL[A-Z]|KODEX|TIGER|DBC|USO)/.test(sym)) return "idx";
+  return "us";
+}
+
+function buildMarketRows(recent) {
+  var out = [];
+  Object.keys(recent.symbols || {}).forEach(function (sym) {
+    var d = recent.symbols[sym];
+    var c = d.c || [], v = d.v || [], n = c.length;
+    if (n < 22 || c[n - 1] == null) return;
+    var last = c[n - 1];
+    var m1 = last / c[Math.max(0, n - 22)] - 1;
+    var m3 = last / c[0] - 1;                                  // 90일 파일이라 사실상 약 3~4개월
+    var hi = d.meta && d.meta.fiftyTwoWeekHigh;
+    var vsHi = hi > 0 ? last / hi - 1 : null;
+    var rsi = typeof rsiWilder === "function" && n > 15 ? rsiWilder(c, 14) : null;
+    var v5 = 0, v20 = 0, i;
+    for (i = n - 5; i < n; i++) v5 += v[i] || 0;
+    for (i = Math.max(0, n - 25); i < n - 5; i++) v20 += v[i] || 0;
+    v5 /= 5; v20 /= Math.max(1, Math.min(20, n - 5));
+    out.push({
+      sym: sym, name: (d.meta && (d.meta.shortName || d.meta.longName)) || sym,
+      cur: (d.meta && d.meta.currency) || "", grp: classifySymbol(sym),
+      last: last, m1: m1, m3: m3, vsHi: vsHi, rsi: rsi,
+      volX: v20 > 0 ? v5 / v20 : null,
+      lastT: (d.t && d.t.length ? d.t[d.t.length - 1] * 1000 : null)
+    });
+  });
+  return out;
+}
+
+var MAP_COLS = [
+  { k: "vsHi", label: "52주 최고 대비", asc: true },
+  { k: "m1", label: "1개월", asc: false },
+  { k: "m3", label: "3개월", asc: false },
+  { k: "rsi", label: "RSI", asc: true },
+  { k: "volX", label: "거래량", asc: false }
+];
+
+function renderMarketMap() {
+  var box = $("marketMap");
+  if (!box) return;
+  var rows = mapState.rows;
+  if (!rows) { box.innerHTML = ""; return; }
+  var list = rows.filter(function (r) { return mapState.filter === "all" || r.grp === mapState.filter; });
+  var k = mapState.sortKey, asc = mapState.sortAsc;
+  list.sort(function (a, b) {
+    var x = a[k], y = b[k];
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return asc ? x - y : y - x;
+  });
+  var html = "<thead><tr><th>종목</th><th>최근 종가</th>" + MAP_COLS.map(function (c) {
+    var on = c.k === mapState.sortKey;
+    return '<th class="mapSort' + (on ? " on" : "") + '" data-sk="' + c.k + '">' + c.label + (on ? (mapState.sortAsc ? " ▲" : " ▼") : "") + "</th>";
+  }).join("") + "<th></th></tr></thead><tbody>";
+  list.forEach(function (r) {
+    var u = r.cur === "KRW" ? "원" : (r.cur ? " " + r.cur : "");
+    var rsiCls = r.rsi == null ? "" : r.rsi <= 30 ? "down" : r.rsi >= 70 ? "up" : "";
+    html += '<tr><td style="text-align:left"><b>' + cmpLabel(r.sym) + "</b><br><small style='color:var(--sub)'>" + r.sym + "</small></td>" +
+      "<td>" + fmtPrice(r.last) + u + "</td>" +
+      '<td class="' + (r.vsHi == null ? "" : pctCls(r.vsHi)) + '"><b>' + (r.vsHi == null ? "-" : fmtPct(r.vsHi)) + "</b></td>" +
+      '<td class="' + pctCls(r.m1) + '">' + fmtPct(r.m1) + "</td>" +
+      '<td class="' + pctCls(r.m3) + '">' + fmtPct(r.m3) + "</td>" +
+      '<td><span class="' + (rsiCls === "down" ? "pos" : rsiCls === "up" ? "neg" : "") + '">' + (r.rsi == null ? "-" : r.rsi.toFixed(0)) + "</span></td>" +
+      "<td>" + (r.volX == null ? "-" : (r.volX >= 2 ? "<b class='neg'>" + r.volX.toFixed(1) + "배</b>" : r.volX.toFixed(1) + "배")) + "</td>" +
+      "<td style='white-space:nowrap'><button class='chip' data-mopen='" + r.sym + "'>분석</button> " +
+      '<button class="chip" data-mwatch="' + r.sym + '">' + (isWatched(r.sym) ? "★" : "☆") + "</button></td></tr>";
+  });
+  box.innerHTML = html + "</tbody>";
+  $("mapStatus").textContent = list.length + "개 표시 · " +
+    (mapState.rows._gen ? mapState.rows._gen.slice(0, 10) + " 기준" : "");
+
+  Array.prototype.forEach.call(box.querySelectorAll(".mapSort"), function (th) {
+    th.onclick = function () {
+      var sk = th.getAttribute("data-sk");
+      if (mapState.sortKey === sk) mapState.sortAsc = !mapState.sortAsc;
+      else {
+        mapState.sortKey = sk;
+        var col = MAP_COLS.filter(function (c) { return c.k === sk; })[0];
+        mapState.sortAsc = col ? col.asc : true;
+      }
+      renderMarketMap();
+    };
+  });
+  Array.prototype.forEach.call(box.querySelectorAll("[data-mopen]"), function (b) {
+    b.onclick = function () {
+      var s = b.getAttribute("data-mopen");
+      navTo("single", "analysis");
+      $("searchInput").value = s;
+      loadSymbol(s);
+    };
+  });
+  Array.prototype.forEach.call(box.querySelectorAll("[data-mwatch]"), function (b) {
+    b.onclick = function () {
+      toggleWatch(b.getAttribute("data-mwatch"));
+      b.textContent = isWatched(b.getAttribute("data-mwatch")) ? "★" : "☆";
+      renderWatchList();
+    };
+  });
+}
+
+function loadMarketMap() {
+  if (mapState.rows) { renderMarketMap(); return; }
+  if (typeof fetchRecent !== "function") { $("mapStatus").textContent = "데이터 준비 중입니다."; return; }
+  $("mapStatus").textContent = "전 종목 데이터 불러오는 중... (한 번만 받습니다)";
+  dataReady().then(function () { return fetchRecent(); }).then(function (recent) {
+    if (!recent || !recent.symbols) {
+      $("mapStatus").textContent = "사전 수집 데이터가 아직 없습니다. 내일 아침 자동 수집 후 표시됩니다.";
+      return;
+    }
+    var rows = buildMarketRows(recent);
+    rows._gen = recent.generated || "";
+    mapState.rows = rows;
+    renderMarketMap();
+  }).catch(function () {
+    $("mapStatus").textContent = "데이터를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.";
+  });
+}
+
+Array.prototype.forEach.call(document.querySelectorAll("#mapFilters [data-mf]"), function (b) {
+  b.onclick = function () {
+    mapState.filter = b.getAttribute("data-mf");
+    Array.prototype.forEach.call(document.querySelectorAll("#mapFilters [data-mf]"), function (x) {
+      x.classList.toggle("active", x === b);
+    });
+    renderMarketMap();
+  };
+});
+
 /* 탭 진입 시 */
 function renderWatchTab(force) {
   renderNewsFilters();
@@ -302,6 +440,8 @@ function renderWatchTab(force) {
   loadWatchQuotes();
   loadWatchNews();
   loadMarketNews();
+  if (force) mapState.rows = null;
+  loadMarketMap();
 }
 
 /* ---------- 이벤트 ---------- */
@@ -312,6 +452,21 @@ Array.prototype.forEach.call(document.querySelectorAll("#marketCats button"), fu
   b.onclick = function () { marketCat = b.getAttribute("data-cat"); loadMarketNews(); };
 });
 $("watchRefresh").onclick = function () { renderWatchTab(true); };
+$("watchExport").onclick = function () {
+  var url = location.origin + location.pathname + buildShareHash("full");
+  var ok = false;
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+  } catch (e) { ok = false; }
+  if (!ok && navigator.clipboard) { navigator.clipboard.writeText(url); ok = true; }
+  setWatchStatus(ok
+    ? "링크를 복사했습니다. 다른 기기·브라우저에서 이 링크를 열면 관심 종목 " + loadWatch().length + "개와 장바구니·시뮬 설정이 그대로 복원됩니다."
+    : "복사에 실패했습니다. 브라우저 주소창의 링크를 직접 복사해 주세요.", !ok);
+};
 $("watchBtn").onclick = function () {
   if (!state.symbol) { setStatus("먼저 종목을 분석해 주세요.", true); return; }
   var added = toggleWatch(state.symbol, state.meta.shortName || state.meta.longName || state.symbol);

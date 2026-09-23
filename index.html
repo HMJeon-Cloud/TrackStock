@@ -18,7 +18,7 @@
 <style>
   :root {
     --bg: #0f1420; --card: #171e2e; --card2: #1d2638;
-    --line: #2a3550; --txt: #e6ebf5; --sub: #8b97b0;
+    --line: #2a3550; --txt: #e6ebf5; --sub: #9db0d0;
     --up: #ff5b5b; --down: #4d8dff;
     --accent: #ffc94d; --good: #3ddc97;
   }
@@ -156,6 +156,26 @@
   .glItem span { color: var(--txt); }
   @media (max-width: 640px) { .glList { grid-template-columns: 1fr; } }
   .moneyHint { font-size: 11px; color: var(--accent); margin-left: 4px; white-space: nowrap; }
+  .mapSort { cursor: pointer; user-select: none; }
+  .mapSort:hover { color: var(--accent); }
+  .mapSort.on { color: var(--accent); }
+  #mapFilters .chip.active { background: var(--accent); color: #14181f; border-color: var(--accent); font-weight: bold; }
+  .evtNo { display: inline-block; min-width: 15px; height: 15px; line-height: 15px; text-align: center;
+    border-radius: 50%; color: #10141f; font-size: 10px; font-style: normal; margin-right: 2px; }
+  /* 차트 컨트롤 바: 기간 프리셋 + 확대/이동 버튼 */
+  .chartCtrl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 8px; }
+  .chartCtrl .rangeBtns, .chartCtrl .zoomBtns { display: flex; gap: 4px; }
+  .chartCtrl .zoomBtns { margin-left: auto; }
+  .chartCtrl button { font-size: 12px; padding: 5px 10px; border-radius: 8px; cursor: pointer; min-width: 34px; }
+  .chartCtrl button.active { background: var(--accent); color: #14181f; border-color: var(--accent); font-weight: bold; }
+  .chartCtrl button:active { transform: scale(0.96); }
+  @media (max-width: 640px) {
+    .chartCtrl { gap: 4px; }
+    .chartCtrl .zoomBtns { margin-left: 0; width: 100%; }
+    .chartCtrl .zoomBtns button { flex: 1 1 0; padding: 8px 4px; }
+    .chartCtrl .rangeBtns { width: 100%; }
+    .chartCtrl .rangeBtns button { flex: 1 1 0; padding: 8px 4px; }
+  }
   /* 뉴스 */
   .newsList { list-style: none; padding: 0; margin: 0; }
   .newsItem { padding: 9px 0; border-bottom: 1px solid #1e2637; }
@@ -282,7 +302,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.3</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.4</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -298,6 +318,10 @@
   <button data-tab="sim">포트폴리오 시뮬레이터</button>
   <button data-tab="watch">관심 종목 · 뉴스</button>
   <button id="shareBtn" style="margin-left:auto;border-bottom:none;font-size:12px" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
+</div>
+<div id="storageWarn" class="hidden" style="margin:8px 0;padding:10px 12px;border:1px solid #5a4a1e;background:#241f12;border-radius:10px;font-size:12px;line-height:1.6">
+  <span id="storageWarnMsg"></span>
+  <button class="chip" id="storageWarnClose" style="margin-left:8px;font-size:11px;padding:3px 8px">닫기</button>
 </div>
 <div class="subTabs" id="subTabs">
   <button data-sub="analysis" class="active">종목 분석</button>
@@ -359,16 +383,24 @@
         </select>
         <input id="fxFixed" type="number" step="0.1" class="hidden" style="width:100px;font-size:12px;padding:5px 8px">
       </span>
-      <button class="chip" id="chartResetZoom" title="확대를 원래대로 되돌립니다">↺ 확대 초기화</button>
       <label class="opt"><input type="checkbox" id="showMA"> 이동평균선 (20/60/240일)</label>
       <label class="opt"><input type="checkbox" id="showLevels"> 지지/저항선</label>
       <label class="opt hidden" id="divToggleWrap" title="배당을 받을 때마다 같은 종목에 재투자했다고 가정한 총수익 기준으로 모든 표와 차트를 다시 계산합니다">
         <input type="checkbox" id="divToggle"> 배당 재투자 반영(총수익)</label>
       <label class="opt"><input type="checkbox" id="logScale"> 로그 스케일</label>
+      <select id="benchSel" style="font-size:12px;padding:5px 8px" title="같은 기간을 벤치마크와 %수익률로 겹쳐 봅니다. 시장 대비 잘했는지가 한눈에 보입니다">
+        <option value="">벤치마크 비교 안 함</option>
+        <option value="^KS11">코스피와 비교</option>
+        <option value="SPY">S&amp;P500과 비교</option>
+        <option value="QQQ">나스닥100과 비교</option>
+        <option value="GLD">금과 비교</option>
+      </select>
       <label class="opt"><input type="checkbox" id="showEvents" checked> 이벤트 선</label>
       <label class="opt"><input type="checkbox" id="showLabels"> 이벤트 이름</label>
     </div>
+    <div class="chartCtrl" id="mainChartCtrl" data-canvas="mainChart"></div>
     <div class="chartWrap"><canvas id="mainChart"></canvas></div>
+    <div id="benchNote" class="mentalNote hidden" style="margin-top:8px"></div>
     <div id="divNote" class="mentalNote hidden"></div>
     <div id="eventList"></div>
     <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
@@ -376,7 +408,7 @@
       <ul>
         <li><b>차트 위에 마우스를 올리면</b> 그날의 가격과, 앞뒤 10일 안에 있었던 사건이 함께 뜹니다.</li>
         <li><b>이 앱의 가격은 "확정된 하루치 종가"입니다.</b> 일봉(하루 한 개의 봉) 데이터만 쓰기 때문에 화면의 가격은 <b>가장 최근 거래일의 종가</b>이며 장중 실시간 가격이 아닙니다. 제목 옆 날짜가 그 기준일입니다. 국내 장은 15:30, 미국 장은 한국시간 06:00경 마감하며 그 뒤에 갱신됩니다.</li>
-        <li><b>확대/축소</b> — 차트 위에서 <b>마우스 휠</b>을 굴리면 커서가 있는 지점을 중심으로 확대·축소됩니다. 확대 상태에서 <b>드래그</b>하면 좌우로 이동하고, y축은 보이는 구간에 맞춰 자동으로 다시 잡힙니다. <b>↺ 확대 초기화</b> 버튼으로 전체 보기로 돌아옵니다. 모바일에서는 두 손가락 벌리기로 확대됩니다.</li>
+        <li><b>확대/축소</b> — 차트 위에서 <b>마우스 휠</b>을 굴리면 커서가 있는 지점을 중심으로 확대·축소됩니다. 확대 상태에서 <b>드래그</b>하면 좌우로 이동하고, y축은 보이는 구간에 맞춰 자동으로 다시 잡힙니다. 차트 위의 <b>기간 버튼(3개월~전체)</b>으로 원하는 구간을 바로 볼 수 있고, <b>−/＋/◀/▶</b> 버튼이나 <b>차트 더블클릭(더블탭)</b>·<b>⟲ 전체</b>로 조작합니다. 모바일에서는 두 손가락 벌리기로 확대되고, 확대된 상태에서만 드래그 이동이 됩니다(전체 보기에서는 화면 스크롤 우선).</li>
         <li><b>이동평균선</b>을 켜면 20일(파랑)·60일(초록)·240일(보라) 평균선이 겹쳐집니다. 각각 1개월·3개월·1년 추세를 뜻하며, 자세한 해석은 아래 <b>전문가 지표</b> 카드의 학습 가이드에 있습니다.</li>
         <li><b>로그 스케일</b>을 켜면 세로 이동 거리가 같을 때 상승률도 같아집니다. 가격이 몇 배씩 오른 종목의 초기 구간을 볼 때 켜세요. 끄면(기본) 절대 금액 차이가 그대로 보입니다.</li>
         <li><b>원화 환산</b>은 미국 주식에만 나타납니다. 켜면 달러 주가에 그날그날 환율을 곱해, 한국 투자자가 실제로 체감한 원화 수익률로 모든 표가 다시 계산됩니다. 달러가 올랐다면 원화 수익률이 달러 수익률보다 높게 나옵니다.</li>
@@ -419,7 +451,7 @@
         <option value="120" selected>최근 120일</option>
         <option value="250">최근 250일</option>
       </select>
-      <button class="chip" id="candleResetZoom">↺ 확대 초기화</button>
+      <span class="chartCtrl" id="candleChartCtrl" data-canvas="candleChart" style="margin:0"></span>
       <span style="font-size:11px;color:var(--sub)"><span style="color:var(--up)">■</span> 양봉(종가&gt;시가) <span style="color:var(--down)">■</span> 음봉(종가&lt;시가) · 노란선 20일 이동평균 · 아래 옅은 막대 거래량</span>
     </div>
     <div class="chartWrap"><canvas id="candleChart"></canvas></div>
@@ -776,7 +808,6 @@
         </select>
         <input id="cmpFxFixed" type="number" step="0.1" class="hidden" style="width:100px;font-size:12px;padding:5px 8px">
       </span>
-      <button class="chip" id="cmpResetZoom" title="휠 확대를 원래대로">↺ 확대 초기화</button>
       <label class="opt"><input type="checkbox" id="cmpLog" checked> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="cmpShowEvents" checked> 이벤트 선</label>
       <label class="opt"><input type="checkbox" id="cmpShowLabels"> 이벤트 이름</label>
@@ -784,7 +815,8 @@
       <button class="chip hidden" id="cmpResetView">전체 기간으로</button>
     </div>
     <div id="cmpInvestSummary" class="row" style="margin-bottom:8px"></div>
-    <div class="chartWrap"><canvas id="cmpChart"></canvas></div>
+    <div class="chartCtrl" id="cmpChartCtrl" data-canvas="cmpChart"></div>
+      <div class="chartWrap"><canvas id="cmpChart"></canvas></div>
     <div id="cmpEventList"></div>
     <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
       <b>같은 날 같은 금액을 각 자산에 넣었다면 지금 얼마가 되었을까</b>를 그린 그래프입니다. 모든 선이 같은 지점에서 출발하므로 높이 차이가 곧 성과 차이입니다.
@@ -907,12 +939,12 @@
     <h3>포트폴리오 가치 곡선</h3>
     <div class="row" style="margin-bottom:8px">
       <label class="opt"><input type="checkbox" id="simShowAssets"> 개별 자산 100% 곡선도 표시</label>
-      <button class="chip" id="simResetZoom" title="휠 확대를 원래대로">↺ 확대 초기화</button>
       <label class="opt"><input type="checkbox" id="simLog" checked> 로그 스케일</label>
       <label class="opt"><input type="checkbox" id="simShowEvents" checked> 이벤트 선</label>
       <label class="opt" title="배당을 재투자한 총수익 기준으로 시뮬레이션합니다"><input type="checkbox" id="simDiv"> 배당 재투자</label>
     </div>
-    <div class="chartWrap"><canvas id="simChart"></canvas></div>
+    <div class="chartCtrl" id="simChartCtrl" data-canvas="simChart"></div>
+      <div class="chartWrap"><canvas id="simChart"></canvas></div>
     <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
       설정한 비중대로 실제 투자했다면 계좌가 어떻게 움직였을지를 그린 그래프입니다.
       <ul>
@@ -1008,16 +1040,44 @@
 <div id="tab-watch" class="hidden">
 <div class="card" id="watchCard">
   <h2>관심 종목 <small>내 종목들의 현재 위치를 한눈에</small>
-    <button class="chip" id="watchRefresh" style="margin-left:8px">↻ 새로고침</button></h2>
+    <button class="chip" id="watchRefresh" style="margin-left:8px">↻ 새로고침</button>
+    <button class="chip" id="watchExport" style="margin-left:4px" title="관심 종목·장바구니·시뮬 설정을 링크 하나로 복사합니다. 다른 기기·브라우저에서 열면 그대로 복원됩니다">📤 다른 기기로 옮기기</button></h2>
   <div id="watchStatus" style="font-size:12px;color:var(--sub);min-height:16px"></div>
   <div class="tableWrap"><table id="watchList"></table></div>
   <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
     관심 종목은 이 기기에만 저장됩니다(서버로 가지 않음). 개별 종목 분석에서 <b>☆</b>을 누르면 추가되고, 최대 20개까지입니다.
+    다른 기기나 브라우저에서도 보려면 위 <b>📤 다른 기기로 옮기기</b>로 링크를 복사해 그쪽에서 한 번 열어 주세요. 기존 목록에 합쳐집니다.
     <ul>
       <li><b>52주 최고 대비</b>가 -5% 안이면 신고가 부근, -20% 아래면 조정 중입니다. 관심 종목 중 어디가 싸졌는지 훑어보는 용도입니다.</li>
       <li><b>1년 최대낙폭</b>은 최근 1년 안에서 겪은 가장 깊은 하락입니다. 이 숫자가 내 한계보다 크면 비중을 줄여야 할 종목입니다.</li>
       <li><b>분석</b>은 개별 종목 화면으로, <b>🛒</b>는 장바구니로 보냅니다.</li>
       <li>표의 가격은 <b>확정된 최근 거래일 종가</b>이며 장중 실시간 가격이 아닙니다. 종목명 아래 날짜가 그 기준일입니다.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="card" id="marketMapCard">
+  <h2>전 종목 현재 위치 <small>236개 자산이 각자 전고점에서 얼마나 내려와 있나 — 세일 폭 순</small></h2>
+  <div class="mentalNote" style="margin-top:0">
+    <b>이 표는 추천이 아니라 위치 지도입니다.</b> 낙폭이 크다 = 싸다가 아닙니다. 크게 빠진 데는 대개 이유가 있고,
+    그 이유가 회복 가능한 것인지는 이 표가 아니라 각 종목의 <b>분석</b> 화면(낙폭 이력·회복 기록)에서 확인해야 합니다.
+    시장이 무서울 때 "다 같이 빠졌나, 내 것만 빠졌나"를 확인하는 용도로 쓰세요.
+  </div>
+  <div class="row" id="mapFilters" style="margin:10px 0 6px">
+    <button class="chip active" data-mf="all">전체</button>
+    <button class="chip" data-mf="kr">국내</button>
+    <button class="chip" data-mf="us">해외</button>
+    <button class="chip" data-mf="idx">지수·ETF</button>
+    <button class="chip" data-mf="alt">금·환율·코인</button>
+  </div>
+  <div id="mapStatus" style="font-size:12px;color:var(--sub);min-height:16px"></div>
+  <div class="tableWrap" style="max-height:520px"><table id="marketMap"></table></div>
+  <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+    <ul>
+      <li><b>52주 최고 대비</b>가 이 표의 기준입니다. 0%에 가까우면 신고가 부근, -30% 아래면 깊은 조정입니다. 열 제목을 누르면 그 열로 다시 정렬됩니다.</li>
+      <li><b>RSI(14)</b> — 30 아래면 과매도(파랑), 70 위면 과열(빨강) 신호로 흔히 읽습니다. 신호일 뿐 매매 근거가 아닙니다.</li>
+      <li><b>거래량</b> — 최근 5일 평균이 그 앞 20일 평균의 몇 배인지. 2배 이상이면 무슨 일이 있다는 뜻이니 뉴스를 확인하세요.</li>
+      <li>데이터는 매일 아침 갱신되는 사전 수집분(최근 90일 + 52주 범위)입니다. 3개월 수익률은 90일 데이터의 최대 범위입니다.</li>
     </ul>
   </div></details>
 </div>
@@ -1055,7 +1115,7 @@
   이름·연락처 등 개인을 식별하는 정보는 수집하지 않으며, 입력하신 평단가·투자금액은 기기 밖으로 나가지 않습니다.
 </footer>
 
-<script src="tickers.js?v=4.3"></script>
+<script src="tickers.js?v=4.4"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -1301,15 +1361,136 @@ function buildZoomOptions() {
       wheel: { enabled: true, speed: 0.08 },
       pinch: { enabled: true },
       mode: "x",
-      onZoomComplete: function (c) { fitYToVisible(c.chart); }
+      onZoomComplete: function (c) {
+        fitYToVisible(c.chart);
+        clearRangeActive(c.chart);      // 손으로 확대하면 기간 버튼 강조 해제
+      }
     },
     pan: {
       enabled: true, mode: "x",
+      // 전체 보기 상태에서는 팬을 시작하지 않는다 → 모바일에서 한 손가락 세로 스크롤이 막히지 않는다
+      onPanStart: function (c) { return c.chart.getZoomLevel() > 1.001; },
       onPanComplete: function (c) { fitYToVisible(c.chart); }
     },
     limits: { x: { minRange: 10 } }
   };
 }
+
+/* ---------- 공용 차트 컨트롤 (기간 프리셋 + 확대/이동 버튼) ---------- */
+function clearRangeActive(chart) {
+  if (!chart || !chart._ctrlBar) return;
+  Array.prototype.forEach.call(chart._ctrlBar.querySelectorAll("[data-days]"), function (b) {
+    b.classList.remove("active");
+  });
+}
+
+/* 최근 n거래일만 보이도록 x축을 맞춘다 (0이면 전체) */
+function applyRangePreset(chart, days) {
+  if (!chart) return;
+  var n = chart.data.labels.length;
+  chart.resetZoom("none");
+  if (days > 0 && days < n) {
+    chart.zoomScale("x", { min: n - days, max: n - 1 }, "none");
+  }
+  fitYToVisible(chart);
+  chart.update("none");
+}
+
+/* 버튼 바를 차트에 연결한다. getChart는 항상 최신 인스턴스를 돌려주는 함수 */
+function setupChartCtrl(barId, getChart) {
+  var bar = $(barId);
+  if (!bar || bar._bound) return;
+  bar._bound = true;
+
+  function chartNow() {
+    var c = getChart();
+    if (c) c._ctrlBar = bar;
+    return c;
+  }
+  Array.prototype.forEach.call(bar.querySelectorAll("[data-days]"), function (btn) {
+    btn.onclick = function () {
+      var c = chartNow();
+      if (!c) return;
+      applyRangePreset(c, +btn.getAttribute("data-days"));
+      Array.prototype.forEach.call(bar.querySelectorAll("[data-days]"), function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+    };
+  });
+  Array.prototype.forEach.call(bar.querySelectorAll("[data-act]"), function (btn) {
+    btn.onclick = function () {
+      var c = chartNow();
+      if (!c) return;
+      var act = btn.getAttribute("data-act");
+      var w = (c.chartArea ? c.chartArea.right - c.chartArea.left : 300) * 0.3;
+      if (act === "in") c.zoom(1.3);
+      else if (act === "out") c.zoom(0.75);
+      else if (act === "left") c.pan({ x: w });     // 과거 쪽으로
+      else if (act === "right") c.pan({ x: -w });   // 최근 쪽으로
+      else { c.resetZoom(); clearRangeActive(c); markRangeAll(bar); }
+      if (act !== "reset") clearRangeActive(c);
+      fitYToVisible(c);
+      c.update("none");
+    };
+  });
+  // 캔버스 더블클릭·더블탭 → 전체 보기
+  var canvas = bar.getAttribute("data-canvas");
+  var cv = canvas ? $(canvas) : null;
+  if (cv && !cv._dblBound) {
+    cv._dblBound = true;
+    cv.addEventListener("dblclick", function () {
+      var c = chartNow();
+      if (!c) return;
+      c.resetZoom();
+      clearRangeActive(c);
+      markRangeAll(bar);
+      fitYToVisible(c);
+      c.update("none");
+    });
+  }
+}
+function markRangeAll(bar) {
+  var all = bar.querySelector('[data-days="0"]');
+  if (all) all.classList.add("active");
+}
+/* 컨트롤 바 HTML 생성 (presets: [[일수,라벨],...] · 없으면 확대 버튼만) */
+function chartCtrlHtml(presets) {
+  var htmlStr = "";
+  if (presets && presets.length) {
+    htmlStr += '<span class="rangeBtns">' + presets.map(function (p) {
+      return '<button class="chip' + (p[0] === 0 ? " active" : "") + '" data-days="' + p[0] + '">' + p[1] + "</button>";
+    }).join("") + "</span>";
+  }
+  htmlStr += '<span class="zoomBtns">' +
+    '<button class="chip" data-act="out" title="축소">−</button>' +
+    '<button class="chip" data-act="in" title="확대">＋</button>' +
+    '<button class="chip" data-act="left" title="과거로 이동">◀</button>' +
+    '<button class="chip" data-act="right" title="최근으로 이동">▶</button>' +
+    '<button class="chip" data-act="reset" title="전체 보기로 (차트 더블클릭도 됩니다)">⟲ 전체</button></span>';
+  return htmlStr;
+}
+
+/* ---------- 크로스헤어: 손끝·커서 위치에 세로 기준선 ---------- */
+var crosshairPlugin = {
+  id: "smCrosshair",
+  afterDatasetsDraw: function (chart) {
+    var tt = chart.tooltip;
+    if (!tt || !tt.getActiveElements || !tt.getActiveElements().length || tt.opacity === 0) return;
+    var x = tt.getActiveElements()[0].element.x;
+    var area = chart.chartArea;
+    if (!area || x < area.left || x > area.right) return;
+    var ctx = chart.ctx;
+    ctx.save();
+    ctx.strokeStyle = "rgba(230,235,245,0.35)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, area.top);
+    ctx.lineTo(x, area.bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+if (typeof Chart !== "undefined" && Chart.register) Chart.register(crosshairPlugin);
 
 /* 회복되지 않은 하락 구간의 현재 상태를 세분화해서 표시한다.
    "진행중" 한 단어는 하락 중인지 반등 중인지 알 수 없어 사용자를 헷갈리게 한다. */
@@ -1494,24 +1675,26 @@ function drawEventsOnChart(chart, tsArr, showLines, showLabels) {
   ctx.setLineDash([]);
 
   if (showLabels) {
-    ctx.font = "10px sans-serif";
+    // 세로로 눕힌 이름 대신 번호 뱃지를 상단에 단다. 번호는 아래 이벤트 목록과 같다.
+    ctx.font = "bold 10px sans-serif";
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    var laneCount = 3, laneH = (ys.bottom - ys.top) / laneCount;
-    var laneLastX = [-999, -999, -999], MIN_GAP = 13;
+    var R = 8, GAP = R * 2 + 3;
+    var laneLastX = [-999, -999];
     for (var k = 0; k < pts.length; k++) {
-      var lane = -1;
-      for (var L = 0; L < laneCount; L++) {
-        if (pts[k].x - laneLastX[L] >= MIN_GAP) { lane = L; break; }
-      }
+      var px = pts[k].x;
+      if (px < xs.left - R || px > xs.right + R) continue;   // 확대로 화면 밖이면 생략
+      var lane = px - laneLastX[0] >= GAP ? 0 : (px - laneLastX[1] >= GAP ? 1 : -1);
       if (lane < 0) continue;
-      laneLastX[lane] = pts[k].x;
-      ctx.globalAlpha = 0.95;
+      laneLastX[lane] = px;
+      var cy = ys.top + R + 2 + lane * (R * 2 + 4);
+      ctx.globalAlpha = 1;
       ctx.fillStyle = EVENT_TYPES[pts[k].e.type] || "#999";
-      ctx.save();
-      ctx.translate(pts[k].x + 4, ys.top + lane * laneH + 6);
-      ctx.rotate(Math.PI / 2);
-      ctx.fillText(pts[k].e.name, 0, 0);
-      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(px, cy, R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#10141f";
+      ctx.fillText(String(k + 1), px, cy + 0.5);
     }
   }
   ctx.restore();
@@ -1531,10 +1714,11 @@ function newsSearchLink(t, name) {
 function eventListHtml(t0, t1) {
   var inRange = matchEvents(EVENTS, t0, t1);
   if (!inRange.length) return '<span style="color:var(--sub)">이 기간에 등록된 주요 이벤트가 없습니다.</span>';
-  return '<span style="color:var(--sub)">이 기간의 주요 이벤트 (차트의 점선):</span><br>' +
-    inRange.map(function (e) {
+  return '<span style="color:var(--sub)">이 기간의 주요 이벤트 — 번호가 차트 상단 뱃지와 같습니다:</span><br>' +
+    inRange.map(function (e, i) {
       var c = EVENT_TYPES[e.type] || "#999";
       return '<span class="evtTag" style="border:1px solid ' + c + ';color:' + c + '">' +
+        '<b class="evtNo" style="background:' + c + '">' + (i + 1) + "</b> " +
         e.date.slice(2).replace(/-/g, ".") + " " + e.name + "</span>";
     }).join(" ");
 }
@@ -2170,16 +2354,55 @@ var mainEventPlugin = {
   }
 };
 
+/* 벤치마크 시계열을 메인 날짜에 맞춰 % 수익률로 변환 (없는 날은 직전 값 유지) */
+function mapBenchToRows(rows, benchRows) {
+  if (!benchRows || !benchRows.length) return null;
+  var out = [], j = 0, base = null;
+  for (var i = 0; i < rows.length; i++) {
+    while (j < benchRows.length - 1 && benchRows[j + 1].t <= rows[i].t) j++;
+    var v = benchRows[j].t <= rows[i].t ? benchRows[j].c : null;
+    if (v != null && base == null) base = v;
+    out.push(v != null && base ? (v / base - 1) * 100 : null);
+  }
+  return { data: out, base: base };
+}
+
 function renderChart() {
   var rows = state.rows;
   var showMA = $("showMA").checked && typeof smaSeries === "function";
+
+  // 벤치마크 비교가 켜져 있으면 둘 다 "첫날 대비 %"로 그린다
+  var benchMap = state.benchRows ? mapBenchToRows(rows, state.benchRows) : null;
+  var pctMode = !!(benchMap && benchMap.base);
+  var base0 = rows.length ? rows[0].c : 1;
+
   var datasets = [{
-    label: "종가",
-    data: rows.map(function (r) { return r.c; }),
-    borderColor: "#ffc94d", borderWidth: 1.4,
-    pointRadius: 0, tension: 0, fill: false
+    label: pctMode ? "이 종목 (%)" : "종가",
+    data: pctMode
+      ? rows.map(function (r) { return (r.c / base0 - 1) * 100; })
+      : rows.map(function (r) { return r.c; }),
+    borderColor: "#ffc94d", borderWidth: 1.6,
+    pointRadius: 0, tension: 0,
+    fill: "start",
+    backgroundColor: function (context) {
+      // 라인 아래를 옅은 그라디언트로 채워 방향을 한눈에 보이게 한다
+      var area = context.chart.chartArea;
+      if (!area) return "rgba(255,201,77,0.06)";
+      var g = context.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+      g.addColorStop(0, "rgba(255,201,77,0.22)");
+      g.addColorStop(1, "rgba(255,201,77,0)");
+      return g;
+    }
   }];
-  if (showMA) {
+  if (pctMode) {
+    datasets.push({
+      label: (cmpLabel ? cmpLabel(state.bench) : state.bench) + " (%)",
+      data: benchMap.data,
+      borderColor: "#9db0d0", borderWidth: 1.4, borderDash: [6, 4],
+      pointRadius: 0, tension: 0, fill: false, spanGaps: true
+    });
+  }
+  if (showMA && !pctMode) {
     var closes = rows.map(function (r) { return r.c; });
     [[20, "#4dc3ff", "20일선"], [60, "#3ddc97", "60일선"], [240, "#c47dff", "240일선"]].forEach(function (m) {
       if (closes.length > m[0]) {
@@ -2202,10 +2425,11 @@ function renderChart() {
       interaction: { mode: "index", intersect: false },
       plugins: {
         zoom: buildZoomOptions(),
-        legend: { display: showMA, labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
+        legend: { display: showMA || pctMode, labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: function (ctx) {
+              if (pctMode) return (ctx.dataset.label || "") + ": " + (ctx.parsed.y >= 0 ? "+" : "") + ctx.parsed.y.toFixed(1) + "%";
               return (ctx.dataset.label || "") + ": " + fmtPrice(ctx.parsed.y) + " " + state.displayCur;
             },
             afterBody: function (items) {
@@ -2217,18 +2441,64 @@ function renderChart() {
         }
       },
       scales: {
-        x: { ticks: { color: "#8b97b0", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "#222b40" } },
+        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
         y: {
-          type: $("logScale").checked ? "logarithmic" : "linear",
-          ticks: { color: "#8b97b0", callback: function (v) { return fmtPrice(v); } },
-          grid: { color: "#222b40" }
+          // %모드는 음수가 나올 수 있어 로그 축과 함께 쓸 수 없다
+          type: !pctMode && $("logScale").checked ? "logarithmic" : "linear",
+          ticks: { color: "#a7b6d4", callback: function (v) {
+            return pctMode ? (v >= 0 ? "+" : "") + v + "%" : fmtPrice(v);
+          } },
+          grid: { color: "rgba(96,116,166,0.16)" }
         }
       }
     },
     plugins: [mainEventPlugin].concat(typeof levelsPlugin !== "undefined" ? [levelsPlugin] : [])
   });
   $("eventList").innerHTML = eventListHtml(rows[0].t, rows[rows.length - 1].t);
+  renderBenchNote(pctMode ? benchMap : null);
 }
+
+function renderBenchNote(benchMap) {
+  var box = $("benchNote");
+  if (!box) return;
+  if (!benchMap || !state.rows || !state.rows.length) { box.classList.add("hidden"); return; }
+  var rows = state.rows;
+  var myRet = rows[rows.length - 1].c / rows[0].c - 1;
+  var last = null;
+  for (var i = benchMap.data.length - 1; i >= 0; i--) if (benchMap.data[i] != null) { last = benchMap.data[i] / 100; break; }
+  if (last == null) { box.classList.add("hidden"); return; }
+  var diff = myRet - last;
+  var bn = cmpLabel ? cmpLabel(state.bench) : state.bench;
+  var name = (state.meta && (state.meta.shortName || state.meta.longName)) || state.symbol;
+  box.innerHTML = "이 기간 <b>" + name + " " + fmtPct(myRet) + "</b> · " + bn + " " + fmtPct(last) +
+    " → 상대 성과 <b class='" + pctCls(diff) + "'>" + (diff >= 0 ? "+" : "") + (diff * 100).toFixed(1) + "%p</b>. " +
+    (diff >= 0 ? "시장(벤치마크)보다 잘했습니다." : "같은 기간 시장을 그냥 샀을 때보다 뒤졌습니다. 개별 종목을 고르는 노력이 이 결과와 맞는지 점검해 보세요.") +
+    " <small style='color:var(--sub)'>벤치마크는 현지 통화 기준 · 배당 미반영 가격 지수는 실제 총수익보다 낮게 보입니다.</small>";
+  box.classList.remove("hidden");
+}
+
+$("benchSel").onchange = function () {
+  var sym = this.value;
+  if (!sym || !state.rows) {
+    state.bench = null; state.benchRows = null;
+    if (state.rows) renderChart(); else renderBenchNote(null);
+    return;
+  }
+  if (sym === state.symbol) {
+    setStatus("같은 종목과는 비교할 수 없습니다.", true);
+    this.value = ""; return;
+  }
+  var sel = this;
+  setStatus("벤치마크 데이터 불러오는 중...");
+  getChartData(sym, $("rangeSel").value).then(function (p) {
+    state.bench = sym; state.benchRows = p.rows;
+    setStatus(sourceNote());
+    renderChart();
+  }).catch(function (e) {
+    setStatus("벤치마크를 불러오지 못했습니다: " + e.message, true);
+    sel.value = "";
+  });
+};
 $("logScale").onchange = function () { if (state.rows) renderChart(); };
 $("showMA").onchange = function () { if (state.rows) renderChart(); };
 $("divToggle").onchange = function () {
@@ -2237,7 +2507,6 @@ $("divToggle").onchange = function () {
   applyCurrency();
   render();
 };
-$("chartResetZoom").onclick = function () { resetChartZoom(state.chart); };
 $("showEvents").onchange = function () { if (state.chart) state.chart.update(); };
 $("showLabels").onchange = function () { if (state.chart) state.chart.update(); };
 
@@ -2543,27 +2812,98 @@ Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]")
 $("backPill").onclick = function () { history.back(); };
 
 /* ---------- 설정 공유 (URL 해시) ---------- */
-function buildShareHash() {
+function buildShareHash(mode) {
+  // mode: undefined=공유 링크(화면 포함) · "session"=자동 저장(데이터만) · "full"=관심 종목까지
   var p = [];
   function add(k, v) { if (v !== "" && v != null) p.push(k + "=" + encodeURIComponent(v)); }
-  add("t", currentTab);
-  if (currentTab === "single") add("sub", currentSub);
-  if (state.symbol) add("s", state.symbol);
+  if (mode !== "session") {
+    add("t", currentTab);
+    if (currentTab === "single") add("sub", currentSub);
+    if (state.symbol) add("s", state.symbol);
+  }
   add("r", $("rangeSel").value);
   if ($("krwToggle").checked) add("krw", "1");
   if (cmpState.cart.length) add("c", cmpState.cart.join(","));
   var ws = cmpState.cart.map(function (x) { return (simState.weights[x] != null ? simState.weights[x] : ""); });
   if (ws.some(function (x) { return x !== ""; })) add("w", ws.join(","));
   add("sd", $("simStart").value);
-  add("si", String(numVal("simInit")));
-  add("sm", String(numVal("simMonthly")));
+  var _si = numVal("simInit"), _sm = numVal("simMonthly");
+  add("si", isFinite(_si) ? String(_si) : "");
+  add("sm", isFinite(_sm) ? String(_sm) : "");
   add("sr", $("simRebal").value);
+  if (mode === "full") {
+    // 관심 종목·최근 조회까지 담는다 → 다른 기기에서 열면 그대로 복원
+    try {
+      var wl = JSON.parse(localStorage.getItem("stockmind.watch") || "[]");
+      if (wl.length) add("wl", wl.map(function (x) { return x.s; }).join(","));
+    } catch (e) {}
+  }
   return "#" + p.join("&");
 }
 
-function applyShareHash() {
-  var raw = location.hash.replace(/^#/, "");
+/* ---------- 세션 자동 저장/복원 ----------
+   장바구니·비중·시뮬 설정을 바꿀 때마다 이 기기에 저장하고, 다음 방문 때 되살린다.
+   (관심 종목·최근 조회는 각자의 키로 이미 저장된다) */
+var SESSION_KEY = "stockmind.session";
+var sessionRestoring = false;
+function saveSession() {
+  if (sessionRestoring) return;
+  try { localStorage.setItem(SESSION_KEY, buildShareHash("session").slice(1)); } catch (e) {}
+}
+function loadSession() {
+  try { return localStorage.getItem(SESSION_KEY) || ""; } catch (e) { return ""; }
+}
+
+/* 카카오톡·인스타그램 같은 인앱 브라우저는 앱 업데이트나 캐시 정리 때
+   저장한 정보(관심 종목 등)가 사라질 수 있다. 감지해서 한 번 안내한다. */
+function inAppBrowserName() {
+  var ua = navigator.userAgent || "";
+  if (/KAKAOTALK/i.test(ua)) return "카카오톡";
+  if (/Instagram/i.test(ua)) return "인스타그램";
+  if (/FBAN|FBAV/i.test(ua)) return "페이스북";
+  if (/NAVER\(inapp/i.test(ua)) return "네이버 앱";
+  if (/Line\//i.test(ua)) return "라인";
+  return null;
+}
+function showStorageWarning() {
+  var box = $("storageWarn"), msg = $("storageWarnMsg");
+  if (!box) return;
+  var dismissed = "";
+  try { dismissed = localStorage.getItem("sm.warnDismissed") || ""; } catch (e) {}
+  if (!storageWorks()) {
+    msg.innerHTML = "⚠ 지금 브라우저 설정에서는 <b>관심 종목·장바구니가 저장되지 않습니다</b> (시크릿 모드 등). 일반 창으로 열면 유지됩니다.";
+    box.classList.remove("hidden");
+    return;
+  }
+  var app = inAppBrowserName();
+  if (app && dismissed !== "inapp") {
+    msg.innerHTML = "지금 <b>" + app + " 안의 브라우저</b>로 보고 계십니다. 여기 저장한 관심 종목은 앱을 업데이트하거나 캐시를 지우면 사라질 수 있습니다. " +
+      "오래 쓰시려면 우측 하단 메뉴에서 <b>다른 브라우저로 열기</b>(Chrome·Safari)를 눌러 주세요. " +
+      "이미 저장한 목록은 관심 종목 탭의 <b>📤 다른 기기로 옮기기</b>로 가져갈 수 있습니다.";
+    box.classList.remove("hidden");
+    $("storageWarnClose").onclick = function () {
+      box.classList.add("hidden");
+      try { localStorage.setItem("sm.warnDismissed", "inapp"); } catch (e) {}
+    };
+    return;
+  }
+  $("storageWarnClose").onclick = function () { box.classList.add("hidden"); };
+}
+showStorageWarning();
+
+/* 저장이 실제로 되는 환경인지 (사파리 프라이빗 등은 쓰기가 실패한다) */
+function storageWorks() {
+  try {
+    localStorage.setItem("sm.probe", "1");
+    localStorage.removeItem("sm.probe");
+    return true;
+  } catch (e) { return false; }
+}
+
+function applyShareHash(rawOverride) {
+  var raw = rawOverride != null ? rawOverride : location.hash.replace(/^#/, "");
   if (!raw) return;
+  sessionRestoring = true;
   var q = {};
   raw.split("&").forEach(function (kv) {
     var i = kv.indexOf("=");
@@ -2588,10 +2928,35 @@ function applyShareHash() {
     $("searchInput").value = q.s;
     load();
   }
+  if (q.wl) {
+    // 다른 기기에서 가져온 관심 종목: 기존 것과 합친다 (덮어쓰지 않음)
+    try {
+      var cur = JSON.parse(localStorage.getItem("stockmind.watch") || "[]");
+      var have = {};
+      cur.forEach(function (x) { have[x.s] = 1; });
+      q.wl.split(",").filter(Boolean).forEach(function (s) {
+        if (!have[s] && cur.length < 20) { cur.push({ s: s, n: s, t: Date.now() }); have[s] = 1; }
+      });
+      localStorage.setItem("stockmind.watch", JSON.stringify(cur));
+    } catch (e) {}
+  }
   if (q.t) switchTab(q.t, q.sub);
   else if (q.sub) switchTab("single", q.sub);
-  history.replaceState(viewState(), "");
+  sessionRestoring = false;
+  saveSession();
+  if (rawOverride == null) history.replaceState(viewState(), "");
 }
+
+// 차트 컨트롤 바 채우기·연결
+var RANGE_PRESETS = [[63, "3개월"], [126, "6개월"], [252, "1년"], [756, "3년"], [0, "전체"]];
+$("mainChartCtrl").innerHTML = chartCtrlHtml(RANGE_PRESETS);
+setupChartCtrl("mainChartCtrl", function () { return state.chart; });
+
+// 시뮬 설정이 바뀌면 자동 저장 (장바구니·비중은 compare.js/sim.js에서 호출)
+["rangeSel", "krwToggle", "simStart", "simInit", "simMonthly", "simRebal"].forEach(function (id) {
+  var el = $(id);
+  if (el) el.addEventListener("change", saveSession);
+});
 
 $("shareBtn").onclick = function () {
   var url = location.origin + location.pathname + buildShareHash();
@@ -2616,16 +2981,22 @@ $("shareBtn").onclick = function () {
   setTimeout(function () { setStatus(""); }, 4000);
 };
 
-// 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다
-window.addEventListener("load", applyShareHash);
+// 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다.
+// URL에 공유 해시가 있으면 그걸 쓰고, 없으면 이 기기에 저장된 세션을 되살린다.
+window.addEventListener("load", function () {
+  var urlHash = location.hash.replace(/^#/, "");
+  if (urlHash) { applyShareHash(); return; }
+  var saved = loadSession();
+  if (saved) applyShareHash(saved);
+});
 </script>
-<script src="metrics.js?v=4.3"></script>
-<script src="technical.js?v=4.3"></script>
-<script src="company.js?v=4.3"></script>
-<script src="compare.js?v=4.3"></script>
-<script src="sim.js?v=4.3"></script>
-<script src="insight.js?v=4.3"></script>
-<script src="guide.js?v=4.3"></script>
-<script src="watch.js?v=4.3"></script>
+<script src="metrics.js?v=4.4"></script>
+<script src="technical.js?v=4.4"></script>
+<script src="company.js?v=4.4"></script>
+<script src="compare.js?v=4.4"></script>
+<script src="sim.js?v=4.4"></script>
+<script src="insight.js?v=4.4"></script>
+<script src="guide.js?v=4.4"></script>
+<script src="watch.js?v=4.4"></script>
 </body>
 </html>

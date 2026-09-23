@@ -234,16 +234,21 @@ function renderChips() {
     btn.onclick = function () {
       var s = btn.getAttribute("data-x");
       cmpState.cart = cmpState.cart.filter(function (x) { return x !== s; });
+      cartChanged();
       renderChips();
     };
   });
 }
 
+function cartChanged() {
+  if (typeof saveSession === "function") saveSession();
+}
 function addToCart(sym) {
   if (!sym) return;
   if (cmpState.cart.indexOf(sym) >= 0) return;
   if (cmpState.cart.length >= 8) { setCmpStatus("최대 8개까지 비교할 수 있습니다.", true); return; }
   cmpState.cart.push(sym);
+  cartChanged();
   renderChips();
   setCmpStatus("");
 }
@@ -289,6 +294,7 @@ $("addCartBtn").onclick = function () {
   var i = cmpState.cart.indexOf(state.symbol);
   if (i >= 0) {
     cmpState.cart.splice(i, 1);
+    cartChanged();
     renderChips();
     setStatus("장바구니에서 뺐습니다: " + cmpLabel(state.symbol));
   } else {
@@ -505,7 +511,7 @@ function renderCmpChart() {
     datasets.push({
       label: "누적 투입원금",
       data: investedLine,
-      borderColor: "#8b97b0", borderWidth: 1.2, borderDash: [5, 4],
+      borderColor: "#a7b6d4", borderWidth: 1.2, borderDash: [5, 4],
       pointRadius: 0, tension: 0, fill: false
     });
   }
@@ -538,20 +544,20 @@ function renderCmpChart() {
         }
       },
       scales: {
-        x: { ticks: { color: "#8b97b0", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "#222b40" } },
+        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
         y: {
           type: isLog ? "logarithmic" : "linear",
           ticks: {
-            color: "#8b97b0",
+            color: "#a7b6d4",
             callback: function (v) { return isAmount ? fmtMoney(v) : fmtPct(v / 100 - 1); }
           },
           grid: {
             color: function (ctx) {
               // 본전선 강조 (거치식 금액모드는 원금, 수익률모드는 0%)
-              if (!ctx.tick) return "#222b40";
+              if (!ctx.tick) return "rgba(96,116,166,0.16)";
               var baseline = isAmount ? (isDca ? null : principal) : 100;
-              if (baseline == null) return "#222b40";
-              return Math.abs(ctx.tick.value - baseline) < baseline * 0.001 ? "#5a6580" : "#222b40";
+              if (baseline == null) return "rgba(96,116,166,0.16)";
+              return Math.abs(ctx.tick.value - baseline) < baseline * 0.001 ? "#5a6580" : "rgba(96,116,166,0.16)";
             }
           }
         }
@@ -605,7 +611,10 @@ function renderInvestSummary() {
       Math.round(worst.val).toLocaleString("ko-KR") + "원 (" + fmtPct(worst.ret) + ")</b></span>";
 }
 
-$("cmpResetZoom").onclick = function () { if (typeof resetChartZoom === "function") resetChartZoom(cmpState.chart); };
+if (typeof chartCtrlHtml === "function") {
+  $("cmpChartCtrl").innerHTML = chartCtrlHtml([[63, "3개월"], [126, "6개월"], [252, "1년"], [756, "3년"], [0, "전체"]]);
+  setupChartCtrl("cmpChartCtrl", function () { return cmpState.chart; });
+}
 $("cmpDiv").onchange = function () {
   if (!cmpState.results) return;
   rebuildAligned();
