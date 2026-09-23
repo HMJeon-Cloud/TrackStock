@@ -31,6 +31,7 @@ export default async function handler(req, res) {
 
   out.news = !!((process.env.NAVER_HUB_KEY_ID && process.env.NAVER_HUB_KEY) ||
                 (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET));
+  out.sync = !!(process.env.USER_SALT && process.env.USER_SALT.length >= 16 && process.env.BLOB_READ_WRITE_TOKEN);
   res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1800");
   res.status(200).json(out);
 }
