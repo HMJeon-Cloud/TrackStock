@@ -117,7 +117,8 @@ function worstEpisodes(days, idxVals, topN) {
 }
 
 /* ================= 상태 & UI ================= */
-var simState = { results: null, aligned: null, chart: null, weights: {}, idx: null, startIdx: 0 };
+var simState = { results: null, aligned: null, chart: null, weights: {}, idx: null, startIdx: 0,
+  amountMode: false, amounts: {} };
 
 function setSimStatus(msg, isErr) {
   var el = $("simStatus");
@@ -136,6 +137,10 @@ function syncSimAssets() {
     $("simWeightSum").textContent = "";
     return;
   }
+  $("simAmtMode").checked = !!simState.amountMode;
+  $("simInit").readOnly = !!simState.amountMode;
+  $("simInit").title = simState.amountMode ? "금액 입력 모드에서는 종목별 금액의 합계가 초기 투자금이 됩니다" : "";
+  if (simState.amountMode) { renderSimAmountRows(box, cart); return; }
   var html = "";
   cart.forEach(function (sym, i) {
     if (simState.weights[sym] == null) simState.weights[sym] = Math.round(100 / cart.length);
@@ -170,6 +175,67 @@ function syncSimAssets() {
   updateWeightSum();
 }
 
+/* 금액 입력 모드: 종목별로 넣을 원화 금액 → 비중과 초기 투자금을 자동 계산 */
+function renderSimAmountRows(box, cart) {
+  var initNow = numVal("simInit");
+  cart.forEach(function (sym) {
+    if (simState.amounts[sym] == null) {
+      var w = simState.weights[sym] != null ? simState.weights[sym] : 100 / cart.length;
+      simState.amounts[sym] = Math.round((isFinite(initNow) && initNow > 0 ? initNow : 10000000) * w / 100);
+    }
+  });
+  var html = "";
+  cart.forEach(function (sym, i) {
+    var col = CMP_COLORS[i % CMP_COLORS.length];
+    html += '<div class="wRow">' +
+      "<i class='dot' style='background:" + col + "'></i>" +
+      '<span class="wName">' + cmpLabel(sym) + "</span>" +
+      '<input class="wAmt" data-a="' + sym + '" value="' + addCommas(String(simState.amounts[sym] || 0)) + '" inputmode="numeric">원' +
+      '<span class="wPct" data-p="' + sym + '"></span>' +
+      "</div>";
+  });
+  box.innerHTML = html;
+  Array.prototype.forEach.call(box.querySelectorAll("[data-a]"), function (el) {
+    el.addEventListener("input", function () {
+      var raw = el.value.replace(/[^\d]/g, "");
+      el.value = raw ? addCommas(raw) : "";
+      simState.amounts[el.getAttribute("data-a")] = +raw || 0;
+      syncAmountsToWeights();
+    });
+  });
+  syncAmountsToWeights();
+}
+
+function syncAmountsToWeights() {
+  var cart = cmpState.cart, total = 0;
+  cart.forEach(function (s) { total += simState.amounts[s] || 0; });
+  cart.forEach(function (s) {
+    var w = total > 0 ? (simState.amounts[s] || 0) / total * 100 : 0;
+    simState.weights[s] = Math.round(w * 10) / 10;
+    var p = document.querySelector('#simAssets [data-p="' + s + '"]');
+    if (p) p.textContent = w.toFixed(1) + "%";
+  });
+  $("simInit").value = addCommas(String(total));
+  var hint = $("simInitHint");
+  if (hint) hint.textContent = total >= 10000 ? "(" + koAmount(total) + ")" : "";
+  var el = $("simWeightSum");
+  el.innerHTML = "총액<b>" + (total ? total.toLocaleString("ko-KR") + "원" : "0원") + "</b>";
+  el.title = "";
+  if (typeof saveSession === "function") saveSession();
+}
+
+$("simAmtMode").onchange = function () {
+  simState.amountMode = this.checked;
+  if (!this.checked) {
+    // 금액 → % 로 돌아갈 때 정수 비중으로 정리
+    cmpState.cart.forEach(function (s) { simState.weights[s] = Math.round(simState.weights[s] || 0); });
+  } else {
+    simState.amounts = {};     // 현재 비중·초기 투자금 기준으로 다시 채운다
+  }
+  syncSimAssets();
+  if (typeof saveSession === "function") saveSession();
+};
+
 function updateWeightSum() {
   var sum = 0;
   cmpState.cart.forEach(function (s) { sum += simState.weights[s] || 0; });
@@ -181,6 +247,14 @@ function updateWeightSum() {
 $("simEqual").onclick = function () {
   var cart = cmpState.cart;
   if (!cart.length) return;
+  if (simState.amountMode) {
+    var total = 0;
+    cart.forEach(function (s) { total += simState.amounts[s] || 0; });
+    if (!total) total = 10000000;
+    cart.forEach(function (s) { simState.amounts[s] = Math.round(total / cart.length); });
+    syncSimAssets();
+    return;
+  }
   var base = Math.floor(100 / cart.length);
   cart.forEach(function (s, i) {
     simState.weights[s] = base + (i < 100 - base * cart.length ? 1 : 0);

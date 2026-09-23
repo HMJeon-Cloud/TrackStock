@@ -163,6 +163,26 @@
     padding: 18px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; }
   #cloudBtn.synced { color: var(--good); }
   .tabs #cloudBtn.hidden + #shareBtn { margin-left: auto !important; }
+  .hForm { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+  .hForm > div { display: flex; flex-direction: column; }
+  .hLbl { font-size: 11px; color: var(--sub); margin-bottom: 3px; }
+  .hResults { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: var(--card2);
+    border: 1px solid var(--line); border-radius: 8px; margin-top: 2px; max-height: 240px; overflow-y: auto; }
+  .hRes { padding: 8px 10px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #1e2637; }
+  .hRes:hover { background: #26314a; }
+  .hRes small { color: var(--sub); margin-left: 4px; }
+  .hLot td { font-size: 12px; background: #141a28; color: var(--sub); }
+  .hBar { height: 4px; background: #1e2637; border-radius: 2px; margin-top: 3px; min-width: 50px; }
+  .hBar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  #hInsight:empty { display: none; }
+  #hInsight ul { margin: 0; padding-left: 18px; line-height: 1.7; }
+  #pfModeTabs { display: flex; }
+  .wAmt { width: 130px; font-size: 13px; padding: 5px 8px; text-align: right; }
+  .wPct { min-width: 48px; font-size: 12px; color: var(--sub); text-align: right; }
+  @media (max-width: 640px) {
+    .hForm > div { flex: 1 1 45%; }
+    .hForm input, .hForm select { width: 100% !important; }
+  }
   .mapSort { cursor: pointer; user-select: none; }
   .mapSort:hover { color: var(--accent); }
   .mapSort.on { color: var(--accent); }
@@ -309,7 +329,7 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.5</small></h1>
+<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.6</small></h1>
 <div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
 
 <div class="tabs">
@@ -322,7 +342,7 @@
     </div>
   </div>
   <button data-tab="compare">장바구니 비교</button>
-  <button data-tab="sim">포트폴리오 시뮬레이터</button>
+  <button data-tab="sim">내 포트폴리오</button>
   <button data-tab="watch">관심 종목 · 뉴스</button>
   <button id="cloudBtn" class="hidden" style="margin-left:auto;border-bottom:none;font-size:12px" title="관심 종목·장바구니·시뮬 설정을 아이디+PIN으로 저장해 어느 기기에서든 이어서 봅니다">☁ 내 데이터</button>
   <button id="shareBtn" style="border-bottom:none;font-size:12px;margin-left:0" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
@@ -899,8 +919,77 @@
 </div><!-- /tab-compare -->
 
 <div id="tab-sim" class="hidden">
-<div class="card" id="simCard">
-  <h2>포트폴리오 시뮬레이터 <small>비중을 나눠 과거에 대입하고 결과를 학습</small></h2>
+<div class="subTabs show" id="pfModeTabs" style="padding-top:0;margin-bottom:10px">
+  <button data-pm="hold" class="active">내 보유 현황</button>
+  <button data-pm="sim">과거 시뮬레이션</button>
+</div>
+
+<div class="card" id="holdCard">
+  <h2>내 보유 현황 <small>산 날짜·가격이 제각각이어도, 지금 내 계좌가 어디쯤인지</small></h2>
+  <div class="row" id="hSummary" style="margin-bottom:10px"></div>
+  <div id="hStatus" style="font-size:12px;color:var(--sub);min-height:16px"></div>
+  <div id="hBody"></div>
+  <div class="tableWrap"><table id="hTable"></table></div>
+  <div id="hInsight" class="mentalNote" style="margin-top:10px"></div>
+
+  <div id="hChartWrap" class="hidden" style="margin-top:12px">
+    <h3>평가금액과 투입 원금 <small>점선(원금) 위로 노란선이 있으면 이익 구간</small></h3>
+    <div class="chartCtrl" id="hChartCtrl" data-canvas="hChart"></div>
+    <div class="chartWrap"><canvas id="hChart"></canvas></div>
+  </div>
+
+  <div class="row" style="margin-top:10px">
+    <button class="chip" id="hToSim" title="지금 보유 구성을 금액 그대로 시뮬레이터로 옮겨, 과거에 이 구성이었다면 어땠을지 봅니다">📊 이 구성으로 과거 시뮬레이션</button>
+  </div>
+
+  <details id="hDetails" class="howto" style="margin-top:12px"><summary>매수·매도 기록 추가</summary><div class="body">
+    <div class="hForm">
+      <div id="hSymBox" style="position:relative;flex:1 1 220px">
+        <label class="hLbl">종목</label>
+        <input id="hSym" placeholder="종목명 또는 티커 (예: 삼성전자, NVDA)" autocomplete="off" style="width:100%">
+        <div id="hSymResults" class="hResults"></div>
+      </div>
+      <div><label class="hLbl">구분</label>
+        <select id="hSide"><option value="buy">매수</option><option value="sell">매도</option></select></div>
+      <div><label class="hLbl">날짜</label><input id="hDate" type="date"></div>
+      <div><label class="hLbl">입력 방식</label>
+        <select id="hMode"><option value="qty">수량으로</option><option value="amt">금액으로</option></select></div>
+      <div><label class="hLbl" id="hValLabel">수량 (주)</label><input id="hVal" placeholder="예: 10" style="width:130px"></div>
+      <div><label class="hLbl">단가 <span id="hPriceUnit">원</span></label><input id="hPrice" placeholder="비우면 그날 종가" style="width:130px"></div>
+      <div id="hFxWrap" class="hidden"><label class="hLbl">환율 (원/달러)</label><input id="hFx" placeholder="비우면 그날 환율" style="width:110px"></div>
+      <div style="flex:1 1 160px"><label class="hLbl">메모 (선택)</label><input id="hMemo" placeholder="예: 성과급" style="width:100%"></div>
+    </div>
+    <button class="primary" id="hAddBtn" style="margin-top:8px">기록 추가</button>
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+      <b style="font-size:13px">정기 매수 일괄 추가</b>
+      <small style="color:var(--sub)"> — 매월 같은 날 같은 금액씩 산 경우, 위 <b>종목</b>만 고르고 여기서 한 번에</small>
+      <div class="hForm" style="margin-top:6px">
+        <div><label class="hLbl">시작일</label><input id="hDcaStart" type="date"></div>
+        <div><label class="hLbl">종료일 (비우면 오늘)</label><input id="hDcaEnd" type="date"></div>
+        <div><label class="hLbl">매월 매수일</label><input id="hDcaDay" type="number" min="1" max="28" value="25" style="width:70px"></div>
+        <div><label class="hLbl">매월 금액 (원)</label><input id="hDcaAmt" placeholder="예: 500,000" style="width:140px"></div>
+      </div>
+      <button class="chip" id="hDcaBtn" style="margin-top:8px">정기 매수 기록 만들기</button>
+    </div>
+    <div id="hFormMsg" style="font-size:12px;margin-top:8px;line-height:1.6"></div>
+  </div></details>
+
+  <details class="howto"><summary>이 화면 읽는 법</summary><div class="body">
+    <ul>
+      <li><b>평단가</b>는 증권사와 같은 <b>이동평균법</b>입니다. 여러 번 나눠 사면 산 금액만큼 가중평균되고, 일부를 팔아도 남은 수량의 평단은 그대로입니다. 판 부분의 차익은 <b>실현손익</b>으로 따로 모입니다.</li>
+      <li><b>해외 자산</b>은 산 날의 환율로 원금을, 최근 환율로 평가금액을 계산합니다. 그래서 원화 수익률에는 <b>환율 효과</b>가 포함되고, 손익 칸 아래의 "현지"는 달러 기준 수익률입니다.</li>
+      <li><b>연환산(XIRR)</b>은 매수 시점과 금액이 제각각인 투자를 "연 몇 % 복리"로 환산한 값입니다. 적립식은 나중에 넣은 돈일수록 굴린 기간이 짧아서, 단순 수익률보다 이 값이 실제 성과에 가깝습니다. 1년 미만은 연환산하면 숫자가 과장되니 표시하지 않습니다.</li>
+      <li>차트의 <b>투입 원금</b>은 지금 들고 있는 수량의 매수 원가입니다. 매도하면 판 만큼 줄어듭니다.</li>
+      <li><b>이 앱의 과거 가격은 액면분할이 반영된 값</b>입니다. 분할 전에 사셨다면 수량은 분할 비율만큼 늘리고 단가는 나눠서 입력해 주세요 (단가를 비워두면 자동으로 맞춰집니다).</li>
+      <li>배당으로 받은 현금은 계산에 들어가지 않습니다. 가격 손익만 보여줍니다.</li>
+      <li>기록은 이 기기에 저장되며, <b>☁ 내 데이터</b>로 클라우드 저장을 켜면 다른 기기에서도 이어서 봅니다.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="card hidden" id="simCard">
+  <h2>과거 시뮬레이션 <small>이 구성이었다면 과거에 어땠을까 — 비중을 나눠 대입하고 결과를 학습</small></h2>
   <div class="mentalNote" style="margin-top:0;margin-bottom:10px">
     <b>장바구니 비교</b> 탭의 종목을 그대로 사용합니다. 종목을 바꾸려면 그 탭에서 담거나 빼세요.
   </div>
@@ -908,6 +997,7 @@
   <div class="row" style="margin-top:10px">
     <button class="chip" id="simEqual">균등 분배</button>
     <button class="chip" id="simApplyWeights">비중 적용</button>
+    <label class="opt" title="비율(%) 대신 종목별로 넣을 금액을 입력합니다. 합계가 초기 투자금이 됩니다"><input type="checkbox" id="simAmtMode"> 금액으로 입력</label>
     <span id="simWeightSum" class="badge"></span>
   </div>
   <div class="row" style="margin-top:10px">
@@ -1139,7 +1229,8 @@
         회원가입·비밀번호가 아니라 <b>아이디+PIN 조합이 곧 열쇠</b>입니다.
       </div>
       <input id="cloudId" placeholder="별명 또는 이메일 (2자 이상)" autocomplete="off" style="width:100%;margin-bottom:6px">
-      <input id="cloudPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN — 숫자 4~8자리 (6자리 이상 권장)" autocomplete="off" style="width:100%;margin-bottom:10px">
+      <input id="cloudPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN — 숫자 4~8자리 (6자리 이상 권장)" autocomplete="off" style="width:100%;margin-bottom:8px">
+      <label class="opt" style="display:block;margin-bottom:10px;font-size:12px"><input type="checkbox" id="cloudHold" checked> 보유 현황 거래 기록도 함께 저장</label>
       <div class="row">
         <button class="primary" id="cloudSaveBtn">지금 데이터로 저장</button>
         <button id="cloudLoadBtn">저장해 둔 것 불러오기</button>
@@ -1148,7 +1239,7 @@
         · 아이디와 PIN <b>원문은 서버에 저장되지 않습니다</b> (암호화된 지문만 저장 위치를 정하는 데 쓰입니다).<br>
         · 같은 아이디라도 PIN이 다르면 서로 다른 저장 공간이라, 다른 사람과 겹칠 걱정은 없습니다.<br>
         · 대신 <b>PIN을 잊으면 복구할 방법이 없습니다.</b> 이메일을 아이디로 쓰고 PIN을 6자리 이상으로 하시길 권합니다.<br>
-        · 저장되는 것: 관심 종목·최근 조회·장바구니·비중·시뮬 설정. 평단가·개인정보는 저장되지 않습니다.
+        · 저장되는 것: 관심 종목·최근 조회·장바구니·비중·시뮬 설정, 그리고 아래를 체크하면 <b>내 보유 현황의 거래 기록</b>(날짜·수량·단가). 이름·연락처 같은 개인정보는 받지 않습니다.
       </div>
     </div>
 
@@ -1168,10 +1259,11 @@
   관심 종목·최근 조회는 기본적으로 이용자 기기에만 저장됩니다. <b>클라우드 저장(☁ 내 데이터)</b>을 직접 켠 경우에만
   관심 종목·장바구니·시뮬 설정이 서버에 저장되며, 아이디·PIN 원문은 저장되지 않고 개인 식별 정보도 수집하지 않습니다.<br>
   서비스 개선을 위해 Microsoft Clarity로 <b>익명 사용 통계</b>(방문 화면, 클릭 위치 등)를 수집합니다.
-  이름·연락처 등 개인을 식별하는 정보는 수집하지 않으며, 입력하신 평단가·투자금액은 기기 밖으로 나가지 않습니다.
+  이름·연락처 등 개인을 식별하는 정보는 수집하지 않습니다. 내 보유 현황의 거래 기록과 평단가는 이 기기에만 저장되며,
+  클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </footer>
 
-<script src="tickers.js?v=4.5"></script>
+<script src="tickers.js?v=4.6"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -2771,6 +2863,7 @@ function switchTab(target, sub, noScroll) {
   $("subTabs").classList.toggle("show", target === "single");
   // 시뮬레이터는 장바구니를 공유하므로 열 때마다 비중 입력칸을 맞춘다
   if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
+  if (target === "sim" && typeof renderHoldings === "function" && !$("holdCard").classList.contains("hidden")) renderHoldings();
   if (target === "watch" && typeof renderWatchTab === "function") renderWatchTab(false);
   document.querySelectorAll(".tabItem.open").forEach(function (el) { el.classList.remove("open"); });
   resizeVisibleCharts();
@@ -2882,6 +2975,7 @@ function buildShareHash(mode) {
   if (cmpState.cart.length) add("c", cmpState.cart.join(","));
   var ws = cmpState.cart.map(function (x) { return (simState.weights[x] != null ? simState.weights[x] : ""); });
   if (ws.some(function (x) { return x !== ""; })) add("w", ws.join(","));
+  if (simState.amountMode) add("am", cmpState.cart.map(function (x) { return simState.amounts[x] || 0; }).join(","));
   add("sd", $("simStart").value);
   var _si = numVal("simInit"), _sm = numVal("simMonthly");
   add("si", isFinite(_si) ? String(_si) : "");
@@ -2930,7 +3024,13 @@ function buildCloudPayload() {
   var watch = [], recent = [];
   try { watch = JSON.parse(localStorage.getItem("stockmind.watch") || "[]"); } catch (e) {}
   try { recent = JSON.parse(localStorage.getItem("stockmind.recent") || "[]"); } catch (e) {}
-  return { session: buildShareHash("session").slice(1), watch: watch, recent: recent };
+  var out = { session: buildShareHash("session").slice(1), watch: watch, recent: recent };
+  var inclHold = true;
+  try { inclHold = localStorage.getItem("sm.cloud.hold") !== "0"; } catch (e) {}
+  if (inclHold) {
+    try { out.holdings = JSON.parse(localStorage.getItem("stockmind.holdings") || "null"); } catch (e) {}
+  }
+  return out;
 }
 
 function applyCloudData(data) {
@@ -2952,8 +3052,16 @@ function applyCloudData(data) {
     recents.forEach(function (x) { if (x && x.s && !seenR[x.s] && outR.length < 6) { seenR[x.s] = 1; outR.push(x); } });
     localStorage.setItem("stockmind.recent", JSON.stringify(outR));
   } catch (e) {}
+  try {
+    if (data.holdings && Array.isArray(data.holdings.lots)) {
+      var localH = JSON.parse(localStorage.getItem("stockmind.holdings") || "null");
+      var cloudNewer = !localH || !localH.updatedAt || (data.holdings.updatedAt || "") >= localH.updatedAt;
+      if (cloudNewer) localStorage.setItem("stockmind.holdings", JSON.stringify(data.holdings));
+    }
+  } catch (e) {}
   sessionRestoring = false;
   if (data.session) applyShareHash(data.session);
+  if (typeof renderHoldings === "function" && currentTab === "sim") renderHoldings();
   if (typeof renderRecent === "function") renderRecent();
   if (typeof renderWatchList === "function" && currentTab === "watch") renderWatchList();
   if (typeof syncWatchBtn === "function") syncWatchBtn();
@@ -3081,6 +3189,10 @@ function cloudCreds() {
   if (!/^\d{4,8}$/.test(pin)) { cloudSetMsg("PIN은 숫자 4~8자리여야 합니다.", true); return null; }
   return { id: id, pin: pin };
 }
+$("cloudHold").checked = (function () { try { return localStorage.getItem("sm.cloud.hold") !== "0"; } catch (e) { return true; } })();
+$("cloudHold").onchange = function () {
+  try { localStorage.setItem("sm.cloud.hold", this.checked ? "1" : "0"); } catch (e) {}
+};
 $("cloudSaveBtn").onclick = function () { var c = cloudCreds(); if (c) { cloudSetMsg("저장 중..."); cloudSave(c, false); } };
 $("cloudLoadBtn").onclick = function () { var c = cloudCreds(); if (c) { cloudSetMsg("확인 중..."); cloudLoad(c, false); } };
 $("cloudSaveNow").onclick = function () { cloudSetMsg("저장 중..."); clearTimeout(cloud.timer); cloudSave(null, false); };
@@ -3160,6 +3272,11 @@ function applyShareHash(rawOverride) {
       if (v !== "" && cmpState.cart[i]) simState.weights[cmpState.cart[i]] = +v;
     });
   }
+  if (q.am && cmpState.cart.length) {
+    simState.amountMode = true;
+    simState.amounts = {};
+    q.am.split(",").forEach(function (v, i) { if (cmpState.cart[i]) simState.amounts[cmpState.cart[i]] = +v || 0; });
+  }
   if (q.r) $("rangeSel").value = q.r;
   if (q.krw === "1") $("krwToggle").checked = true;
   if (q.sd) $("simStart").value = q.sd;
@@ -3232,13 +3349,14 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=4.5"></script>
-<script src="technical.js?v=4.5"></script>
-<script src="company.js?v=4.5"></script>
-<script src="compare.js?v=4.5"></script>
-<script src="sim.js?v=4.5"></script>
-<script src="insight.js?v=4.5"></script>
-<script src="guide.js?v=4.5"></script>
-<script src="watch.js?v=4.5"></script>
+<script src="metrics.js?v=4.6"></script>
+<script src="technical.js?v=4.6"></script>
+<script src="company.js?v=4.6"></script>
+<script src="compare.js?v=4.6"></script>
+<script src="sim.js?v=4.6"></script>
+<script src="insight.js?v=4.6"></script>
+<script src="guide.js?v=4.6"></script>
+<script src="watch.js?v=4.6"></script>
+<script src="holdings.js?v=4.6"></script>
 </body>
 </html>
