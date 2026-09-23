@@ -13,7 +13,7 @@
 import { put } from "@vercel/blob";
 import { createHmac } from "crypto";
 
-const MAX_BYTES = 24 * 1024;           // 데이터 상한 (관심 20 + 장바구니 8 + 설정이면 충분)
+const MAX_BYTES = 256 * 1024;          // 데이터 상한 (보유 거래 기록 포함 — 10년 적립식 여러 종목도 여유)
 const MIN_SAVE_GAP_MS = 10 * 1000;
 const lastSave = new Map();             // token → 마지막 저장 시각 (웜 인스턴스 한정 best-effort)
 
