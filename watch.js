@@ -26,6 +26,7 @@ function toggleWatch(sym, name) {
   }
   saveWatch(list);
   syncWatchBtn();
+  if (typeof cloudDirty === "function") cloudDirty();
   return i < 0;
 }
 function syncWatchBtn() {
