@@ -133,14 +133,14 @@ var levelsPlugin = {
         ctx.globalAlpha = 1;
         var txt = label + " " + fmtPrice(list[i].price) + " (" + list[i].touches + "회)";
         var tw = ctx.measureText(txt).width + 8;
-        ctx.fillStyle = "#0f1420";
+        ctx.fillStyle = "#f2f4f6";
         ctx.fillRect(area.right - tw - 2, y - 8, tw, 16);
         ctx.fillStyle = color;
         ctx.fillText(txt, area.right - tw + 2, y);
       }
     }
-    draw(L.resistance, "#ff5b5b", "저항");
-    draw(L.support, "#3ddc97", "지지");
+    draw(L.resistance, "#f04452", "저항");
+    draw(L.support, "#03a15b", "지지");
     ctx.restore();
   }
 };
@@ -164,7 +164,7 @@ function renderLevelsTable() {
       '<td class="pos">+' + (lv.pct * 100).toFixed(1) + "%</td><td>" + lv.touches + "회</td><td>" + fmtDate(lv.lastT) + "</td></tr>";
   });
   var lastT = state.rows[state.rows.length - 1].t;
-  html += "<tr style='background:#202a40'><td><b>최근 종가</b><br><small style='color:var(--sub)'>" + fmtDate(lastT) +
+  html += "<tr style='background:#e8f3ff'><td><b>최근 종가</b><br><small style='color:var(--sub)'>" + fmtDate(lastT) +
     "</small></td><td><b>" + fmtPrice(L.cur) + unit + "</b></td><td>-</td><td>-</td><td>-</td></tr>";
   L.support.forEach(function (lv) {
     html += "<tr><td><b style='color:var(--good)'>지지</b></td><td>" + fmtPrice(lv.price) + unit + "</td>" +
@@ -184,7 +184,7 @@ function renderCandles() {
   }
   $("candleCard").classList.remove("hidden");
 
-  var UP = "#ff5b5b", DOWN = "#4d8dff";
+  var UP = "#f04452", DOWN = "#3182f6";
   var colors = rows.map(function (r) { return r.c >= r.o ? UP : DOWN; });
   var closes = rows.map(function (r) { return r.c; });
   var maxVol = 0;
@@ -207,7 +207,7 @@ function renderCandles() {
     var ma20 = smaSeries(allCloses, 20).slice(-rows.length);
     datasets.push({
       label: "20일선", type: "line", data: ma20,
-      borderColor: "#ffc94d", borderWidth: 1.2, pointRadius: 0, tension: 0, fill: false, order: 0
+      borderColor: "#f97316", borderWidth: 1.2, pointRadius: 0, tension: 0, fill: false, order: 0
     });
   }
   if (maxVol > 0) {
@@ -246,8 +246,8 @@ function renderCandles() {
         }
       },
       scales: {
-        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
-        y: { position: "left", ticks: { color: "#a7b6d4", callback: function (v) { return fmtPrice(v); } }, grid: { color: "rgba(96,116,166,0.16)" } },
+        x: { ticks: { color: "#8b95a1", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(25,31,40,0.06)" } },
+        y: { position: "left", ticks: { color: "#8b95a1", callback: function (v) { return fmtPrice(v); } }, grid: { color: "rgba(25,31,40,0.06)" } },
         y1: { position: "right", max: maxVol * 4, display: false, grid: { display: false } }
       }
     }

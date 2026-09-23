@@ -12,15 +12,17 @@
     y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
   })(window, document, "clarity", "script", "yi17yfiz78");
 </script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<meta name="theme-color" content="#f2f4f6">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <style>
   :root {
-    --bg: #0f1420; --card: #171e2e; --card2: #1d2638;
-    --line: #2a3550; --txt: #e6ebf5; --sub: #9db0d0;
-    --up: #ff5b5b; --down: #4d8dff;
-    --accent: #ffc94d; --good: #3ddc97;
+    --bg: #f2f4f6; --card: #ffffff; --card2: #f9fafb;
+    --line: #e5e8eb; --txt: #191f28; --sub: #6b7684;
+    --up: #f04452; --down: #3182f6;
+    --accent: #3182f6; --good: #03a15b;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--txt); font-family: -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; padding: 16px; max-width: 1100px; margin: 0 auto; }
@@ -33,7 +35,7 @@
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   input, select, button { background: var(--card2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 14px; }
   input:focus, select:focus { outline: 1px solid var(--accent); }
-  button.primary { background: var(--accent); color: #14181f; font-weight: bold; cursor: pointer; border: none; }
+  button.primary { background: var(--accent); color: #ffffff; font-weight: bold; cursor: pointer; border: none; }
   button.chip { font-size: 12px; padding: 6px 10px; cursor: pointer; }
   button.chip:hover { border-color: var(--accent); }
   label.opt { font-size: 12px; color: var(--sub); cursor: pointer; }
@@ -41,10 +43,10 @@
   #searchInput { width: 100%; }
   #searchResults { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; z-index: 30; max-height: 280px; overflow-y: auto; display: none; margin-top: 3px; }
   #searchResults div.item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
-  #searchResults div.item:hover { background: #253048; }
+  #searchResults div.item:hover { background: #e5e8eb; }
   #searchResults .sym { color: var(--accent); font-weight: bold; margin-right: 6px; }
   #searchResults .exch { color: var(--sub); font-size: 11px; float: right; }
-  #searchResults .grp { padding: 5px 12px; font-size: 11px; color: var(--sub); background: #131a28; }
+  #searchResults .grp { padding: 5px 12px; font-size: 11px; color: var(--sub); background: #f9fafb; }
   .chartWrap { position: relative; height: 400px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -63,7 +65,7 @@
   #eventList { margin-top: 10px; font-size: 12px; line-height: 2; }
   #fxInfo { font-size: 12px; color: var(--good); }
   /* 읽는 법 */
-  details.howto { margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; background: #131a28; }
+  details.howto { margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f9fafb; }
   details.howto summary { cursor: pointer; padding: 8px 12px; font-size: 12px; color: var(--accent); list-style: none; user-select: none; }
   details.howto summary::-webkit-details-marker { display: none; }
   details.howto summary::before { content: "▸ "; }
@@ -81,16 +83,16 @@
   #cmpInput { width: 100%; }
   #cmpResults { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; z-index: 30; max-height: 260px; overflow-y: auto; display: none; margin-top: 3px; }
   #cmpResults .item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
-  #cmpResults .item:hover { background: #253048; }
+  #cmpResults .item:hover { background: #e5e8eb; }
   #cmpResults .exch { color: var(--sub); font-size: 11px; float: right; }
   tr.crisisRow { cursor: pointer; }
-  tr.crisisRow:hover td { background: #202a40; }
-  tr.crisisRow.active td { background: #2c3a5c; }
+  tr.crisisRow:hover td { background: #e8f3ff; }
+  tr.crisisRow.active td { background: #e5e8eb; }
   /* 탭 */
   /* 상단 고정 헤더 */
   .topbar { position: sticky; top: 0; z-index: 100; background: var(--bg);
     margin: -16px -16px 16px; padding: 12px 16px 0; border-bottom: 1px solid var(--line);
-    box-shadow: 0 6px 16px rgba(15,20,32,0.65); }
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
   .topbar h1 { font-size: 20px; margin-bottom: 4px; transition: font-size .15s; }
   .topbar .sub { margin-bottom: 10px; transition: opacity .15s, max-height .15s, margin .15s; }
   /* 스크롤하면 제목줄을 접어 탭만 남긴다 */
@@ -112,8 +114,8 @@
   .tabItem:hover .submenu, .tabItem.open .submenu { display: block; }
   .submenu button { display: block; width: 100%; text-align: left; border: none; border-radius: 0;
     padding: 10px 14px; font-size: 13px; color: var(--txt); }
-  .submenu button:hover { background: #26314a; color: var(--accent); }
-  .submenu button.active { color: var(--accent); font-weight: bold; background: #202a40; }
+  .submenu button:hover { background: #e8f3ff; color: var(--accent); }
+  .submenu button.active { color: var(--accent); font-weight: bold; background: #e8f3ff; }
   .submenu button small { display: block; color: var(--sub); font-size: 11px; font-weight: normal; margin-top: 2px; }
   /* 비중 슬라이더 */
   .cartBtn { position: relative; font-size: 17px; padding: 8px 12px; line-height: 1; cursor: pointer; }
@@ -122,7 +124,7 @@
   .cartCount { position: absolute; top: -6px; right: -6px; background: var(--up); color: #fff;
     font-size: 10px; font-weight: bold; border-radius: 9px; min-width: 16px; height: 16px;
     line-height: 16px; text-align: center; padding: 0 4px; }
-  .wRow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1e2637; }
+  .wRow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f2f4f6; }
   .wName { min-width: 110px; font-size: 13px; }
   .wInput { flex: 1; min-width: 100px; accent-color: var(--accent); padding: 0; background: none; border: none; }
   .wNum { width: 68px; font-size: 13px; padding: 5px 8px; text-align: right; }
@@ -136,8 +138,8 @@
   /* 성향 진단 · 용어 사전 */
   .fq { margin-bottom: 10px; }
   .fqT { font-size: 13px; font-weight: bold; margin-bottom: 5px; }
-  #finderBox .chip.active { background: var(--accent); color: #14181f; border-color: var(--accent); font-weight: bold; }
-  .gFirst { margin-left: auto; background: var(--accent); color: #14181f; font-size: 10px; font-weight: bold;
+  #finderBox .chip.active { background: var(--accent); color: #ffffff; border-color: var(--accent); font-weight: bold; }
+  .gFirst { margin-left: auto; background: var(--accent); color: #ffffff; font-size: 10px; font-weight: bold;
     border-radius: 999px; padding: 2px 7px; white-space: nowrap; }
   /* 먼저 읽어볼 방법: 링크가 아니라 누를 수 있는 카드로 */
   .fRank { list-style: none; padding: 0; margin: 8px 0 0; }
@@ -146,17 +148,17 @@
     padding: 10px 12px; border-radius: 10px; background: var(--card2); cursor: pointer; }
   .fRankBtn:hover { border-color: var(--accent); }
   .fRankNo { flex: 0 0 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%;
-    background: var(--accent); color: #14181f; font-size: 11px; font-weight: bold; }
+    background: var(--accent); color: #ffffff; font-size: 11px; font-weight: bold; }
   .fRankIcon { font-size: 17px; }
   .fRankT { font-size: 13px; font-weight: bold; color: var(--txt); line-height: 1.35; }
   .fRankT small { display: block; color: var(--sub); font-weight: normal; font-size: 11px; margin-top: 2px; }
   .glList { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 16px; }
-  .glItem { font-size: 12px; line-height: 1.6; padding: 6px 0; border-bottom: 1px solid #1e2637; }
+  .glItem { font-size: 12px; line-height: 1.6; padding: 6px 0; border-bottom: 1px solid #f2f4f6; }
   .glItem b { display: block; color: var(--accent); }
   .glItem span { color: var(--txt); }
   @media (max-width: 640px) { .glList { grid-template-columns: 1fr; } }
   .moneyHint { font-size: 11px; color: var(--accent); margin-left: 4px; white-space: nowrap; }
-  #cloudModal { position: fixed; inset: 0; background: rgba(8,11,18,0.72); z-index: 200;
+  #cloudModal { position: fixed; inset: 0; background: rgba(0,0,0,0.38); z-index: 200;
     display: flex; align-items: center; justify-content: center; padding: 16px; }
   #cloudModal.hidden { display: none; }
   .cloudBox { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
@@ -168,11 +170,11 @@
   .hLbl { font-size: 11px; color: var(--sub); margin-bottom: 3px; }
   .hResults { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: var(--card2);
     border: 1px solid var(--line); border-radius: 8px; margin-top: 2px; max-height: 240px; overflow-y: auto; }
-  .hRes { padding: 8px 10px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #1e2637; }
-  .hRes:hover { background: #26314a; }
+  .hRes { padding: 8px 10px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f2f4f6; }
+  .hRes:hover { background: #e8f3ff; }
   .hRes small { color: var(--sub); margin-left: 4px; }
-  .hLot td { font-size: 12px; background: #141a28; color: var(--sub); }
-  .hBar { height: 4px; background: #1e2637; border-radius: 2px; margin-top: 3px; min-width: 50px; }
+  .hLot td { font-size: 12px; background: #f9fafb; color: var(--sub); }
+  .hBar { height: 4px; background: #f2f4f6; border-radius: 2px; margin-top: 3px; min-width: 50px; }
   .hBar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
   #hInsight:empty { display: none; }
   #hInsight ul { margin: 0; padding-left: 18px; line-height: 1.7; }
@@ -186,15 +188,15 @@
   .mapSort { cursor: pointer; user-select: none; }
   .mapSort:hover { color: var(--accent); }
   .mapSort.on { color: var(--accent); }
-  #mapFilters .chip.active { background: var(--accent); color: #14181f; border-color: var(--accent); font-weight: bold; }
+  #mapFilters .chip.active { background: var(--accent); color: #ffffff; border-color: var(--accent); font-weight: bold; }
   .evtNo { display: inline-block; min-width: 15px; height: 15px; line-height: 15px; text-align: center;
-    border-radius: 50%; color: #10141f; font-size: 10px; font-style: normal; margin-right: 2px; }
+    border-radius: 50%; color: #ffffff; font-size: 10px; font-style: normal; margin-right: 2px; }
   /* 차트 컨트롤 바: 기간 프리셋 + 확대/이동 버튼 */
   .chartCtrl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 8px; }
   .chartCtrl .rangeBtns, .chartCtrl .zoomBtns { display: flex; gap: 4px; }
   .chartCtrl .zoomBtns { margin-left: auto; }
   .chartCtrl button { font-size: 12px; padding: 5px 10px; border-radius: 8px; cursor: pointer; min-width: 34px; }
-  .chartCtrl button.active { background: var(--accent); color: #14181f; border-color: var(--accent); font-weight: bold; }
+  .chartCtrl button.active { background: var(--accent); color: #ffffff; border-color: var(--accent); font-weight: bold; }
   .chartCtrl button:active { transform: scale(0.96); }
   @media (max-width: 640px) {
     .chartCtrl { gap: 4px; }
@@ -205,18 +207,18 @@
   }
   /* 뉴스 */
   .newsList { list-style: none; padding: 0; margin: 0; }
-  .newsItem { padding: 9px 0; border-bottom: 1px solid #1e2637; }
+  .newsItem { padding: 9px 0; border-bottom: 1px solid #f2f4f6; }
   .newsItem a { color: var(--txt); text-decoration: none; font-size: 13px; line-height: 1.5; display: block; }
   .newsItem a:hover { color: var(--accent); text-decoration: underline; }
   .newsMeta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--sub); }
-  .newsTag { background: #26314a; color: var(--accent); border-radius: 999px; padding: 1px 7px; }
+  .newsTag { background: #e8f3ff; color: var(--accent); border-radius: 999px; padding: 1px 7px; }
   .newsSym { color: var(--good); font-weight: bold; }
   .newsGroup { margin-bottom: 14px; }
   .newsGroupTitle { font-size: 13px; font-weight: bold; color: var(--accent); margin-bottom: 2px; }
-  #newsFilters .chip.active, #marketCats .chip.active { background: var(--accent); color: #14181f; border-color: var(--accent); font-weight: bold; }
+  #newsFilters .chip.active, #marketCats .chip.active { background: var(--accent); color: #ffffff; border-color: var(--accent); font-weight: bold; }
   /* 돌아가기 알약 */
   .backPill { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 300;
-    background: var(--accent); color: #14181f; font-weight: bold; font-size: 13px; border: none;
+    background: var(--accent); color: #ffffff; font-weight: bold; font-size: 13px; border: none;
     border-radius: 999px; padding: 10px 18px; box-shadow: 0 8px 20px rgba(0,0,0,.5); cursor: pointer; }
   .backPill:hover { filter: brightness(1.08); }
   /* 투자 방법 안내 */
@@ -226,7 +228,7 @@
   .guideItem { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; cursor: pointer;
     border-radius: 10px; background: var(--card2); }
   .guideItem:hover { border-color: var(--accent); }
-  .guideItem.active { background: #2a2416; border-color: var(--accent); }
+  .guideItem.active { background: #fffbeb; border-color: var(--accent); }
   .guideItem .gi { font-size: 20px; width: 26px; text-align: center; }
   .guideItem .gt { font-size: 13px; font-weight: bold; line-height: 1.3; }
   .guideItem .gt small { display: block; color: var(--sub); font-weight: normal; font-size: 11px; margin-top: 2px; }
@@ -240,12 +242,12 @@
   .gStepT { font-weight: bold; }
   .gStepD { color: var(--sub); font-size: 12px; margin: 2px 0 6px; }
   .gGo { font-size: 12px; }
-  .gDisclaimer { background: #241618; border: 1px solid #4a2428; border-radius: 8px; padding: 8px 12px;
+  .gDisclaimer { background: #fff5f6; border: 1px solid #ffd8dc; border-radius: 8px; padding: 8px 12px;
     font-size: 12px; line-height: 1.7; margin-bottom: 12px; color: var(--txt); }
   .gDisclaimer b { color: var(--up); }
-  .gRule { background: #16241c; border: 1px solid #244a34; border-radius: 8px; padding: 10px 12px; }
+  .gRule { background: #f0fbf4; border: 1px solid #c6f0d8; border-radius: 8px; padding: 10px 12px; }
   .gRule > b { color: var(--good); }
-  .gTrap { background: #241618; border: 1px solid #4a2428; border-radius: 8px; padding: 10px 12px; }
+  .gTrap { background: #fff5f6; border: 1px solid #ffd8dc; border-radius: 8px; padding: 10px 12px; }
   .gTrap > b { color: var(--up); }
   .gPresets { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin: 6px 0 8px; }
   .gPreset { text-align: left; padding: 10px 12px; border-radius: 10px; cursor: pointer; line-height: 1.4; }
@@ -318,53 +320,248 @@
   .subTabs { display: none; gap: 6px; padding: 8px 0 4px; }
   .subTabs.show { display: flex; }
   .subTabs button { flex: 0 1 auto; min-width: 130px; font-size: 13px; padding: 8px 16px; border-radius: 999px; }
-  .subTabs button.active { background: var(--accent); color: #14181f; border-color: var(--accent); font-weight: bold; }
+  .subTabs button.active { background: var(--accent); color: #ffffff; border-color: var(--accent); font-weight: bold; }
   .submenu { display: none !important; }
   .tabItem > button .caret { display: none; }
   .gBackToList { display: inline-block; margin-bottom: 10px; }
   @media (max-width: 700px) {
     .subTabs button { flex: 1 1 0; min-width: 0; padding: 8px 10px; }
   }
+
+  /* ================================================================
+     v5 밝은 UI — 토스증권 스타일 기준
+     흰 카드 · 둥근 모서리 · 파란 강조색 · 넉넉한 여백 · 정렬 통일
+     ================================================================ */
+  :root {
+    --bg: #f2f4f6; --card: #ffffff; --card2: #f2f4f6; --soft: #f9fafb;
+    --line: #e5e8eb; --txt: #191f28; --txt2: #4e5968; --sub: #8b95a1;
+    --up: #f04452; --down: #3182f6; --accent: #3182f6; --accentSoft: #e8f3ff; --good: #03a15b;
+    --r-card: 20px; --r-ctl: 12px;
+  }
+  body { font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    padding: 0 16px 40px; max-width: 1080px; letter-spacing: -0.2px; -webkit-font-smoothing: antialiased; }
+  b, strong { font-weight: 700; }
+
+  /* 헤더 */
+  .topbar { margin: 0 -16px 16px; padding: 14px 16px 0; background: rgba(242,244,246,0.92);
+    backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: none; box-shadow: none; }
+  .brandRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .brand { font-size: 22px; font-weight: 800; margin: 0; cursor: pointer; letter-spacing: -0.5px; }
+  .brand span { color: var(--accent); }
+  .topActions { display: flex; gap: 6px; }
+  .iconBtn { background: var(--card); border: none; border-radius: 999px; padding: 7px 12px; font-size: 12px;
+    color: var(--txt2); font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .iconBtn:hover { background: var(--accentSoft); color: var(--accent); }
+  #cloudBtn.synced { color: var(--good); }
+
+  /* 상단 탭 (데스크톱) */
+  .tabs { display: flex; gap: 4px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+    border-radius: 12px 12px 0 0; border-bottom: 3px solid transparent; padding: 10px 14px 9px;
+    font-size: 15px; font-weight: 600; color: var(--sub); cursor: pointer; white-space: nowrap; }
+  .tabs button i { font-style: normal; font-size: 15px; }
+  .tabs button:hover { color: var(--txt); }
+  .tabs button.active { color: var(--txt); border-bottom-color: var(--txt); }
+
+  /* 카드 */
+  .card { background: var(--card); border: none; border-radius: var(--r-card); padding: 22px 22px 20px;
+    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+  .card h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 19px; font-weight: 700;
+    color: var(--txt); margin-bottom: 14px; letter-spacing: -0.4px; }
+  .card h2 small { flex-basis: 100%; order: 3; margin: 0; font-size: 13px; font-weight: 400; color: var(--sub); letter-spacing: -0.1px; }
+  .card h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 16px; font-weight: 700;
+    color: var(--txt); margin: 22px 0 10px; }
+  .card h3 small { font-size: 12px; font-weight: 400; color: var(--sub); }
+  .card > h3:first-child { margin-top: 0; }
+
+  /* 버튼·입력 */
+  input, select, button { font-family: inherit; }
+  input, select { background: var(--card2); border: 1.5px solid transparent; border-radius: var(--r-ctl);
+    padding: 11px 14px; font-size: 15px; color: var(--txt); transition: border-color .15s, background .15s; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); background: #fff; }
+  input::placeholder { color: #b0b8c1; }
+  input[type=checkbox] { padding: 0; width: 16px; height: 16px; accent-color: var(--accent); vertical-align: -3px; }
+  input[type=range] { background: none; padding: 0; border: none; }
+  button { background: var(--card2); border: none; border-radius: var(--r-ctl); padding: 11px 16px; font-size: 14px;
+    font-weight: 600; color: var(--txt2); cursor: pointer; transition: background .15s, color .15s, transform .08s; }
+  button:hover { background: #e5e8eb; }
+  button:active { transform: scale(0.97); }
+  button.primary { background: var(--accent); color: #fff; font-weight: 700; }
+  button.primary:hover { background: #1b64da; }
+  button.chip { background: var(--card2); border: none; border-radius: 999px; padding: 7px 13px; font-size: 13px;
+    font-weight: 600; color: var(--txt2); }
+  button.chip:hover { background: var(--accentSoft); color: var(--accent); }
+  button.chip.active, #finderBox .chip.active, #mapFilters .chip.active, #newsFilters .chip.active, #marketCats .chip.active,
+  .chartCtrl button.active { background: var(--accentSoft); color: var(--accent); border: none; font-weight: 700; }
+  label.opt { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--txt2); }
+  .row { gap: 8px; }
+  .linkBtn { background: none; padding: 0; font-size: inherit; color: var(--txt2); text-decoration: underline; font-weight: 500; }
+  .linkBtn:hover { background: none; color: var(--accent); }
+
+  /* 알약형 하위 탭 */
+  .pills { display: flex; gap: 6px; margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+  .pills::-webkit-scrollbar { display: none; }
+  .pills button { flex: 0 0 auto; background: var(--card); border-radius: 999px; padding: 9px 16px; font-size: 14px;
+    font-weight: 600; color: var(--txt2); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .pills button.active { background: var(--txt); color: #fff; }
+  .subPane > .card:last-child { margin-bottom: 14px; }
+  .emptyCard { background: var(--card); border-radius: var(--r-card); padding: 40px 20px; text-align: center;
+    color: var(--sub); font-size: 15px; margin-bottom: 14px; }
+
+  /* 통계 타일 (배지) */
+  .badge { background: var(--soft); border: none; border-radius: 14px; padding: 12px 14px; font-size: 12px;
+    color: var(--sub); font-weight: 500; min-width: 0; }
+  .badge b { font-size: 18px; font-weight: 700; color: var(--txt); margin-top: 4px; letter-spacing: -0.3px; }
+
+  /* 표 */
+  table { font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 12px 10px; border-bottom: 1px solid #f2f4f6; }
+  th { font-size: 12px; font-weight: 600; color: var(--sub); background: var(--card); }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--soft); }
+  .tableWrap { border-radius: 12px; }
+
+  /* 안내 */
+  .mentalNote { background: var(--soft); border-radius: 14px; padding: 12px 14px; font-size: 13px; color: var(--txt2);
+    line-height: 1.7; margin-top: 10px; }
+  .mentalNote:empty { display: none; }
+  .noteLine { font-size: 13px; color: var(--txt2); background: var(--soft); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; }
+  .popSrc { display: none; }
+  .infoBtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0;
+    border-radius: 50%; background: var(--card2); color: var(--sub); font-size: 12px; font-weight: 700; flex: 0 0 auto; }
+  .infoBtn:hover { background: var(--accentSoft); color: var(--accent); }
+  .infoInline { display: inline-flex; align-items: center; gap: 4px; background: none; padding: 4px 0; margin-top: 8px;
+    color: var(--sub); font-size: 13px; font-weight: 500; }
+  .infoInline:hover { background: none; color: var(--accent); }
+
+  /* 팝업 */
+  .modalWrap, #cloudModal { position: fixed; inset: 0; background: rgba(0,0,0,0.38); z-index: 300;
+    display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn .15s; }
+  .modalWrap.hidden, #cloudModal.hidden { display: none; }
+  .modalBox, .cloudBox { background: #fff; border: none; border-radius: 24px; padding: 24px; width: 100%; max-width: 480px;
+    max-height: 86vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.18); animation: popUp .18s; }
+  .modalBox h3 { font-size: 19px; font-weight: 700; margin: 0 0 14px; color: var(--txt); }
+  .modalBody { font-size: 14px; line-height: 1.75; color: var(--txt2); }
+  .modalBody b { color: var(--txt); }
+  .modalBody ul { margin: 6px 0 6px 18px; } .modalBody li { margin-bottom: 6px; }
+  .modalBody p { margin-bottom: 8px; }
+  .modalBody .body { padding: 0; font-size: 14px; color: var(--txt2); }
+  .modalClose { width: 100%; margin-top: 16px; background: var(--card2); }
+  .cloudBox h3 { color: var(--txt) !important; font-size: 19px !important; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes popUp { from { transform: translateY(12px); opacity: 0 } to { transform: none; opacity: 1 } }
+
+  /* 홈 */
+  .hero { text-align: center; padding: 36px 8px 26px; }
+  .heroEmoji { font-size: 44px; margin-bottom: 12px; }
+  .heroTitle { font-size: 28px; font-weight: 800; line-height: 1.3; letter-spacing: -0.8px; color: var(--txt); margin-bottom: 10px; }
+  .heroSub { font-size: 15px; color: var(--txt2); line-height: 1.6; max-width: 360px; margin: 0 auto; }
+  .startCards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 720px; margin: 0 auto 22px; }
+  .startCard { display: flex; align-items: center; gap: 14px; text-align: left; background: var(--card); border-radius: var(--r-card);
+    padding: 22px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .startCard:hover { background: #fff; box-shadow: 0 6px 20px rgba(49,130,246,0.14); }
+  .startIcon { flex: 0 0 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+  .startText { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .startText b { font-size: 17px; color: var(--txt); }
+  .startText small { font-size: 13px; color: var(--sub); font-weight: 500; }
+  .startArrow { font-size: 24px; color: #c5cbd2; font-weight: 400; }
+  .homeChips { max-width: 720px; margin: 0 auto; text-align: center; }
+  .homeChipsLabel { display: block; font-size: 13px; color: var(--sub); margin-bottom: 10px; font-weight: 600; }
+  .homeChips .row { justify-content: center; }
+  .homeChips .chip { background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+
+  /* 투자법 */
+  .finder { background: var(--soft); border-radius: 16px; padding: 16px; }
+  .finder h3 { margin-top: 0 !important; }
+  .fq { margin-bottom: 14px; } .fqT { font-size: 14px; margin-bottom: 8px; }
+  .fRankBtn { background: #fff; border-radius: 14px; padding: 12px 14px; }
+  .guideItem { border-radius: 16px !important; }
+
+  /* 차트 */
+  .chartWrap { height: 360px; }
+  .chartCtrl button { background: var(--card2); border-radius: 10px; padding: 6px 11px; font-size: 13px; }
+
+  /* 하단 안내 한 줄 */
+  .footLine { text-align: center; font-size: 12px; color: var(--sub); padding: 18px 0 8px; }
+  .banners > div { background: #fff !important; border: none !important; border-radius: 16px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06); padding: 12px 16px !important; font-size: 13px !important; margin: 0 0 12px !important; }
+  .backPill { background: var(--txt) !important; color: #fff !important; border: none !important; border-radius: 999px !important; }
+
+  /* 모바일: 하단 탭바 */
+  @media (max-width: 700px) {
+    body { padding: 0 12px calc(84px + env(safe-area-inset-bottom)); }
+    .topbar { margin: 0 -12px 12px; padding: 12px 14px 10px; }
+    .brand { font-size: 20px; }
+    .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; margin: 0; gap: 0; justify-content: space-around;
+      background: rgba(255,255,255,0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); overflow: visible; }
+    .tabs button { flex: 1 1 0; flex-direction: column; gap: 2px; padding: 6px 2px; border: none; border-radius: 10px;
+      font-size: 11px; font-weight: 600; min-width: 0; }
+    .tabs button i { font-size: 20px; filter: grayscale(1); opacity: .55; }
+    .tabs button.active { color: var(--txt); border: none; }
+    .tabs button.active i { filter: none; opacity: 1; }
+    .card { padding: 18px 16px; border-radius: 18px; }
+    .card h2 { font-size: 18px; }
+    .startCards { grid-template-columns: 1fr; }
+    .hero { padding: 24px 4px 20px; }
+    .heroTitle { font-size: 25px; }
+    .chartWrap { height: 290px; }
+    th, td { padding: 10px 8px; font-size: 13px; }
+    .badge b { font-size: 16px; }
+    .modalWrap, #cloudModal { align-items: flex-end; padding: 0; }
+    .modalBox, .cloudBox { border-radius: 24px 24px 0 0; max-height: 88vh; padding: 22px 20px calc(20px + env(safe-area-inset-bottom)); }
+  }
+
+  /* v5 보완 */
+  .chartTop { margin-bottom: 10px; }
+  .chartOpts { background: var(--soft); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; gap: 10px 16px; }
+  .evtMore { border: 1px solid var(--line); color: var(--sub); cursor: pointer; }
+  .evtCell { width: 250px; white-space: normal; line-height: 1.9; }
+  .tabs button:hover, .tabs button:focus, .tabs button:active { background: none; }
+  #presets .chip, #recentChips .chip { flex: 0 0 auto; }
+  @media (max-width: 700px) {
+    .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg); position: static; }
+    #presets { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: -16px; margin-right: -16px; padding: 0 16px; }
+    #presets::-webkit-scrollbar { display: none; }
+    #presets .chip { flex: 0 0 auto !important; padding: 8px 14px !important; }
+    .chartOpts label.opt { flex: 1 1 45%; }
+  }
 </style>
 </head>
 <body>
 <header class="topbar" id="topbar">
-<h1>Stock<span>Mind</span> <small style="font-size:12px;color:var(--sub)">v4.7</small></h1>
-<div class="sub">과거를 알면 하락이 와도 흔들리지 않는다 — 하락장 멘탈 방어 대시보드</div>
-
-<div class="tabs">
-  <button class="active" data-tab="guide">어떻게 투자하면 될까?</button>
-  <div class="tabItem" id="singleTabItem">
-    <button data-tab="single">개별 종목 분석<span class="caret">▾</span></button>
-    <div class="submenu">
-      <button data-sub="analysis" class="active">종목 분석<small>차트 · 지지저항 · 캔들 · 재무 · 지표</small></button>
-      <button data-sub="insight">인사이트<small>보유기간 손실확률 · 급등급락 · 자동요약</small></button>
+  <div class="brandRow">
+    <h1 class="brand" id="brandHome">Stock<span>Mind</span></h1>
+    <div class="topActions">
+      <button id="cloudBtn" class="iconBtn hidden" title="관심 종목·보유 기록을 아이디+PIN으로 저장해 어느 기기에서든 이어서 봅니다">☁ 내 데이터</button>
+      <button id="shareBtn" class="iconBtn" title="현재 화면을 링크로 복사합니다">🔗 공유</button>
     </div>
   </div>
-  <button data-tab="compare">장바구니 비교</button>
-  <button data-tab="sim">내 포트폴리오</button>
-  <button data-tab="watch">관심 종목 · 뉴스</button>
-  <button id="cloudBtn" class="hidden" style="margin-left:auto;border-bottom:none;font-size:12px" title="관심 종목·장바구니·시뮬 설정을 아이디+PIN으로 저장해 어느 기기에서든 이어서 봅니다">☁ 내 데이터</button>
-  <button id="shareBtn" style="border-bottom:none;font-size:12px;margin-left:0" title="현재 설정을 링크로 복사합니다">🔗 설정 공유</button>
-</div>
-<div id="cloudOffer" class="hidden" style="margin:8px 0;padding:10px 12px;border:1px solid #2e4a3a;background:#12241b;border-radius:10px;font-size:12px;line-height:1.6">
+  <nav class="tabs">
+    <button class="active" data-tab="home"><i>🏠</i><span>홈</span></button>
+    <button data-tab="guide"><i>🧭</i><span>투자법</span></button>
+    <button data-tab="single"><i>📊</i><span>종목</span></button>
+    <button data-tab="compare"><i>⚖️</i><span>비교</span></button>
+    <button data-tab="sim"><i>💼</i><span>내 자산</span></button>
+    <button data-tab="watch"><i>⭐</i><span>관심</span></button>
+  </nav>
+</header>
+<div class="banners">
+<div id="cloudOffer" class="hidden" style="margin:8px 0;padding:10px 12px;border:1px solid #c6f0d8;background:#f0fbf4;border-radius:10px;font-size:12px;line-height:1.6">
   방금 저장한 항목은 <b>지금 이 브라우저에만</b> 남습니다. 다른 기기나 브라우저에서도 이어서 보려면 클라우드에 저장하세요 (아이디+PIN만 있으면 됩니다).
   <button class="chip" id="cloudOfferYes" style="margin-left:6px">☁ 클라우드에 저장</button>
   <button class="chip" id="cloudOfferNo" style="font-size:11px;padding:3px 8px">괜찮아요, 이 기기만</button>
 </div>
-<div id="storageWarn" class="hidden" style="margin:8px 0;padding:10px 12px;border:1px solid #5a4a1e;background:#241f12;border-radius:10px;font-size:12px;line-height:1.6">
+<div id="storageWarn" class="hidden" style="margin:8px 0;padding:10px 12px;border:1px solid #ffe8a3;background:#fffbeb;border-radius:10px;font-size:12px;line-height:1.6">
   <span id="storageWarnMsg"></span>
   <button class="chip" id="storageWarnClose" style="margin-left:8px;font-size:11px;padding:3px 8px">닫기</button>
 </div>
-<div class="subTabs" id="subTabs">
-  <button data-sub="analysis" class="active">종목 분석</button>
-  <button data-sub="insight">인사이트</button>
 </div>
-</header>
 <button id="backPill" class="backPill hidden" title="안내 화면의 보던 위치로 돌아갑니다">← 안내로 돌아가기</button>
 
 <div id="tab-single" class="hidden">
-<div id="sub-analysis">
 <div class="card" id="searchCard">
   <div class="row">
     <div id="searchBox">
@@ -399,15 +596,23 @@
   </div>
   <div id="status"></div>
 </div>
-
-<div id="resultArea" class="hidden">
-
-  <div class="card" id="chartCard">
+<div class="pills" id="subTabs">
+  <button data-sub="chart" class="active">차트</button>
+  <button data-sub="history">하락·회복</button>
+  <button data-sub="insight">인사이트</button>
+  <button data-sub="tech">기술 지표</button>
+  <button data-sub="company">기업 정보</button>
+</div>
+<div id="subEmpty" class="emptyCard hidden">위에서 종목을 검색하거나 칩을 눌러 보세요 🔍</div>
+<div id="sub-chart" class="subPane"><div class="card" id="chartCard">
     <h2 id="chartTitle">가격 차트</h2>
     <div id="fxLine" class="row hidden" style="margin-bottom:8px">
       <span id="fxInfo"></span>
     </div>
-    <div class="row" style="margin-bottom:8px">
+    <div class="row chartTop">
+      <button class="chip" id="chartOptBtn">⚙ 표시 옵션</button>
+          </div>
+    <div class="row chartOpts hidden" id="chartOpts">
       <label class="opt" id="krwWrap"><input type="checkbox" id="krwToggle"> 원화(KRW)로 환산</label>
       <span id="fxCtrl" class="hidden">
         <select id="fxMode" style="font-size:12px;padding:5px 8px">
@@ -437,195 +642,57 @@
     <div id="divNote" class="mentalNote hidden"></div>
     <div id="eventList"></div>
     <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
-      노란 선이 <b>종가 흐름</b>, 세로 점선이 그 시점에 있었던 <b>사건</b>입니다. 색은 사건의 종류(전쟁·위기·금리·팬데믹·정치·회복)를 뜻합니다.
+      파란 선이 <b>종가 흐름</b>, 세로 점선이 그 시점에 있었던 <b>사건</b>입니다. 색은 사건의 종류(전쟁·위기·금리·팬데믹·정치·회복)를 뜻합니다.
       <ul>
         <li><b>차트 위에 마우스를 올리면</b> 그날의 가격과, 앞뒤 10일 안에 있었던 사건이 함께 뜹니다.</li>
         <li><b>이 앱의 가격은 "확정된 하루치 종가"입니다.</b> 일봉(하루 한 개의 봉) 데이터만 쓰기 때문에 화면의 가격은 <b>가장 최근 거래일의 종가</b>이며 장중 실시간 가격이 아닙니다. 제목 옆 날짜가 그 기준일입니다. 국내 장은 15:30, 미국 장은 한국시간 06:00경 마감하며 그 뒤에 갱신됩니다.</li>
         <li><b>확대/축소</b> — 차트 위에서 <b>마우스 휠</b>을 굴리면 커서가 있는 지점을 중심으로 확대·축소됩니다. 확대 상태에서 <b>드래그</b>하면 좌우로 이동하고, y축은 보이는 구간에 맞춰 자동으로 다시 잡힙니다. 차트 위의 <b>기간 버튼(3개월~전체)</b>으로 원하는 구간을 바로 볼 수 있고, <b>−/＋/◀/▶</b> 버튼이나 <b>차트 더블클릭(더블탭)</b>·<b>⟲ 전체</b>로 조작합니다. 모바일에서는 두 손가락 벌리기로 확대되고, 확대된 상태에서만 드래그 이동이 됩니다(전체 보기에서는 화면 스크롤 우선).</li>
-        <li><b>이동평균선</b>을 켜면 20일(파랑)·60일(초록)·240일(보라) 평균선이 겹쳐집니다. 각각 1개월·3개월·1년 추세를 뜻하며, 자세한 해석은 아래 <b>전문가 지표</b> 카드의 학습 가이드에 있습니다.</li>
+        <li><b>이동평균선</b>을 켜면 20일(주황)·60일(초록)·240일(보라) 평균선이 겹쳐집니다. 각각 1개월·3개월·1년 추세를 뜻하며, 자세한 해석은 아래 <b>전문가 지표</b> 카드의 학습 가이드에 있습니다.</li>
         <li><b>로그 스케일</b>을 켜면 세로 이동 거리가 같을 때 상승률도 같아집니다. 가격이 몇 배씩 오른 종목의 초기 구간을 볼 때 켜세요. 끄면(기본) 절대 금액 차이가 그대로 보입니다.</li>
         <li><b>원화 환산</b>은 미국 주식에만 나타납니다. 켜면 달러 주가에 그날그날 환율을 곱해, 한국 투자자가 실제로 체감한 원화 수익률로 모든 표가 다시 계산됩니다. 달러가 올랐다면 원화 수익률이 달러 수익률보다 높게 나옵니다.</li>
         <li><b>환율 적용 방식</b> — <b>일별 실제 환율</b>(기본)은 매일의 실제 환율을 씁니다. <b>고정 환율</b>을 고르고 숫자를 직접 넣으면 전 기간에 그 환율 하나만 적용하는데, 이렇게 하면 환율 변동 효과가 사라져 <b>순수한 주가 등락만</b> 원화로 볼 수 있습니다. 두 방식의 차이가 곧 환율이 내 수익에 기여한 몫입니다.</li>
       </ul>
       <b>주의:</b> 사건 점선은 "이때 이런 일이 있었다"는 표시일 뿐, 그 사건이 가격 변화의 원인이라는 뜻은 아닙니다.
     </div></details>
-  </div>
-
-  <div class="card" id="techCard">
-    <h2>기간 수익률 & 지지·저항선 <small>지금 어디쯤 왔고, 어디서 막히고 받쳐지는가</small></h2>
-    <div id="periodReturns" class="row" style="margin-bottom:12px"></div>
-    <h3 style="margin-top:6px">자동 탐지된 지지선 · 저항선</h3>
-    <div class="tableWrap"><table id="levelsTable"></table></div>
-    <div id="levelsNote" class="mentalNote"></div>
-    <details class="howto"><summary>학습 가이드 — 지지선과 저항선</summary><div class="body">
-      <b>■ 개념을 한 문장으로</b><br>
-      <b>지지선</b>은 주가가 떨어지다가 <b>여러 번 멈추고 되돌아 올라간 가격대</b>, <b>저항선</b>은 오르다가 <b>여러 번 막히고 되돌아 내려온 가격대</b>입니다.
-      그 가격에서 "이 정도면 싸다"고 사는 사람들(지지)과 "이 정도면 팔자"는 사람들(저항)이 반복해서 나타났다는 흔적입니다.<br><br>
-      <b>■ 이 앱이 찾는 방법</b><br>
-      최근 250거래일(약 1년)에서 좌우 6일 안에 가장 높았던 날(스윙 고점)과 가장 낮았던 날(스윙 저점)을 전부 찾고, 서로 1.5% 안에 있는 것들을 하나의 가격대로 묶습니다.
-      <b>터치 횟수</b>가 많을수록 시장이 그 가격을 여러 번 "의식"했다는 뜻이라 신뢰도가 높습니다. 위 차트에서 <b>지지/저항선</b>을 켜면 점선으로 겹쳐 보입니다.<br><br>
-      <b>■ 초보자가 실제로 쓰는 법</b><br>
+  </div></div>
+<div id="sub-history" class="subPane hidden"><div class="card" id="ddCard">
+    <h2>고점 대비 하락 (Drawdown) <small>10% 이상 하락한 구간과 당시 이슈</small></h2>
+    <div class="tableWrap"><table id="ddTable"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      전고점을 찍은 뒤 바닥까지 얼마나 빠졌고, 원래 자리로 돌아오는 데 얼마나 걸렸는지를 낙폭 순으로 정렬한 표입니다.
       <ul>
-        <li><b>지지선 근처에서 산다</b> — 떨어지다 멈출 확률이 다른 곳보다 높기 때문입니다. 단, 지지선이 <b>깨지면</b>(종가가 지지선 아래로 마감) 그 아래 다음 지지선까지 열려 있다고 봅니다. 그래서 "지지선 살짝 아래에 손절선"을 두는 것이 정석입니다.</li>
-        <li><b>저항선 근처에서는 추격매수하지 않는다</b> — 막힐 확률이 높은 곳입니다. 저항선을 <b>돌파하면</b>(거래량 동반 종가 마감) 그 저항선은 새로운 지지선이 됩니다. 뚫린 천장이 바닥이 되는 셈이라 '역할 전환'이라 부릅니다.</li>
-        <li><b>터치 횟수 1회짜리는 참고만</b> — 우연일 수 있습니다. 2~3회 이상이 의미 있습니다.</li>
+        <li><b>낙폭</b> — 고점 종가 대비 저점 종가의 하락률. 큰 순서로 정렬돼 있습니다.</li>
+        <li><b>📰 당시 기사</b> — 저점 전후 2주간의 기사를 네이버 뉴스 검색으로 엽니다. 그때 시장이 무엇을 두려워했는지 보면, 지금의 공포가 얼마나 흔한 종류인지 알 수 있습니다.</li>
+        <li><b>회복일</b> — 하락 전 고점 가격을 다시 넘어선 날. 아직 회복하지 못한 구간은 상태를 셋으로 나눠 보여줍니다: <span class="neg">▼ 하락 진행중</span>(최근 종가가 저점 부근), <span class="pos">△ 반등 중</span>(저점에서 올라왔지만 갈 길이 남음), <span class="pos">▲ 회복 임박</span>(전고점까지 70% 이상 회복). 저점 대비 상승폭과 전고점까지 남은 거리도 함께 표시됩니다.</li>
+        <li><b>하락기간</b> — 고점에서 저점까지 걸린 날짜. 회복까지 걸린 시간은 회복일에서 따로 확인하세요. 떨어지는 데 3개월, 회복에 3년이 걸리는 일도 흔합니다.</li>
+        <li><b>당시 이슈</b> — 그 하락~회복 구간 안에 있었던 사건들. 여러 개가 붙어 있으면 악재가 겹친 구간입니다.</li>
       </ul>
-      <b>■ 함정</b><br>
-      지지·저항은 <b>확률적 경향</b>이지 벽이 아닙니다. 실적 발표나 큰 뉴스 앞에서는 쉽게 뚫립니다. 그리고 많은 사람이 같은 선을 보고 있어서 <b>"지지선 살짝 아래까지 찔렀다가 급반등"</b>(손절 물량 털기)이 자주 일어납니다. 지지선을 0.5~1% 깨졌다고 바로 팔지 말고 <b>종가 기준</b>으로 판단하세요.<br>
-      <b>52주 최저·최고, 이동평균선(240일선)</b>도 사실상 지지·저항으로 작용하는 경우가 많으니 아래 전문가 지표와 함께 보세요.
+      <b>이렇게 쓰세요:</b> 평단가를 입력하면 오른쪽에 <span class="avgHighlight">내 평단가 적용 시</span> 열이 생깁니다. 각 하락이 지금 재현될 때 내 매수가가 도달할 가격이니, <b>미리 보고 마음의 준비를 해두는 용도</b>입니다.
     </div></details>
-  </div>
-
-  <div class="card hidden" id="candleCard">
-    <h2>캔들 차트 <small>최근 흐름을 하루 단위로 읽기</small></h2>
-    <div class="row" style="margin-bottom:8px">
-      <select id="candleDays">
-        <option value="60">최근 60일</option>
-        <option value="120" selected>최근 120일</option>
-        <option value="250">최근 250일</option>
-      </select>
-      <span class="chartCtrl" id="candleChartCtrl" data-canvas="candleChart" style="margin:0"></span>
-      <span style="font-size:11px;color:var(--sub)"><span style="color:var(--up)">■</span> 양봉(종가&gt;시가) <span style="color:var(--down)">■</span> 음봉(종가&lt;시가) · 노란선 20일 이동평균 · 아래 옅은 막대 거래량</span>
-    </div>
-    <div class="chartWrap"><canvas id="candleChart"></canvas></div>
-    <div id="candleRecent" class="row" style="margin-top:10px"></div>
-    <details class="howto"><summary>학습 가이드 — 캔들 보는 법</summary><div class="body">
-      <b>■ 캔들 하나가 담는 정보 4가지</b><br>
-      캔들 하나 = 하루입니다. <b>몸통</b>(두꺼운 부분)의 위아래 끝이 <b>시가와 종가</b>, <b>꼬리</b>(가는 선)의 끝이 그날 <b>최고가와 최저가</b>입니다.
-      한국에서는 종가가 시가보다 높으면 <span style="color:var(--up)"><b>빨간 양봉</b></span>, 낮으면 <span style="color:var(--down)"><b>파란 음봉</b></span>입니다. (미국은 초록/빨강으로 반대라 해외 차트 볼 때 주의)<br><br>
-      <b>■ 몸통과 꼬리로 읽는 심리</b><br>
+  </div><div class="card" id="rallyCard">
+    <h2>저점 대비 상승 (Rally) <small>바닥에서 얼마나 올랐나</small></h2>
+    <div class="tableWrap"><table id="rallyTable"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      위 하락 표의 <b>정확히 반대편</b>입니다. 각 바닥에서 다음 고점까지 얼마나 올랐는지를 보여줍니다.
       <ul>
-        <li><b>몸통이 길다</b> = 하루 종일 한 방향으로 밀렸다. 장대양봉은 강한 매수, 장대음봉은 강한 매도. 특히 <b>거래량이 함께 크면</b> 진짜 힘이 실린 것입니다.</li>
-        <li><b>몸통이 거의 없다 (도지)</b> = 시가≈종가. 사려는 힘과 팔려는 힘이 팽팽했다는 뜻. 추세 끝에 나오면 방향 전환 신호로 봅니다.</li>
-        <li><b>아래꼬리가 길다 (망치형)</b> = 장중에 크게 떨어졌다가 <b>다시 끌어올렸다</b>. 하락 끝에 나오면 "여기서 사는 사람이 있다"는 신호. 위 지지선과 겹치면 더 의미 있습니다.</li>
-        <li><b>윗꼬리가 길다 (유성형)</b> = 장중에 크게 올랐다가 <b>밀려 내려왔다</b>. 상승 끝에 나오면 "여기선 파는 사람이 많다"는 신호. 저항선과 겹치면 더 의미 있습니다.</li>
+        <li>저점 날짜를 위 하락 표의 저점 날짜와 맞춰 보세요. <b>가장 무서웠던 날이 가장 큰 상승의 출발점</b>이었던 경우가 반복해서 나타납니다.</li>
+        <li><b>기간</b>이 길수록 그 상승을 누리려면 그만큼 들고 있어야 했다는 뜻입니다.</li>
       </ul>
-      차트 위에 마우스를 올리면 그날의 시·고·저·종가와 <b>모양 판정</b>이 뜹니다. 아래 배지는 최근 5일 요약입니다.<br><br>
-      <b>■ 거래량을 함께 보는 이유</b><br>
-      캔들 아래 옅은 막대가 거래량입니다. <b>가격 움직임은 거래량이 뒷받침될 때만 믿을 만합니다.</b> 거래량 없이 오른 장대양봉은 소수의 매수로 만들어진 것이라 쉽게 무너지고, 거래량 터지며 나온 장대음봉은 큰손이 빠져나가는 신호일 수 있습니다.<br><br>
-      <b>■ 초보자 주의</b><br>
-      캔들 패턴 하나로 매매하면 안 됩니다. 캔들은 <b>"어디서(지지/저항) 어떤 모양이 나왔나"</b>로 읽어야 합니다. 지지선에서 망치형 + 거래량 증가처럼 <b>세 가지가 겹칠 때</b>만 신호로 취급하고, 하나만 보고 판단하지 마세요. 그리고 이 앱의 목적대로 — 하루 캔들보다 <b>10년 낙폭 표</b>가 훨씬 중요합니다.
+      <b>주의:</b> 이 표는 지나고 나서야 알 수 있는 저점을 기준으로 합니다. 실시간으로 바닥을 맞힐 수 있다는 뜻이 아니라, <b>공포 구간에서 팔면 무엇을 놓치는지</b>를 보여주는 자료로 읽으세요.
     </div></details>
-  </div>
-
-  <div class="card hidden" id="fundCard">
-    <h2>기업 정보 & 투자지표 <small>가격 뒤에 있는 회사의 실체 · 국내·해외 모두 지원 (투자자 매매동향·업종 비교는 국내만)</small></h2>
-    <div id="fundStatus" style="font-size:12px;color:var(--sub);line-height:1.8"></div>
-    <div id="fundBody" class="hidden">
-      <h3 style="margin-top:4px">시세 <small>국내 종목은 네이버 기준, 해외 종목은 최근 종가 기준</small></h3>
-      <div id="fundQuote" class="row"></div>
-      <h3>투자지표 <small>마우스를 올리거나 길게 누르면 뜻이 뜹니다</small></h3>
-      <div id="fundMetrics" class="row"></div>
-      <div id="fundConsensus" class="mentalNote"></div>
-      <h3>실적 추이
-        <button class="chip active" id="fundViewQ" style="margin-left:8px">분기</button>
-        <button class="chip" id="fundViewA">연간</button>
-      </h3>
-      <div class="tableWrap"><table id="fundFinance"></table></div>
-      <div id="fundFinanceUnit" style="font-size:11px;color:var(--sub);margin-top:6px"></div>
-      <h3>투자자별 매매동향 <small>순매수 수량(주) · 외국인·기관·개인</small></h3>
-      <div class="tableWrap"><table id="fundTrend"></table></div>
-      <div id="fundSource" style="font-size:11px;color:var(--sub);margin-top:8px"></div>
-    </div>
-    <details class="howto"><summary>학습 가이드 — ROE · PER · PBR · EV/EBITDA를 초보자가 읽는 법</summary><div class="body">
-      네 지표는 전부 <b>"이 회사가 얼마나 잘 벌고, 그 대가로 시장이 얼마를 매기고 있나"</b>를 묻는 질문입니다. 하나씩 일상 언어로 풀면 이렇습니다.<br><br>
-      <b>■ ROE (자기자본이익률) — "내 돈으로 몇 % 벌었나"</b><br>
-      순이익 ÷ 자기자본. 주주가 맡긴 돈 100원으로 1년에 15원을 벌면 ROE 15%입니다. <b>이 회사가 장사를 잘하는지 보는 첫 번째 숫자</b>입니다.
-      관례상 <b>15% 이상 우수, 8~15% 양호, 그 아래는 낮음</b>으로 봅니다. 워런 버핏이 가장 중시하는 지표로 유명하죠.
-      <b>함정:</b> 빚을 많이 내면 자기자본이 작아져 ROE가 높아 보입니다. 그래서 <b>부채비율</b>과 반드시 같이 보세요. 부채비율이 200%를 넘는데 ROE만 높으면 위험 신호입니다.<br><br>
-      <b>■ PER (주가수익비율) — "버는 돈의 몇 년치 가격인가"</b><br>
-      주가 ÷ 주당순이익(EPS). PER 10이면 지금 이익이 유지될 때 <b>10년이면 투자금을 회수</b>한다는 뜻입니다. 낮을수록 "싸다", 높을수록 "비싸다"고 말합니다.
-      <b>그런데 절대 기준은 없습니다.</b> 성장이 빠른 회사는 미래 이익을 당겨와 PER 30~50이 정상이고, 성장이 멈춘 회사는 PER 5도 비쌀 수 있습니다.
-      그래서 <b>같은 업종끼리</b> 비교하고(위 배지에 업종 PER 표시), <b>추정 PER</b>(내년 이익 전망 기준)과 함께 봐야 합니다.
-      <b>함정:</b> 이익이 줄어드는 회사는 PER이 낮아 보입니다(저PER 트랩). "PER 5인데 왜 아무도 안 사지?" 싶으면 이익이 곧 줄어들 거라고 시장이 보는 겁니다. 적자면 PER 자체가 계산되지 않습니다.<br><br>
-      <b>■ PBR (주가순자산비율) — "회사 재산의 몇 배 가격인가"</b><br>
-      주가 ÷ 주당순자산(BPS). 회사가 가진 재산(자본)을 주식 수로 나눈 것이 BPS이고, 주가가 그 몇 배인지가 PBR입니다.
-      <b>PBR 1 미만</b>은 "회사를 통째로 사서 청산해도 남는" 가격이라는 뜻입니다. 이론상 싸지만, 실제로는 <b>그 재산으로 돈을 못 번다는 시장의 평가</b>인 경우가 많습니다.
-      은행·건설·지주회사가 만성 PBR 1 미만인 이유입니다. 반대로 PBR이 5를 넘으면 장부상 재산보다 브랜드·기술 같은 무형가치를 시장이 크게 쳐준다는 뜻입니다.
-      <b>ROE와 짝으로 보세요.</b> ROE가 높은 회사는 PBR이 높아도 정당하고, ROE가 낮은데 PBR이 낮은 건 싼 게 아니라 그럴 만한 겁니다.<br><br>
-      <b>■ EV/EBITDA — "빚까지 포함해 회사 통째 가격이 영업현금의 몇 배인가"</b><br>
-      EV(기업가치) = 시가총액 + 순차입금. EBITDA = 영업이익 + 감가상각비(현금이 안 나가는 비용을 다시 더한 것). 이 둘의 비율입니다.
-      PER은 빚을 무시하지만 EV/EBITDA는 <b>빚까지 포함해서 회사를 통째로 사는 가격</b>을 봅니다. 그래서 부채가 많은 업종(통신·에너지·항공)이나 국가 간 비교에서 PER보다 공정합니다.
-      관례상 <b>8배 미만이면 싼 편, 15배 이상이면 비싼 편</b>으로 봅니다. 실적 표에 값이 있으면 표시되고, 없으면 네이버증권 &gt; 종목분석 &gt; 투자지표에서 확인할 수 있습니다.<br><br>
-      <b>■ EPS와 BPS는 재료, PER와 PBR은 요리</b><br>
-      EPS(주당순이익)와 BPS(주당순자산)는 회사 자체의 숫자이고, 여기에 주가를 나눈 것이 PER·PBR입니다.
-      즉 <b>주가가 오르면 회사는 그대로인데 PER·PBR만 올라갑니다.</b> "PER이 높아졌다"는 말이 회사가 나빠졌다는 뜻이 아니라 <b>비싸졌다</b>는 뜻인 이유입니다.<br><br>
-      <b>■ 투자자별 매매동향 읽기</b><br>
-      외국인·기관은 정보와 자금이 많아 이들이 <b>연속으로 순매수</b>하는 종목은 뭔가 근거가 있다고 봅니다. 반대로 외국인·기관이 팔고 <b>개인만 사는</b> 종목은 조심합니다.
-      다만 하루 이틀은 의미 없고 <b>5~10일 이상 방향이 유지될 때</b>만 참고하세요. 외국인 보유율이 꾸준히 올라가는 것도 긍정 신호입니다.<br><br>
-      <b>■ 네 지표를 한 번에 읽는 순서</b><br>
-      ① <b>ROE</b>로 장사를 잘하는 회사인지 → ② <b>부채비율</b>로 빚으로 만든 ROE가 아닌지 → ③ <b>PER·PBR</b>로 그 회사를 지금 비싸게 사는 건 아닌지(업종 비교) → ④ <b>실적 추이</b>로 매출·영업이익이 늘고 있는지(전망치 포함) → ⑤ 이 앱의 <b>낙폭 표</b>로 좋은 회사라도 얼마나 흔들렸는지.
-      <b>좋은 회사와 좋은 주식은 다릅니다.</b> ROE 20%인 훌륭한 회사도 PER 60에 사면 10년을 기다려야 할 수 있습니다.
+  </div><div class="card" id="yearCard">
+    <h2>연도별 핵심 지표 <small>연초 가격 · 최고/최저 · 최대 일일 상승/하락</small></h2>
+    <div class="tableWrap"><table id="yearTable"></table></div>
+    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
+      한 해를 한 줄로 압축한 표입니다.
+      <ul>
+        <li><b>연초가</b> — 그 해 첫 거래일의 종가. 연간수익은 (그 해 마지막 종가 ÷ 연초가)로 계산합니다.</li>
+        <li><b>최고가·최저가</b> — 종가가 아니라 <b>장중 고가·저가</b> 기준이라, 연초가보다 낮은 최저가가 나올 수 있습니다.</li>
+        <li><b>최대 일일상승/하락</b> — 그 해에 하루 만에 움직인 가장 큰 폭입니다.</li>
+      </ul>
+      <b>이렇게 쓰세요:</b> 연간수익이 플러스인 해에도 최저가는 한참 아래인 경우가 흔합니다. <b>결과가 좋았던 해에도 도중에는 무서웠다</b>는 사실을 확인하는 표입니다.
     </div></details>
-  </div>
-
-  <div class="card hidden" id="metricsCard">
-    <h2>전문가 지표 <small>증권사 리포트와 전문가들이 보는 숫자들</small></h2>
-    <div class="row" style="margin-bottom:10px">
-      <label class="opt">무위험 수익률(연)
-        <input id="rfRate" type="number" step="0.1" value="3.0" style="width:80px;margin-left:4px">%
-      </label>
-      <span style="font-size:11px;color:var(--sub)">— 샤프·소르티노 계산 기준. "아무 위험 없이 받을 수 있는 이자"로, 보통 1년 예금금리나 국채금리(한국 3%대, 미국 4%대 수준)를 넣습니다.</span>
-    </div>
-    <div id="metricsBadges" class="row"></div>
-    <div id="metricsNote" class="mentalNote"></div>
-    <details class="howto"><summary>학습 가이드 — 이 지표들을 전문가처럼 읽는 법</summary><div class="body">
-      <b>■ RSI (상대강도지수, 14일)</b><br>
-      최근 14거래일 동안 오른 폭과 내린 폭의 비율입니다. <b>70 이상이면 과열</b>(단기간 급하게 올랐다),
-      <b>30 이하면 침체</b>(급하게 떨어졌다)로 읽습니다. 주의: 과열이 곧 하락 신호는 아닙니다.
-      강한 상승장에서는 RSI가 70 위에 몇 달씩 머물기도 합니다. "RSI 30 이하 = 매수"처럼 기계적으로 쓰면 떨어지는 칼을 잡게 됩니다.
-      전문가들은 방향 판단이 아니라 <b>"지금 시장이 얼마나 한쪽으로 쏠려 있는가"를 재는 온도계</b>로 씁니다.<br><br>
-
-      <b>■ 이동평균선 (20/60/240일)</b><br>
-      최근 N일 종가의 평균을 이은 선입니다. 차트에서 켜 보세요. 20일선은 약 1개월(단기 추세),
-      60일선은 약 3개월(중기), 240일선은 약 1년(장기 추세)입니다.
-      주가가 240일선 <b>위</b>에 있으면 장기 상승 추세, <b>아래</b>면 하락 추세로 보는 것이 관례입니다.
-      <b>240일선 이격</b>은 최근 종가가 이 선에서 얼마나 떨어져 있는지로, 이격이 크게 벌어지면(±20% 이상)
-      평균으로 되돌아가려는 힘이 커진다고 봅니다. 다만 이것도 확률적 경향이지 법칙이 아닙니다.<br><br>
-
-      <b>■ 52주 최고/최저 대비</b><br>
-      뉴스에서 "52주 신고가"라고 부르는 그 지표입니다. 최고가 대비 -5% 이내면 신고가 부근,
-      -30% 아래면 깊은 조정 중입니다. 이 앱의 Drawdown 표와 함께 보면 지금 위치가 과거 어떤 국면과 비슷한지 가늠할 수 있습니다.<br><br>
-
-      <b>■ 샤프 비율 (Sharpe Ratio)</b><br>
-      <b>"감수한 위험 1단위당 얼마나 벌었나"</b>입니다. (연수익률 − 무위험수익률) ÷ 연변동성으로 계산합니다.
-      수익률이 같아도 덜 흔들리면서 벌었으면 샤프가 높습니다. 관례상 <b>1 이상이면 우수, 0.5~1 양호, 0 미만이면
-      예금보다 못한 장사</b>였다는 뜻입니다. 펀드·ETF를 고를 때 수익률 대신 이걸 비교하는 것이 전문가들의 기본기입니다.<br><br>
-
-      <b>■ 소르티노 비율 (Sortino Ratio)</b><br>
-      샤프의 개선판입니다. 샤프는 위로 튀는 변동까지 "위험"으로 벌점을 주지만, 투자자가 실제로 두려워하는 건
-      하락뿐이므로 소르티노는 <b>하락 변동성만 분모</b>에 넣습니다. 급등이 잦은 자산은 샤프보다 소르티노가 높게 나옵니다.<br><br>
-
-      <b>■ MDD (Maximum Drawdown, 최대 낙폭)</b><br>
-      이 앱 전체의 중심 지표입니다. 고점에서 저점까지 가장 깊이 빠진 폭으로, <b>이 자산을 들고 가려면 견뎌야 했던
-      최대 고통</b>입니다. 전문가들이 전략을 평가할 때 수익률보다 먼저 보는 숫자이며,
-      "CAGR ÷ MDD"(칼마 비율 — 낙폭 1%를 감수할 때 연 몇 %를 벌었나)로 전략의 효율을 재기도 합니다. 내가 견딜 수 있는 MDD를 먼저 정하고
-      그 안에서 자산을 고르는 것이 순서입니다.<br><br>
-
-      <b>■ PER / PBR — 보는 법</b><br>
-      <b>PER(주가수익비율)</b> = 시가총액 ÷ 연간 순이익. "이 회사가 버는 돈의 몇 년치 가격에 거래되나"입니다.
-      PER 10이면 지금 이익이 유지될 때 본전까지 10년. 낮을수록 싸다고 말하지만, <b>이익이 줄어드는 회사는
-      PER이 낮아 보이는 함정</b>(저PER 트랩)이 있고, 성장주는 미래 이익을 당겨와 PER이 높게 형성됩니다.
-      같은 업종끼리 비교해야 의미가 있습니다.<br>
-      <b>PBR(주가순자산비율)</b> = 시가총액 ÷ 순자산(자본). PBR 1 미만은 "회사를 통째로 사서 청산해도 남는" 가격이라는
-      뜻이지만, 실제로는 그 자산의 질이 나쁘거나 수익성이 낮다는 시장의 평가인 경우가 많습니다.
-      은행·지주회사가 만성적으로 PBR 1 미만인 이유입니다.<br>
-      이 두 지표는 아래 <b>기업 정보 & 투자지표</b> 카드에 나옵니다(국내·해외 모두). 그 카드의 학습 가이드에 더 자세한 해석법이 있으니,
-      이 카드의 가격 분석과 <b>교차로</b> 보시면 됩니다:
-      가격이 반토막 났는데 PER도 역사적 저점이라면 근거 있는 관심, 가격은 쌌는데 이익이 더 빨리 줄어 PER이 오히려
-      높아졌다면 싼 게 아닙니다.<br><br>
-
-      <b>■ 종합하는 법</b><br>
-      전문가들은 지표 하나로 판단하지 않습니다. 이 앱 기준으로는:
-      ① 인사이트 탭에서 보유기간별 손실 확률로 <b>시간 지평</b>을 정하고
-      ② MDD로 <b>견딜 수 있는 크기</b>를 확인하고
-      ③ 샤프·변동성으로 <b>효율</b>을 비교하고
-      ④ RSI·이격도·52주 위치로 <b>지금이 쏠린 국면인지</b> 보고
-      ⑤ PER/PBR은 외부에서 확인해 <b>가격과 가치를 교차 검증</b>하는 순서입니다.
-    </div></details>
-  </div>
-
-  <div class="card" id="avgCard">
+  </div><div class="card" id="avgCard">
     <h2>내 평단가 기준 시나리오 <small>과거가 반복된다면 내 계좌는 어디까지 갈까</small></h2>
     <div class="row">
       <input id="avgPrice" type="number" step="any" placeholder="내 평단가 입력" style="width:170px">
@@ -648,59 +715,10 @@
       <b>내 환전 환율</b> — 미국 주식은 환전 시점과 매수 시점이 달라 자동 환율이 실제와 어긋납니다. 이 칸에 <b>내가 실제로 환전한 환율</b>을 넣으면 원화 평단가가 그 값으로 계산되고, 원화 환산을 켜고 끌 때도 이 환율이 쓰입니다. 비워 두면 최신 환율이 기본값으로 들어갑니다. 원화 환산이 켜진 상태라면 원화 평단가를 직접 입력해도 됩니다.<br>
       <b>주의:</b> 과거 최대 낙폭이 미래의 하한선은 아닙니다. 더 깊은 하락도 가능하며, 이 수치는 "최소한 이 정도는 각오해야 한다"는 기준선으로 쓰세요.
     </div></details>
-  </div>
-
-  <div class="card" id="yearCard">
-    <h2>연도별 핵심 지표 <small>연초 가격 · 최고/최저 · 최대 일일 상승/하락</small></h2>
-    <div class="tableWrap"><table id="yearTable"></table></div>
-    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
-      한 해를 한 줄로 압축한 표입니다.
-      <ul>
-        <li><b>연초가</b> — 그 해 첫 거래일의 종가. 연간수익은 (그 해 마지막 종가 ÷ 연초가)로 계산합니다.</li>
-        <li><b>최고가·최저가</b> — 종가가 아니라 <b>장중 고가·저가</b> 기준이라, 연초가보다 낮은 최저가가 나올 수 있습니다.</li>
-        <li><b>최대 일일상승/하락</b> — 그 해에 하루 만에 움직인 가장 큰 폭입니다.</li>
-      </ul>
-      <b>이렇게 쓰세요:</b> 연간수익이 플러스인 해에도 최저가는 한참 아래인 경우가 흔합니다. <b>결과가 좋았던 해에도 도중에는 무서웠다</b>는 사실을 확인하는 표입니다.
-    </div></details>
-  </div>
-
-  <div class="card" id="ddCard">
-    <h2>고점 대비 하락 (Drawdown) <small>10% 이상 하락한 구간과 당시 이슈</small></h2>
-    <div class="tableWrap"><table id="ddTable"></table></div>
-    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
-      전고점을 찍은 뒤 바닥까지 얼마나 빠졌고, 원래 자리로 돌아오는 데 얼마나 걸렸는지를 낙폭 순으로 정렬한 표입니다.
-      <ul>
-        <li><b>낙폭</b> — 고점 종가 대비 저점 종가의 하락률. 큰 순서로 정렬돼 있습니다.</li>
-        <li><b>📰 당시 기사</b> — 저점 전후 2주간의 기사를 네이버 뉴스 검색으로 엽니다. 그때 시장이 무엇을 두려워했는지 보면, 지금의 공포가 얼마나 흔한 종류인지 알 수 있습니다.</li>
-        <li><b>회복일</b> — 하락 전 고점 가격을 다시 넘어선 날. 아직 회복하지 못한 구간은 상태를 셋으로 나눠 보여줍니다: <span class="neg">▼ 하락 진행중</span>(최근 종가가 저점 부근), <span class="pos">△ 반등 중</span>(저점에서 올라왔지만 갈 길이 남음), <span class="pos">▲ 회복 임박</span>(전고점까지 70% 이상 회복). 저점 대비 상승폭과 전고점까지 남은 거리도 함께 표시됩니다.</li>
-        <li><b>하락기간</b> — 고점에서 저점까지 걸린 날짜. 회복까지 걸린 시간은 회복일에서 따로 확인하세요. 떨어지는 데 3개월, 회복에 3년이 걸리는 일도 흔합니다.</li>
-        <li><b>당시 이슈</b> — 그 하락~회복 구간 안에 있었던 사건들. 여러 개가 붙어 있으면 악재가 겹친 구간입니다.</li>
-      </ul>
-      <b>이렇게 쓰세요:</b> 평단가를 입력하면 오른쪽에 <span class="avgHighlight">내 평단가 적용 시</span> 열이 생깁니다. 각 하락이 지금 재현될 때 내 매수가가 도달할 가격이니, <b>미리 보고 마음의 준비를 해두는 용도</b>입니다.
-    </div></details>
-  </div>
-
-  <div class="card" id="rallyCard">
-    <h2>저점 대비 상승 (Rally) <small>바닥에서 얼마나 올랐나</small></h2>
-    <div class="tableWrap"><table id="rallyTable"></table></div>
-    <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
-      위 하락 표의 <b>정확히 반대편</b>입니다. 각 바닥에서 다음 고점까지 얼마나 올랐는지를 보여줍니다.
-      <ul>
-        <li>저점 날짜를 위 하락 표의 저점 날짜와 맞춰 보세요. <b>가장 무서웠던 날이 가장 큰 상승의 출발점</b>이었던 경우가 반복해서 나타납니다.</li>
-        <li><b>기간</b>이 길수록 그 상승을 누리려면 그만큼 들고 있어야 했다는 뜻입니다.</li>
-      </ul>
-      <b>주의:</b> 이 표는 지나고 나서야 알 수 있는 저점을 기준으로 합니다. 실시간으로 바닥을 맞힐 수 있다는 뜻이 아니라, <b>공포 구간에서 팔면 무엇을 놓치는지</b>를 보여주는 자료로 읽으세요.
-    </div></details>
-  </div>
-
-</div>
-
-</div><!-- /sub-analysis -->
-
-<div id="sub-insight" class="hidden">
-<div class="card" id="insightCard">
+  </div></div>
+<div id="sub-insight" class="subPane hidden"><div class="card" id="insightCard">
   <h2>인사이트 <small id="insTitle">위 종목의 과거 데이터로 계산한 사실들 — "오래 들고 있으면 정말 안전해지나"를 숫자로</small></h2>
-  <div id="insShortWarn" class="mentalNote hidden" style="margin-top:8px;border-color:#4a2428;background:#241618"></div>
+  <div id="insShortWarn" class="mentalNote hidden" style="margin-top:8px;border-color:#ffd8dc;background:#fff5f6"></div>
 
   <div id="insEmpty" class="mentalNote">
     먼저 <b>종목 분석</b> 화면에서 종목을 조회해 주세요. 데이터가 길수록 통계가 안정되며,
@@ -765,14 +783,14 @@
     </div></details>
 
     <h3>자동 요약 <small>위 계산에서 나온 사실만 문장으로</small></h3>
-    <div id="insSentences" style="font-size:13px;line-height:2;padding:12px 14px;background:#131a28;border:1px solid var(--line);border-radius:8px"></div>
+    <div id="insSentences" style="font-size:13px;line-height:2;padding:12px 14px;background:#f9fafb;border:1px solid var(--line);border-radius:8px"></div>
     <div class="row" style="margin-top:8px">
       <button class="chip" id="insCopy">문장 복사</button>
       <span id="insCopyMsg" style="font-size:12px;color:var(--good)"></span>
     </div>
     <textarea id="insCopySrc" class="hidden" style="width:100%;height:150px;margin-top:8px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px"></textarea>
 
-    <div class="mentalNote" style="margin-top:16px;padding:12px 14px;background:#1a1420;border:1px solid #3a2a30;border-radius:8px">
+    <div class="popSrc" data-pop="꼭 알아둘 점">
       <b style="color:var(--up)">이 탭의 통계를 믿기 전에 반드시 알아야 할 두 가지</b>
       <ul style="margin:6px 0 0 16px">
         <li><b>생존 편향</b> — 지금 조회 가능한 종목은 살아남았기 때문에 데이터가 존재합니다. 같은 기간 상장폐지되거나 사라진 회사는 애초에 계산에 들어오지 않습니다. 따라서 "버티면 회복한다"는 결론은 <b>구조적으로 낙관 쪽으로 기울어</b> 있습니다. 개별 종목일수록 이 편향이 큽니다.</li>
@@ -782,14 +800,181 @@
       여러 사례를 본 다음에 판단하는 것이, 한쪽만 보고 확신하는 것보다 낫습니다.
     </div>
   </div>
-</div>
+</div></div>
+<div id="sub-tech" class="subPane hidden"><div class="card" id="techCard">
+    <h2>기간 수익률 & 지지·저항선 <small>지금 어디쯤 왔고, 어디서 막히고 받쳐지는가</small></h2>
+    <div id="periodReturns" class="row" style="margin-bottom:12px"></div>
+    <h3 style="margin-top:6px">자동 탐지된 지지선 · 저항선</h3>
+    <div class="tableWrap"><table id="levelsTable"></table></div>
+    <div id="levelsNote" class="mentalNote"></div>
+    <details class="howto"><summary>학습 가이드 — 지지선과 저항선</summary><div class="body">
+      <b>■ 개념을 한 문장으로</b><br>
+      <b>지지선</b>은 주가가 떨어지다가 <b>여러 번 멈추고 되돌아 올라간 가격대</b>, <b>저항선</b>은 오르다가 <b>여러 번 막히고 되돌아 내려온 가격대</b>입니다.
+      그 가격에서 "이 정도면 싸다"고 사는 사람들(지지)과 "이 정도면 팔자"는 사람들(저항)이 반복해서 나타났다는 흔적입니다.<br><br>
+      <b>■ 이 앱이 찾는 방법</b><br>
+      최근 250거래일(약 1년)에서 좌우 6일 안에 가장 높았던 날(스윙 고점)과 가장 낮았던 날(스윙 저점)을 전부 찾고, 서로 1.5% 안에 있는 것들을 하나의 가격대로 묶습니다.
+      <b>터치 횟수</b>가 많을수록 시장이 그 가격을 여러 번 "의식"했다는 뜻이라 신뢰도가 높습니다. 위 차트에서 <b>지지/저항선</b>을 켜면 점선으로 겹쳐 보입니다.<br><br>
+      <b>■ 초보자가 실제로 쓰는 법</b><br>
+      <ul>
+        <li><b>지지선 근처에서 산다</b> — 떨어지다 멈출 확률이 다른 곳보다 높기 때문입니다. 단, 지지선이 <b>깨지면</b>(종가가 지지선 아래로 마감) 그 아래 다음 지지선까지 열려 있다고 봅니다. 그래서 "지지선 살짝 아래에 손절선"을 두는 것이 정석입니다.</li>
+        <li><b>저항선 근처에서는 추격매수하지 않는다</b> — 막힐 확률이 높은 곳입니다. 저항선을 <b>돌파하면</b>(거래량 동반 종가 마감) 그 저항선은 새로운 지지선이 됩니다. 뚫린 천장이 바닥이 되는 셈이라 '역할 전환'이라 부릅니다.</li>
+        <li><b>터치 횟수 1회짜리는 참고만</b> — 우연일 수 있습니다. 2~3회 이상이 의미 있습니다.</li>
+      </ul>
+      <b>■ 함정</b><br>
+      지지·저항은 <b>확률적 경향</b>이지 벽이 아닙니다. 실적 발표나 큰 뉴스 앞에서는 쉽게 뚫립니다. 그리고 많은 사람이 같은 선을 보고 있어서 <b>"지지선 살짝 아래까지 찔렀다가 급반등"</b>(손절 물량 털기)이 자주 일어납니다. 지지선을 0.5~1% 깨졌다고 바로 팔지 말고 <b>종가 기준</b>으로 판단하세요.<br>
+      <b>52주 최저·최고, 이동평균선(240일선)</b>도 사실상 지지·저항으로 작용하는 경우가 많으니 아래 전문가 지표와 함께 보세요.
+    </div></details>
+  </div><div class="card hidden" id="candleCard">
+    <h2>캔들 차트 <small>최근 흐름을 하루 단위로 읽기</small></h2>
+    <div class="row" style="margin-bottom:8px">
+      <select id="candleDays">
+        <option value="60">최근 60일</option>
+        <option value="120" selected>최근 120일</option>
+        <option value="250">최근 250일</option>
+      </select>
+      <span class="chartCtrl" id="candleChartCtrl" data-canvas="candleChart" style="margin:0"></span>
+      <span style="font-size:11px;color:var(--sub)"><span style="color:var(--up)">■</span> 양봉(종가&gt;시가) <span style="color:var(--down)">■</span> 음봉(종가&lt;시가) · 주황선 20일 이동평균 · 아래 옅은 막대 거래량</span>
+    </div>
+    <div class="chartWrap"><canvas id="candleChart"></canvas></div>
+    <div id="candleRecent" class="row" style="margin-top:10px"></div>
+    <details class="howto"><summary>학습 가이드 — 캔들 보는 법</summary><div class="body">
+      <b>■ 캔들 하나가 담는 정보 4가지</b><br>
+      캔들 하나 = 하루입니다. <b>몸통</b>(두꺼운 부분)의 위아래 끝이 <b>시가와 종가</b>, <b>꼬리</b>(가는 선)의 끝이 그날 <b>최고가와 최저가</b>입니다.
+      한국에서는 종가가 시가보다 높으면 <span style="color:var(--up)"><b>빨간 양봉</b></span>, 낮으면 <span style="color:var(--down)"><b>파란 음봉</b></span>입니다. (미국은 초록/빨강으로 반대라 해외 차트 볼 때 주의)<br><br>
+      <b>■ 몸통과 꼬리로 읽는 심리</b><br>
+      <ul>
+        <li><b>몸통이 길다</b> = 하루 종일 한 방향으로 밀렸다. 장대양봉은 강한 매수, 장대음봉은 강한 매도. 특히 <b>거래량이 함께 크면</b> 진짜 힘이 실린 것입니다.</li>
+        <li><b>몸통이 거의 없다 (도지)</b> = 시가≈종가. 사려는 힘과 팔려는 힘이 팽팽했다는 뜻. 추세 끝에 나오면 방향 전환 신호로 봅니다.</li>
+        <li><b>아래꼬리가 길다 (망치형)</b> = 장중에 크게 떨어졌다가 <b>다시 끌어올렸다</b>. 하락 끝에 나오면 "여기서 사는 사람이 있다"는 신호. 위 지지선과 겹치면 더 의미 있습니다.</li>
+        <li><b>윗꼬리가 길다 (유성형)</b> = 장중에 크게 올랐다가 <b>밀려 내려왔다</b>. 상승 끝에 나오면 "여기선 파는 사람이 많다"는 신호. 저항선과 겹치면 더 의미 있습니다.</li>
+      </ul>
+      차트 위에 마우스를 올리면 그날의 시·고·저·종가와 <b>모양 판정</b>이 뜹니다. 아래 배지는 최근 5일 요약입니다.<br><br>
+      <b>■ 거래량을 함께 보는 이유</b><br>
+      캔들 아래 옅은 막대가 거래량입니다. <b>가격 움직임은 거래량이 뒷받침될 때만 믿을 만합니다.</b> 거래량 없이 오른 장대양봉은 소수의 매수로 만들어진 것이라 쉽게 무너지고, 거래량 터지며 나온 장대음봉은 큰손이 빠져나가는 신호일 수 있습니다.<br><br>
+      <b>■ 초보자 주의</b><br>
+      캔들 패턴 하나로 매매하면 안 됩니다. 캔들은 <b>"어디서(지지/저항) 어떤 모양이 나왔나"</b>로 읽어야 합니다. 지지선에서 망치형 + 거래량 증가처럼 <b>세 가지가 겹칠 때</b>만 신호로 취급하고, 하나만 보고 판단하지 마세요. 그리고 이 앱의 목적대로 — 하루 캔들보다 <b>10년 낙폭 표</b>가 훨씬 중요합니다.
+    </div></details>
+  </div><div class="card hidden" id="metricsCard">
+    <h2>전문가 지표 <small>증권사 리포트와 전문가들이 보는 숫자들</small></h2>
+    <div class="row" style="margin-bottom:10px">
+      <label class="opt">무위험 수익률(연)
+        <input id="rfRate" type="number" step="0.1" value="3.0" style="width:80px;margin-left:4px">%
+      </label>
+      <span style="font-size:11px;color:var(--sub)">— 샤프·소르티노 계산 기준. "아무 위험 없이 받을 수 있는 이자"로, 보통 1년 예금금리나 국채금리(한국 3%대, 미국 4%대 수준)를 넣습니다.</span>
+    </div>
+    <div id="metricsBadges" class="row"></div>
+    <div id="metricsNote" class="mentalNote"></div>
+    <details class="howto"><summary>학습 가이드 — 이 지표들을 전문가처럼 읽는 법</summary><div class="body">
+      <b>■ RSI (상대강도지수, 14일)</b><br>
+      최근 14거래일 동안 오른 폭과 내린 폭의 비율입니다. <b>70 이상이면 과열</b>(단기간 급하게 올랐다),
+      <b>30 이하면 침체</b>(급하게 떨어졌다)로 읽습니다. 주의: 과열이 곧 하락 신호는 아닙니다.
+      강한 상승장에서는 RSI가 70 위에 몇 달씩 머물기도 합니다. "RSI 30 이하 = 매수"처럼 기계적으로 쓰면 떨어지는 칼을 잡게 됩니다.
+      전문가들은 방향 판단이 아니라 <b>"지금 시장이 얼마나 한쪽으로 쏠려 있는가"를 재는 온도계</b>로 씁니다.<br><br>
 
-</div><!-- /sub-insight -->
+      <b>■ 이동평균선 (20/60/240일)</b><br>
+      최근 N일 종가의 평균을 이은 선입니다. 차트에서 켜 보세요. 20일선은 약 1개월(단기 추세),
+      60일선은 약 3개월(중기), 240일선은 약 1년(장기 추세)입니다.
+      주가가 240일선 <b>위</b>에 있으면 장기 상승 추세, <b>아래</b>면 하락 추세로 보는 것이 관례입니다.
+      <b>240일선 이격</b>은 최근 종가가 이 선에서 얼마나 떨어져 있는지로, 이격이 크게 벌어지면(±20% 이상)
+      평균으로 되돌아가려는 힘이 커진다고 봅니다. 다만 이것도 확률적 경향이지 법칙이 아닙니다.<br><br>
+
+      <b>■ 52주 최고/최저 대비</b><br>
+      뉴스에서 "52주 신고가"라고 부르는 그 지표입니다. 최고가 대비 -5% 이내면 신고가 부근,
+      -30% 아래면 깊은 조정 중입니다. 이 앱의 Drawdown 표와 함께 보면 지금 위치가 과거 어떤 국면과 비슷한지 가늠할 수 있습니다.<br><br>
+
+      <b>■ 샤프 비율 (Sharpe Ratio)</b><br>
+      <b>"감수한 위험 1단위당 얼마나 벌었나"</b>입니다. (연수익률 − 무위험수익률) ÷ 연변동성으로 계산합니다.
+      수익률이 같아도 덜 흔들리면서 벌었으면 샤프가 높습니다. 관례상 <b>1 이상이면 우수, 0.5~1 양호, 0 미만이면
+      예금보다 못한 장사</b>였다는 뜻입니다. 펀드·ETF를 고를 때 수익률 대신 이걸 비교하는 것이 전문가들의 기본기입니다.<br><br>
+
+      <b>■ 소르티노 비율 (Sortino Ratio)</b><br>
+      샤프의 개선판입니다. 샤프는 위로 튀는 변동까지 "위험"으로 벌점을 주지만, 투자자가 실제로 두려워하는 건
+      하락뿐이므로 소르티노는 <b>하락 변동성만 분모</b>에 넣습니다. 급등이 잦은 자산은 샤프보다 소르티노가 높게 나옵니다.<br><br>
+
+      <b>■ MDD (Maximum Drawdown, 최대 낙폭)</b><br>
+      이 앱 전체의 중심 지표입니다. 고점에서 저점까지 가장 깊이 빠진 폭으로, <b>이 자산을 들고 가려면 견뎌야 했던
+      최대 고통</b>입니다. 전문가들이 전략을 평가할 때 수익률보다 먼저 보는 숫자이며,
+      "CAGR ÷ MDD"(칼마 비율 — 낙폭 1%를 감수할 때 연 몇 %를 벌었나)로 전략의 효율을 재기도 합니다. 내가 견딜 수 있는 MDD를 먼저 정하고
+      그 안에서 자산을 고르는 것이 순서입니다.<br><br>
+
+      <b>■ PER / PBR — 보는 법</b><br>
+      <b>PER(주가수익비율)</b> = 시가총액 ÷ 연간 순이익. "이 회사가 버는 돈의 몇 년치 가격에 거래되나"입니다.
+      PER 10이면 지금 이익이 유지될 때 본전까지 10년. 낮을수록 싸다고 말하지만, <b>이익이 줄어드는 회사는
+      PER이 낮아 보이는 함정</b>(저PER 트랩)이 있고, 성장주는 미래 이익을 당겨와 PER이 높게 형성됩니다.
+      같은 업종끼리 비교해야 의미가 있습니다.<br>
+      <b>PBR(주가순자산비율)</b> = 시가총액 ÷ 순자산(자본). PBR 1 미만은 "회사를 통째로 사서 청산해도 남는" 가격이라는
+      뜻이지만, 실제로는 그 자산의 질이 나쁘거나 수익성이 낮다는 시장의 평가인 경우가 많습니다.
+      은행·지주회사가 만성적으로 PBR 1 미만인 이유입니다.<br>
+      이 두 지표는 아래 <b>기업 정보 & 투자지표</b> 카드에 나옵니다(국내·해외 모두). 그 카드의 학습 가이드에 더 자세한 해석법이 있으니,
+      이 카드의 가격 분석과 <b>교차로</b> 보시면 됩니다:
+      가격이 반토막 났는데 PER도 역사적 저점이라면 근거 있는 관심, 가격은 쌌는데 이익이 더 빨리 줄어 PER이 오히려
+      높아졌다면 싼 게 아닙니다.<br><br>
+
+      <b>■ 종합하는 법</b><br>
+      전문가들은 지표 하나로 판단하지 않습니다. 이 앱 기준으로는:
+      ① 인사이트 탭에서 보유기간별 손실 확률로 <b>시간 지평</b>을 정하고
+      ② MDD로 <b>견딜 수 있는 크기</b>를 확인하고
+      ③ 샤프·변동성으로 <b>효율</b>을 비교하고
+      ④ RSI·이격도·52주 위치로 <b>지금이 쏠린 국면인지</b> 보고
+      ⑤ PER/PBR은 외부에서 확인해 <b>가격과 가치를 교차 검증</b>하는 순서입니다.
+    </div></details>
+  </div></div>
+<div id="sub-company" class="subPane hidden"><div class="card hidden" id="fundCard">
+    <h2>기업 정보 & 투자지표 <small>가격 뒤에 있는 회사의 실체 · 국내·해외 모두 지원 (투자자 매매동향·업종 비교는 국내만)</small></h2>
+    <div id="fundStatus" style="font-size:12px;color:var(--sub);line-height:1.8"></div>
+    <div id="fundBody" class="hidden">
+      <h3 style="margin-top:4px">시세 <small>국내 종목은 네이버 기준, 해외 종목은 최근 종가 기준</small></h3>
+      <div id="fundQuote" class="row"></div>
+      <h3>투자지표 <small>마우스를 올리거나 길게 누르면 뜻이 뜹니다</small></h3>
+      <div id="fundMetrics" class="row"></div>
+      <div id="fundConsensus" class="mentalNote"></div>
+      <h3>실적 추이
+        <button class="chip active" id="fundViewQ" style="margin-left:8px">분기</button>
+        <button class="chip" id="fundViewA">연간</button>
+      </h3>
+      <div class="tableWrap"><table id="fundFinance"></table></div>
+      <div id="fundFinanceUnit" style="font-size:11px;color:var(--sub);margin-top:6px"></div>
+      <h3>투자자별 매매동향 <small>순매수 수량(주) · 외국인·기관·개인</small></h3>
+      <div class="tableWrap"><table id="fundTrend"></table></div>
+      <div id="fundSource" style="font-size:11px;color:var(--sub);margin-top:8px"></div>
+    </div>
+    <details class="howto"><summary>학습 가이드 — ROE · PER · PBR · EV/EBITDA를 초보자가 읽는 법</summary><div class="body">
+      네 지표는 전부 <b>"이 회사가 얼마나 잘 벌고, 그 대가로 시장이 얼마를 매기고 있나"</b>를 묻는 질문입니다. 하나씩 일상 언어로 풀면 이렇습니다.<br><br>
+      <b>■ ROE (자기자본이익률) — "내 돈으로 몇 % 벌었나"</b><br>
+      순이익 ÷ 자기자본. 주주가 맡긴 돈 100원으로 1년에 15원을 벌면 ROE 15%입니다. <b>이 회사가 장사를 잘하는지 보는 첫 번째 숫자</b>입니다.
+      관례상 <b>15% 이상 우수, 8~15% 양호, 그 아래는 낮음</b>으로 봅니다. 워런 버핏이 가장 중시하는 지표로 유명하죠.
+      <b>함정:</b> 빚을 많이 내면 자기자본이 작아져 ROE가 높아 보입니다. 그래서 <b>부채비율</b>과 반드시 같이 보세요. 부채비율이 200%를 넘는데 ROE만 높으면 위험 신호입니다.<br><br>
+      <b>■ PER (주가수익비율) — "버는 돈의 몇 년치 가격인가"</b><br>
+      주가 ÷ 주당순이익(EPS). PER 10이면 지금 이익이 유지될 때 <b>10년이면 투자금을 회수</b>한다는 뜻입니다. 낮을수록 "싸다", 높을수록 "비싸다"고 말합니다.
+      <b>그런데 절대 기준은 없습니다.</b> 성장이 빠른 회사는 미래 이익을 당겨와 PER 30~50이 정상이고, 성장이 멈춘 회사는 PER 5도 비쌀 수 있습니다.
+      그래서 <b>같은 업종끼리</b> 비교하고(위 배지에 업종 PER 표시), <b>추정 PER</b>(내년 이익 전망 기준)과 함께 봐야 합니다.
+      <b>함정:</b> 이익이 줄어드는 회사는 PER이 낮아 보입니다(저PER 트랩). "PER 5인데 왜 아무도 안 사지?" 싶으면 이익이 곧 줄어들 거라고 시장이 보는 겁니다. 적자면 PER 자체가 계산되지 않습니다.<br><br>
+      <b>■ PBR (주가순자산비율) — "회사 재산의 몇 배 가격인가"</b><br>
+      주가 ÷ 주당순자산(BPS). 회사가 가진 재산(자본)을 주식 수로 나눈 것이 BPS이고, 주가가 그 몇 배인지가 PBR입니다.
+      <b>PBR 1 미만</b>은 "회사를 통째로 사서 청산해도 남는" 가격이라는 뜻입니다. 이론상 싸지만, 실제로는 <b>그 재산으로 돈을 못 번다는 시장의 평가</b>인 경우가 많습니다.
+      은행·건설·지주회사가 만성 PBR 1 미만인 이유입니다. 반대로 PBR이 5를 넘으면 장부상 재산보다 브랜드·기술 같은 무형가치를 시장이 크게 쳐준다는 뜻입니다.
+      <b>ROE와 짝으로 보세요.</b> ROE가 높은 회사는 PBR이 높아도 정당하고, ROE가 낮은데 PBR이 낮은 건 싼 게 아니라 그럴 만한 겁니다.<br><br>
+      <b>■ EV/EBITDA — "빚까지 포함해 회사 통째 가격이 영업현금의 몇 배인가"</b><br>
+      EV(기업가치) = 시가총액 + 순차입금. EBITDA = 영업이익 + 감가상각비(현금이 안 나가는 비용을 다시 더한 것). 이 둘의 비율입니다.
+      PER은 빚을 무시하지만 EV/EBITDA는 <b>빚까지 포함해서 회사를 통째로 사는 가격</b>을 봅니다. 그래서 부채가 많은 업종(통신·에너지·항공)이나 국가 간 비교에서 PER보다 공정합니다.
+      관례상 <b>8배 미만이면 싼 편, 15배 이상이면 비싼 편</b>으로 봅니다. 실적 표에 값이 있으면 표시되고, 없으면 네이버증권 &gt; 종목분석 &gt; 투자지표에서 확인할 수 있습니다.<br><br>
+      <b>■ EPS와 BPS는 재료, PER와 PBR은 요리</b><br>
+      EPS(주당순이익)와 BPS(주당순자산)는 회사 자체의 숫자이고, 여기에 주가를 나눈 것이 PER·PBR입니다.
+      즉 <b>주가가 오르면 회사는 그대로인데 PER·PBR만 올라갑니다.</b> "PER이 높아졌다"는 말이 회사가 나빠졌다는 뜻이 아니라 <b>비싸졌다</b>는 뜻인 이유입니다.<br><br>
+      <b>■ 투자자별 매매동향 읽기</b><br>
+      외국인·기관은 정보와 자금이 많아 이들이 <b>연속으로 순매수</b>하는 종목은 뭔가 근거가 있다고 봅니다. 반대로 외국인·기관이 팔고 <b>개인만 사는</b> 종목은 조심합니다.
+      다만 하루 이틀은 의미 없고 <b>5~10일 이상 방향이 유지될 때</b>만 참고하세요. 외국인 보유율이 꾸준히 올라가는 것도 긍정 신호입니다.<br><br>
+      <b>■ 네 지표를 한 번에 읽는 순서</b><br>
+      ① <b>ROE</b>로 장사를 잘하는 회사인지 → ② <b>부채비율</b>로 빚으로 만든 ROE가 아닌지 → ③ <b>PER·PBR</b>로 그 회사를 지금 비싸게 사는 건 아닌지(업종 비교) → ④ <b>실적 추이</b>로 매출·영업이익이 늘고 있는지(전망치 포함) → ⑤ 이 앱의 <b>낙폭 표</b>로 좋은 회사라도 얼마나 흔들렸는지.
+      <b>좋은 회사와 좋은 주식은 다릅니다.</b> ROE 20%인 훌륭한 회사도 PER 60에 사면 10년을 기다려야 할 수 있습니다.
+    </div></details>
+  </div></div>
+
 </div><!-- /tab-single -->
 
 <div id="tab-compare" class="hidden">
 <div class="card" id="compareCard">
-  <h2>장바구니 비교 <small>내 종목이 무너질 때 무엇이 버텼는가 — 헷지자산 탐색</small></h2>
+  <h2>종목 비교 <small>내 종목이 무너질 때 무엇이 버텼는가 — 헷지자산 탐색</small></h2>
   <div class="row">
     <div id="cmpSearchBox">
       <input id="cmpInput" placeholder="비교할 종목 추가 (예: 금, 미국채20년, 달러)" autocomplete="off">
@@ -919,7 +1104,7 @@
 </div><!-- /tab-compare -->
 
 <div id="tab-sim" class="hidden">
-<div class="subTabs show" id="pfModeTabs" style="padding-top:0;margin-bottom:10px">
+<div class="pills" id="pfModeTabs">
   <button data-pm="hold" class="active">내 보유 현황</button>
   <button data-pm="sim">과거 시뮬레이션</button>
 </div>
@@ -933,16 +1118,17 @@
   <div id="hInsight" class="mentalNote" style="margin-top:10px"></div>
 
   <div id="hChartWrap" class="hidden" style="margin-top:12px">
-    <h3>평가금액과 투입 원금 <small>점선(원금) 위로 노란선이 있으면 이익 구간</small></h3>
+    <h3>평가금액과 투입 원금 <small>점선(원금) 위로 파란 선이 있으면 이익</small></h3>
     <div class="chartCtrl" id="hChartCtrl" data-canvas="hChart"></div>
     <div class="chartWrap"><canvas id="hChart"></canvas></div>
   </div>
 
   <div class="row" style="margin-top:10px">
+    <button class="primary" id="hAddOpen">＋ 기록 추가</button>
     <button class="chip" id="hToSim" title="지금 보유 구성을 금액 그대로 시뮬레이터로 옮겨, 과거에 이 구성이었다면 어땠을지 봅니다">📊 이 구성으로 과거 시뮬레이션</button>
   </div>
 
-  <details id="hDetails" class="howto" style="margin-top:12px"><summary>매수·매도 기록 추가</summary><div class="body">
+  <div class="popSrc" id="hDetails" data-pop="매수·매도 기록" data-popid="hDetails">
     <div class="hForm">
       <div id="hSymBox" style="position:relative;flex:1 1 220px">
         <label class="hLbl">종목</label>
@@ -973,7 +1159,7 @@
       <button class="chip" id="hDcaBtn" style="margin-top:8px">정기 매수 기록 만들기</button>
     </div>
     <div id="hFormMsg" style="font-size:12px;margin-top:8px;line-height:1.6"></div>
-  </div></details>
+  </div>
 
   <details class="howto"><summary>이 화면 읽는 법</summary><div class="body">
     <ul>
@@ -990,9 +1176,7 @@
 
 <div class="card hidden" id="simCard">
   <h2>과거 시뮬레이션 <small>이 구성이었다면 과거에 어땠을까 — 비중을 나눠 대입하고 결과를 학습</small></h2>
-  <div class="mentalNote" style="margin-top:0;margin-bottom:10px">
-    <b>장바구니 비교</b> 탭의 종목을 그대로 사용합니다. 종목을 바꾸려면 그 탭에서 담거나 빼세요.
-  </div>
+  <div class="noteLine"><b>비교</b> 탭의 장바구니 종목을 그대로 씁니다.<span style="display:none"> </span></div>
   <div id="simAssets"></div>
   <div class="row" style="margin-top:10px">
     <button class="chip" id="simEqual">균등 분배</button>
@@ -1023,7 +1207,7 @@
   <div id="simStatus"></div>
 
   <div id="simBody" class="hidden">
-    <div id="simDesc" style="margin-top:14px;padding:12px 14px;background:#131a28;border:1px solid var(--line);border-radius:8px;font-size:13px;line-height:1.9"></div>
+    <div id="simDesc" style="margin-top:14px;padding:12px 14px;background:#f9fafb;border:1px solid var(--line);border-radius:8px;font-size:13px;line-height:1.9"></div>
     <div id="simWarn" style="font-size:12px;color:var(--up);line-height:1.8;margin-top:8px"></div>
     <div id="simBadges" class="row" style="margin-top:12px"></div>
     <details class="howto"><summary>위 숫자들이 각각 무슨 뜻인가요?</summary><div class="body">
@@ -1051,8 +1235,8 @@
     <details class="howto"><summary>이 차트 읽는 법</summary><div class="body">
       설정한 비중대로 실제 투자했다면 계좌가 어떻게 움직였을지를 그린 그래프입니다.
       <ul>
-        <li><b>굵은 노란 선</b>이 내 포트폴리오입니다. <b>회색 굵은 점선</b>은 같은 비중으로 시작만 하고 <b>한 번도 리밸런싱하지 않은 경우</b>로, 두 선의 벌어짐이 곧 리밸런싱이 만든 차이입니다.</li>
-        <li><b>가는 점선(계단 모양)</b>이 <b>누적 투입원금</b>입니다. 매월 추가금을 넣도록 설정했을 때만 나타나며, 매달 한 칸씩 올라가는 계단이 곧 그달의 추가 매수입니다. <b>노란 선이 이 점선보다 위에 있으면 이익, 아래면 손실</b>입니다. 추가금을 0으로 두면 이 선은 사라지고 초기 투자금 한 번만 넣은 것이 됩니다.</li>
+        <li><b>굵은 파란 선</b>이 내 포트폴리오입니다. <b>회색 굵은 점선</b>은 같은 비중으로 시작만 하고 <b>한 번도 리밸런싱하지 않은 경우</b>로, 두 선의 벌어짐이 곧 리밸런싱이 만든 차이입니다.</li>
+        <li><b>가는 점선(계단 모양)</b>이 <b>누적 투입원금</b>입니다. 매월 추가금을 넣도록 설정했을 때만 나타나며, 매달 한 칸씩 올라가는 계단이 곧 그달의 추가 매수입니다. <b>파란 선이 이 점선보다 위에 있으면 이익, 아래면 손실</b>입니다. 추가금을 0으로 두면 이 선은 사라지고 초기 투자금 한 번만 넣은 것이 됩니다.</li>
         <li><b>개별 자산 100% 곡선</b>을 켜면 "한 종목에 몰빵했다면"과 비교됩니다. 포트폴리오 선이 최고 자산보다 낮은 건 정상이며, <b>대신 훨씬 덜 흔들렸다</b>는 점을 아래 최대낙폭에서 확인하세요.</li>
       </ul>
       <b>핵심:</b> 이 시뮬레이터의 목적은 최고 수익 조합을 찾는 것이 아닙니다. 그건 과거를 알고 나서야 가능한 일입니다. <b>같은 하락장에서 비중에 따라 내 계좌가 얼마나 다르게 반응하는지</b>를 몸으로 익히는 것이 목적입니다.
@@ -1097,7 +1281,7 @@
       <b>이렇게 쓰세요:</b> 이 표의 낙폭이 <b>내가 실제로 견딜 수 있는 크기인지</b> 자문해 보고, 아니라면 헷지 자산 비중을 올려 다시 실행하세요. 숫자가 어떻게 바뀌는지 보는 것이 이 시뮬레이터의 핵심 사용법입니다.
     </div></details>
 
-    <div class="mentalNote" style="margin-top:16px;padding:12px 14px;background:#1a1420;border:1px solid #3a2a30;border-radius:8px">
+    <div class="popSrc" data-pop="꼭 알아둘 점">
       <b style="color:var(--up)">반드시 기억할 것</b><br>
       세금·거래비용·슬리피지(주문가와 실제 체결가의 차이)가 반영되지 않았고, 배당은 "배당 재투자" 체크를 켜야 포함됩니다. 특히 리밸런싱은 실제로는 매매수수료와 세금이 발생하므로 표에 나온 리밸런싱 이득은 <b>실전보다 과대평가된 값</b>입니다.<br>
       그리고 <b>과거 데이터에서 수익이 가장 높았던 비중을 고르는 것은 정답을 보고 문제를 푸는 일</b>입니다. 그 비중이 앞으로도 최선일 이유는 없습니다. 이 시뮬레이터는 최적 조합을 찾는 도구가 아니라, <b>같은 하락장에서 비중에 따라 내 계좌가 얼마나 다르게 반응하는지 감각을 익히는 도구</b>입니다.
@@ -1106,49 +1290,79 @@
 </div>
 </div><!-- /tab-sim -->
 
-<div id="tab-guide">
+<div id="tab-home">
+  <section class="hero">
+    <div class="heroEmoji">📈</div>
+    <h2 class="heroTitle">하락이 와도<br>흔들리지 않는 투자</h2>
+    <p class="heroSub">과거 데이터로 "얼마나 떨어지고, 얼마 만에 회복했는지" 쉽게 보여드려요</p>
+  </section>
+  <div class="startCards">
+    <button class="startCard" id="startGuide">
+      <span class="startIcon" style="background:#e8f3ff">🧭</span>
+      <span class="startText"><b>나에게 맞는 투자법 찾기</b><small>질문 4개면 충분해요</small></span>
+      <span class="startArrow">›</span>
+    </button>
+    <button class="startCard" id="startBrowse">
+      <span class="startIcon" style="background:#fff4e6">🔍</span>
+      <span class="startText"><b>종목 둘러보기</b><small>삼성전자·S&amp;P500의 지난 기록 보기</small></span>
+      <span class="startArrow">›</span>
+    </button>
+  </div>
+  <div class="homeChips">
+    <span class="homeChipsLabel">많이 보는 종목</span>
+    <div class="row" id="homePresets">
+      <button class="chip" data-s="005930.KS">삼성전자</button>
+      <button class="chip" data-s="SPY">S&amp;P500</button>
+      <button class="chip" data-s="QQQ">나스닥100</button>
+      <button class="chip" data-s="^KS11">코스피</button>
+      <button class="chip" data-s="GLD">금</button>
+      <button class="chip" data-s="BTC-USD">비트코인</button>
+    </div>
+  </div>
+</div>
+
+<div id="tab-guide" class="hidden">
 <div class="card" id="guideCard">
-  <h2>어떻게 투자하면 될까? <small>표와 그래프를 어떤 순서로 보면 되는지</small></h2>
-  <div id="guideIntro" class="mentalNote" style="margin-top:0;line-height:1.9">
-    투자를 처음 접하면 표와 그래프가 많을수록 오히려 <b>"그래서 어디부터 봐야 하지?"</b>가 됩니다.<br>
-    이 화면은 그 순서를 잡아 주는 곳입니다. 바로 아래 <b>4가지 질문</b>에 답하면 성향에 맞춰 먼저 읽어볼 방법에 표시가 붙고,
-    각 방법을 고르면 <b>그 방식이 무엇인지 → 이 앱의 어떤 표를 어떤 순서로 보면 되는지 → 어디서 흔히 실패하는지</b>를
-    쉬운 말로 안내한 뒤 해당 표로 바로 이동하는 버튼을 드립니다. 모르는 용어는 맨 아래 <b>용어 사전</b>에 있습니다.
-    <div style="margin:10px 0 6px;padding:10px 12px;background:#241618;border:1px solid #4a2428;border-radius:8px">
+  <h2>나에게 맞는 투자법 <small>질문에 답하면 먼저 읽어볼 방법을 골라 드려요</small></h2>
+  <div class="noteLine">⚠ 추천이 아니라 <b>표 읽는 순서</b>를 안내하는 화면이에요</div>
+  <div class="popSrc" data-pop="이 화면은 이렇게 써요">
+    <p>투자를 처음 접하면 표와 그래프가 많을수록 오히려 "어디부터 봐야 하지?"가 됩니다. 이 화면은 그 순서를 잡아 드려요.</p>
+    <p>아래 <b>4가지 질문</b>에 답하면 먼저 읽어볼 방법에 표시가 붙고, 방법을 고르면 <b>무엇인지 → 어떤 표를 어떤 순서로 → 어디서 흔히 실패하는지</b>를 안내하고 해당 표로 바로 이동합니다.</p>
+    <p>처음이라면 <b>낙폭(MDD) 기준 투자</b>와 <b>자산배분 포트폴리오</b>부터 읽어 보세요.</p>
+    <p style="margin-top:10px;padding:10px 12px;background:#fff5f6;border-radius:10px">
       <b style="color:var(--up)">⚠ 이 화면은 투자 추천이 아닙니다.</b><br>
       정답을 알려주는 화면도, 종목을 골라 주는 화면도 아닙니다. 어떤 방식이 <b>당신에게 맞는지</b>는 이 앱이 알 수 없고, 알 수 있다고 말하는 사람은 의심하셔야 합니다.
       여기 나오는 예시 종목·예시 비중·예시 규칙은 <b>표 읽는 법을 익히기 위한 연습용</b>일 뿐이며, 과거 데이터는 미래를 보장하지 않습니다.
       최종 판단과 책임은 언제나 투자자 본인에게 있습니다.
-    </div>
-    <small style="color:var(--sub)">처음이라면 <b>낙폭(MDD) 기준 투자</b>와 <b>자산배분 포트폴리오</b>부터 읽어 보세요. 이 앱이 가장 잘 설명할 수 있는 두 가지입니다.
-    자동 조회되는 예시 종목은 검색창에서 언제든 다른 종목으로 바꿀 수 있습니다.</small>
+    </p>
   </div>
-  <details class="howto" open style="margin:12px 0"><summary>나에게 맞는 방법부터 찾기 — 4가지 질문</summary><div class="body">
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px">
-      답에 따라 아래 목록에서 <b>먼저 읽어볼 순서</b>를 표시합니다. 정답 판정이 아니라 읽는 순서일 뿐이며, 답을 바꿔 보면서 순서가 어떻게 달라지는지 보는 것이 더 유익합니다.
-    </div>
+  <section class="finder">
+    <h3>질문 4개 <small>답을 바꾸면 순서도 바뀌어요</small></h3>
     <div id="finderBox"></div>
     <div id="finderResult"></div>
-  </div></details>
-  <div class="guideWrap">
+  </section>
+  <h3 style="margin-top:18px">투자 방법 9가지 <button class="chip" id="glossaryBtn" style="margin-left:6px">📖 용어 사전</button></h3>
+<div class="guideWrap">
     <div id="guideList" class="guideList"></div>
     <div id="guideDetail" class="guideDetail hidden"></div>
   </div>
-  <details class="howto" style="margin-top:14px"><summary>용어 사전 — 모르는 말이 나오면 여기서</summary><div class="body">
-    <div id="glossary" class="glList"></div>
-  </div></details>
+  <div class="popSrc" data-pop="📖 용어 사전" data-popid="glossaryPop"><div id="glossary" class="glList"></div></div>
 </div>
 </div><!-- /tab-guide -->
 
 <div id="tab-watch" class="hidden">
-<div class="card" id="watchCard">
-  <h2>관심 종목 <small>내 종목들의 현재 위치를 한눈에</small>
-    <button class="chip" id="watchRefresh" style="margin-left:8px">↻ 새로고침</button>
-    <button class="chip" id="watchExport" style="margin-left:4px" title="관심 종목·장바구니·시뮬 설정을 링크 하나로 복사합니다. 다른 기기·브라우저에서 열면 그대로 복원됩니다">📤 다른 기기로 옮기기</button></h2>
+<div class="pills" id="watchTabs">
+  <button data-wp="list" class="active">관심 종목</button>
+  <button data-wp="map">전체 종목</button>
+  <button data-wp="news">뉴스</button>
+</div>
+<div id="wp-list" class="subPane"><div class="card" id="watchCard">
+  <h2>관심 종목 <small>내 종목들의 현재 위치를 한눈에</small></h2>
+  <div class="row" style="margin:-4px 0 12px"><button class="chip" id="watchRefresh">↻ 새로고침</button><button class="chip" id="watchExport" title="관심 종목·장바구니·시뮬 설정을 링크 하나로 복사합니다. 다른 기기·브라우저에서 열면 그대로 복원됩니다">📤 다른 기기로 옮기기</button></div>
   <div id="watchStatus" style="font-size:12px;color:var(--sub);min-height:16px"></div>
   <div class="tableWrap"><table id="watchList"></table></div>
   <details class="howto"><summary>이 표 읽는 법</summary><div class="body">
-    관심 종목은 이 기기에만 저장됩니다(서버로 가지 않음). 개별 종목 분석에서 <b>☆</b>을 누르면 추가되고, 최대 20개까지입니다.
+    관심 종목은 이 기기에만 저장됩니다(서버로 가지 않음). <b>종목</b> 탭에서 <b>☆</b>을 누르면 추가되고, 최대 20개까지입니다.
     다른 기기·브라우저에서도 보는 방법은 둘입니다: <b>☁ 내 데이터</b>(우측 상단)에 아이디+PIN으로 저장해 어디서든 불러오거나(권장, 이후 자동 저장),
     <b>📤 다른 기기로 옮기기</b> 링크를 복사해 그쪽에서 한 번 여는 방법(계정 없이 1회 이동)입니다.
     <ul>
@@ -1158,11 +1372,11 @@
       <li>표의 가격은 <b>확정된 최근 거래일 종가</b>이며 장중 실시간 가격이 아닙니다. 종목명 아래 날짜가 그 기준일입니다.</li>
     </ul>
   </div></details>
-</div>
-
-<div class="card" id="marketMapCard">
+</div></div>
+<div id="wp-map" class="subPane hidden"><div class="card" id="marketMapCard">
   <h2>전 종목 현재 위치 <small>236개 자산이 각자 전고점에서 얼마나 내려와 있나 — 세일 폭 순</small></h2>
-  <div class="mentalNote" style="margin-top:0">
+  <div class="noteLine">⚠ 추천이 아니라 <b>위치 지도</b>예요. 많이 빠졌다고 싸다는 뜻은 아니에요</div>
+  <div class="popSrc" data-pop="이 표는 이렇게 봐요">
     <b>이 표는 추천이 아니라 위치 지도입니다.</b> 낙폭이 크다 = 싸다가 아닙니다. 크게 빠진 데는 대개 이유가 있고,
     그 이유가 회복 가능한 것인지는 이 표가 아니라 각 종목의 <b>분석</b> 화면(낙폭 이력·회복 기록)에서 확인해야 합니다.
     시장이 무서울 때 "다 같이 빠졌나, 내 것만 빠졌나"를 확인하는 용도로 쓰세요.
@@ -1184,11 +1398,10 @@
       <li>데이터는 매일 아침 갱신되는 사전 수집분(최근 90일 + 52주 범위)입니다. 3개월 수익률은 90일 데이터의 최대 범위입니다.</li>
     </ul>
   </div></details>
-</div>
-
-<div class="card" id="newsCard">
+</div></div>
+<div id="wp-news" class="subPane hidden"><div class="card" id="newsCard">
   <h2>뉴스 <small>관심 종목 기사와 시장 전체를 흔드는 기사</small></h2>
-  <div class="mentalNote" style="margin-top:0">
+  <div class="popSrc" data-pop="뉴스는 이렇게 봐요">
     제목만 모아 보여주고, 누르면 원문(네이버 뉴스)이 새 창으로 열립니다. 제목에서 <b>금리·전쟁·관세·환율·유가·실적</b> 같은
     시장 영향 키워드를 자동으로 태그로 붙였고, 아래 필터로 그 키워드만 골라 볼 수 있습니다.
     <b>기사는 판단 재료이지 매매 신호가 아닙니다.</b> 자극적인 제목일수록 이 앱의 낙폭 표를 먼저 보세요.
@@ -1202,7 +1415,13 @@
   <div class="row" id="marketCats" style="margin-bottom:8px"></div>
   <div id="marketNews"></div>
   <div style="font-size:11px;color:var(--sub);margin-top:10px">출처: 네이버 검색 API(공식) · 10분 캐시 · 기사 저작권은 각 언론사에 있으며 이 앱은 제목과 링크만 표시합니다.</div>
-</div>
+</div></div>
+
+
+
+
+
+
 </div><!-- /tab-watch -->
 
 
@@ -1248,8 +1467,7 @@
   </div>
 </div>
 
-<footer style="margin:24px 0 40px;padding:14px;border-top:1px solid var(--line);font-size:11px;color:var(--sub);line-height:1.8">
-  <b style="color:var(--txt)">이용 안내</b><br>
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · v5.0<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1261,9 +1479,9 @@
   서비스 개선을 위해 Microsoft Clarity로 <b>익명 사용 통계</b>(방문 화면, 클릭 위치 등)를 수집합니다.
   이름·연락처 등 개인을 식별하는 정보는 수집하지 않습니다. 내 보유 현황의 거래 기록과 평단가는 이 기기에만 저장되며,
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
-</footer>
+</div></footer>
 
-<script src="tickers.js?v=4.7"></script>
+<script src="tickers.js?v=5.0"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -1628,7 +1846,7 @@ var crosshairPlugin = {
     if (!area || x < area.left || x > area.right) return;
     var ctx = chart.ctx;
     ctx.save();
-    ctx.strokeStyle = "rgba(230,235,245,0.35)";
+    ctx.strokeStyle = "rgba(25,31,40,0.25)";
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -1762,8 +1980,8 @@ function convertRows(rows, fx) {
 
 /* ================= 상수: 주요 이벤트 (연 1회 수동 업데이트) ================= */
 var EVENT_TYPES = {
-  "전쟁": "#ff5b5b", "위기": "#ff9d4d", "금리": "#ffc94d",
-  "팬데믹": "#c47dff", "정치": "#4dc3ff", "회복": "#3ddc97"
+  "전쟁": "#e34948", "위기": "#eb6834", "금리": "#c98500",
+  "팬데믹": "#7c5cd6", "정치": "#2a78d6", "회복": "#14976a"
 };
 var EVENTS_RAW = [
   ["2000-03-10", "위기", "닷컴버블 고점"],
@@ -1841,7 +2059,7 @@ function drawEventsOnChart(chart, tsArr, showLines, showLabels) {
       ctx.beginPath();
       ctx.arc(px, cy, R, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#10141f";
+      ctx.fillStyle = "#ffffff";
       ctx.fillText(String(k + 1), px, cy + 0.5);
     }
   }
@@ -1850,6 +2068,20 @@ function drawEventsOnChart(chart, tsArr, showLines, showLabels) {
 
 /* 기간 내 이벤트 칩 목록 HTML */
 /* 과거 특정 시점의 기사는 API로 받을 수 없어, 네이버 뉴스 검색을 날짜 범위로 열어 준다 */
+/* 표 안의 이벤트 태그는 3개까지만 — 긴 하락 구간은 사건이 10개 넘게 걸려 행이 지나치게 길어진다 */
+function evtTagsShort(evts) {
+  if (!evts.length) return "";
+  var shown = evts.slice(0, 3).map(evtTag).join("");
+  if (evts.length <= 3) return shown;
+  var rest = evts.slice(3).map(function (e) { return e.date.slice(2).replace(/-/g, ".") + " " + e.name; }).join("\n");
+  return shown + '<span class="evtTag evtMore" title="' + rest.replace(/"/g, "&quot;") + '" onclick="showEvtMore(this)">+' + (evts.length - 3) + "건</span>";
+}
+function showEvtMore(el) {
+  var box = document.createElement("div");
+  box.innerHTML = el.title.split("\n").map(function (l) { return "<div style='padding:6px 0;border-bottom:1px solid #f2f4f6'>" + l + "</div>"; }).join("");
+  if (typeof infoModal !== "undefined") infoModal.open("이 구간의 다른 사건", box);
+}
+
 function newsSearchLink(t, name) {
   function ymd(ms) { var d = new Date(ms); return d.getFullYear() + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + String(d.getDate()).padStart(2, "0"); }
   var from = ymd(t - 7 * 86400000), to = ymd(t + 7 * 86400000);
@@ -2292,15 +2524,12 @@ function load() {
 function sourceNote() {
   if (state.dataSource === "snapshot") return "사전 수집 데이터 (" + (state.dataUpdated || "") + " 기준) · 서버 요청 없이 로드됨";
   if (state.dataSource === "local") return "오늘 받은 데이터를 이 기기에서 재사용 · 서버 요청 없음";
-  if (state.dataSource === "live") {
-    // 스냅샷을 못 쓴 이유를 짧게 붙여 준다 (원인 파악용)
-    var why = DATA.reason ? " (" + DATA.reason + ")" : "";
-    return "실시간 조회" + why;
-  }
+  if (state.dataSource === "live") return "";   // 원인 코드는 콘솔의 smDiag()로 확인
   return "";
 }
 
 function loadSymbol(symbol, noRetry) {
+  if (typeof hideResults === "function") hideResults();
   var range = $("rangeSel").value;
   setStatus("데이터 불러오는 중... (" + symbol + ")");
   if (typeof loadFund === "function") loadFund(symbol);
@@ -2425,7 +2654,6 @@ $("avgFx").addEventListener("change", function () {
 
 /* ---------- 렌더링 ---------- */
 function render() {
-  $("resultArea").classList.remove("hidden");
   var name = state.meta.shortName || state.meta.longName || state.symbol;
   var last = state.rows[state.rows.length - 1];
   $("chartTitle").textContent = name + " (" + state.symbol + ") — 최근 종가 " +
@@ -2487,6 +2715,7 @@ function render() {
 
   // 인사이트 탭이 열려 있으면 같은 데이터로 함께 갱신
   if (typeof renderInsight === "function" && currentSub === "insight") renderInsight();
+  if (typeof refreshSubPanes === "function") refreshSubPanes();
 }
 
 var mainEventPlugin = {
@@ -2529,16 +2758,16 @@ function renderChart() {
     data: pctMode
       ? rows.map(function (r) { return (r.c / base0 - 1) * 100; })
       : rows.map(function (r) { return r.c; }),
-    borderColor: "#ffc94d", borderWidth: 1.6,
+    borderColor: "#3182f6", borderWidth: 1.6,
     pointRadius: 0, tension: 0,
     fill: "start",
     backgroundColor: function (context) {
       // 라인 아래를 옅은 그라디언트로 채워 방향을 한눈에 보이게 한다
       var area = context.chart.chartArea;
-      if (!area) return "rgba(255,201,77,0.06)";
+      if (!area) return "rgba(49,130,246,0.05)";
       var g = context.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-      g.addColorStop(0, "rgba(255,201,77,0.22)");
-      g.addColorStop(1, "rgba(255,201,77,0)");
+      g.addColorStop(0, "rgba(49,130,246,0.16)");
+      g.addColorStop(1, "rgba(49,130,246,0)");
       return g;
     }
   }];
@@ -2546,13 +2775,13 @@ function renderChart() {
     datasets.push({
       label: (cmpLabel ? cmpLabel(state.bench) : state.bench) + " (%)",
       data: benchMap.data,
-      borderColor: "#9db0d0", borderWidth: 1.4, borderDash: [6, 4],
+      borderColor: "#6b7684", borderWidth: 1.4, borderDash: [6, 4],
       pointRadius: 0, tension: 0, fill: false, spanGaps: true
     });
   }
   if (showMA && !pctMode) {
     var closes = rows.map(function (r) { return r.c; });
-    [[20, "#4dc3ff", "20일선"], [60, "#3ddc97", "60일선"], [240, "#c47dff", "240일선"]].forEach(function (m) {
+    [[20, "#f97316", "20일선"], [60, "#03a15b", "60일선"], [240, "#8b5cf6", "240일선"]].forEach(function (m) {
       if (closes.length > m[0]) {
         datasets.push({
           label: m[2], data: smaSeries(closes, m[0]),
@@ -2573,7 +2802,7 @@ function renderChart() {
       interaction: { mode: "index", intersect: false },
       plugins: {
         zoom: buildZoomOptions(),
-        legend: { display: showMA || pctMode, labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
+        legend: { display: showMA || pctMode, labels: { color: "#191f28", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: function (ctx) {
@@ -2589,14 +2818,14 @@ function renderChart() {
         }
       },
       scales: {
-        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
+        x: { ticks: { color: "#8b95a1", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(25,31,40,0.06)" } },
         y: {
           // %모드는 음수가 나올 수 있어 로그 축과 함께 쓸 수 없다
           type: !pctMode && $("logScale").checked ? "logarithmic" : "linear",
-          ticks: { color: "#a7b6d4", callback: function (v) {
+          ticks: { color: "#8b95a1", callback: function (v) {
             return pctMode ? (v >= 0 ? "+" : "") + v + "%" : fmtPrice(v);
           } },
-          grid: { color: "rgba(96,116,166,0.16)" }
+          grid: { color: "rgba(25,31,40,0.06)" }
         }
       }
     },
@@ -2697,8 +2926,8 @@ function renderDdTable() {
         : ongoingStatusHtml(pk.c, tr.c, rows[rows.length - 1].c)) + "</td>" +
       "<td>" + days + "일</td>" +
       (hasAvg ? '<td class="avgHighlight">' + fmtPrice(avg * (1 + ep.dd)) + "</td>" : "") +
-      "<td style='text-align:left;white-space:normal;max-width:230px'>" + (evts.map(evtTag).join("") || "") +
-        newsSearchLink(tr.t, name) + "</td></tr>";
+      "<td style='text-align:left'><div class='evtCell'>" + evtTagsShort(evts) +
+        newsSearchLink(tr.t, name) + "</div></td></tr>";
   }
   if (!sorted.length) html += "<tr><td colspan='7'>10% 이상 하락 구간이 없습니다.</td></tr>";
   $("ddTable").innerHTML = html + "</tbody>";
@@ -2721,7 +2950,7 @@ function renderRallyTable() {
       "<td>" + fmtPrice(to.c) + "<br><small style='color:var(--sub)'>" + fmtDate(to.t) + "</small></td>" +
       "<td>" + days + "일</td>" +
       (hasAvg ? '<td class="avgHighlight">' + fmtPrice(avg * (1 + ra.gain)) + "</td>" : "") +
-      "<td style='text-align:left;white-space:normal;max-width:230px'>" + (evts.map(evtTag).join("") || "-") + "</td></tr>";
+      "<td style='text-align:left'><div class='evtCell'>" + (evtTagsShort(evts) || "-") + "</div></td></tr>";
   }
   if (!rallies.length) html += "<tr><td colspan='6'>표시할 상승 구간이 없습니다.</td></tr>";
   $("rallyTable").innerHTML = html + "</tbody>";
@@ -2828,30 +3057,44 @@ function renderRecent() {
 renderRecent();
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["single", "compare", "sim", "guide", "watch"];
-var currentTab = "guide";
+var TABS = ["home", "single", "compare", "sim", "guide", "watch"];
+var currentTab = "home";
 
-var SUBS = ["analysis", "insight"];
-var currentSub = "analysis";
+var SUBS = ["chart", "history", "insight", "tech", "company"];
+var currentSub = "chart";
 
-/* 개별 종목 분석 탭 안의 하위 화면 전환 (종목 분석 / 인사이트) */
+/* 종목 탭 안의 하위 화면 (차트 / 하락·회복 / 인사이트 / 기술 지표 / 기업 정보).
+   예전 이름 "analysis"는 차트로 받는다 (공유 링크·안내 이동 호환). */
 function switchSub(sub, noScroll) {
-  if (SUBS.indexOf(sub) < 0) sub = "analysis";
+  if (sub === "analysis") sub = "chart";
+  if (SUBS.indexOf(sub) < 0) sub = "chart";
   currentSub = sub;
-  $("sub-analysis").classList.toggle("hidden", sub !== "analysis");
-  $("sub-insight").classList.toggle("hidden", sub !== "insight");
-  Array.prototype.forEach.call(document.querySelectorAll(".submenu button[data-sub], .subTabs button[data-sub]"), function (b) {
+  refreshSubPanes();
+  Array.prototype.forEach.call(document.querySelectorAll("#subTabs button[data-sub]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-sub") === sub);
   });
   if (sub === "insight" && typeof renderInsight === "function") renderInsight();
-  // 숨겨진 동안 만들어진 차트는 크기가 0으로 잡히므로 보일 때 다시 맞춘다
   resizeVisibleCharts();
-  $("singleTabItem").classList.remove("open");
   if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+/* 종목을 아직 안 봤으면 빈 안내만, 봤으면 고른 하위 화면을 보여준다.
+   하위 화면 안의 카드가 모두 숨겨져 있으면(지수는 기업 정보가 없는 등) 그 이유를 적는다. */
+function refreshSubPanes() {
+  var has = !!(state.rows && state.rows.length);
+  SUBS.forEach(function (s) { $("sub-" + s).classList.toggle("hidden", !has || s !== currentSub); });
+  var emp = $("subEmpty");
+  if (!has) { emp.textContent = "위에서 종목을 검색하거나 칩을 눌러 보세요 🔍"; emp.classList.remove("hidden"); return; }
+  var pane = $("sub-" + currentSub);
+  var visible = Array.prototype.some.call(pane.children, function (c) { return !c.classList.contains("hidden"); });
+  if (!visible) {
+    emp.textContent = currentSub === "company" ? "이 종목은 기업 정보가 없어요 (지수·ETF·환율·코인 등)" : "이 종목은 이 화면에 보여줄 데이터가 없어요";
+    emp.classList.remove("hidden");
+  } else emp.classList.add("hidden");
+}
+
 function switchTab(target, sub, noScroll) {
-  if (TABS.indexOf(target) < 0) target = "guide";
+  if (TABS.indexOf(target) < 0) target = "home";
   currentTab = target;
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-tab") === target);
@@ -2860,7 +3103,6 @@ function switchTab(target, sub, noScroll) {
     $("tab-" + t).classList.toggle("hidden", t !== target);
   });
   if (target === "single") switchSub(sub || currentSub, true);
-  $("subTabs").classList.toggle("show", target === "single");
   // 시뮬레이터는 장바구니를 공유하므로 열 때마다 비중 입력칸을 맞춘다
   if (target === "sim" && typeof syncSimAssets === "function") syncSimAssets();
   if (target === "sim" && typeof renderHoldings === "function" && !$("holdCard").classList.contains("hidden")) renderHoldings();
@@ -2932,8 +3174,8 @@ function resizeVisibleCharts() {
   }, 30);
 }
 
-/* 서브메뉴 클릭 */
-Array.prototype.forEach.call(document.querySelectorAll(".submenu button[data-sub], .subTabs button[data-sub]"), function (btn) {
+/* 종목 탭 하위 알약 클릭 */
+Array.prototype.forEach.call(document.querySelectorAll("#subTabs button[data-sub]"), function (btn) {
   btn.onclick = function (e) {
     e.stopPropagation();
     navTo("single", btn.getAttribute("data-sub"));
@@ -2942,23 +3184,155 @@ Array.prototype.forEach.call(document.querySelectorAll(".submenu button[data-sub
 
 
 
-/* 스크롤하면 헤더를 접어 탭만 남긴다 */
-(function () {
-  var bar = $("topbar"), ticking = false;
-  function update() {
-    bar.classList.toggle("shrink", window.scrollY > 40);
-    ticking = false;
-  }
-  window.addEventListener("scroll", function () {
-    if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
-  }, { passive: true });
-  update();
-})();
 
 Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (btn) {
   btn.onclick = function () { navTo(btn.getAttribute("data-tab")); };
 });
 $("backPill").onclick = function () { history.back(); };
+
+/* ---------- 차트 표시 옵션 (기본은 접어 둔다) ---------- */
+function syncChartOptBtn() {
+  var on = ["showMA", "showLevels", "logScale", "showLabels", "krwToggle", "divToggle"].filter(function (id) { return $(id).checked; }).length +
+    ($("benchSel").value ? 1 : 0);
+  $("chartOptBtn").textContent = "⚙ 표시 옵션" + (on ? " · " + on + "개 켜짐" : "");
+}
+$("chartOptBtn").onclick = function () {
+  var open = $("chartOpts").classList.toggle("hidden") === false;
+  this.classList.toggle("active", open);
+};
+Array.prototype.forEach.call($("chartOpts").querySelectorAll("input,select"), function (el) {
+  el.addEventListener("change", syncChartOptBtn);
+});
+
+/* ---------- 홈 ---------- */
+$("brandHome").onclick = function () { navTo("home"); };
+$("startGuide").onclick = function () { navTo("guide"); };
+$("startBrowse").onclick = function () {
+  navTo("single");
+  setTimeout(function () { $("searchInput").focus(); }, 250);
+};
+Array.prototype.forEach.call($("homePresets").children, function (b) {
+  b.onclick = function () {
+    navTo("single", "chart");
+    $("searchInput").value = b.getAttribute("data-s");
+    loadSymbol(b.getAttribute("data-s"));
+  };
+});
+
+/* ---------- 팝업 ----------
+   안내 원본(popSrc·details)은 문서 안 숨김 보관소에 그대로 두고, 열 때만 팝업으로 옮겼다가
+   닫으면 되돌린다. 원본 안의 요소를 스크립트가 id로 계속 찾을 수 있게 하기 위함이다. */
+var infoModal = (function () {
+  var wrap = document.createElement("div");
+  wrap.className = "modalWrap hidden";
+  wrap.innerHTML = '<div class="modalBox" role="dialog" aria-modal="true"><h3></h3><div class="modalBody"></div>' +
+    '<button class="modalClose">닫기</button></div>';
+  document.body.appendChild(wrap);
+  var titleEl = wrap.querySelector("h3"), bodyEl = wrap.querySelector(".modalBody");
+  var cur = null, home = null, homeNext = null;
+  function close() {
+    if (cur && home) { home.insertBefore(cur, homeNext); cur.style.display = ""; }
+    cur = null;
+    wrap.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+  wrap.addEventListener("click", function (e) { if (e.target === wrap) close(); });
+  wrap.querySelector(".modalClose").onclick = close;
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !wrap.classList.contains("hidden")) close(); });
+  return {
+    open: function (title, node) {
+      if (cur) close();
+      cur = node; home = node.parentNode; homeNext = node.nextSibling;
+      titleEl.textContent = title;
+      bodyEl.innerHTML = "";
+      bodyEl.appendChild(node);
+      node.style.display = "block";
+      wrap.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    },
+    close: close
+  };
+})();
+
+/* 안내 원본마다 가장 가까운 제목 옆에 ⓘ 버튼을 단다 (제목이 없으면 작은 링크) */
+function nearestHeading(el) {
+  var n = el, found = null;
+  // 스크립트가 글자를 통째로 바꾸는 제목(id가 있는 제목)에 붙이면 버튼이 지워지므로 건너뛴다
+  function ok(hd) { return hd && !hd.id; }
+  for (var up = 0; up < 3 && n; up++) {
+    var p = n.previousElementSibling;
+    while (p) {
+      if (/^H[23]$/.test(p.tagName)) return ok(p) ? p : null;
+      var inner = p.querySelector && p.querySelector("h2, h3");
+      if (inner && p.tagName !== "DETAILS" && !p.classList.contains("popSrc")) { var all = p.querySelectorAll("h2, h3"); return ok(all[all.length - 1]) ? all[all.length - 1] : null; }
+      p = p.previousElementSibling;
+    }
+    n = n.parentNode;
+    if (n && n.classList && (n.classList.contains("card") || n.classList.contains("subPane"))) {
+      var h2 = n.querySelector("h2");
+      return ok(h2) ? h2 : null;
+    }
+  }
+  return null;
+}
+function buildInfoPopups() {
+  // details.howto → popSrc 로 바꾼다 (입력 폼·질문처럼 본문에 남길 것은 이미 따로 뺐다)
+  Array.prototype.forEach.call(document.querySelectorAll("details.howto"), function (d) {
+    var sum = d.querySelector("summary");
+    var title = sum ? sum.textContent.replace(/\s+/g, " ").trim() : "안내";
+    var src = document.createElement("div");
+    src.className = "popSrc";
+    src.setAttribute("data-pop", title);
+    if (d.id) src.id = d.id;
+    if (sum) sum.remove();
+    while (d.firstChild) src.appendChild(d.firstChild);
+    d.parentNode.replaceChild(src, d);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".popSrc"), function (src) {
+    if (src.getAttribute("data-popid") || src.getAttribute("data-bound")) return;   // 전용 버튼이 여는 것
+    src.setAttribute("data-bound", "1");
+    var title = src.getAttribute("data-pop") || "안내";
+    var shortT = title.replace(/^이 (표|차트|지표|숫자|화면) 읽는 법.*$/, "읽는 법").replace(/^학습 가이드 — /, "");
+    var btn = document.createElement("button");
+    var hd = nearestHeading(src);
+    if (hd && !hd.querySelector(".infoBtn")) {
+      btn.className = "infoBtn"; btn.textContent = "?"; btn.title = title; btn.setAttribute("aria-label", title);
+      hd.appendChild(btn);
+    } else {
+      var card = src.closest ? src.closest(".card") : null;
+      var topRow = card && card.querySelector(".chartTop");
+      if (topRow) {
+        btn.className = "chip"; btn.textContent = "ⓘ " + shortT;
+        topRow.appendChild(btn);
+      } else {
+        btn.className = "infoInline"; btn.textContent = "ⓘ " + shortT;
+        src.parentNode.insertBefore(btn, src);
+      }
+    }
+    btn.onclick = function (e) { e.stopPropagation(); infoModal.open(title, src); };
+  });
+}
+buildInfoPopups();
+function openPop(id) {
+  var src = document.querySelector('.popSrc[data-popid="' + id + '"]') || $(id);
+  if (src) infoModal.open(src.getAttribute("data-pop") || "안내", src);
+}
+$("glossaryBtn").onclick = function () { openPop("glossaryPop"); };
+$("footInfo").onclick = function () { openPop("footPop"); };
+
+/* 안내에서 특정 카드로 이동할 때, 그 카드가 들어 있는 하위 화면을 먼저 연다 */
+function revealEl(id) {
+  var el = $(id);
+  if (!el) return;
+  var n = el;
+  while (n && n !== document.body) {
+    if (n.id && n.id.indexOf("sub-") === 0) { switchSub(n.id.slice(4), true); break; }
+    if (n.id && n.id.indexOf("wp-") === 0 && typeof switchWatchPane === "function") { switchWatchPane(n.id.slice(3)); break; }
+    if (n.id === "simCard" && typeof switchPortfolioMode === "function") { switchPortfolioMode("sim"); break; }
+    if (n.id === "holdCard" && typeof switchPortfolioMode === "function") { switchPortfolioMode("hold"); break; }
+    n = n.parentNode;
+  }
+}
 
 /* ---------- 설정 공유 (URL 해시) ---------- */
 function buildShareHash(mode) {
@@ -3355,14 +3729,14 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=4.7"></script>
-<script src="technical.js?v=4.7"></script>
-<script src="company.js?v=4.7"></script>
-<script src="compare.js?v=4.7"></script>
-<script src="sim.js?v=4.7"></script>
-<script src="insight.js?v=4.7"></script>
-<script src="guide.js?v=4.7"></script>
-<script src="watch.js?v=4.7"></script>
-<script src="holdings.js?v=4.7"></script>
+<script src="metrics.js?v=5.0"></script>
+<script src="technical.js?v=5.0"></script>
+<script src="company.js?v=5.0"></script>
+<script src="compare.js?v=5.0"></script>
+<script src="sim.js?v=5.0"></script>
+<script src="insight.js?v=5.0"></script>
+<script src="guide.js?v=5.0"></script>
+<script src="watch.js?v=5.0"></script>
+<script src="holdings.js?v=5.0"></script>
 </body>
 </html>

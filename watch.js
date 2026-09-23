@@ -132,7 +132,7 @@ function renderWatchList() {
   var list = loadWatch();
   var box = $("watchList");
   if (!list.length) {
-    box.innerHTML = '<div class="mentalNote" style="margin-top:0">관심 종목이 없습니다. <b>개별 종목 분석</b>에서 종목을 조회한 뒤 ' +
+    box.innerHTML = '<div class="mentalNote" style="margin-top:0">관심 종목이 없습니다. <b>종목</b> 탭에서 종목을 조회한 뒤 ' +
       '<b>☆</b> 버튼을 누르면 여기에 쌓입니다. 최대 20개.</div>';
     $("watchNews").innerHTML = "";
     return;
@@ -433,16 +433,32 @@ Array.prototype.forEach.call(document.querySelectorAll("#mapFilters [data-mf]"),
   };
 });
 
+/* 관심 탭 하위 화면: 관심 종목 / 전체 종목 / 뉴스 */
+var watchPane = "list";
+function switchWatchPane(p) {
+  if (["list", "map", "news"].indexOf(p) < 0) p = "list";
+  watchPane = p;
+  ["list", "map", "news"].forEach(function (k) { $("wp-" + k).classList.toggle("hidden", k !== p); });
+  Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {
+    b.classList.toggle("active", b.getAttribute("data-wp") === p);
+  });
+  // 보이는 화면의 데이터만 불러온다 (뉴스·전체 종목은 처음 열 때 한 번)
+  if (p === "map") loadMarketMap();
+  if (p === "news") { renderNewsFilters(); loadWatchNews(); loadMarketNews(); }
+}
+Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {
+  b.onclick = function () { switchWatchPane(b.getAttribute("data-wp")); window.scrollTo({ top: 0, behavior: "smooth" }); };
+});
+
 /* 탭 진입 시 */
 function renderWatchTab(force) {
   renderNewsFilters();
   renderWatchList();
   if (force) { watchState.quotes = {}; watchState.news = {}; }
   loadWatchQuotes();
-  loadWatchNews();
-  loadMarketNews();
   if (force) mapState.rows = null;
-  loadMarketMap();
+  if (watchPane === "map") loadMarketMap();
+  if (watchPane === "news") { loadWatchNews(); loadMarketNews(); }
 }
 
 /* ---------- 이벤트 ---------- */

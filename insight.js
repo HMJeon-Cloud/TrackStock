@@ -247,7 +247,7 @@ function renderHolding(rows, totalYears) {
     // 손실 확률에 따라 배경색 농도를 달리해 한눈에 흐름이 보이게 한다
     var alpha = Math.min(s.lossRate * 1.6, 0.45);
     html += "<tr><td><b>" + yrLabel(s.years) + "</b></td>" +
-      "<td style='background:rgba(255,91,91," + alpha.toFixed(3) + ");font-weight:bold'>" +
+      "<td style='background:rgba(240,68,82," + alpha.toFixed(3) + ");font-weight:bold'>" +
         (s.lossRate * 100).toFixed(1) + "%</td>" +
       '<td class="' + pctCls(s.median) + '">' + fmtPct(s.median) + "</td>" +
       '<td class="neg">' + fmtPct(s.min) + "</td>" +
@@ -316,7 +316,7 @@ function renderTopDays(rows) {
   t.results.forEach(function (r) {
     var amt2 = 10000000 * (1 + r.retNoWorst);
     var ratio2 = base !== 0 ? amt2 / base - 1 : 0;
-    html += "<tr style='background:#141b29'><td>최악 <b>하락</b> " + r.n + "일을 피했다면</td>" +
+    html += "<tr style='background:#f9fafb'><td>최악 <b>하락</b> " + r.n + "일을 피했다면</td>" +
       '<td class="' + pctCls(r.retNoWorst) + '">' + fmtPct(r.retNoWorst) + "</td>" +
       "<td>" + Math.round(amt2).toLocaleString("ko-KR") + "원</td>" +
       '<td class="pos" style="font-weight:bold">' + fmtPct(ratio2) + "</td></tr>";

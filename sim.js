@@ -132,8 +132,7 @@ function syncSimAssets() {
   var cart = cmpState.cart;
   if (!cart.length) {
     box.innerHTML = '<span style="color:var(--sub);font-size:12px">' +
-      '장바구니가 비어 있습니다. <b>개별 종목 분석</b> 탭에서 종목을 분석한 뒤 🛒 버튼으로 담거나, ' +
-      '<b>장바구니 비교</b> 탭의 검색창으로 담아 주세요. 세 탭이 같은 장바구니를 함께 씁니다.</span>';
+      '장바구니가 비어 있어요. <b>종목</b> 탭에서 🛒를 누르거나 <b>비교</b> 탭에서 담아 주세요.</span>';
     $("simWeightSum").textContent = "";
     return;
   }
@@ -387,13 +386,13 @@ function renderSim() {
   var datasets = [{
     label: "내 포트폴리오",
     data: actual.values,
-    borderColor: "#ffc94d", borderWidth: 2.4, pointRadius: 0, tension: 0, fill: false
+    borderColor: "#3182f6", borderWidth: 2.4, pointRadius: 0, tension: 0, fill: false
   }];
   if (I.rebal > 0) {
     datasets.push({
       label: "리밸런싱 안 했다면",
       data: actualNoRebal.values,
-      borderColor: "#a7b6d4", borderWidth: 1.2, borderDash: [6, 4],
+      borderColor: "#8b95a1", borderWidth: 1.2, borderDash: [6, 4],
       pointRadius: 0, tension: 0, fill: false
     });
   }
@@ -401,7 +400,7 @@ function renderSim() {
     datasets.push({
       label: "누적 투입원금",
       data: actual.invested,
-      borderColor: "#5a6580", borderWidth: 1.2, borderDash: [2, 3],
+      borderColor: "#b0b8c1", borderWidth: 1.2, borderDash: [2, 3],
       pointRadius: 0, tension: 0, fill: false
     });
   }
@@ -426,7 +425,7 @@ function renderSim() {
       interaction: { mode: "index", intersect: false },
       plugins: {
         zoom: typeof buildZoomOptions === "function" ? buildZoomOptions() : undefined,
-        legend: { labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
+        legend: { labels: { color: "#191f28", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: function (ctx) {
@@ -442,11 +441,11 @@ function renderSim() {
         }
       },
       scales: {
-        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
+        x: { ticks: { color: "#8b95a1", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(25,31,40,0.06)" } },
         y: {
           type: $("simLog").checked ? "logarithmic" : "linear",
-          ticks: { color: "#a7b6d4", callback: function (v) { return fmtMoney(v); } },
-          grid: { color: "rgba(96,116,166,0.16)" }
+          ticks: { color: "#8b95a1", callback: function (v) { return fmtMoney(v); } },
+          grid: { color: "rgba(25,31,40,0.06)" }
         }
       }
     },
@@ -540,7 +539,7 @@ function renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal,
       if (rr != null) { sum += rr; cnt++; }
     }
     var avgCrisis = cnt ? sum / cnt : null;
-    html += "<tr" + (r.hi ? " style='background:#202a40'" : "") + "><td>" +
+    html += "<tr" + (r.hi ? " style='background:#e8f3ff'" : "") + "><td>" +
       (r.color ? "<i class='dot' style='background:" + r.color + "'></i>" : "") +
       (r.hi ? "<b>" + r.name + "</b>" : r.name) + "</td>" +
       "<td>" + Math.round(r.val).toLocaleString("ko-KR") + "원</td>" +
@@ -581,7 +580,7 @@ function renderSimCrisis(I, R, idx) {
     var typeCol = cw[3] === "회복" ? "var(--good)" : "var(--sub)";
     html += "<tr><td style='text-align:left'>" + cw[0] +
       "<br><small style='color:" + typeCol + "'>" + cw[1].slice(2) + " ~ " + cw[2].slice(2) + "</small></td>" +
-      '<td class="' + pctCls(pr) + '" style="font-weight:bold;background:#202a40">' + fmtPct(pr) + "</td>" +
+      '<td class="' + pctCls(pr) + '" style="font-weight:bold;background:#e8f3ff">' + fmtPct(pr) + "</td>" +
       cells.join("") + "</tr>";
   }
   if (!found) {
@@ -621,7 +620,7 @@ function renderSimWorst(I, R, idx) {
     var days = Math.round((ep.t2 - ep.t1) / 86400000);
     html += "<tr><td style='text-align:left'>" + (n + 1) + "위 하락<br>" +
       "<small style='color:var(--sub)'>" + fmtDate(ep.t1) + " ~ " + fmtDate(ep.t2) + " (" + days + "일)</small></td>" +
-      '<td class="' + pctCls(ep.dd) + '" style="font-weight:bold;background:#202a40">' + fmtPct(ep.dd) + "</td>" +
+      '<td class="' + pctCls(ep.dd) + '" style="font-weight:bold;background:#e8f3ff">' + fmtPct(ep.dd) + "</td>" +
       cells.join("") +
       "<td>" + (ep.recovered ? fmtDate(ep.recovered)
         : ongoingStatusHtml(ep.peakV, ep.troughV, idx.values[idx.values.length - 1])) + "</td></tr>";

@@ -5,7 +5,7 @@
    drawEventsOnChart, eventListHtml, fmtPct, $ 등)를 재사용한다.
    ============================================================ */
 
-var CMP_COLORS = ["#ffc94d", "#4dc3ff", "#3ddc97", "#ff5b5b", "#c47dff", "#ff9d4d", "#7dd3fc", "#f9a8d4"];
+var CMP_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
 
 /* 주요 위기·회복 구간 (연 1회 수동 업데이트)
    [이름, 시작일, 종료일, 유형] */
@@ -220,7 +220,7 @@ function renderChips() {
   var box = $("cmpChips");
   if (!cmpState.cart.length) {
     box.innerHTML = '<span style="color:var(--sub);font-size:12px">장바구니가 비어 있습니다. ' +
-      '위 검색창으로 담거나, <b>개별 종목 분석</b> 탭에서 종목을 분석한 뒤 🛒 버튼으로 담으세요. ' +
+      '위 검색창으로 담거나, <b>종목</b> 탭에서 종목을 분석한 뒤 🛒 버튼으로 담으세요. ' +
       '(비교하려면 2개 이상)</span>';
     return;
   }
@@ -511,7 +511,7 @@ function renderCmpChart() {
     datasets.push({
       label: "누적 투입원금",
       data: investedLine,
-      borderColor: "#a7b6d4", borderWidth: 1.2, borderDash: [5, 4],
+      borderColor: "#8b95a1", borderWidth: 1.2, borderDash: [5, 4],
       pointRadius: 0, tension: 0, fill: false
     });
   }
@@ -525,7 +525,7 @@ function renderCmpChart() {
       interaction: { mode: "index", intersect: false },
       plugins: {
         zoom: typeof buildZoomOptions === "function" ? buildZoomOptions() : undefined,
-        legend: { labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
+        legend: { labels: { color: "#191f28", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: function (ctx) {
@@ -544,20 +544,20 @@ function renderCmpChart() {
         }
       },
       scales: {
-        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
+        x: { ticks: { color: "#8b95a1", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(25,31,40,0.06)" } },
         y: {
           type: isLog ? "logarithmic" : "linear",
           ticks: {
-            color: "#a7b6d4",
+            color: "#8b95a1",
             callback: function (v) { return isAmount ? fmtMoney(v) : fmtPct(v / 100 - 1); }
           },
           grid: {
             color: function (ctx) {
               // 본전선 강조 (거치식 금액모드는 원금, 수익률모드는 0%)
-              if (!ctx.tick) return "rgba(96,116,166,0.16)";
+              if (!ctx.tick) return "rgba(25,31,40,0.06)";
               var baseline = isAmount ? (isDca ? null : principal) : 100;
-              if (baseline == null) return "rgba(96,116,166,0.16)";
-              return Math.abs(ctx.tick.value - baseline) < baseline * 0.001 ? "#5a6580" : "rgba(96,116,166,0.16)";
+              if (baseline == null) return "rgba(25,31,40,0.06)";
+              return Math.abs(ctx.tick.value - baseline) < baseline * 0.001 ? "#b0b8c1" : "rgba(25,31,40,0.06)";
             }
           }
         }
@@ -785,7 +785,7 @@ function renderCmpCorr() {
       var v = pairCorrelation(A.values[r], A.real[r], A.values[c], A.real[c]);
       if (v == null) { html += "<td>-</td>"; continue; }
       var alpha = Math.min(Math.abs(v), 1) * 0.35;
-      var bg = v < 0 ? "rgba(61,220,151," + alpha + ")" : "rgba(255,91,91," + alpha + ")";
+      var bg = v < 0 ? "rgba(3,161,91," + alpha + ")" : "rgba(240,68,82," + alpha + ")";
       html += "<td style='background:" + bg + "'>" + v.toFixed(2) + "</td>";
     }
     html += "</tr>";

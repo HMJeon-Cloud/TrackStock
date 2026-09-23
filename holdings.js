@@ -204,12 +204,14 @@ function renderHoldings() {
   var box = $("hBody");
   if (!box) return;
   if (!H.lots.length) {
-    box.innerHTML = '<div class="mentalNote" style="margin-top:0">아직 기록한 매수가 없습니다. 아래 <b>매수 기록 추가</b>에서 ' +
-      "산 날짜와 수량(또는 금액)을 넣어 주세요. 단가는 비워두면 그날 종가로 채워집니다. 매월 사셨다면 <b>정기 매수 일괄 추가</b>가 편합니다.</div>";
+    box.innerHTML = '<div class="emptyCard" style="box-shadow:none;background:var(--soft);padding:28px 16px">' +
+      '<div style="font-size:34px;margin-bottom:8px">💼</div><b style="color:var(--txt);font-size:16px">아직 기록이 없어요</b>' +
+      '<div style="margin:6px 0 14px;font-size:13px">산 날짜와 수량만 넣으면 평단가·수익률을 계산해 드려요</div>' +
+      '<button class="primary" onclick="openHoldForm()">＋ 첫 기록 추가하기</button></div>';
     $("hSummary").innerHTML = "";
     $("hChartWrap").classList.add("hidden");
     $("hInsight").innerHTML = "";
-    $("hDetails").open = true;
+    $("hTable").innerHTML = "";
     return;
   }
   var groups = groupLots(H.lots);
@@ -406,9 +408,9 @@ function renderHoldChart(tl) {
     data: {
       labels: tl.map(function (p) { return fmtDate(p.t); }),
       datasets: [
-        { label: "평가금액", data: tl.map(function (p) { return p.value; }), borderColor: "#ffc94d", borderWidth: 2,
+        { label: "평가금액", data: tl.map(function (p) { return p.value; }), borderColor: "#3182f6", borderWidth: 2,
           pointRadius: 0, tension: 0, fill: false },
-        { label: "투입 원금", data: tl.map(function (p) { return p.cost; }), borderColor: "#9db0d0", borderWidth: 1.5,
+        { label: "투입 원금", data: tl.map(function (p) { return p.cost; }), borderColor: "#6b7684", borderWidth: 1.5,
           borderDash: [6, 4], pointRadius: 0, tension: 0, fill: false, stepped: true }
       ]
     },
@@ -417,7 +419,7 @@ function renderHoldChart(tl) {
       interaction: { mode: "index", intersect: false },
       plugins: {
         zoom: typeof buildZoomOptions === "function" ? buildZoomOptions() : undefined,
-        legend: { labels: { color: "#e6ebf5", boxWidth: 12, font: { size: 11 } } },
+        legend: { labels: { color: "#191f28", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: function (c) { return c.dataset.label + ": " + fmtKrw(c.parsed.y); },
@@ -429,8 +431,8 @@ function renderHoldChart(tl) {
         }
       },
       scales: {
-        x: { ticks: { color: "#a7b6d4", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(96,116,166,0.16)" } },
-        y: { ticks: { color: "#a7b6d4", callback: function (v) { return koAmount(v) || fmtKrw(v); } }, grid: { color: "rgba(96,116,166,0.16)" } }
+        x: { ticks: { color: "#8b95a1", maxTicksLimit: (window.innerWidth < 640 ? 4 : 8), maxRotation: 0 }, grid: { color: "rgba(25,31,40,0.06)" } },
+        y: { ticks: { color: "#8b95a1", callback: function (v) { return koAmount(v) || fmtKrw(v); } }, grid: { color: "rgba(25,31,40,0.06)" } }
       }
     }
   });
@@ -582,6 +584,13 @@ $("hDcaBtn").onclick = function () {
     renderHoldings();
   });
 };
+
+/* 기록 추가 폼은 팝업으로 연다 */
+function openHoldForm() {
+  hMsg("");
+  if (typeof openPop === "function") openPop("hDetails");
+}
+$("hAddOpen").onclick = openHoldForm;
 
 /* 보유 구성 → 시뮬레이터로 넘기기 (금액 그대로) */
 $("hToSim").onclick = function () {
