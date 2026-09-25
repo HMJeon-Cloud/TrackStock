@@ -1472,7 +1472,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · v5.2<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · v5.3<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1486,7 +1486,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script src="tickers.js?v=5.2"></script>
+<script src="tickers.js?v=5.3"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -2079,7 +2079,7 @@ function evtTagsShort(evts) {
   var shown = evts.slice(0, 3).map(evtTag).join("");
   if (evts.length <= 3) return shown;
   var rest = evts.slice(3).map(function (e) { return e.date.slice(2).replace(/-/g, ".") + " " + e.name; }).join("\n");
-  return shown + '<span class="evtTag evtMore" title="' + rest.replace(/"/g, "&quot;") + '" onclick="showEvtMore(this)">+' + (evts.length - 3) + "건</span>";
+  return shown + '<span class="evtTag evtMore" data-more="' + encodeURIComponent(evts.slice(3).map(evtTag).join("")) + '" title="' + rest.replace(/"/g, "&quot;") + '" onclick="showEvtMore(this)">+' + (evts.length - 3) + "건</span>";
 }
 function showEvtMore(el) {
   var box = document.createElement("div");
@@ -3770,14 +3770,15 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=5.2"></script>
-<script src="technical.js?v=5.2"></script>
-<script src="company.js?v=5.2"></script>
-<script src="compare.js?v=5.2"></script>
-<script src="sim.js?v=5.2"></script>
-<script src="insight.js?v=5.2"></script>
-<script src="guide.js?v=5.2"></script>
-<script src="watch.js?v=5.2"></script>
-<script src="holdings.js?v=5.2"></script>
+<script src="metrics.js?v=5.3"></script>
+<script src="technical.js?v=5.3"></script>
+<script src="company.js?v=5.3"></script>
+<script src="compare.js?v=5.3"></script>
+<script src="sim.js?v=5.3"></script>
+<script src="insight.js?v=5.3"></script>
+<script src="guide.js?v=5.3"></script>
+<script src="watch.js?v=5.3"></script>
+<script src="holdings.js?v=5.3"></script>
+<script src="snapshot.js?v=5.3"></script>
 </body>
 </html>
