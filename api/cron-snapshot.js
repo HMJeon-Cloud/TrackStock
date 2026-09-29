@@ -11,6 +11,26 @@
 // 클라이언트가 ①+②를 합쳐 쓰므로 ①이 며칠 지나도 화면 데이터는 항상 최신이다.
 // 실행당 쓰기 ≈ 12회, 하루 2회 → 월 약 720회로 한도 안에 들어온다.
 import { put, list } from "@vercel/blob";
+import { gzipSync } from "zlib";
+
+/* Upstash Redis — recent(전 종목 최근 90일)를 여기에도 저장한다.
+   Blob이 한도 초과로 정지돼도 '오늘' 브리핑·전 종목 지도가 계속 돌아가게 하기 위해서다.
+   gzip+base64로 줄이면 약 1MB → 200KB 안팎이라 무료 요청 한도(1MB) 안에 들어온다. */
+function redisConf() {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  return url && token ? { url: url.replace(/\/$/, ""), token } : null;
+}
+async function redisSet(conf, key, value, exSec) {
+  const r = await fetch(conf.url, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + conf.token, "Content-Type": "application/json" },
+    body: JSON.stringify(["SET", key, value, "EX", String(exSec)]),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error("Redis: " + (j.error || "HTTP " + r.status));
+  return j.result;
+}
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
@@ -180,9 +200,23 @@ export default async function handler(req, res) {
       } catch (e) { /* 건너뛴다 */ }
     }));
   }
+  let redisRecent = null, blobRecent = null;
   if (recentOk > 0) {
-    await put("recent.json", JSON.stringify(recent), { ...putOpts, cacheControlMaxAge: 10800 });   // 3시간: 하루 2번만 바뀌므로 캐시 미스(읽기 한도)를 줄인다
-    writes++;
+    const body = JSON.stringify(recent);
+    // ②-a Redis (있으면) — 3일 뒤 자동 만료. 다음 실행이 덮어쓴다.
+    const redis = redisConf();
+    if (redis) {
+      try {
+        const gz = gzipSync(Buffer.from(body, "utf8")).toString("base64");
+        await redisSet(redis, "sm:recent", gz, 3 * 86400);
+        redisRecent = { bytes: gz.length, ok: true };
+      } catch (e) { redisRecent = { ok: false, error: String(e.message).slice(0, 120) }; }
+    }
+    // ②-b Blob — 정지 중이면 건너뛴다 (실패해도 아래 계속)
+    try {
+      await put("recent.json", body, { ...putOpts, cacheControlMaxAge: 10800 });   // 3시간: 하루 2번만 바뀌므로 캐시 미스(읽기 한도)를 줄인다
+      writes++; blobRecent = { ok: true };
+    } catch (e) { blobRecent = { ok: false, error: String(e.message).slice(0, 120) }; }
     for (const sym of Object.keys(recent.symbols)) {
       entries[sym] = { ...(entries[sym] || {}), updated: today };
     }
@@ -190,13 +224,16 @@ export default async function handler(req, res) {
 
   /* ③ 목록 */
   const withHistory = symbols.filter((s) => entries[s] && entries[s].history).length;
-  await put("manifest.json", JSON.stringify({
-    generated: new Date().toISOString(),
-    recentDays: RECENT_DAYS,
-    complete: withHistory === symbols.length,
-    symbols: entries,
-  }), { ...putOpts, cacheControlMaxAge: 10800 });
-  writes++;
+  let manifestOk = true;
+  try {
+    await put("manifest.json", JSON.stringify({
+      generated: new Date().toISOString(),
+      recentDays: RECENT_DAYS,
+      complete: withHistory === symbols.length,
+      symbols: entries,
+    }), { ...putOpts, cacheControlMaxAge: 10800 });
+    writes++;
+  } catch (e) { manifestOk = false; }
 
   res.status(200).json({
     ok: true,
@@ -204,6 +241,7 @@ export default async function handler(req, res) {
     historyUpdated: done.length,
     historyRemaining: symbols.length - withHistory,
     recentSymbols: recentOk,
+    redisRecent, blobRecent, manifestOk,
     failed: failed.slice(0, 10),
     elapsedMs: Date.now() - started,
     note: "과거 전체는 순환 갱신, 최근 " + RECENT_DAYS + "일은 매 실행 전 종목 갱신",
