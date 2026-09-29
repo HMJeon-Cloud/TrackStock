@@ -1,5 +1,5 @@
 /* ============================================================
-   표·그래프 이미지 저장 (v5.3)
+   표·그래프 이미지 저장 (v5.4)
    - 모든 표(.tableWrap)와 그래프(.chartWrap) 아래에 "📷 이미지 저장" 버튼을 단다.
    - 그래프: 화면 크기와 무관하게 넓은 크기(960×540)로 다시 그려서 저장한다.
      지금 보고 있는 기간(확대·이동한 범위)과 켜 둔 선들은 그대로 유지된다.
@@ -28,7 +28,8 @@
     ".snapBox .snapCard{margin:14px 0 0!important;padding:0!important;box-shadow:none!important;border:none!important;background:#fff!important}" +
     ".snapBox .tableWrap{max-height:none!important;overflow:visible!important}" +
     ".snapBox th,.snapBox td{position:static!important}" +
-    ".snapBox .snapRow,.snapBox .infoBtn{display:none!important}" +
+    ".snapBox .snapRow,.snapBox .infoBtn,.snapBox .briefWatch{display:none!important}" +
+    ".snapBox .briefPickGrid,.snapBox .briefThemeList,.snapBox .briefTwoCol{grid-template-columns:1fr 1fr!important}.snapBox .briefTemp{grid-template-columns:1.1fr 1fr!important}" +
     ".snapPrev{text-align:center}" +
     ".snapPrev img{max-width:100%;max-height:60vh;border:1px solid var(--line,#e5e8eb);border-radius:12px;background:#fff}" +
     ".snapPrev .snapBtns{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}" +
@@ -70,6 +71,10 @@
 
   /* 이미지 제목·부제 결정 */
   function describe(el) {
+    if (el.dataset && el.dataset.snapTitle) {
+      var lab = (typeof briefState !== "undefined" && briefState.result) ? briefState.result.label + " · " : "";
+      return { title: "오늘의 브리핑 — " + el.dataset.snapTitle, sub: lab + "StockMind 자동 정리" };
+    }
     var h = headingOf(el), t = headingText(h);
     var ctx = "";
     // 종목 탭 안의 표·그래프는 어떤 종목인지 함께 적는다 (가격 차트 제목에는 이미 들어 있음)
@@ -215,6 +220,7 @@
       var card = document.createElement("div");
       card.className = "card snapCard";
       var tw = wrap.cloneNode(true);
+      if (wrap.classList.contains("snapTarget")) { tw.style.marginTop = "0"; tw.style.paddingTop = "0"; tw.style.borderTop = "none"; var h3 = tw.querySelector("h3"); if (h3) h3.remove(); }
       // "+N건"으로 접힌 사건 펼치기
       tw.querySelectorAll(".evtMore").forEach(function (m) {
         if (m.dataset.more) { var s = document.createElement("span"); s.innerHTML = decodeURIComponent(m.dataset.more); m.replaceWith.apply(m, Array.prototype.slice.call(s.childNodes)); }
@@ -240,6 +246,7 @@
       document.body.appendChild(box);
       var tbl = tw.querySelector("table");
       var need = Math.max(box.offsetWidth, (tbl ? tbl.scrollWidth : 0) + 56);
+      if (wrap.classList.contains("snapTarget")) need = 760;
       box.style.width = Math.min(Math.max(need, 560), 1400) + "px";
       box.style.maxWidth = "none";
       var w = box.offsetWidth, h = box.offsetHeight;
@@ -290,7 +297,9 @@
 
   function snap(wrap, btn) {
     var isChart = wrap.classList.contains("chartWrap");
-    if (!isChart) {
+    if (wrap.classList.contains("snapTarget")) {
+      if (!wrap.textContent.trim()) { alert("먼저 내용이 나오도록 해 주세요."); return; }
+    } else if (!isChart) {
       var t = wrap.querySelector("table");
       if (!t || !t.rows.length) { alert("먼저 표에 내용이 나오도록 조회해 주세요."); return; }
     } else if (!(window.Chart && Chart.getChart(wrap.querySelector("canvas")))) {
@@ -312,7 +321,7 @@
 
   /* ---------- 버튼 달기 ---------- */
   function attach() {
-    document.querySelectorAll(".chartWrap, .tableWrap").forEach(function (w) {
+    document.querySelectorAll(".chartWrap, .tableWrap, .snapTarget").forEach(function (w) {
       if (w.dataset.snap || w.closest(".modalWrap, .popSrc, .snapBox")) return;
       w.dataset.snap = "1";
       var row = document.createElement("div");
