@@ -38,7 +38,8 @@ export default async function handler(req, res) {
           const text = gunzipSync(Buffer.from(gz, "base64")).toString("utf8");
           res.setHeader("Content-Type", "application/json; charset=utf-8");
           res.setHeader("X-Snap-Store", "redis");
-          res.setHeader("Cache-Control", "s-maxage=10800, stale-while-revalidate=21600");
+          // Redis 읽기는 사실상 무료라 30분만 캐시 → 아침 수집 직후 빨리 반영된다
+          res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
           return res.status(200).send(text);
         }
       } catch (e) { /* Blob으로 */ }
