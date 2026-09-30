@@ -103,7 +103,8 @@ export default async function handler(req, res) {
         origin: it.originallink || ""
       };
     }).filter((x) => x.title);
-    res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1200");
+    // 30분 CDN 캐시: 같은 검색어는 30분에 한 번만 네이버로 나간다 (사용자가 몇 명이든)
+    res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
     return res.status(200).json({ ok: true, items, query, total: j.total || items.length, mode: useHub ? "hub" : "legacy" });
   } catch (e) {
     return res.status(200).json({ ok: false, reason: "ERROR", items: [], note: e.message });
