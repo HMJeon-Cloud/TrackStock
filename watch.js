@@ -74,7 +74,7 @@ function fetchQuote(sym) {
 function fetchNews(params) {
   var key = JSON.stringify(params);
   var cached = watchState.news[key];
-  if (cached && Date.now() - cached.at < 10 * 60 * 1000) return Promise.resolve(cached.items);
+  if (cached && Date.now() - cached.at < 30 * 60 * 1000) return Promise.resolve(cached.items);
   var qs = Object.keys(params).map(function (k) { return k + "=" + encodeURIComponent(params[k]); }).join("&");
   return fetch("/api/news?" + qs)
     .then(function (r) { return r.json(); })
