@@ -83,7 +83,9 @@ function briefStats(sym, d, mode) {
   };
 }
 
-function briefName(s) { return String(s.name || s.sym).replace(/\s*\(.*?\)\s*/g, "").trim() || s.sym; }
+var BRIEF_KO = {};
+if (typeof TICKER_DICT !== "undefined") TICKER_DICT.forEach(function (t) { BRIEF_KO[t[0]] = t[1]; });
+function briefName(s) { var n = BRIEF_KO[s.sym] || s.name || s.sym; return String(n).replace(/\s*\(.*?\)\s*/g, "").trim() || s.sym; }
 function briefPct(x, digits) { if (x == null || !isFinite(x)) return "-"; var d = digits == null ? 1 : digits; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
 
 function briefCompute(recent, opts) {
@@ -200,13 +202,18 @@ function briefCompute(recent, opts) {
   var bigMove = stocks.filter(function (s) { return s.pctRank != null && s.pctRank >= 0.98 && Math.abs(s.ret1) >= 0.03; })
     .sort(function (a, b) { return Math.abs(b.ret1) - Math.abs(a.ret1); })[0];
   var vix = bySym["^VIX"];
+  var saleList = stocks.filter(function (s) { return s.vsHi != null && s.vsHi <= -0.2; }).sort(function (a, b) { return a.vsHi - b.vsHi; });
+  var athList = stocks.filter(function (s) { return s.vsHi != null && s.vsHi >= -0.02; }).sort(function (a, b) { return b.vsHi - a.vsHi; });
+  var aboveList = stocks.filter(function (s) { return s.above20; }).sort(function (a, b) { return b.vsMa20 - a.vsMa20; });
+  var belowList = stocks.filter(function (s) { return !s.above20; }).sort(function (a, b) { return a.vsMa20 - b.vsMa20; });
   var numbers = [
-    { v: saleN + "개", l: "52주 최고 대비 -20% 이상 '세일 중'", n: stocks.length + "개 중" },
-    { v: athN + "개", l: "52주 최고가 근처(-2% 이내)", n: "신고가 부근" },
-    { v: Math.round(temp.abovePct * 100) + "%", l: "20일 평균선 위에 있는 종목 비율", n: temp.abovePct >= 0.6 ? "상승 추세 우세" : temp.abovePct <= 0.4 ? "하락 추세 우세" : "혼조" }
+    { v: saleN + "개", l: "52주 최고 대비 -20% 이상 '세일 중'", n: stocks.length + "개 중", list: saleList, col: "52주 최고 대비", key: "vsHi", title: "세일 중인 종목 (52주 최고 대비 -20% 이상)" },
+    { v: athN + "개", l: "52주 최고가 근처(-2% 이내)", n: "신고가 부근", list: athList, col: "52주 최고 대비", key: "vsHi", title: "신고가 부근 종목 (52주 최고 대비 -2% 이내)" },
+    { v: Math.round(temp.abovePct * 100) + "%", l: "20일 평균선 위에 있는 종목 비율", n: temp.abovePct >= 0.6 ? "상승 추세 우세" : temp.abovePct <= 0.4 ? "하락 추세 우세" : "혼조",
+      list: aboveList, col: "20일 평균 대비", key: "vsMa20", title: "20일 평균선 위 " + aboveList.length + "개 · 아래 " + belowList.length + "개", list2: belowList, title2: "20일 평균선 아래" }
   ];
-  if (vix) numbers.push({ v: vix.last.toFixed(1), l: "VIX 공포지수", n: vix.last >= 30 ? "공포 구간 — 과거엔 이런 때가 저점 근처였던 적이 많음" : vix.last >= 20 ? "불안 구간" : "평온 구간 — 방심하기 쉬운 때" });
-  if (bigMove) numbers.push({ v: briefPct(bigMove.ret1), l: briefName(bigMove) + " — 최근 90일 중 가장 큰 하루 변동", n: "상위 2% 안" });
+  if (vix) numbers.push({ v: vix.last.toFixed(1), l: "VIX 공포지수", n: vix.last >= 30 ? "공포 구간 — 과거엔 이런 때가 저점 근처였던 적이 많음" : vix.last >= 20 ? "불안 구간" : "평온 구간 — 방심하기 쉬운 때", sym: "^VIX" });
+  if (bigMove) numbers.push({ v: briefPct(bigMove.ret1), l: briefName(bigMove) + " — 최근 90일 중 가장 큰 하루 변동", n: "상위 2% 안", sym: bigMove.sym });
 
   /* 6. 역사 속 이맘때 (±14일, 연도 무관) */
   var hist = [];
@@ -257,6 +264,31 @@ function briefSymLink(s) {
   return '<button class="linkBtn briefSym" data-sym="' + s.sym + '" title="종목 탭에서 보기">' + escapeHtml(briefName(s)) + '</button>';
 }
 function escapeHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+/* 숫자 카드 → 해당 종목 전체 목록 팝업 */
+function openBriefList(n, R) {
+  var box = document.createElement("div");
+  function rows(list, key, col) {
+    if (!list.length) return '<div class="briefDim" style="padding:8px 0">해당 종목이 없어요.</div>';
+    return '<div class="briefRowHead"><span></span><span>종목</span><span>' + col + '</span><span>' + R.label + ' 등락</span></div>' +
+      list.map(function (s, i) {
+        return '<div class="briefRow"><span class="rk">' + (i + 1) + '</span><span class="nm">' + briefSymLink(s) + '</span>' +
+          '<span class="mt"><b>' + briefPct(s[key]) + '</b></span><span class="rt" style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</span></div>';
+      }).join("");
+  }
+  box.innerHTML = '<div class="briefDim" style="margin-bottom:8px">' + escapeHtml(n.title) + ' · ' + n.list.length + '개 · 종목 이름을 누르면 차트로 이동해요</div>' +
+    rows(n.list, n.key, n.col) +
+    (n.list2 ? '<h3 style="margin-top:18px">' + escapeHtml(n.title2) + ' <small>' + n.list2.length + '개</small></h3>' + rows(n.list2, n.key, n.col) : "");
+  Array.prototype.forEach.call(box.querySelectorAll(".briefSym"), function (b) {
+    b.onclick = function () {
+      infoModal.close();
+      $("searchInput").value = b.getAttribute("data-sym");
+      navTo("single", "chart");
+      if (typeof load === "function") load();
+    };
+  });
+  infoModal.open(n.v + " — " + n.l, box);
+}
 
 function renderBrief() {
   var R = briefState.result, box = $("briefBody");
@@ -318,9 +350,18 @@ function renderBrief() {
   }).join("");
 
   /* 숫자·역사 */
-  $("briefNumbers").innerHTML = R.numbers.map(function (n) {
-    return '<div class="briefNum"><b>' + n.v + '</b><span>' + escapeHtml(n.l) + '</span><small>' + escapeHtml(n.n) + '</small></div>';
+  $("briefNumbers").innerHTML = R.numbers.map(function (n, i) {
+    var hint = n.list ? "종목 보기 ›" : n.sym ? "차트 보기 ›" : "";
+    return '<div class="briefNum' + (hint ? " briefNumBtn" : "") + '" data-num="' + i + '"><b>' + n.v + '</b><span>' + escapeHtml(n.l) + '</span><small>' + escapeHtml(n.n) + '</small>' +
+      (hint ? '<em>' + hint + '</em>' : '') + '</div>';
   }).join("");
+  Array.prototype.forEach.call($("briefNumbers").querySelectorAll(".briefNumBtn"), function (el) {
+    el.onclick = function () {
+      var n = R.numbers[+el.getAttribute("data-num")];
+      if (n.sym) { $("searchInput").value = n.sym; navTo("single", "chart"); if (typeof load === "function") load(); return; }
+      openBriefList(n, R);
+    };
+  });
   var hist = R.history;
   $("briefHistory").innerHTML = hist.length ? hist.map(function (e) {
     var col = (typeof EVENT_TYPES !== "undefined" && EVENT_TYPES[e.type]) || "#8b95a1";
