@@ -1,42 +1,22 @@
-// /api/cron-snapshot — 하루 2회 자동 실행 (vercel.json)
+// /api/cron-snapshot — 매일 아침 자동 실행 (vercel.json: 한국시간 07:30·08:30)
 //
-// Vercel Blob의 "Advanced Operations"(put/list)는 무료 월 2,000회뿐이다.
-// 종목마다 매일 파일을 새로 쓰면 하루 수백 회가 되어 한도를 크게 넘는다.
-// 그래서 쓰기를 이렇게 나눈다.
+// 저장소는 Upstash Redis 하나만 쓴다 (v5.5부터 Vercel Blob 제거).
+//   Blob은 무료 쓰기 한도가 월 2,000회뿐이라 한 번 넘기면 저장소 전체가 정지됐다.
+//   Redis는 월 50만 명령·256MB·요청 10MB라 이 앱 규모(하루 약 30명령, 약 50MB)에 여유가 크다.
 //
-//   ① 과거 전체(charts/SYM.json) : 종목을 며칠에 걸쳐 순환 갱신 → 실행당 10회
-//   ② 최근 구간(recent.json)     : 전 종목의 최근 90일을 한 파일에 → 실행당 1회
-//   ③ 목록(manifest.json)        : 실행당 1회
+//   ① 과거 전체(sm:chart:SYM) : 종목을 며칠에 걸쳐 순환 갱신 → 실행당 40개
+//   ② 최근 구간(sm:recent)    : 전 종목의 최근 90일을 한 값에 → 실행당 1개
+//   ③ 목록(sm:manifest)       : 실행당 1개
+//   값은 전부 gzip+base64. 읽기는 /api/snap 이 풀어서 주고 CDN이 캐시한다.
 //
-// 클라이언트가 ①+②를 합쳐 쓰므로 ①이 며칠 지나도 화면 데이터는 항상 최신이다.
-// 실행당 쓰기 ≈ 12회, 하루 2회 → 월 약 720회로 한도 안에 들어온다.
-import { put, list } from "@vercel/blob";
-import { gzipSync } from "zlib";
-
-/* Upstash Redis — recent(전 종목 최근 90일)를 여기에도 저장한다.
-   Blob이 한도 초과로 정지돼도 '오늘' 브리핑·전 종목 지도가 계속 돌아가게 하기 위해서다.
-   gzip+base64로 줄이면 약 1MB → 200KB 안팎이라 무료 요청 한도(1MB) 안에 들어온다. */
-function redisConf() {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-  return url && token ? { url: url.replace(/\/$/, ""), token } : null;
-}
-async function redisSet(conf, key, value, exSec) {
-  const r = await fetch(conf.url, {
-    method: "POST",
-    headers: { Authorization: "Bearer " + conf.token, "Content-Type": "application/json" },
-    body: JSON.stringify(["SET", key, value, "EX", String(exSec)]),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || j.error) throw new Error("Redis: " + (j.error || "HTTP " + r.status));
-  return j.result;
-}
+// 클라이언트가 ①+②를 합쳐 쓰므로 ①이 며칠 지나도 화면 데이터는 항상 최신이다. 실행당 명령 ≈ 43회, 하루 2회 → 월 약 2,600회.
+import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY } from "./_redis.js";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const CONCURRENCY = 6;
 const TIME_BUDGET_MS = 55000;
-const HISTORY_PER_RUN = 10;   // 한 번에 과거 전체를 다시 받을 종목 수
+const HISTORY_PER_RUN = 40;   // 한 번에 과거 전체를 다시 받을 종목 수 (Redis는 쓰기 한도가 넉넉해 넉넉히 잡는다. 시간 예산 55초 안에서 멈춘다)
 const RECENT_DAYS = 90;       // recent.json이 담는 최근 일수
 
 async function loadSymbols(origin) {
@@ -108,19 +88,6 @@ function toSnapshot(symbol, r, maxYears) {
   return { s: symbol, meta, t, o, h, l, c, a, v, div, updated: new Date().toISOString().slice(0, 10) };
 }
 
-async function readJson(url) {
-  try {
-    const r = await fetch(url, { cache: "no-store" });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch (e) { return null; }
-}
-
-function blobBase() {
-  const id = (process.env.BLOB_STORE_ID || "").replace(/^store_/, "");
-  return id ? "https://" + id + ".public.blob.vercel-storage.com/" : null;
-}
-
 export default async function handler(req, res) {
   const started = Date.now();
   if (process.env.CRON_SECRET) {
@@ -133,10 +100,12 @@ export default async function handler(req, res) {
 
   const proto = req.headers["x-forwarded-proto"] || "https";
   const origin = proto + "://" + req.headers.host;
-  const putOpts = { access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" };
   const today = new Date().toISOString().slice(0, 10);
   const force = req.query.force === "1";
-  const base = blobBase();
+  const redis = redisConf();
+  if (!redis) {
+    return res.status(500).json({ error: "Redis가 연결되지 않았습니다 (KV_REST_API_URL / KV_REST_API_TOKEN 필요)." });
+  }
 
   let symbols;
   try {
@@ -146,14 +115,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "심볼 목록을 읽지 못했습니다: " + e.message });
   }
 
-  // list()도 Advanced Operation이므로 공개 URL로 직접 읽는다 (주소를 못 구할 때만 list 사용)
-  let manifest = base ? await readJson(base + "manifest.json") : null;
-  if (!manifest) {
-    try {
-      const r = await list({ prefix: "manifest.json", limit: 1 });
-      if (r.blobs && r.blobs[0]) manifest = await readJson(r.blobs[0].url);
-    } catch (e) { /* 처음이면 새로 만든다 */ }
-  }
+  let manifest = null;
+  try { const t = await getJsonGzText(redis, KEY.manifest); if (t) manifest = JSON.parse(t); } catch (e) { /* 처음이면 새로 만든다 */ }
   const entries = (manifest && manifest.symbols) || {};
 
   let writes = 0;
@@ -174,7 +137,7 @@ export default async function handler(req, res) {
         if (!r) throw new Error("no data");
         const snap = toSnapshot(sym, r, 25);
         if (!snap.t.length) throw new Error("empty");
-        await put("charts/" + sym + ".json", JSON.stringify(snap), putOpts);
+        await setJsonGz(redis, KEY.chart(sym), snap, 45 * 86400);   // 45일 안에 다시 안 받으면 만료
         writes++;
         entries[sym] = { ...(entries[sym] || {}), history: today, rows: snap.t.length, updated: today };
         done.push(sym);
@@ -200,23 +163,12 @@ export default async function handler(req, res) {
       } catch (e) { /* 건너뛴다 */ }
     }));
   }
-  let redisRecent = null, blobRecent = null;
+  let recentSaved = null;
   if (recentOk > 0) {
-    const body = JSON.stringify(recent);
-    // ②-a Redis (있으면) — 3일 뒤 자동 만료. 다음 실행이 덮어쓴다.
-    const redis = redisConf();
-    if (redis) {
-      try {
-        const gz = gzipSync(Buffer.from(body, "utf8")).toString("base64");
-        await redisSet(redis, "sm:recent", gz, 3 * 86400);
-        redisRecent = { bytes: gz.length, ok: true };
-      } catch (e) { redisRecent = { ok: false, error: String(e.message).slice(0, 120) }; }
-    }
-    // ②-b Blob — 정지 중이면 건너뛴다 (실패해도 아래 계속)
     try {
-      await put("recent.json", body, { ...putOpts, cacheControlMaxAge: 10800 });   // 3시간: 하루 2번만 바뀌므로 캐시 미스(읽기 한도)를 줄인다
-      writes++; blobRecent = { ok: true };
-    } catch (e) { blobRecent = { ok: false, error: String(e.message).slice(0, 120) }; }
+      const bytes = await setJsonGz(redis, KEY.recent, recent, 7 * 86400);
+      writes++; recentSaved = { ok: true, bytes };
+    } catch (e) { recentSaved = { ok: false, error: String(e.message).slice(0, 120) }; }
     for (const sym of Object.keys(recent.symbols)) {
       entries[sym] = { ...(entries[sym] || {}), updated: today };
     }
@@ -226,22 +178,23 @@ export default async function handler(req, res) {
   const withHistory = symbols.filter((s) => entries[s] && entries[s].history).length;
   let manifestOk = true;
   try {
-    await put("manifest.json", JSON.stringify({
+    await setJsonGz(redis, KEY.manifest, {
       generated: new Date().toISOString(),
       recentDays: RECENT_DAYS,
       complete: withHistory === symbols.length,
       symbols: entries,
-    }), { ...putOpts, cacheControlMaxAge: 10800 });
+    });
     writes++;
   } catch (e) { manifestOk = false; }
 
   res.status(200).json({
     ok: true,
-    blobWrites: writes,
+    store: "redis",
+    redisWrites: writes,
     historyUpdated: done.length,
     historyRemaining: symbols.length - withHistory,
     recentSymbols: recentOk,
-    redisRecent, blobRecent, manifestOk,
+    recentSaved, manifestOk,
     failed: failed.slice(0, 10),
     elapsedMs: Date.now() - started,
     note: "과거 전체는 순환 갱신, 최근 " + RECENT_DAYS + "일은 매 실행 전 종목 갱신",
