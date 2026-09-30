@@ -32,7 +32,8 @@ var BRIEF_THEMES = [
 ];
 /* 참고 종목에서 빼는 것: 레버리지·인버스·변동성지수·환율 (숫자 기준이 왜곡된다) */
 var BRIEF_EXCLUDE = /^(TQQQ|SOXL|122630\.KS|114800\.KS|\^VIX|DX-Y\.NYB|KRW=X|JPYKRW=X|EURKRW=X)$/;
-/* 인기 종목 (사람들이 가장 많이 찾는 것들 — 고정 목록 + 거래대금으로 '관심 열기' 표시) */
+/* 인기 종목 기본 목록 — 실제로는 이 앱에서 최근 2주간 많이 조회·관심 담은 순위(/api/snap?popular=1)로 매일 바뀐다.
+   조회 데이터가 아직 적을 때(합계 30 미만)만 이 목록을 쓴다. */
 var BRIEF_POPULAR = ["005930.KS", "000660.KS", "SPY", "QQQ", "NVDA", "TSLA", "AAPL", "PLTR", "BTC-USD", "ETH-USD", "XRP-USD", "GLD", "^KS11", "KRW=X"];
 var BRIEF_MAX = { movers: 15, picks: 12, turnover: 10 };
 var BRIEF_INDEX_ROW = [["^KS11", "코스피"], ["^KQ11", "코스닥"], ["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["KRW=X", "달러/원"], ["GLD", "금"], ["BTC-USD", "비트코인"], ["^VIX", "공포지수"]];
@@ -164,7 +165,6 @@ function briefCompute(recent, opts) {
   /* 4-b. 인기 종목 + 거래대금 순위 */
   var fx = bySym["KRW=X"] ? bySym["KRW=X"].last : 1400;
   function amtKrw(s) { return s.amt * (/\.K[SQ]$/.test(s.sym) || s.cur === "KRW" ? 1 : fx); }
-  var popular = BRIEF_POPULAR.map(function (sym) { return bySym[sym]; }).filter(Boolean);
   var withAmt = rows.filter(function (s) { return s.amt > 0 && !/^\^|=X$|=F$/.test(s.sym) && !BRIEF_EXCLUDE.test(s.sym); });
   var turnover = {
     kr: withAmt.filter(function (s) { return /\.K[SQ]$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
@@ -172,6 +172,27 @@ function briefCompute(recent, opts) {
     coin: withAmt.filter(function (s) { return /-USD$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, 5)
   };
   var hotVol = withAmt.filter(function (s) { return s.amtX != null && s.amtX >= 1.8; }).sort(function (a, b) { return b.amtX - a.amtX; }).slice(0, BRIEF_MAX.turnover);
+  var popSrc = "default", popScore = {};
+  var ranked = (opts.popular || []).filter(function (p) { return bySym[p.s] && !BRIEF_EXCLUDE.test(p.s); });
+  var popTotal = ranked.reduce(function (a, p) { return a + p.score; }, 0);
+  var popular;
+  if (popTotal >= 30 && ranked.length >= 6) {
+    popSrc = "ranked";
+    ranked.forEach(function (p, i) { popScore[p.s] = { score: p.score, rank: i + 1 }; });
+    popular = ranked.slice(0, 14).map(function (p) { return bySym[p.s]; });
+    // 순위 밖이라도 대표 지수·환율은 맨 뒤에 붙여 준다
+    ["^KS11", "KRW=X"].forEach(function (sym) { if (bySym[sym] && popular.indexOf(bySym[sym]) < 0 && popular.length < 16) popular.push(bySym[sym]); });
+  } else {
+    // 조회 기록이 아직 적으면 거래대금(종가×거래량) 기준으로 매일 자동 구성:
+    // 한국 5 + 미국 5 + 코인 2 + 거래대금이 평소보다 급증한 것 2 → 고정 목록이 아니라 그날 시장이 정한다
+    popSrc = "turnover";
+    var seen = {};
+    function pushAll(list, n) { list.slice(0, n).forEach(function (s) { if (!seen[s.sym]) { seen[s.sym] = 1; popular.push(s); } }); }
+    popular = [];
+    pushAll(turnover.kr, 5); pushAll(turnover.us, 5); pushAll(turnover.coin, 2); pushAll(hotVol, 2);
+    if (popular.length < 6) popular = BRIEF_POPULAR.map(function (sym) { return bySym[sym]; }).filter(Boolean);
+    ["^KS11", "KRW=X"].forEach(function (sym) { if (bySym[sym] && !seen[sym]) popular.push(bySym[sym]); });
+  }
 
   /* 5. 오늘의 숫자 */
   var saleN = stocks.filter(function (s) { return s.vsHi != null && s.vsHi <= -0.2; }).length;
@@ -197,7 +218,7 @@ function briefCompute(recent, opts) {
       if (diff <= 14 && d.getFullYear() < now.getFullYear()) hist.push({ date: e.date, name: e.name, type: e.type, years: now.getFullYear() - d.getFullYear() });
     });
   }
-  return { mode: mode, label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
+  return { mode: mode, label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
 }
 
 /* 뉴스 제목 묶음 → 키워드 순위 (NEWS_TAGS 재사용) */
@@ -309,11 +330,17 @@ function renderBrief() {
     : '<div class="briefDim">이맘때 기록된 큰 사건은 없어요. 조용한 계절이네요.</div>';
 
   /* 인기 종목 */
+  $("briefPopNote").textContent = R.popSrc === "ranked"
+    ? "이 앱에서 최근 2주간 많이 조회하고 관심에 담은 순서예요 (지난 주는 절반 가중치). 매일 바뀌어요."
+    : R.popSrc === "turnover"
+    ? "오늘 거래대금(종가×거래량)이 가장 큰 종목들이에요 — 한국 5 · 미국 5 · 코인 2 · 거래가 급증한 2. 이 앱의 조회 기록이 쌓이면 '사람들이 많이 본 순서'로 바뀌어요."
+    : "아직 데이터가 적어 기본 목록을 보여드려요.";
   $("briefPopular").innerHTML = R.popular.map(function (s) {
+    var rk = R.popScore[s.sym];
     var noAmt = /^\^|=X$|=F$/.test(s.sym);   // 지수·환율은 거래대금이 의미 없다
     var heat = noAmt || s.amtX == null ? "" : s.amtX >= 1.5 ? "🔥 관심 몰림" : s.amtX >= 1.1 ? "활발" : s.amtX <= 0.7 ? "조용" : "보통";
     return '<div class="briefPop">' +
-      '<div class="briefPopHead">' + briefSymLink(s) + '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>' +
+      '<div class="briefPopHead">' + (rk ? '<span class="briefPopRank">' + rk.rank + '</span>' : '') + briefSymLink(s) + '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>' +
       '<div class="briefPopMeta">' + (s.vsHi != null ? "52주 최고 대비 " + briefPct(s.vsHi) : "") +
       (!noAmt && s.amtX != null ? ' · 거래대금 평소의 ' + s.amtX.toFixed(1) + '배' : "") + '</div>' +
       (heat ? '<div class="briefPopHeat">' + heat + '</div>' : "") +
@@ -400,13 +427,16 @@ function loadBrief(force) {
   if (briefState.result && !force) { renderBrief(); return; }
   st.textContent = "전 종목 데이터 정리 중… (한 번만 받아요)";
   $("briefBody").classList.add("hidden");
-  dataReady().then(function () { return briefState.recent || fetchRecent(); }).then(function (recent) {
+  var popP = fetch("/api/snap?popular=1").then(function (r) { return r.json(); }).then(function (j) { return (j && j.items) || []; }).catch(function () { return []; });
+  Promise.all([dataReady().then(function () { return briefState.recent || fetchRecent(); }), popP]).then(function (arr) {
+    var recent = arr[0];
+    briefState.popular = arr[1];
     if (!recent || !recent.symbols) {
       st.innerHTML = "아직 정리할 데이터가 없어요. 매일 아침 자동 수집이 끝나면 여기에 브리핑이 나와요.";
       return;
     }
     briefState.recent = recent;
-    briefState.result = briefCompute(recent, { mode: briefState.mode });
+    briefState.result = briefCompute(recent, { mode: briefState.mode, popular: briefState.popular });
     st.textContent = "";
     $("briefBody").classList.remove("hidden");
     renderBrief();
@@ -420,7 +450,7 @@ function switchBriefMode(mode) {
   Array.prototype.forEach.call(document.querySelectorAll("#briefModeTabs [data-bm]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-bm") === mode);
   });
-  if (briefState.recent) { briefState.result = briefCompute(briefState.recent, { mode: mode }); renderBrief(); }
+  if (briefState.recent) { briefState.result = briefCompute(briefState.recent, { mode: mode, popular: briefState.popular }); renderBrief(); }
   else loadBrief(true);
 }
 Array.prototype.forEach.call(document.querySelectorAll("#briefModeTabs [data-bm]"), function (b) {

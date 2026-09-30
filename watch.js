@@ -23,6 +23,7 @@ function toggleWatch(sym, name) {
   else {
     if (list.length >= 20) { setStatus("관심 종목은 최대 20개까지입니다.", true); return false; }
     list.push({ s: sym, n: name || sym, t: Date.now() });
+    if (typeof popHit === "function") popHit(sym, "watch");
   }
   saveWatch(list);
   syncWatchBtn();
