@@ -2,15 +2,29 @@
   "name": "StockMind — 하락이 와도 흔들리지 않는 투자",
   "short_name": "StockMind",
   "description": "과거 데이터로 '얼마나 떨어지고, 얼마 만에 회복했는지' 보여주는 주식 분석 앱",
-  "start_url": "./?src=pwa",
-  "scope": "./",
+  "start_url": "/?src=pwa",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f2f4f6",
   "theme_color": "#f2f4f6",
   "lang": "ko",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/"
 }
