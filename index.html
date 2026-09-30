@@ -552,6 +552,18 @@
   .briefNewsLink { font-size: 12px; color: var(--txt2); text-decoration: none; line-height: 1.5; display: block; }
   .briefNewsLink:hover { color: var(--accent); }
   .briefNewsLink small { color: var(--sub); margin-left: 4px; }
+  .briefMore { display: block; width: 100%; margin-top: 8px; padding: 9px; border: 1px dashed var(--line); border-radius: 12px; background: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .briefMore:hover { background: var(--accentSoft); }
+  .briefPopGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .briefPop { background: var(--soft); border-radius: 14px; padding: 12px 14px; }
+  .briefPopHead { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+  .briefPopMeta { font-size: 11px; color: var(--sub); margin-top: 3px; line-height: 1.5; }
+  .briefPopHeat { font-size: 11px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+  .briefThreeCol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .briefTo { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .briefToRank { width: 18px; color: var(--sub); font-size: 12px; text-align: right; }
+  .briefToAmt { margin-left: auto; color: var(--txt2); font-size: 12px; white-space: nowrap; }
+  .briefToAmt small { color: var(--sub); }
   .briefKwChip { display: inline-flex; align-items: center; gap: 4px; background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--txt2); }
   .briefKwChip b { color: var(--accent); }
   .briefKwChip.hot { background: #fff1f2; border-color: #ffd8dc; color: var(--txt); }
@@ -577,8 +589,8 @@
   .briefSym.linkBtn { color: var(--txt); font-weight: 600; text-decoration: none; padding: 0; font-size: inherit; }
   .briefSym.linkBtn:hover { color: var(--accent); }
   @media (max-width: 700px) {
-    .briefTemp, .briefThemeList, .briefTwoCol, .briefPickGrid { grid-template-columns: 1fr; }
-    .briefNumGrid { grid-template-columns: 1fr 1fr; }
+    .briefTemp, .briefThemeList, .briefTwoCol, .briefPickGrid, .briefThreeCol { grid-template-columns: 1fr; }
+    .briefNumGrid, .briefPopGrid { grid-template-columns: 1fr 1fr; }
     .tabs button { font-size: 10px; }
   }
   /* v5 보완 */
@@ -1374,6 +1386,8 @@
       <li><b>금일</b>은 각 종목의 마지막 거래일 하루 변화, <b>금주</b>는 최근 5거래일 변화예요. 한국·미국 시장은 마감 시각이 달라 기준일이 하루 다를 수 있어요.</li>
       <li><b>참고 종목</b>의 각 칸은 어떤 숫자로 걸렀는지 이유를 같이 보여줘요. 이유가 납득되지 않으면 그 종목은 넘기세요.</li>
       <li>레버리지·인버스 ETF, 환율, 공포지수는 숫자 기준이 왜곡되어 참고 종목에서 뺐어요.</li>
+      <li>모든 등락은 <b>종가 기준</b>이에요(마지막 거래일 종가 ÷ 그 전 거래일 종가). 네이버·증권사 앱은 장중에 실시간 가격으로 보여주므로, 장이 열려 있는 시간에 보면 숫자가 달라요. 장 마감 뒤에는 같아져요.</li>
+      <li>거래대금은 종가 × 거래량이라 정확한 거래소 집계와 조금 차이 날 수 있어요. 순위와 '평소 대비 배수'를 보는 용도예요.</li>
       <li>급등·급락 종목의 기사 제목은 "이유 후보"예요. 기사가 없으면 시장 전체 흐름일 가능성이 커요.</li>
     </ul>
     이 화면은 "무엇을 살까"보다 <b>"오늘 시장이 어떤 상태인가"</b>를 파악하는 데 쓰세요. 투자 조언이 아닙니다.
@@ -1399,6 +1413,20 @@
       </div>
       <h3 style="margin-top:18px">뉴스 키워드 <small>최근 기사 제목에서 가장 많이 나온 말</small></h3>
       <div id="briefKeywords"><div class="briefDim">뉴스 불러오는 중…</div></div>
+    </section>
+
+    <section class="briefSec snapTarget" data-snap-title="인기 종목">
+      <h3>인기 종목 <small>많이 찾는 종목의 오늘 · '거래대금 평소의 N배'가 클수록 관심이 몰린 날</small></h3>
+      <div id="briefPopular" class="briefPopGrid"></div>
+      <h3 style="margin-top:18px">돈이 몰린 곳 <small>거래대금 순위</small></h3>
+      <div class="briefThreeCol">
+        <div><div class="briefColTitle">🇰🇷 한국</div><div id="briefToKr"></div></div>
+        <div><div class="briefColTitle">🇺🇸 미국</div><div id="briefToUs"></div></div>
+        <div><div class="briefColTitle">🪙 코인</div><div id="briefToCoin"></div></div>
+      </div>
+      <h3 style="margin-top:18px">평소보다 유난히 많이 거래된 <small>거래대금이 20일 평균의 1.8배 이상</small></h3>
+      <div id="briefHotVol"></div>
+      <div id="briefToNote" class="briefDim" style="margin-top:8px"></div>
     </section>
 
     <section class="briefSec snapTarget" data-snap-title="참고 종목">
@@ -1602,7 +1630,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · v5.5<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · v5.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1616,7 +1644,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script src="tickers.js?v=5.5"></script>
+<script src="tickers.js?v=5.6"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -3873,16 +3901,16 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=5.5"></script>
-<script src="technical.js?v=5.5"></script>
-<script src="company.js?v=5.5"></script>
-<script src="compare.js?v=5.5"></script>
-<script src="sim.js?v=5.5"></script>
-<script src="insight.js?v=5.5"></script>
-<script src="guide.js?v=5.5"></script>
-<script src="watch.js?v=5.5"></script>
-<script src="holdings.js?v=5.5"></script>
-<script src="brief.js?v=5.5"></script>
-<script src="snapshot.js?v=5.5"></script>
+<script src="metrics.js?v=5.6"></script>
+<script src="technical.js?v=5.6"></script>
+<script src="company.js?v=5.6"></script>
+<script src="compare.js?v=5.6"></script>
+<script src="sim.js?v=5.6"></script>
+<script src="insight.js?v=5.6"></script>
+<script src="guide.js?v=5.6"></script>
+<script src="watch.js?v=5.6"></script>
+<script src="holdings.js?v=5.6"></script>
+<script src="brief.js?v=5.6"></script>
+<script src="snapshot.js?v=5.6"></script>
 </body>
 </html>

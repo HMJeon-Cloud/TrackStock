@@ -29,7 +29,7 @@
     ".snapBox .tableWrap{max-height:none!important;overflow:visible!important}" +
     ".snapBox th,.snapBox td{position:static!important}" +
     ".snapBox .snapRow,.snapBox .infoBtn,.snapBox .briefWatch{display:none!important}" +
-    ".snapBox .briefPickGrid,.snapBox .briefThemeList,.snapBox .briefTwoCol{grid-template-columns:1fr 1fr!important}.snapBox .briefTemp{grid-template-columns:1.1fr 1fr!important}" +
+    ".snapBox .briefPickGrid,.snapBox .briefThemeList,.snapBox .briefTwoCol{grid-template-columns:1fr 1fr!important}.snapBox .briefThreeCol{grid-template-columns:1fr 1fr 1fr!important}.snapBox .briefPopGrid{grid-template-columns:1fr 1fr 1fr 1fr!important}.snapBox .briefMore{display:none!important}.snapBox .briefTemp{grid-template-columns:1.1fr 1fr!important}" +
     ".snapPrev{text-align:center}" +
     ".snapPrev img{max-width:100%;max-height:60vh;border:1px solid var(--line,#e5e8eb);border-radius:12px;background:#fff}" +
     ".snapPrev .snapBtns{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}" +

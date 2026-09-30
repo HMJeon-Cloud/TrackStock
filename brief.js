@@ -32,6 +32,9 @@ var BRIEF_THEMES = [
 ];
 /* 참고 종목에서 빼는 것: 레버리지·인버스·변동성지수·환율 (숫자 기준이 왜곡된다) */
 var BRIEF_EXCLUDE = /^(TQQQ|SOXL|122630\.KS|114800\.KS|\^VIX|DX-Y\.NYB|KRW=X|JPYKRW=X|EURKRW=X)$/;
+/* 인기 종목 (사람들이 가장 많이 찾는 것들 — 고정 목록 + 거래대금으로 '관심 열기' 표시) */
+var BRIEF_POPULAR = ["005930.KS", "000660.KS", "SPY", "QQQ", "NVDA", "TSLA", "AAPL", "PLTR", "BTC-USD", "ETH-USD", "XRP-USD", "GLD", "^KS11", "KRW=X"];
+var BRIEF_MAX = { movers: 15, picks: 12, turnover: 10 };
 var BRIEF_INDEX_ROW = [["^KS11", "코스피"], ["^KQ11", "코스닥"], ["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["KRW=X", "달러/원"], ["GLD", "금"], ["BTC-USD", "비트코인"], ["^VIX", "공포지수"]];
 
 /* ---------- 순수 계산 ---------- */
@@ -53,6 +56,9 @@ function briefStats(sym, d, mode) {
   for (i = n - 5; i < n; i++) v5 += v[i] || 0;
   for (i = Math.max(0, n - 25); i < n - 5; i++) v20 += v[i] || 0;
   v5 /= 5; v20 /= Math.max(1, Math.min(20, n - 5));
+  // 거래대금(마지막 날): 코인은 야후 거래량이 이미 달러 금액, 주식은 종가×주식수
+  var amtLast = /-USD$/.test(sym) ? (v[n - 1] || 0) : (v[n - 1] || 0) * last;
+  var amtAvg = /-USD$/.test(sym) ? v20 : v20 * ma20;
   // 일간 수익률 변동성(90일) — 조용한 우상향 판단
   var rs = [], mean = 0;
   for (i = 1; i < n; i++) { var r = c[i] / c[i - 1] - 1; rs.push(r); mean += r; }
@@ -70,6 +76,7 @@ function briefStats(sym, d, mode) {
     last: last, ret: ret, ret1: ret1, ret5: ret5, m1: m1, m3: m3, ma20: ma20, ma5: ma5, vsMa20: last / ma20 - 1,
     vsHi: vsHi, vs90: vs90, rsi: rsi, volX: v20 > 0 ? v5 / v20 : null, sd: sd, above20: last >= ma20,
     pctRank: rs.length ? 1 - bigger / rs.length : null, crossUp: crossUp,
+    amt: amtLast, amtX: amtAvg > 0 ? amtLast / amtAvg : null,
     lastT: d.t && d.t.length ? d.t[d.t.length - 1] * 1000 : null,
     bestDay: null
   };
@@ -116,21 +123,24 @@ function briefCompute(recent, opts) {
 
   /* 3. 급등·급락 */
   var sorted = stocks.slice().sort(function (a, b) { return b.ret - a.ret; });
-  var movers = { up: sorted.slice(0, 5), down: sorted.slice(-5).reverse() };
+  var movers = { up: sorted.slice(0, BRIEF_MAX.movers), down: sorted.slice(-BRIEF_MAX.movers).reverse() };
+  // 시장별 기준일 (한국·미국은 마감 시각이 달라 하루 차이 날 수 있다)
+  var asOfKr = 0, asOfUs = 0;
+  rows.forEach(function (s) { if (!s.lastT) return; if (/\.K[SQ]$|^\^KS|^\^KQ/.test(s.sym)) { if (s.lastT > asOfKr) asOfKr = s.lastT; } else if (s.lastT > asOfUs) asOfUs = s.lastT; });
 
   /* 4. 참고 종목 (규칙) */
   function take(list, n) { return list.slice(0, n); }
   var rising = take(stocks.filter(function (s) { return s.ret5 != null && s.ret5 > 0.03 && s.above20 && (s.volX == null || s.volX >= 1.0); })
-    .sort(function (a, b) { return (b.ret5 + (b.volX ? Math.min(b.volX, 3) * 0.01 : 0)) - (a.ret5 + (a.volX ? Math.min(a.volX, 3) * 0.01 : 0)); }), 4);
+    .sort(function (a, b) { return (b.ret5 + (b.volX ? Math.min(b.volX, 3) * 0.01 : 0)) - (a.ret5 + (a.volX ? Math.min(a.volX, 3) * 0.01 : 0)); }), BRIEF_MAX.picks);
   var sale = take(stocks.filter(function (s) { return s.vsHi != null && s.vsHi <= -0.15 && s.ret5 != null && s.ret5 > 0 && s.last > s.ma5; })
-    .sort(function (a, b) { return a.vsHi - b.vsHi; }), 4);
+    .sort(function (a, b) { return a.vsHi - b.vsHi; }), BRIEF_MAX.picks);
   var steady = take(stocks.filter(function (s) { return s.m3 > 0.05 && s.above20 && s.sd > 0; })
-    .sort(function (a, b) { return a.sd - b.sd; }), 4);
+    .sort(function (a, b) { return a.sd - b.sd; }), BRIEF_MAX.picks);
   var hot = take(stocks.filter(function (s) { return s.vsMa20 >= 0.12 || (s.rsi != null && s.rsi >= 75); })
-    .sort(function (a, b) { return b.vsMa20 - a.vsMa20; }), 4);
+    .sort(function (a, b) { return b.vsMa20 - a.vsMa20; }), BRIEF_MAX.picks);
   var cold = take(stocks.filter(function (s) { return (s.rsi != null && s.rsi <= 30) || s.vsMa20 <= -0.12; })
-    .sort(function (a, b) { return a.vsMa20 - b.vsMa20; }), 4);
-  var crossed = take(stocks.filter(function (s) { return s.crossUp; }).sort(function (a, b) { return b.ret1 - a.ret1; }), 4);
+    .sort(function (a, b) { return a.vsMa20 - b.vsMa20; }), BRIEF_MAX.picks);
+  var crossed = take(stocks.filter(function (s) { return s.crossUp; }).sort(function (a, b) { return b.ret1 - a.ret1; }), BRIEF_MAX.picks);
 
   function why(kind, s) {
     var nm = briefName(s);
@@ -150,6 +160,18 @@ function briefCompute(recent, opts) {
     { id: "hot", icon: "🌡️", title: "과열 주의", sub: "20일 평균보다 12% 이상 위 또는 RSI 75 이상", items: hot },
     { id: "cold", icon: "🧊", title: "과하게 눌린", sub: "RSI 30 이하 또는 20일 평균보다 12% 이상 아래", items: cold }
   ].map(function (p) { p.items = p.items.map(function (s) { return { s: s, why: why(p.id, s) }; }); return p; });
+
+  /* 4-b. 인기 종목 + 거래대금 순위 */
+  var fx = bySym["KRW=X"] ? bySym["KRW=X"].last : 1400;
+  function amtKrw(s) { return s.amt * (/\.K[SQ]$/.test(s.sym) || s.cur === "KRW" ? 1 : fx); }
+  var popular = BRIEF_POPULAR.map(function (sym) { return bySym[sym]; }).filter(Boolean);
+  var withAmt = rows.filter(function (s) { return s.amt > 0 && !/^\^|=X$|=F$/.test(s.sym) && !BRIEF_EXCLUDE.test(s.sym); });
+  var turnover = {
+    kr: withAmt.filter(function (s) { return /\.K[SQ]$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
+    us: withAmt.filter(function (s) { return !/\.K[SQ]$|-USD$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
+    coin: withAmt.filter(function (s) { return /-USD$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, 5)
+  };
+  var hotVol = withAmt.filter(function (s) { return s.amtX != null && s.amtX >= 1.8; }).sort(function (a, b) { return b.amtX - a.amtX; }).slice(0, BRIEF_MAX.turnover);
 
   /* 5. 오늘의 숫자 */
   var saleN = stocks.filter(function (s) { return s.vsHi != null && s.vsHi <= -0.2; }).length;
@@ -175,7 +197,7 @@ function briefCompute(recent, opts) {
       if (diff <= 14 && d.getFullYear() < now.getFullYear()) hist.push({ date: e.date, name: e.name, type: e.type, years: now.getFullYear() - d.getFullYear() });
     });
   }
-  return { mode: mode, label: label, asOf: asOf, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
+  return { mode: mode, label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
 }
 
 /* 뉴스 제목 묶음 → 키워드 순위 (NEWS_TAGS 재사용) */
@@ -191,7 +213,22 @@ function briefKeywords(items) {
 }
 
 /* ================= UI ================= */
-var briefState = { mode: "day", recent: null, result: null, newsAt: 0 };
+var briefState = { mode: "day", recent: null, result: null, newsAt: 0, open: {} };
+var BRIEF_SHOW = { movers: 5, picks: 4, turnover: 5, hotVol: 5 };
+
+/* 더보기/접기: 목록 HTML 조각들을 받아 앞 n개만 보이고 나머지는 버튼으로 편다 */
+function briefCollapsible(key, parts, n, unit) {
+  if (parts.length <= n) return parts.join("");
+  var open = !!briefState.open[key];
+  var html = parts.slice(0, open ? parts.length : n).join("");
+  html += '<button class="briefMore" data-more="' + key + '">' + (open ? "접기 ▲" : "더보기 ▼ (+" + (parts.length - n) + (unit || "개") + ")") + '</button>';
+  return html;
+}
+function briefFmtAmt(krw) {
+  if (krw >= 1e12) return (krw / 1e12).toFixed(1) + "조원";
+  if (krw >= 1e8) return Math.round(krw / 1e8).toLocaleString() + "억원";
+  return Math.round(krw / 1e4).toLocaleString() + "만원";
+}
 
 function briefFmtDate(ms) { if (!ms) return ""; var d = new Date(ms); return d.getFullYear() + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + String(d.getDate()).padStart(2, "0"); }
 function briefColor(x) { return x > 0 ? "var(--up)" : x < 0 ? "var(--down)" : "var(--sub)"; }
@@ -204,7 +241,7 @@ function renderBrief() {
   var R = briefState.result, box = $("briefBody");
   if (!R || !box) return;
   var L = R.label;
-  $("briefAsOf").textContent = "데이터 기준 " + briefFmtDate(R.asOf) + " 종가 · " + R.count + "개 자산 · 사람이 고른 추천이 아니라 숫자 기준으로 걸러낸 참고 목록이에요";
+  $("briefAsOf").textContent = "종가 기준 — 한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs) + " · " + R.count + "개 자산 · 사람이 고른 추천이 아니라 숫자 기준으로 걸러낸 참고 목록이에요";
 
   /* 온도계 */
   var t = R.temp;
@@ -234,14 +271,14 @@ function renderBrief() {
 
   /* 급등락 */
   function moverRows(list, kind) {
-    return list.map(function (s) {
+    return briefCollapsible("mv-" + kind, list.map(function (s) {
       return '<div class="briefMover" data-sym="' + s.sym + '">' +
         '<div class="briefMoverHead">' + briefSymLink(s) + '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>' +
         '<div class="briefMoverMeta">' + (s.vsHi != null ? "52주 최고 대비 " + briefPct(s.vsHi) : "") + (s.volX ? " · 거래량 " + s.volX.toFixed(1) + "배" : "") +
         (s.pctRank != null && s.pctRank >= 0.95 && R.mode === "day" ? " · 최근 90일 중 상위 " + Math.max(1, Math.round((1 - s.pctRank) * 100)) + "% 큰 변동" : "") + '</div>' +
         '<div class="briefMoverNews" data-news="' + s.sym + '">' + (list.indexOf(s) < 3 ? '<span class="briefDim">관련 기사 찾는 중…</span>' : '') + '</div>' +
         '</div>';
-    }).join("");
+    }), BRIEF_SHOW.movers, "개");
   }
   $("briefUp").innerHTML = moverRows(R.movers.up, "up");
   $("briefDown").innerHTML = moverRows(R.movers.down, "down");
@@ -250,12 +287,12 @@ function renderBrief() {
   $("briefPicks").innerHTML = R.picks.map(function (p) {
     return '<div class="briefPick">' +
       '<div class="briefPickHead"><span class="briefPickIcon">' + p.icon + '</span><div><b>' + p.title + '</b><small>' + p.sub + '</small></div></div>' +
-      (p.items.length ? p.items.map(function (it) {
+      (p.items.length ? briefCollapsible("pk-" + p.id, p.items.map(function (it) {
         return '<div class="briefPickItem"><div class="briefPickName">' + briefSymLink(it.s) +
           '<span style="color:' + briefColor(it.s.ret) + '">' + briefPct(it.s.ret) + '</span>' +
           '<button class="chip briefWatch" data-sym="' + it.s.sym + '" data-name="' + escapeHtml(it.s.name) + '">☆ 관심</button></div>' +
           '<div class="briefPickWhy">' + escapeHtml(it.why) + '</div></div>';
-      }).join("") : '<div class="briefDim" style="padding:8px 0">' + L + '은 조건에 맞는 종목이 없어요.</div>') +
+      }), BRIEF_SHOW.picks, "개") : '<div class="briefDim" style="padding:8px 0">' + L + '은 조건에 맞는 종목이 없어요.</div>') +
       '</div>';
   }).join("");
 
@@ -270,6 +307,43 @@ function renderBrief() {
       '<b>' + escapeHtml(e.name) + '</b><span class="briefDim">' + e.date.replace(/-/g, ".") + ' · ' + e.years + '년 전 이맘때</span></div>';
   }).join("") + '<div class="briefDim" style="margin-top:8px">그때도 시장은 무너질 것 같았지만, 지금 차트에서는 작은 점이 됐어요. 종목 탭에서 사건 표시선을 켜면 그 뒤 흐름이 보여요.</div>'
     : '<div class="briefDim">이맘때 기록된 큰 사건은 없어요. 조용한 계절이네요.</div>';
+
+  /* 인기 종목 */
+  $("briefPopular").innerHTML = R.popular.map(function (s) {
+    var noAmt = /^\^|=X$|=F$/.test(s.sym);   // 지수·환율은 거래대금이 의미 없다
+    var heat = noAmt || s.amtX == null ? "" : s.amtX >= 1.5 ? "🔥 관심 몰림" : s.amtX >= 1.1 ? "활발" : s.amtX <= 0.7 ? "조용" : "보통";
+    return '<div class="briefPop">' +
+      '<div class="briefPopHead">' + briefSymLink(s) + '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>' +
+      '<div class="briefPopMeta">' + (s.vsHi != null ? "52주 최고 대비 " + briefPct(s.vsHi) : "") +
+      (!noAmt && s.amtX != null ? ' · 거래대금 평소의 ' + s.amtX.toFixed(1) + '배' : "") + '</div>' +
+      (heat ? '<div class="briefPopHeat">' + heat + '</div>' : "") +
+      '</div>';
+  }).join("");
+  function turnoverRows(list, key) {
+    return briefCollapsible("to-" + key, list.map(function (s, i) {
+      return '<div class="briefTo"><span class="briefToRank">' + (i + 1) + '</span>' + briefSymLink(s) +
+        '<span class="briefToAmt">' + briefFmtAmt(R.amtKrw(s)) + (s.amtX != null ? ' <small>평소의 ' + s.amtX.toFixed(1) + '배</small>' : '') + '</span>' +
+        '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>';
+    }), BRIEF_SHOW.turnover, "개");
+  }
+  $("briefToKr").innerHTML = turnoverRows(R.turnover.kr, "kr");
+  $("briefToUs").innerHTML = turnoverRows(R.turnover.us, "us");
+  $("briefToCoin").innerHTML = R.turnover.coin.length ? turnoverRows(R.turnover.coin, "coin") : '<div class="briefDim">데이터 없음</div>';
+  $("briefHotVol").innerHTML = R.hotVol.length ? briefCollapsible("hv", R.hotVol.map(function (s) {
+    return '<div class="briefTo">' + briefSymLink(s) + '<span class="briefToAmt">평소의 <b>' + s.amtX.toFixed(1) + '배</b> 거래 · ' + briefFmtAmt(R.amtKrw(s)) + '</span>' +
+      '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>';
+  }), BRIEF_SHOW.hotVol, "개") : '<div class="briefDim">' + L + '은 평소보다 유난히 많이 거래된 종목이 없어요.</div>';
+  $("briefToNote").textContent = "거래대금 = 종가 × 거래량 (코인은 24시간 거래액), 달러는 " + Math.round(R.fx).toLocaleString() + "원으로 환산. '평소'는 최근 20일 평균이에요.";
+
+  Array.prototype.forEach.call(box.querySelectorAll(".briefMore"), function (b) {
+    b.onclick = function () {
+      var k = b.getAttribute("data-more");
+      briefState.open[k] = !briefState.open[k];
+      var y = b.getBoundingClientRect().top + window.scrollY;
+      renderBrief();
+      if (!briefState.open[k]) window.scrollTo({ top: Math.max(0, y - 300) });
+    };
+  });
 
   /* 클릭 연결 */
   Array.prototype.forEach.call(box.querySelectorAll(".briefSym"), function (b) {

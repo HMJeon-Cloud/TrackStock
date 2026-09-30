@@ -27,6 +27,8 @@ var TICKER_DICT = [
   ["USO", "원유 ETF (USO)", "오일 유가"],
   ["BTC-USD", "비트코인", "bitcoin 코인"],
   ["ETH-USD", "이더리움", "ethereum"],
+  ["XRP-USD", "리플", "XRP 엑스알피"],
+  ["SOL-USD", "솔라나", "SOL"],
 
   /* ---- 미국 채권 ETF ---- */
   ["TLT", "미국채 20년+ (TLT)", "장기채"],
