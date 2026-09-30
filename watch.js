@@ -436,8 +436,9 @@ Array.prototype.forEach.call(document.querySelectorAll("#mapFilters [data-mf]"),
 
 /* 관심 탭 하위 화면: 관심 종목 / 전체 종목 / 뉴스 */
 var watchPane = "list";
-function switchWatchPane(p) {
+function switchWatchPane(p, fromHistory) {
   if (["list", "map", "news"].indexOf(p) < 0) p = "list";
+  if (!fromHistory && p !== watchPane && typeof pushPaneState === "function") pushPaneState({ wp: p });
   watchPane = p;
   ["list", "map", "news"].forEach(function (k) { $("wp-" + k).classList.toggle("hidden", k !== p); });
   Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {

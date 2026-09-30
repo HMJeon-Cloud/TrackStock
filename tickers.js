@@ -29,6 +29,9 @@ var TICKER_DICT = [
   ["ETH-USD", "이더리움", "ethereum"],
   ["XRP-USD", "리플", "XRP 엑스알피"],
   ["SOL-USD", "솔라나", "SOL"],
+  ["DOGE-USD", "도지코인", "DOGE"],
+  ["ADA-USD", "에이다", "ADA 카르다노"],
+  ["BNB-USD", "바이낸스코인", "BNB"],
 
   /* ---- 미국 채권 ETF ---- */
   ["TLT", "미국채 20년+ (TLT)", "장기채"],

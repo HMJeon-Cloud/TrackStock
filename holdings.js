@@ -610,7 +610,9 @@ $("hToSim").onclick = function () {
 };
 
 /* ---------- 보유 현황 / 과거 시뮬레이션 전환 ---------- */
-function switchPortfolioMode(mode) {
+function switchPortfolioMode(mode, fromHistory) {
+  var cur = $("holdCard").classList.contains("hidden") ? "sim" : "hold";
+  if (!fromHistory && mode !== cur && typeof pushPaneState === "function") pushPaneState({ pm: mode });
   $("holdCard").classList.toggle("hidden", mode !== "hold");
   $("simCard").classList.toggle("hidden", mode !== "sim");
   Array.prototype.forEach.call(document.querySelectorAll("#pfModeTabs [data-pm]"), function (b) {

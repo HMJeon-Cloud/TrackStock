@@ -169,7 +169,7 @@ function briefCompute(recent, opts) {
   var turnover = {
     kr: withAmt.filter(function (s) { return /\.K[SQ]$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
     us: withAmt.filter(function (s) { return !/\.K[SQ]$|-USD$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
-    coin: withAmt.filter(function (s) { return /-USD$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, 5)
+    coin: withAmt.filter(function (s) { return /-USD$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover)
   };
   var hotVol = withAmt.filter(function (s) { return s.amtX != null && s.amtX >= 1.8; }).sort(function (a, b) { return b.amtX - a.amtX; }).slice(0, BRIEF_MAX.turnover);
   var popSrc = "default", popScore = {};
@@ -335,30 +335,37 @@ function renderBrief() {
     : R.popSrc === "turnover"
     ? "오늘 거래대금(종가×거래량)이 가장 큰 종목들이에요 — 한국 5 · 미국 5 · 코인 2 · 거래가 급증한 2. 이 앱의 조회 기록이 쌓이면 '사람들이 많이 본 순서'로 바뀌어요."
     : "아직 데이터가 적어 기본 목록을 보여드려요.";
-  $("briefPopular").innerHTML = R.popular.map(function (s) {
+  var popHead = '<div class="briefRowHead"><span></span><span>종목</span><span>52주 고점比 · 거래 평소比</span><span>등락</span></div>';
+  var popRows = R.popular.map(function (s, i) {
     var rk = R.popScore[s.sym];
     var noAmt = /^\^|=X$|=F$/.test(s.sym);   // 지수·환율은 거래대금이 의미 없다
-    var heat = noAmt || s.amtX == null ? "" : s.amtX >= 1.5 ? "🔥 관심 몰림" : s.amtX >= 1.1 ? "활발" : s.amtX <= 0.7 ? "조용" : "보통";
-    return '<div class="briefPop">' +
-      '<div class="briefPopHead">' + (rk ? '<span class="briefPopRank">' + rk.rank + '</span>' : '') + briefSymLink(s) + '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>' +
-      '<div class="briefPopMeta">' + (s.vsHi != null ? "52주 최고 대비 " + briefPct(s.vsHi) : "") +
-      (!noAmt && s.amtX != null ? ' · 거래대금 평소의 ' + s.amtX.toFixed(1) + '배' : "") + '</div>' +
-      (heat ? '<div class="briefPopHeat">' + heat + '</div>' : "") +
+    var heat = noAmt || s.amtX == null ? "" : s.amtX.toFixed(1) + "배";
+    return '<div class="briefRow">' +
+      '<span class="rk' + (rk ? " top" : "") + '">' + (rk ? rk.rank : i + 1) + '</span>' +
+      '<span class="nm">' + briefSymLink(s) + '</span>' +
+      '<span class="mt">' + (s.vsHi != null ? '<b>' + briefPct(s.vsHi, 0) + '</b>' : '') + (heat ? ' · <span class="' + (s.amtX >= 1.5 ? "heat" : "") + '">' + (s.amtX >= 1.5 ? "🔥" : "") + heat + '</span>' : '') + '</span>' +
+      '<span class="rt" style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</span>' +
       '</div>';
-  }).join("");
+  });
+  // PC에서는 두 칸으로 나눠 각각 머리글을 붙인다 (모바일은 한 칸으로 합쳐짐)
+  var half = Math.ceil(popRows.length / 2);
+  $("briefPopular").innerHTML = '<div class="briefPopCol">' + popHead + popRows.slice(0, half).join("") + '</div>' +
+    (popRows.length > half ? '<div class="briefPopCol">' + popHead + popRows.slice(half).join("") + '</div>' : "");
   function turnoverRows(list, key) {
-    return briefCollapsible("to-" + key, list.map(function (s, i) {
-      return '<div class="briefTo"><span class="briefToRank">' + (i + 1) + '</span>' + briefSymLink(s) +
-        '<span class="briefToAmt">' + briefFmtAmt(R.amtKrw(s)) + (s.amtX != null ? ' <small>평소의 ' + s.amtX.toFixed(1) + '배</small>' : '') + '</span>' +
-        '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>';
+    return '<div class="briefRowHead"><span></span><span>종목</span><span>거래대금 · 평소比</span><span>등락</span></div>' +
+      briefCollapsible("to-" + key, list.map(function (s, i) {
+      return '<div class="briefRow"><span class="rk">' + (i + 1) + '</span><span class="nm">' + briefSymLink(s) + '</span>' +
+        '<span class="mt"><b>' + briefFmtAmt(R.amtKrw(s)) + '</b>' + (s.amtX != null ? ' · <span class="' + (s.amtX >= 1.5 ? "heat" : "") + '">' + s.amtX.toFixed(1) + '배</span>' : '') + '</span>' +
+        '<span class="rt" style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</span></div>';
     }), BRIEF_SHOW.turnover, "개");
   }
   $("briefToKr").innerHTML = turnoverRows(R.turnover.kr, "kr");
   $("briefToUs").innerHTML = turnoverRows(R.turnover.us, "us");
   $("briefToCoin").innerHTML = R.turnover.coin.length ? turnoverRows(R.turnover.coin, "coin") : '<div class="briefDim">데이터 없음</div>';
-  $("briefHotVol").innerHTML = R.hotVol.length ? briefCollapsible("hv", R.hotVol.map(function (s) {
-    return '<div class="briefTo">' + briefSymLink(s) + '<span class="briefToAmt">평소의 <b>' + s.amtX.toFixed(1) + '배</b> 거래 · ' + briefFmtAmt(R.amtKrw(s)) + '</span>' +
-      '<b style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</b></div>';
+  $("briefHotVol").innerHTML = R.hotVol.length ? '<div class="briefRowHead"><span></span><span>종목</span><span>평소比 · 거래대금</span><span>등락</span></div>' + briefCollapsible("hv", R.hotVol.map(function (s, i) {
+    return '<div class="briefRow"><span class="rk">' + (i + 1) + '</span><span class="nm">' + briefSymLink(s) + '</span>' +
+      '<span class="mt"><span class="heat">' + s.amtX.toFixed(1) + '배</span> · <b>' + briefFmtAmt(R.amtKrw(s)) + '</b></span>' +
+      '<span class="rt" style="color:' + briefColor(s.ret) + '">' + briefPct(s.ret) + '</span></div>';
   }), BRIEF_SHOW.hotVol, "개") : '<div class="briefDim">' + L + '은 평소보다 유난히 많이 거래된 종목이 없어요.</div>';
   $("briefToNote").textContent = "거래대금 = 종가 × 거래량 (코인은 24시간 거래액), 달러는 " + Math.round(R.fx).toLocaleString() + "원으로 환산. '평소'는 최근 20일 평균이에요.";
 
@@ -376,7 +383,7 @@ function renderBrief() {
   Array.prototype.forEach.call(box.querySelectorAll(".briefSym"), function (b) {
     b.onclick = function () {
       $("searchInput").value = b.getAttribute("data-sym");
-      switchTab("single", "chart");
+      if (typeof navTo === "function") navTo("single", "chart"); else switchTab("single", "chart");
       if (typeof load === "function") load();
     };
   });
@@ -445,7 +452,8 @@ function loadBrief(force) {
   });
 }
 
-function switchBriefMode(mode) {
+function switchBriefMode(mode, fromHistory) {
+  if (!fromHistory && mode !== briefState.mode && typeof pushPaneState === "function") pushPaneState({ bm: mode });
   briefState.mode = mode;
   Array.prototype.forEach.call(document.querySelectorAll("#briefModeTabs [data-bm]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-bm") === mode);
