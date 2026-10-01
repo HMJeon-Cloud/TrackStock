@@ -290,6 +290,11 @@ function chLoadAlloc() {
     if (typeof snapAttach === "function") snapAttach();
   });
 }
+/* 구성 내용 한 줄: "S&P500(SPY) 40 · 금(GLD) 15 …" */
+var CH_SHORT = { SPY: "S&P500", QQQ: "나스닥100", SCHD: "배당주", TLT: "장기채", IEF: "중기채", SHY: "단기채", GLD: "금", DBC: "원자재", USO: "원유" };
+function chMix(items) { return items.map(function (it) { return (CH_SHORT[it[0]] || chName(it[0])) + "(" + it[0] + ") " + it[1] + "%"; }).join(" · "); }
+function chMixShort(items) { return items.map(function (it) { return it[0] + " " + it[1]; }).join(" · "); }
+var CH_LEGEND = "SPY=S&P500 · QQQ=나스닥100 · SCHD=미국 배당주 · TLT=장기채(20년+) · IEF=중기채(7~10년) · SHY=단기채(1~3년) · GLD=금 · DBC=원자재";
 function chPortCells(arr) {
   return arr.map(function (x) {
     if (!x) return '<td>-</td>';
@@ -320,15 +325,22 @@ function chRenderAlloc() {
         '<tr class="chWhyRow"><td colspan="' + (2 + P.length) + '"><div class="chWhyTxt">💡 ' + it.why + '</div></td></tr>';
     }).join("") +
     '<tr class="chPortRow"><td colspan="2"><b>이 구성</b></td>' + chPortCells(plan.port) + '</tr>' +
-    '<tr class="chPortRow sub"><td colspan="2">주식60/채권40</td>' + chPortCells(plan.b6040) + '</tr>' +
-    '<tr class="chPortRow sub"><td colspan="2">S&P500 100%</td>' + chPortCells(plan.spy) + '</tr>' +
+    '<tr class="chPortRow sub"><td colspan="2">주식60/채권40<div class="chMix">SPY 60 · IEF 40</div></td>' + chPortCells(plan.b6040) + '</tr>' +
+    '<tr class="chPortRow sub"><td colspan="2">S&P500 100%<div class="chMix">SPY 100</div></td>' + chPortCells(plan.spy) + '</tr>' +
     '</table></div>' +
 
     '<h4 class="chSub">⚖️ 6가지 구성 비교 <small>같은 기간에 각 구성으로 샀다면 · 수익률 / 그 사이 최대 낙폭</small></h4>' +
+    '<div class="briefDim" style="margin-bottom:6px">구성 아래 숫자는 비중(%) · ' + CH_LEGEND + '</div>' +
     '<div class="tableWrap"><table id="chCmp"><tr><th>구성</th>' + chPerHead() + '</tr>' +
-    chState.cmp.map(function (c) { return '<tr' + (c.key === plan.key ? ' class="chCur"' : '') + '><td><b>' + c.label + '</b>' + (c.key === plan.key ? ' <span class="chNowBadge">지금</span>' : '') + '</td>' + chPortCells(c.res) + '</tr>'; }).join("") +
+    chState.cmp.map(function (c) {
+      return '<tr' + (c.key === plan.key ? ' class="chCur"' : '') + '><td><b>' + c.label + '</b>' + (c.key === plan.key ? ' <span class="chNowBadge">지금</span>' : '') +
+        '<div class="chMix">' + chMixShort(CH_PLANS[c.key].items) + '</div></td>' + chPortCells(c.res) + '</tr>';
+    }).join("") +
+    '<tr class="chPortRow sub"><td>주식60/채권40<div class="chMix">SPY 60 · IEF 40</div></td>' + chPortCells(plan.b6040) + '</tr>' +
+    '<tr class="chPortRow sub"><td>S&P500 100%<div class="chMix">SPY 100</div></td>' + chPortCells(plan.spy) + '</tr>' +
     '</table></div>' +
     '<ul class="chCmpSum">' + lines.join("") + '</ul>' +
+    '<div class="chWhyBox" style="margin-top:8px">💬 <b>\'지금\' 표시가 1위가 아닌 이유</b> — 이 표는 <b>지난</b> 3개월~3년 동안 각 구성을 들고 있었다면 어땠을지를 보여줘요. \'지금\' 구성은 오늘의 신호(금리·공포·유가·달러)를 보고 <b>앞으로</b>를 대비해 고른 것이라, 지난 기간 성적과 순위가 다를 수 있어요. 지난 기간 1위를 따라가면 이미 오른 자산을 뒤늦게 사는 셈이 되기 쉬워요.</div>' +
     '<div class="briefDim" style="margin-top:6px">짧은 기간 1위와 긴 기간 1위가 다르다면, 그게 "상황에 맞춰 비중을 조절하는 이유"이자 "한 구성에 다 걸지 않는 이유"예요. 수익만 보지 말고 최대 낙폭(버틸 수 있는 하락인지)을 같이 보세요. 처음 비중으로 사서 그대로 둔 기준이며, 상황 규칙에 따라 고른 <b>예시</b>이지 추천이 아니에요.</div>';
 }
 function chAllocText() {
@@ -338,11 +350,15 @@ function chAllocText() {
   if (plan && plan.rows) {
     L.push(""); L.push("🎯 지금 상황 맞춤 구성 예시 — " + plan.title);
     if (chState.now && chState.now.why.length) L.push("근거: " + chState.now.why.join(" / "));
-    plan.rows.forEach(function (it) { L.push("· " + it.name + " " + it.w + "% — " + it.why); });
+    plan.rows.forEach(function (it) { L.push("· " + it.name + "(" + it.sym + ") " + it.w + "% — " + it.why); });
     L.push("이 구성 (" + heads + "): " + plan.port.map(function (x) { return x ? chPct(x.ret, 0) + "(최대 " + chPct(x.mdd, 0) + ")" : "-"; }).join(" / "));
     L.push("주식60/채권40: " + plan.b6040.map(function (x) { return x ? chPct(x.ret, 0) : "-"; }).join(" / "));
   }
-  if (chState.cmpLines && chState.cmpLines.length) { L.push(""); L.push("📊 6가지 구성 비교 — 기간별 1위"); chState.cmpLines.forEach(function (l) { L.push("· " + l); }); }
+  if (chState.cmpLines && chState.cmpLines.length) {
+    L.push(""); L.push("📊 6가지 구성 비교 — 기간별 1위"); chState.cmpLines.forEach(function (l) { L.push("· " + l); });
+    L.push("구성 내용:"); Object.keys(CH_PLANS).forEach(function (k) { L.push("  " + CH_PLAN_LABEL[k] + ": " + chMix(CH_PLANS[k].items)); });
+    L.push("  주식60/채권40: S&P500(SPY) 60% · 중기채(IEF) 40%");
+  }
   // 왜 움직였나 (선택한 기간)
   var pi = chState.whyPeriod, days = CH_PERIODS[pi][1];
   L.push(""); L.push("🔎 왜 움직였나 (" + CH_PERIODS[pi][0] + ")");
