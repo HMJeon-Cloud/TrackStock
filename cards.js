@@ -1,5 +1,5 @@
 /* ============================================================
-   카드 뉴스 (v6.8) — 인스타·스레드용 1080×1350(4:5) 이미지
+   카드 뉴스 (v6.9) — 인스타·스레드용 1080×1350(4:5) 이미지
    한 장에 메시지 하나: 맨 위 큰 제목이 "이 카드가 말하려는 것", 아래는 그 근거 숫자만.
    오늘의 브리핑 5장 / 채널 브리핑 자료 5장. 데이터는 화면과 같은 계산 결과를 그대로 쓴다.
    ============================================================ */
@@ -128,10 +128,12 @@ function cLabel(c, s, color) { cText(c.g, s, CARD.PAD, c.y + 30, 30, 800, color 
 /* ---------- 오늘의 브리핑 카드 ---------- */
 function cardsBrief() {
   var R = briefState.result; if (!R) return [];
-  var out = [], T = 5, date = cDate(R.asOfUs || R.asOf), L = R.label, P = CARD.PAD;
+  var M = R.market || "all", MN = M !== "all" ? R.mktName + " " : "";
+  var out = [], T = 5, date = cDate(M === "kr" ? R.asOfKr : (R.asOfUs || R.asOf)), L = R.label, P = CARD.PAD;
+  var TAG = (M === "kr" ? "🇰🇷 " : M === "us" ? "🇺🇸 " : M === "coin" ? "🪙 " : "") + MN;
   // 1. 표지 — 시장 온도
   var c = cNew(), t = R.temp;
-  cHead(c, "오늘의 브리핑 · " + date, L + " 시장은 " + t.word, "오른 종목 " + Math.round(t.upPct * 100) + "% (" + t.up + " / " + t.total + ")", 1, T);
+  cHead(c, TAG + "오늘의 브리핑 · " + date, L + " " + MN + "시장은 " + t.word, "오른 종목 " + Math.round(t.upPct * 100) + "% (" + t.up + " / " + t.total + ")", 1, T);
   var g = c.g, W = CARD.W - P * 2;
   cRound(g, P, c.y, W, 28, 14, "#e8f3ff");
   var grd = g.createLinearGradient(P, 0, P + W, 0); grd.addColorStop(0, CARD_C.down); grd.addColorStop(1, CARD_C.up);
@@ -139,33 +141,43 @@ function cardsBrief() {
   R.indexRow.slice(0, 6).forEach(function (x) { cRow(c, x.name, cPct(x.ret), cCol(x.ret), { price: cPrice(x.sym, x.last) }); });
   cPara(c, t.desc);
   cFoot(c); out.push({ name: "1_시장온도", cv: c.cv });
-  // 2. 테마 — 업종 평균 + 그 업종 1등 종목과 주가
+  // 2. 테마 — 업종 평균 + 그 업종 1등 종목과 주가 (코인처럼 업종이 2개 미만이면 전체 시세표)
   c = cNew(); var th = R.themes, top = th[0], bot = th[th.length - 1];
-  cHead(c, "자금 흐름 · " + date, top.name + " 강세, " + bot.name + " 약세", "업종 평균 등락 · 업종 안에서 가장 많이 오른 종목과 주가", 2, T);
+  if (th.length < 2) {
+    var all = R.movers.up.concat(R.movers.down.slice().reverse()).slice(0, 10);
+    cHead(c, TAG + "시세 · " + date, MN + "전체 " + L + " 등락", "종목 · 지금 가격 · " + L + " 등락", 2, T);
+    var ah = cH(c, all.length, 84);
+    all.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), cCol(s.ret), { rank: i + 1, h: ah, price: cPrice(s.sym, s.last) }); });
+    cFoot(c); out.push({ name: "2_전체시세", cv: c.cv });
+  } else {
+  cHead(c, TAG + "자금 흐름 · " + date, top.name + " 강세, " + bot.name + " 약세", "업종 평균 등락 · 업종 안에서 가장 많이 오른 종목과 주가", 2, T);
   var mx = Math.max.apply(null, th.map(function (x) { return Math.abs(x.ret); })) || 0.01;
   var th10 = th.slice(0, 10), hh = cH(c, th10.length, 84);
   th10.forEach(function (x) { var b = x.best; cRow(c, x.name, cPct(x.ret), cCol(x.ret), { bar: x.ret / mx, h: hh, noLine: true, priceSize: 24, price: b ? briefName(b) + " " + cPrice(b.sym, b.last) + " " + cPct(b.ret) : "" }); });
   cFoot(c); out.push({ name: "2_테마흐름", cv: c.cv });
+  }
   // 3. 급등·급락
   c = cNew(); var up = R.movers.up.slice(0, 5), dn = R.movers.down.slice(0, 5);
-  if (!up.length || !dn.length) return out;
-  cHead(c, "가장 많이 움직인 종목 · " + date, "1위 " + briefName(up[0]) + " " + cPct(up[0].ret), "가장 많이 내린 종목은 " + briefName(dn[0]) + " " + cPct(dn[0].ret), 3, T);
+  var lead = up[0] || dn[0];
+  if (!lead) return out;
+  cHead(c, TAG + "가장 많이 움직인 종목 · " + date, up[0] ? "1위 " + briefName(up[0]) + " " + cPct(up[0].ret) : "오른 종목이 없어요",
+    dn[0] ? "가장 많이 내린 종목은 " + briefName(dn[0]) + " " + cPct(dn[0].ret) : "내린 종목이 없어요", 3, T);
   var mh = cH(c, up.length + dn.length, 72, false, 100);
-  cLabel(c, "▲ 급등", CARD_C.up);
+  if (up.length) cLabel(c, "▲ 급등", CARD_C.up);
   up.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), CARD_C.up, { rank: i + 1, h: mh, price: cPrice(s.sym, s.last) }); });
-  c.y += 14; cLabel(c, "▼ 급락", CARD_C.down);
+  if (dn.length) { c.y += 14; cLabel(c, "▼ 급락", CARD_C.down); }
   dn.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), CARD_C.down, { rank: i + 1, h: mh, price: cPrice(s.sym, s.last) }); });
   cFoot(c); out.push({ name: "3_급등급락", cv: c.cv });
   // 4. 인기 종목
   c = cNew(); var pop = R.popular.filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 8);
   var hot = pop.filter(function (s) { return s.amtX != null && s.amtX >= 1.5; }).sort(function (a, b) { return b.amtX - a.amtX; });
-  cHead(c, "인기 종목 · " + date, hot.length ? briefName(hot[0]) + "에 돈이 몰렸어요" : "많이 찾는 종목의 " + L, "주가 · 등락 (작은 글씨: 거래대금이 평소의 몇 배인지)", 4, T);
+  cHead(c, TAG + "인기 종목 · " + date, hot.length ? briefName(hot[0]) + "에 돈이 몰렸어요" : "많이 찾는 종목의 " + L, "주가 · 등락 (작은 글씨: 거래대금이 평소의 몇 배인지)", 4, T);
   var ph = cH(c, pop.length, 84);
   pop.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), cCol(s.ret), { rank: i + 1, h: ph, price: cPrice(s.sym, s.last), mid: s.amtX != null ? s.amtX.toFixed(1) + "배" : "" }); });
   cFoot(c, R.popSrc === "ranked" ? "앱 조회 순위 · 투자 조언 아님" : "거래대금 기준 · 투자 조언 아님"); out.push({ name: "4_인기종목", cv: c.cv });
   // 5. 숫자 + 세일 폭 큰 종목
   c = cNew(); var nums = R.numbers.slice(0, 4), sale = (nums[0].list || []).filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 3);
-  cHead(c, "숫자로 보는 " + L, "세일 중인 종목 " + nums[0].v, "52주 최고가보다 20% 넘게 싼 종목 수 · 시장 전체를 네 숫자로", 5, T);
+  cHead(c, TAG + "숫자로 보는 " + L, "세일 중인 종목 " + nums[0].v, "52주 최고가보다 20% 넘게 싼 종목 수 · 시장 전체를 네 숫자로", 5, T);
   cTiles(c, nums.map(function (n) { return { v: n.v, l: n.l }; }));
   if (sale.length) {
     c.y += 6; cLabel(c, "가장 많이 할인된 종목 (52주 최고 대비)");
@@ -185,11 +197,14 @@ function cardsChannel() {
   var date = cDate(R.asOfUs), P = CARD.PAD, W = CARD.W - P * 2;
   function idx(name) { return R.indexRow.filter(function (x) { return x.name === name; })[0]; }
   // 1. 미국 증시 요약
-  var c = cNew(), sp = idx("S&P500"), nq = idx("나스닥");
-  cHead(c, "미국 증시 데일리 · " + date + " 마감", "S&P500 " + cPct(sp && sp.ret) + " · 나스닥 " + cPct(nq && nq.ret), "지수·환율·금·코인의 종가와 하루 등락", 1, T);
-  var ih = cH(c, R.indexRow.length, 76, true);
-  R.indexRow.forEach(function (x) { cRow(c, x.name, cPct(x.ret), cCol(x.ret), { h: ih, price: cPrice(x.sym, x.last) }); });
-  var th = R.themes;
+  // 미국 증시 데일리는 미국 지표만 (국내·코인과 섞지 않음) + 한국 투자자용 달러/원
+  var U = briefCompute(chState.recent, { market: "us" });
+  var urow = U.indexRow.concat(R.indexRow.filter(function (x) { return x.sym === "KRW=X"; }));
+  var c = cNew(), sp = urow.filter(function (x) { return x.sym === "^GSPC"; })[0], nq = urow.filter(function (x) { return x.sym === "^IXIC"; })[0];
+  cHead(c, "🇺🇸 미국 증시 데일리 · " + date + " 마감", "S&P500 " + cPct(sp && sp.ret) + " · 나스닥 " + cPct(nq && nq.ret), "미국 지수·공포지수·채권·금 + 달러/원", 1, T);
+  var ih = cH(c, urow.length, 76, true);
+  urow.forEach(function (x) { cRow(c, x.name, cPct(x.ret), cCol(x.ret), { h: ih, price: cPrice(x.sym, x.last) }); });
+  var th = U.themes;
   cNote(c, "강세 " + th.slice(0, 2).map(function (x) { return x.name; }).join("·") + " / 약세 " + th.slice(-2).map(function (x) { return x.name; }).join("·"));
   cFoot(c); out.push({ name: "1_미국증시", cv: c.cv });
   // 2. MDD
@@ -270,12 +285,18 @@ function cardsOpen(kind) {
     if (!list.length) { alert("아직 데이터가 다 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요."); return; }
     var day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     var box = document.createElement("div");
-    box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button>' +
+    var mk = kind === "brief" && typeof briefState !== "undefined" ? (briefState.market || "all") : null;
+    var mkHtml = mk ? '<div class="pills" style="margin-bottom:10px">' + Object.keys(BRIEF_MKT).map(function (k) {
+      return '<button data-cm="' + k + '"' + (k === mk ? ' class="active"' : '') + '>' + BRIEF_MKT[k] + '</button>'; }).join("") + '</div>' : "";
+    box.innerHTML = mkHtml + '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button>' +
       (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유 (인스타·카톡)</button>' : '') +
       '<span class="briefDim">1080×1350 · 인스타 4:5 · 저장이 안 되면 이미지를 길게 눌러 저장</span></div><div class="cardsWrap"></div>';
     var wrap = box.querySelector(".cardsWrap");
+    Array.prototype.forEach.call(box.querySelectorAll("[data-cm]"), function (b) {
+      b.onclick = function () { switchBriefMarket(b.getAttribute("data-cm")); cardsOpen("brief"); };
+    });
     list.forEach(function (it, i) {
-      it.url = it.cv.toDataURL("image/png"); it.file = "StockMind_" + (kind === "brief" ? "오늘" : "채널") + "_" + day + "_" + it.name + ".png";
+      it.url = it.cv.toDataURL("image/png"); it.file = "uphill.lab_" + (kind === "brief" ? "오늘" + (mk && mk !== "all" ? "_" + BRIEF_MKT[mk] : "") : "채널") + "_" + day + "_" + it.name + ".png";
       var f = document.createElement("figure");
       f.innerHTML = '<img alt=""><figcaption><span>' + (i + 1) + '. ' + it.name.replace(/^\d_/, "") + '</span><button class="chip" style="padding:3px 10px;font-size:11px">저장</button></figcaption>';
       f.querySelector("img").src = it.url;
@@ -289,7 +310,7 @@ function cardsOpen(kind) {
         .then(function (files) { if (navigator.canShare({ files: files })) return navigator.share({ files: files }); alert("이 기기는 여러 장 공유를 지원하지 않아요. 한 장씩 저장해 주세요."); })
         .catch(function () {});
     };
-    infoModal.open("🃏 " + (kind === "brief" ? "오늘의 브리핑" : "채널 브리핑") + " 카드 " + list.length + "장", box);
+    infoModal.open("🃏 " + (kind === "brief" ? (mk && mk !== "all" ? BRIEF_MKT[mk] + " " : "") + "오늘의 브리핑" : "채널 브리핑") + " 카드 " + list.length + "장", box);
   });
 }
 function cardsDownload(it) { var a = document.createElement("a"); a.href = it.url; a.download = it.file; document.body.appendChild(a); a.click(); a.remove(); }
