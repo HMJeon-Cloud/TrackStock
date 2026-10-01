@@ -65,7 +65,7 @@ export function composeDaily(recent, names, news) {
   L.push("");
   // 테마 (미국 종목만)
   const themes = THEMES.map(([name, list]) => {
-    const l = list.map((s) => by[s]).filter((s) => s && !KR.test(s.sym));
+    const l = list.map((s) => by[s]).filter((s) => s && us.includes(s));   // 점검 통과한 미국 종목만
     if (l.length < 2) return null;
     const avg = l.reduce((a, s) => a + s.ret1, 0) / l.length;
     const best = l.slice().sort((a, b) => b.ret1 - a.ret1)[0];
