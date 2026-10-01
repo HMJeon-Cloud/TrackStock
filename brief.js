@@ -139,7 +139,7 @@ function briefCompute(recent, opts) {
 
   /* 2. 테마 흐름 */
   var themes = BRIEF_THEMES.map(function (t) {
-    var list = t[1].map(function (sym) { return bySym[sym]; }).filter(Boolean);
+    var list = t[1].map(function (sym) { return quality.bad[sym] || BRIEF_DUP[sym] ? null : bySym[sym]; }).filter(Boolean);   // 점검 제외·중복 종목은 업종 평균에서도 뺀다
     if (list.length < 2) return null;
     var avg = 0; list.forEach(function (s) { avg += s.ret; }); avg /= list.length;
     var best = list.slice().sort(function (a, b) { return b.ret - a.ret; })[0];
@@ -203,7 +203,7 @@ function briefCompute(recent, opts) {
   };
   var hotVol = withAmt.filter(function (s) { return s.amtX != null && s.amtX >= 1.8; }).sort(function (a, b) { return b.amtX - a.amtX; }).slice(0, BRIEF_MAX.turnover);
   var popSrc = "default", popScore = {};
-  var ranked = (opts.popular || []).filter(function (p) { return bySym[p.s] && !BRIEF_EXCLUDE.test(p.s); });
+  var ranked = (opts.popular || []).filter(function (p) { return bySym[p.s] && !BRIEF_EXCLUDE.test(p.s) && !quality.bad[p.s]; });
   var popTotal = ranked.reduce(function (a, p) { return a + p.score; }, 0);
   var popular;
   if (popTotal >= 30 && ranked.length >= 6) {
