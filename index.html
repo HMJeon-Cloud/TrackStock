@@ -575,6 +575,13 @@
   .chEpCell span { color: var(--txt2); }
   .chEpNote { font-size: 12px; color: var(--txt2); line-height: 1.7; margin-top: 6px; }
   @media (max-width: 700px) { .chEpGrid { grid-template-columns: 1fr 1fr; } }
+  .chSub { font-size: 14px; margin: 14px 0 6px; }
+  .chSub small { color: var(--sub); font-weight: 400; margin-left: 4px; font-size: 12px; }
+  tr.chHasWhy td { border-bottom: none !important; padding-bottom: 2px !important; }
+  tr.chWhyRow td { font-size: 12px; color: #b45309; white-space: normal; line-height: 1.55; padding-top: 0 !important; text-align: left !important; }
+  .chWhyTxt { position: sticky; left: 12px; max-width: min(620px, calc(100vw - 80px)); white-space: normal; }
+  .chWhyBox { background: #fff4e6; color: #92400e; border-radius: 10px; padding: 8px 12px; font-size: 12px; margin-bottom: 8px; }
+  .chGroup { font-size: 11px; color: var(--sub); font-weight: 700; margin: 6px 0 4px; }
   .chNote { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-family: inherit; font-size: 14px; line-height: 1.6; resize: vertical; background: var(--card); color: var(--txt); }
   .briefMore { display: block; width: 100%; margin-top: 8px; padding: 9px; border: 1px dashed var(--line); border-radius: 12px; background: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .briefMore:hover { background: var(--accentSoft); }
@@ -1410,6 +1417,7 @@
 <div class="card" id="briefCard">
   <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
     <h2 style="margin:0">오늘의 브리핑 <small id="briefAsOf">전 종목 시세와 뉴스 제목을 숫자 기준으로 정리해요</small></h2>
+    <button class="chip" id="briefToChannel" style="flex:0 0 auto">📢 채널용 글 ›</button>
   </div>
   <div class="pills" id="briefModeTabs" style="margin-top:12px">
     <button data-bm="day" class="active">금일</button>
@@ -1491,9 +1499,9 @@
   <details class="howto"><summary>이 화면 쓰는 법</summary><div class="body">
     <ul>
       <li><b>①</b>은 서버가 종가·뉴스 제목으로 자동으로 쓴 글이에요. 매일 아침 수집 뒤 새로 만들어져요.</li>
-      <li><b>②</b>는 지정한 종목의 10년치 데이터로 "지금 낙폭이 역대 몇 번째인지"를 계산해요. 종목은 티커를 쉼표로 적고 적용을 누르면 바뀌어요.</li>
-      <li><b>④</b>는 금리 급등·공포 급락 같은 과거 구간에서 자산별로 어떻게 움직였고, 얼마 만에 회복했는지를 실제 데이터로 보여줘요. 지금 시장과 비슷한 상황이 맨 위로 와요.</li>
-      <li>메모 칸에 오늘 올릴 내용을 적으면 '전체 글'에 함께 들어가요. 메모는 이 기기에만 저장돼요.</li>
+      <li><b>②</b>는 10년치 데이터로 "지금 낙폭이 역대 몇 번째인지"를 계산해요. 위는 늘 같은 대표 자산, 아래 🎯는 오늘 데이터(인기 종목·크게 빠진 대형주·오늘 급락·지금 상황의 버팀목)로 자동으로 골라 이유를 붙여요.</li>
+      <li><b>③</b>의 🎯 구성은 지금 시장 신호(금리·공포·유가·달러)에 따라 정해 둔 규칙으로 고른 예시예요. 추천이 아니라 생각해 볼 출발점이에요.</li>
+      <li><b>④</b>는 금리 급등·공포 급락 같은 과거 구간에서 대표 자산 11개와 지금 인기 자산들이 어떻게 움직였고, 얼마 만에 회복했는지를 실제 데이터로 보여줘요. 지금 시장과 비슷한 상황이 맨 위로 와요.</li>
       <li>섹션마다 📷 이미지 저장이 있어서 인스타·스레드용 카드로 쓸 수 있어요. '스레드용'은 500자 안으로 줄인 버전이에요.</li>
       <li>자동 글에는 전망·추천이 없어요. 숫자와 기사 제목까지만 쓰고, 판단은 운영자가 메모로 덧붙이는 구조예요.</li>
     </ul>
@@ -1512,31 +1520,23 @@
   </section>
 
   <section class="briefSec snapTarget" data-snap-title="MDD 분석">
-    <h3>② MDD · 과거 데이터 기반 위치 <small>전고점 대비 낙폭이 역대 몇 번째인지</small></h3>
-    <div class="row" style="gap:6px;margin-bottom:8px">
-      <input id="chMddInput" placeholder="티커를 쉼표로 (예: SPY, QQQ, 005930.KS)" style="flex:1 1 260px">
-      <button class="chip" id="chMddApply">적용</button><button class="chip" id="chMddCopy">복사</button>
-    </div>
+    <h3>② MDD · 과거 데이터 기반 위치 <small>대표 자산 + 지금 상황에 맞춰 고른 종목 · 전고점 대비 낙폭이 역대 몇 번째인지</small></h3>
+    <div class="row" style="gap:6px;margin-bottom:8px"><button class="chip" id="chMddCopy">복사</button></div>
     <div id="chMdd"></div>
   </section>
 
-  <section class="briefSec snapTarget" data-snap-title="4자산 스냅샷">
-    <h3>③ 자산배분 스냅샷 <small>주식·채권·금·현금성·달러의 기간별 등락</small></h3>
+  <section class="briefSec snapTarget" data-snap-title="자산배분">
+    <h3>③ 자산배분 <small>대표 자산 등락 + 지금 상황에 맞춘 구성 예시(비중·이유)</small></h3>
     <div class="row" style="gap:6px;margin-bottom:8px"><button class="chip" id="chAllocCopy">복사</button></div>
     <div id="chAlloc"></div>
   </section>
 
   <section class="briefSec snapTarget" data-snap-title="상황별 과거 사례">
-    <h3>④ 상황별 과거 사례 <small>이런 때 과거엔 무엇이 버티고, 무엇이 빠졌고, 얼마 만에 회복했나</small></h3>
+    <h3>④ 상황별 과거 사례 <small>대표 자산 11개 + 지금 인기 자산 · 무엇이 버티고, 빠지고, 얼마 만에 회복했나</small></h3>
     <div class="row" style="gap:6px;margin-bottom:8px"><button class="chip" id="chScenCopy">전체 복사</button><span class="briefDim">전체 글에는 '지금과 비슷'한 사례만 들어가요</span></div>
     <div id="chScen"></div>
   </section>
 
-  <section class="briefSec">
-    <h3>운영자 메모 <small>전략 · 부동산 · 자료·독서 — 전체 글에 함께 들어가요</small></h3>
-    <div id="chNotes"></div>
-    <div class="briefDim" style="margin-top:8px">부동산 데이터는 <a href="https://track-apt.vercel.app" target="_blank" rel="noopener">TrackApt</a>에서 보고 요약을 적어 주세요.</div>
-  </section>
 </div>
 </div><!-- /tab-channel -->
 
@@ -1555,6 +1555,11 @@
     <button class="startCard" id="startBrowse">
       <span class="startIcon" style="background:#fff4e6">🔍</span>
       <span class="startText"><b>종목 둘러보기</b><small>삼성전자·S&amp;P500의 지난 기록 보기</small></span>
+      <span class="startArrow">›</span>
+    </button>
+    <button class="startCard" id="startChannel">
+      <span class="startIcon" style="background:#fff1f2">📢</span>
+      <span class="startText"><b>채널 브리핑 자료</b><small>데일리 브리핑 · MDD · 자산배분 · 과거 사례를 글로</small></span>
       <span class="startArrow">›</span>
     </button>
     <button class="startCard" id="startBrief">
@@ -1722,7 +1727,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button> · v6.3<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button> · v6.4<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1736,7 +1741,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script src="tickers.js?v=6.3"></script>
+<script src="tickers.js?v=6.4"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -3461,6 +3466,8 @@ $("brandHome").onclick = function () { navTo("home"); };
 $("startGuide").onclick = function () { navTo("guide"); };
 $("startBrief").onclick = function () { navTo("brief"); };
 $("footChannel").onclick = function () { navTo("channel"); };
+$("startChannel").onclick = function () { navTo("channel"); };
+$("briefToChannel").onclick = function () { navTo("channel"); };
 
 /* ---------- 앱 설치(PWA) — 설치 버튼은 두지 않고 브라우저 메뉴의 '앱 설치'만 쓴다.
    서비스 워커는 설치 조건을 채우고 오프라인일 때 마지막 화면을 보여주는 용도 ---------- */
@@ -4025,17 +4032,17 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=6.3"></script>
-<script src="technical.js?v=6.3"></script>
-<script src="company.js?v=6.3"></script>
-<script src="compare.js?v=6.3"></script>
-<script src="sim.js?v=6.3"></script>
-<script src="insight.js?v=6.3"></script>
-<script src="guide.js?v=6.3"></script>
-<script src="watch.js?v=6.3"></script>
-<script src="holdings.js?v=6.3"></script>
-<script src="brief.js?v=6.3"></script>
-<script src="channel.js?v=6.3"></script>
-<script src="snapshot.js?v=6.3"></script>
+<script src="metrics.js?v=6.4"></script>
+<script src="technical.js?v=6.4"></script>
+<script src="company.js?v=6.4"></script>
+<script src="compare.js?v=6.4"></script>
+<script src="sim.js?v=6.4"></script>
+<script src="insight.js?v=6.4"></script>
+<script src="guide.js?v=6.4"></script>
+<script src="watch.js?v=6.4"></script>
+<script src="holdings.js?v=6.4"></script>
+<script src="brief.js?v=6.4"></script>
+<script src="channel.js?v=6.4"></script>
+<script src="snapshot.js?v=6.4"></script>
 </body>
 </html>

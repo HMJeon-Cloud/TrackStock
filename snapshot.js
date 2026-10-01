@@ -323,6 +323,7 @@
   function attach() {
     document.querySelectorAll(".chartWrap, .tableWrap, .snapTarget").forEach(function (w) {
       if (w.dataset.snap || w.closest(".modalWrap, .popSrc, .snapBox")) return;
+      if (!w.classList.contains("snapTarget") && w.parentNode.closest(".snapTarget")) return;   // 섹션 전체 저장 버튼이 있으면 안쪽 표마다 또 달지 않는다
       w.dataset.snap = "1";
       var row = document.createElement("div");
       row.className = "snapRow";
