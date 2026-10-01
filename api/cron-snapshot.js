@@ -15,8 +15,10 @@ import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY } from "./_redis.js"
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const CONCURRENCY = 6;
-const TIME_BUDGET_MS = 55000;
-const HISTORY_PER_RUN = 40;   // 한 번에 과거 전체를 다시 받을 종목 수 (Redis는 쓰기 한도가 넉넉해 넉넉히 잡는다. 시간 예산 55초 안에서 멈춘다)
+const TIME_BUDGET_MS = 52000;     // 함수 최대 60초 안에서 저장까지 끝나도록 여유를 둔다
+const RECENT_BUDGET_MS = 32000;   // ① 최근 구간(가장 중요)에 먼저 쓰는 시간
+const FETCH_TIMEOUT_MS = 8000;    // 야후 한 건이 멈춰 있어도 8초면 포기
+const HISTORY_PER_RUN = 20;       // 남은 시간에 과거 전체를 받을 종목 수 (하루 2회 → 약 6일이면 전 종목 한 바퀴)
 const RECENT_DAYS = 90;       // recent.json이 담는 최근 일수
 
 async function loadSymbols(origin) {
@@ -30,6 +32,13 @@ async function loadSymbols(origin) {
 }
 
 /* Yahoo 일봉. range=max 는 interval을 무시하고 월봉을 주므로 날짜 범위로 요청한다. */
+const yahooStats = { ok: 0, http: {}, timeout: 0, error: 0 };
+async function fetchT(url, opt) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+  try { return await fetch(url, { ...opt, signal: ac.signal }); }
+  finally { clearTimeout(t); }
+}
 async function fetchYahoo(symbol, days) {
   const now = Math.floor(Date.now() / 1000);
   const p1 = Math.floor(now - days * 86400);
@@ -38,8 +47,8 @@ async function fetchYahoo(symbol, days) {
     "?period1=" + p1 + "&period2=" + now + "&interval=1d&events=div%2Csplit";
   for (const host of ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]) {
     try {
-      const r = await fetch("https://" + host + path, { headers: { "User-Agent": UA, Accept: "application/json" } });
-      if (!r.ok) continue;
+      const r = await fetchT("https://" + host + path, { headers: { "User-Agent": UA, Accept: "application/json" } });
+      if (!r.ok) { yahooStats.http[r.status] = (yahooStats.http[r.status] || 0) + 1; continue; }
       const j = await r.json();
       const res = j && j.chart && j.chart.result && j.chart.result[0];
       if (!res || !res.timestamp || !res.timestamp.length) continue;
@@ -47,8 +56,9 @@ async function fetchYahoo(symbol, days) {
       if (gran && gran !== "1d") continue;
       const span = (res.timestamp[res.timestamp.length - 1] - res.timestamp[0]) / 86400;
       if (span > 365 * 3 && res.timestamp.length < span / 3) continue;
+      yahooStats.ok++;
       return res;
-    } catch (e) { /* 다음 호스트 */ }
+    } catch (e) { if (e && e.name === "AbortError") yahooStats.timeout++; else yahooStats.error++; }
   }
   return null;
 }
@@ -122,15 +132,51 @@ export default async function handler(req, res) {
   let writes = 0;
   const done = [], failed = [];
 
-  /* ① 과거 전체 — 가장 오래 안 받은 종목부터 */
+  /* ① 최근 구간 — 가장 중요하므로 먼저. 이번에 못 받은 종목은 지난 값을 그대로 둔다 */
+  let prevRecent = null;
+  try { const t = await getJsonGzText(redis, KEY.recent); if (t) prevRecent = JSON.parse(t); } catch (e) { /* 없으면 새로 */ }
+  const recent = { generated: new Date().toISOString(), days: RECENT_DAYS, symbols: {} };
+  let recentOk = 0;
+  for (let i = 0; i < symbols.length; i += CONCURRENCY) {
+    if (Date.now() - started > RECENT_BUDGET_MS) break;
+    await Promise.all(symbols.slice(i, i + CONCURRENCY).map(async (sym) => {
+      try {
+        const r = await fetchYahoo(sym, RECENT_DAYS);
+        if (!r) return;
+        const s = toSnapshot(sym, r, 1);
+        if (!s.t.length) return;
+        recent.symbols[sym] = { t: s.t, o: s.o, h: s.h, l: s.l, c: s.c, a: s.a, v: s.v, div: s.div, meta: s.meta };
+        recentOk++;
+      } catch (e) { /* 건너뛴다 */ }
+    }));
+  }
+  let kept = 0;
+  if (prevRecent && prevRecent.symbols) {
+    for (const sym of symbols) {
+      if (!recent.symbols[sym] && prevRecent.symbols[sym]) { recent.symbols[sym] = prevRecent.symbols[sym]; kept++; }
+    }
+  }
+  let recentSaved = null;
+  if (recentOk > 0) {
+    try {
+      const bytes = await setJsonGz(redis, KEY.recent, recent, 14 * 86400);
+      writes++; recentSaved = { ok: true, bytes };
+    } catch (e) { recentSaved = { ok: false, error: String(e.message).slice(0, 160) }; }
+    for (const sym of Object.keys(recent.symbols)) {
+      if (!prevRecent || !prevRecent.symbols || recent.symbols[sym] !== prevRecent.symbols[sym]) entries[sym] = { ...(entries[sym] || {}), updated: today };
+    }
+  } else {
+    recentSaved = { ok: false, error: "야후에서 한 종목도 받지 못함 — 지난 데이터 유지" };
+  }
+
+  /* ② 과거 전체 — 남은 시간 안에서, 가장 오래 안 받은 종목부터 */
   const stale = symbols
     .map((s) => ({ s, at: (entries[s] && entries[s].history) || "" }))
     .sort((x, y) => (x.at < y.at ? -1 : x.at > y.at ? 1 : 0))
     .filter((x) => force || x.at !== today)
     .slice(0, HISTORY_PER_RUN);
-
   for (let i = 0; i < stale.length; i += CONCURRENCY) {
-    if (Date.now() - started > TIME_BUDGET_MS) break;
+    if (Date.now() - started > TIME_BUDGET_MS - 6000) break;   // 한 묶음(최대 8초) 여유
     await Promise.all(stale.slice(i, i + CONCURRENCY).map(async ({ s: sym }) => {
       try {
         const r = await fetchYahoo(sym, 25 * 365.25);
@@ -147,33 +193,6 @@ export default async function handler(req, res) {
     }));
   }
 
-  /* ② 최근 구간 — 전 종목을 한 파일에 */
-  const recent = { generated: new Date().toISOString(), days: RECENT_DAYS, symbols: {} };
-  let recentOk = 0;
-  for (let i = 0; i < symbols.length; i += CONCURRENCY) {
-    if (Date.now() - started > TIME_BUDGET_MS) break;
-    await Promise.all(symbols.slice(i, i + CONCURRENCY).map(async (sym) => {
-      try {
-        const r = await fetchYahoo(sym, RECENT_DAYS);
-        if (!r) return;
-        const s = toSnapshot(sym, r, 1);
-        if (!s.t.length) return;
-        recent.symbols[sym] = { t: s.t, o: s.o, h: s.h, l: s.l, c: s.c, a: s.a, v: s.v, div: s.div, meta: s.meta };
-        recentOk++;
-      } catch (e) { /* 건너뛴다 */ }
-    }));
-  }
-  let recentSaved = null;
-  if (recentOk > 0) {
-    try {
-      const bytes = await setJsonGz(redis, KEY.recent, recent, 7 * 86400);
-      writes++; recentSaved = { ok: true, bytes };
-    } catch (e) { recentSaved = { ok: false, error: String(e.message).slice(0, 120) }; }
-    for (const sym of Object.keys(recent.symbols)) {
-      entries[sym] = { ...(entries[sym] || {}), updated: today };
-    }
-  }
-
   /* ③ 목록 */
   const withHistory = symbols.filter((s) => entries[s] && entries[s].history).length;
   let manifestOk = true;
@@ -187,14 +206,23 @@ export default async function handler(req, res) {
     writes++;
   } catch (e) { manifestOk = false; }
 
+  /* ④ 실행 기록 — /api/config 에서 비밀값 없이 확인할 수 있게 남긴다 */
+  const log = {
+    at: new Date().toISOString(), elapsedMs: Date.now() - started,
+    symbols: symbols.length, recentOk, kept, recentSaved, historyUpdated: done.length,
+    historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
+    failedSample: failed.slice(0, 5)
+  };
+  try { await redisCmd(redis, ["SET", "sm:cronlog", JSON.stringify(log), "EX", String(14 * 86400)]); } catch (e) {}
+
   res.status(200).json({
     ok: true,
     store: "redis",
     redisWrites: writes,
     historyUpdated: done.length,
     historyRemaining: symbols.length - withHistory,
-    recentSymbols: recentOk,
-    recentSaved, manifestOk,
+    recentSymbols: recentOk, recentKept: kept,
+    recentSaved, manifestOk, yahoo: yahooStats,
     failed: failed.slice(0, 10),
     elapsedMs: Date.now() - started,
     note: "과거 전체는 순환 갱신, 최근 " + RECENT_DAYS + "일은 매 실행 전 종목 갱신",

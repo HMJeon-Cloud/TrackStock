@@ -1,6 +1,6 @@
 // /api/config — 클라이언트가 데이터 준비 상태를 알아내는 용도 (CDN 1시간 캐시).
 //   스냅샷은 Upstash Redis에 있고 /api/snap 으로 읽는다. 여기서는 목록(manifest)의 요약만 돌려준다.
-import { redisConf, getJsonGzText, KEY } from "./_redis.js";
+import { redisConf, redisCmd, getJsonGzText, KEY } from "./_redis.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -26,12 +26,15 @@ export default async function handler(req, res) {
       out.reason = "ERROR";
       out.detail = String(e.message).slice(0, 160);
     }
+    // 마지막 자동 수집 결과 (문제 진단용)
+    try { const l = await redisCmd(redis, ["GET", "sm:cronlog"]); if (l) out.lastRun = JSON.parse(l); } catch (e) {}
+    try { out.recentExists = !!(await redisCmd(redis, ["EXISTS", KEY.recent])); } catch (e) {}
   }
 
   out.news = !!((process.env.NAVER_HUB_KEY_ID && process.env.NAVER_HUB_KEY) ||
                 (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET));
   out.sync = !!(process.env.USER_SALT && process.env.USER_SALT.length >= 16 && (redis || process.env.BLOB_READ_WRITE_TOKEN));
   out.syncStore = redis ? "redis" : (process.env.BLOB_READ_WRITE_TOKEN ? "blob" : null);
-  res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
+  res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1200");
   res.status(200).json(out);
 }
