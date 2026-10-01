@@ -574,13 +574,33 @@
   .chEpCell { display: flex; justify-content: space-between; font-size: 12px; background: var(--soft); border-radius: 8px; padding: 5px 8px; }
   .chEpCell span { color: var(--txt2); }
   .chEpNote { font-size: 12px; color: var(--txt2); line-height: 1.7; margin-top: 6px; }
-  @media (max-width: 700px) { .chEpGrid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 700px) {
+    .chEpGrid { grid-template-columns: 1fr 1fr; }
+    #chAlloc th, #chAlloc td { padding: 8px 4px; font-size: 12px; }
+    #chAlloc td:first-child, #chAlloc th:first-child { padding-left: 6px; }
+    #chAlloc .briefDim { font-size: 10px; }
+  }
   .chSub { font-size: 14px; margin: 14px 0 6px; }
   .chSub small { color: var(--sub); font-weight: 400; margin-left: 4px; font-size: 12px; }
   tr.chHasWhy td { border-bottom: none !important; padding-bottom: 2px !important; }
   tr.chWhyRow td { font-size: 12px; color: #b45309; white-space: normal; line-height: 1.55; padding-top: 0 !important; text-align: left !important; }
   .chWhyTxt { position: sticky; left: 12px; max-width: min(620px, calc(100vw - 80px)); white-space: normal; }
   .chWhyBox { background: #fff4e6; color: #92400e; border-radius: 10px; padding: 8px 12px; font-size: 12px; margin-bottom: 8px; }
+  .chMdd { font-size: 10px; color: var(--sub); font-weight: 400; }
+  #channelCard .tableWrap { max-height: none; overflow-y: visible; }
+  tr.chPortRow td { background: var(--soft); }
+  tr.chPortRow.sub td { background: none; color: var(--txt2); font-size: 12px; }
+  tr.chCur td { background: #fff8ec; }
+  .chCmpSum { margin: 8px 0 0 18px; font-size: 13px; line-height: 1.8; color: var(--txt2); }
+  .chWhyAsset { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-top: 8px; }
+  .chWhyHead { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+  .chWhyRule { font-size: 12px; color: var(--txt2); line-height: 1.6; margin-top: 4px; }
+  .chWhyDays { font-size: 12px; margin-top: 6px; line-height: 2; }
+  .chDay { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; white-space: nowrap; }
+  .chDay .newsLink { padding: 0 6px; font-size: 11px; }
+  .chWhyNews { margin-top: 4px; }
+  .chWhyEvents { margin-top: 10px; font-size: 12px; line-height: 2; }
+  .chWhyEvents b { margin-right: 6px; }
   .chGroup { font-size: 11px; color: var(--sub); font-weight: 700; margin: 6px 0 4px; }
   .chNote { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-family: inherit; font-size: 14px; line-height: 1.6; resize: vertical; background: var(--card); color: var(--txt); }
   .briefMore { display: block; width: 100%; margin-top: 8px; padding: 9px; border: 1px dashed var(--line); border-radius: 12px; background: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
@@ -1526,9 +1546,11 @@
   </section>
 
   <section class="briefSec snapTarget" data-snap-title="자산배분">
-    <h3>③ 자산배분 <small>대표 자산 등락 + 지금 상황에 맞춘 구성 예시(비중·이유)</small></h3>
+    <h3>③ 자산배분 <small>대표 자산 · 지금 상황 맞춤 구성 · 6가지 구성 비교 — 3개월부터 3년까지</small></h3>
     <div class="row" style="gap:6px;margin-bottom:8px"><button class="chip" id="chAllocCopy">복사</button></div>
     <div id="chAlloc"></div>
+    <h4 class="chSub">🔎 왜 오르고 내렸나 <small>국채·금·원자재·달러·주식 — 원리, 크게 움직인 날의 기사, 그 기간의 사건</small></h4>
+    <div id="chWhy"></div>
   </section>
 
   <section class="briefSec snapTarget" data-snap-title="상황별 과거 사례">
@@ -1727,7 +1749,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button> · v6.4<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button> · v6.5<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1741,7 +1763,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script src="tickers.js?v=6.4"></script>
+<script src="tickers.js?v=6.5"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -4032,17 +4054,17 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=6.4"></script>
-<script src="technical.js?v=6.4"></script>
-<script src="company.js?v=6.4"></script>
-<script src="compare.js?v=6.4"></script>
-<script src="sim.js?v=6.4"></script>
-<script src="insight.js?v=6.4"></script>
-<script src="guide.js?v=6.4"></script>
-<script src="watch.js?v=6.4"></script>
-<script src="holdings.js?v=6.4"></script>
-<script src="brief.js?v=6.4"></script>
-<script src="channel.js?v=6.4"></script>
-<script src="snapshot.js?v=6.4"></script>
+<script src="metrics.js?v=6.5"></script>
+<script src="technical.js?v=6.5"></script>
+<script src="company.js?v=6.5"></script>
+<script src="compare.js?v=6.5"></script>
+<script src="sim.js?v=6.5"></script>
+<script src="insight.js?v=6.5"></script>
+<script src="guide.js?v=6.5"></script>
+<script src="watch.js?v=6.5"></script>
+<script src="holdings.js?v=6.5"></script>
+<script src="brief.js?v=6.5"></script>
+<script src="channel.js?v=6.5"></script>
+<script src="snapshot.js?v=6.5"></script>
 </body>
 </html>

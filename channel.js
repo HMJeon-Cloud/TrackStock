@@ -172,48 +172,189 @@ function chPickPlan() {
   var key = m.panic ? "panic" : m.rateUp ? "rateUp" : m.oilUp ? "oilUp" : m.rateDown ? "rateDown" : m.dollarUp ? "dollarUp" : "none";
   return Object.assign({ key: key }, CH_PLANS[key]);
 }
+/* 기간별 성과 계산 (10년치 데이터) */
+var CH_PERIODS = [["3개월", 91], ["6개월", 182], ["1년", 365], ["3년", 1095]];
+var CH_PLAN_LABEL = { panic: "조정·공포형", rateUp: "금리 상승형", oilUp: "유가 급등형", rateDown: "금리 하락형", dollarUp: "달러 강세형", none: "평소 균형형" };
+var CH_WHY_ASSETS = [
+  ["TLT", "미국 장기채", "미국 국채 금리", "금리가 오르면(물가↑·긴축·경기 과열) 채권 가격은 내리고, 금리가 내리면(경기 둔화·인하 기대·위기 때 안전자산 수요) 채권 가격은 올라요."],
+  ["GLD", "금", "금값 국제 금시세", "실질금리가 내려가거나 달러가 약해질 때, 전쟁·금융 불안이 커질 때 올라요. 금리가 빠르게 오르면 이자가 없는 금은 약해지기 쉬워요."],
+  ["DBC", "원자재", "국제유가 원자재", "경기가 좋아 수요가 늘거나 전쟁·감산으로 공급이 막히면 올라요. 경기 침체 우려가 커지면 가장 먼저 빠지는 편이에요."],
+  ["KRW=X", "달러/원", "원달러 환율", "미국 금리가 더 높거나 위기 때 안전자산 수요가 몰리면 달러가 강해져요(환율↑). 한국 수출 경기가 좋으면 원화가 강해져요(환율↓)."],
+  ["SPY", "미국 주식", "뉴욕증시", "기업 실적과 금리가 핵심이에요. 실적이 좋아도 금리가 급하게 오르면 빠지고, 금리 인하 기대가 생기면 먼저 반등하곤 해요."]
+];
+chState.whyPeriod = 2;   // 기본 1년
+chState.hist = {};
+function chLoadHist(list) {
+  return Promise.all(list.map(function (sym) {
+    if (chState.hist[sym]) return null;
+    return getChartData(sym, "max").then(function (p) { chState.hist[sym] = p.rows || []; }).catch(function () { chState.hist[sym] = []; });
+  }));
+}
+function chAt(rows, ms) { if (!rows || !rows.length) return null; var i = chIdx(rows, ms); if (i >= rows.length) i = rows.length - 1; return i; }
+function chPeriodRet(sym, days) {
+  var r = chState.hist[sym]; if (!r || r.length < 30) return null;
+  var lastT = r[r.length - 1].t, i0 = chAt(r, lastT - days * 86400000);
+  if (r[i0].t - (lastT - days * 86400000) > 15 * 86400000) return null;   // 그만큼 오래된 데이터가 없음
+  return r[r.length - 1].c / r[i0].c - 1;
+}
+/* 구성(비중) 성과: 처음 비중으로 사서 그대로 둔 경우의 수익률·최대낙폭 */
+function chPortfolio(items, days) {
+  var data = items.map(function (it) { return { w: it[1] / 100, r: chState.hist[it[0]] }; }).filter(function (d) { return d.r && d.r.length > 30; });
+  if (!data.length) return null;
+  var ref = data[0].r, lastT = ref[ref.length - 1].t, t0 = lastT - days * 86400000;
+  if (data.some(function (d) { return d.r[0].t > t0 + 15 * 86400000; })) return null;
+  var base = data.map(function (d) { return d.r[chAt(d.r, t0)].c; }), wsum = data.reduce(function (a, d) { return a + d.w; }, 0);
+  var i0 = chAt(ref, t0), peak = 1, mdd = 0, v = 1;
+  for (var i = i0; i < ref.length; i += 1) {
+    var t = ref[i].t; v = 0;
+    data.forEach(function (d, k) { var j = chAt(d.r, t); v += d.w / wsum * d.r[j].c / base[k]; });
+    if (v > peak) peak = v; var dd = v / peak - 1; if (dd < mdd) mdd = dd;
+  }
+  return { ret: v - 1, mdd: mdd };
+}
 function chRet(sym) {
   var d = chState.recent && chState.recent.symbols[sym]; if (!d || !d.c || d.c.length < 22) return null;
   var c = d.c, n = c.length, last = c[n - 1];
   return { d1: last / c[n - 2] - 1, w1: n > 5 ? last / c[n - 6] - 1 : null, m1: last / c[Math.max(0, n - 22)] - 1, m3: last / c[0] - 1 };
 }
 function chTd(x) { return '<td style="color:' + (x > 0 ? "var(--up)" : x < 0 ? "var(--down)" : "var(--sub)") + '">' + chPct(x) + '</td>'; }
+function chPerHead() { return CH_PERIODS.map(function (p) { return '<th>' + p[0] + '</th>'; }).join(""); }
+
+/* '왜 움직였나': 기간 중 가장 크게 움직인 날 + 그 시기 사건 + 당시 기사 검색 링크 */
+function chBigDays(sym, days, n) {
+  var r = chState.hist[sym]; if (!r || r.length < 30) return [];
+  var lastT = r[r.length - 1].t, i0 = chAt(r, lastT - days * 86400000), out = [];
+  for (var i = Math.max(1, i0 + 1); i < r.length; i++) out.push({ t: r[i].t, ch: r[i].c / r[i - 1].c - 1 });
+  return out.sort(function (a, b) { return Math.abs(b.ch) - Math.abs(a.ch); }).slice(0, n);
+}
+function chNewsLink(t, q, label) {
+  function ymd(ms) { var d = new Date(ms); return d.getFullYear() + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + String(d.getDate()).padStart(2, "0"); }
+  var url = "https://search.naver.com/search.naver?where=news&query=" + encodeURIComponent(q) + "&pd=3&ds=" + ymd(t - 3 * 86400000) + "&de=" + ymd(t + 3 * 86400000) + "&sort=0";
+  return '<a class="evtTag newsLink" href="' + url + '" target="_blank" rel="noopener">' + (label || "📰 당시 기사") + '</a>';
+}
+function chFmtDay(t) { var d = new Date(t); return (d.getFullYear() % 100) + "." + (d.getMonth() + 1) + "." + d.getDate(); }
+function chRenderWhy() {
+  var pi = chState.whyPeriod, per = CH_PERIODS[pi], days = per[1];
+  var html = '<div class="pills" id="chWhyTabs" style="margin-bottom:10px">' + CH_PERIODS.map(function (p, i) { return '<button data-wp="' + i + '"' + (i === pi ? ' class="active"' : '') + '>' + p[0] + '</button>'; }).join("") + '</div>';
+  var lastT = Date.now(), t0 = lastT - days * 86400000;
+  var evs = (typeof EVENTS !== "undefined" ? EVENTS : []).filter(function (e) { return e.ts >= t0 && e.ts <= lastT; });
+  html += CH_WHY_ASSETS.map(function (a) {
+    var ret = chPeriodRet(a[0], days), big = chBigDays(a[0], days, 3);
+    var news = (chState.whyNews || {})[a[0]] || [];
+    return '<div class="chWhyAsset"><div class="chWhyHead"><b>' + a[1] + '</b><span style="color:' + (ret > 0 ? "var(--up)" : ret < 0 ? "var(--down)" : "var(--sub)") + ';font-weight:700">' + per[0] + ' ' + chPct(ret) + '</span></div>' +
+      '<div class="chWhyRule">📘 ' + a[3] + '</div>' +
+      (big.length ? '<div class="chWhyDays"><span class="briefDim">크게 움직인 날</span> ' + big.map(function (b) {
+        return '<span class="chDay"><b style="color:' + (b.ch > 0 ? "var(--up)" : "var(--down)") + '">' + chFmtDay(b.t) + ' ' + chPct(b.ch) + '</b> ' + chNewsLink(b.t, a[2], "📰") + '</span>';
+      }).join("") + '</div>' : '') +
+      (pi === 0 && news.length ? '<div class="chWhyNews">' + news.slice(0, 2).map(function (it) { return '<a class="briefNewsLink" href="' + it.url + '" target="_blank" rel="noopener">· ' + escapeHtml(it.title) + '</a>'; }).join("") + '</div>' : '') +
+      '</div>';
+  }).join("");
+  html += evs.length ? '<div class="chWhyEvents"><b>이 기간의 큰 사건</b> ' + evs.map(function (e) {
+    var col = (typeof EVENT_TYPES !== "undefined" && EVENT_TYPES[e.type]) || "#8b95a1";
+    return '<span class="evtTag" style="color:' + col + ';border-color:' + col + '">' + e.date.slice(2).replace(/-/g, ".") + ' ' + e.name + '</span>';
+  }).join("") + '</div>' : '<div class="briefDim" style="margin-top:6px">이 기간에 앱에 기록된 큰 사건은 없어요. 위의 📰 링크로 그날 기사를 확인해 보세요.</div>';
+  html += '<div class="briefDim" style="margin-top:6px">📰는 그날 앞뒤 3일의 네이버 뉴스 검색으로 열려요. 최근 3개월을 고르면 최신 기사 제목도 함께 보여요.</div>';
+  $("chWhy").innerHTML = html;
+  Array.prototype.forEach.call(document.querySelectorAll("#chWhyTabs [data-wp]"), function (b) {
+    b.onclick = function () { chState.whyPeriod = +b.getAttribute("data-wp"); chRenderWhy(); chUpdateCount(); };
+  });
+}
+function chLoadWhyNews() {
+  if (typeof fetchNews !== "function") return Promise.resolve();
+  chState.whyNews = {};
+  return Promise.all(CH_WHY_ASSETS.map(function (a) {
+    return fetchNews({ type: "stock", q: a[2], size: 3 }).then(function (items) { chState.whyNews[a[0]] = items || []; });
+  }));
+}
+
 function chLoadAlloc() {
-  if (!chState.recent) { $("chAlloc").innerHTML = '<div class="briefDim">데이터 없음</div>'; return; }
-  var rows = CH_ALLOC.map(function (p) { var r = chRet(p[0]); return r ? Object.assign({ name: p[1] }, r) : null; }).filter(Boolean);
-  chState.alloc = rows;
+  if (!chState.recent) { $("chAlloc").innerHTML = '<div class="briefDim">데이터 없음</div>'; return Promise.resolve(); }
   var plan = chPickPlan(); chState.plan = plan;
-  var items = plan.items.map(function (it) { return { sym: it[0], w: it[1], why: it[2], name: chName(it[0]), r: chRet(it[0]) }; });
-  var wsum = 0, w3 = 0; items.forEach(function (it) { if (it.r) { wsum += it.w; w3 += it.w * it.r.m3; } });
-  plan.m3 = wsum ? w3 / wsum : null;
-  var b6040 = (function () { var a = chRet("SPY"), b = chRet("IEF") || chRet("TLT"); return a && b ? 0.6 * a.m3 + 0.4 * b.m3 : null; })();
-  plan.b6040 = b6040;
+  var syms = {}; CH_ALLOC.forEach(function (a) { syms[a[0]] = 1; }); CH_WHY_ASSETS.forEach(function (a) { syms[a[0]] = 1; });
+  Object.keys(CH_PLANS).forEach(function (k) { CH_PLANS[k].items.forEach(function (it) { syms[it[0]] = 1; }); }); syms.IEF = 1;
+  $("chAlloc").innerHTML = '<div class="briefDim">3년치까지 기간별로 계산 중…</div>';
+  return Promise.all([chLoadHist(Object.keys(syms)), chLoadWhyNews()]).then(function () {
+    var P = CH_PERIODS;
+    // 대표 자산
+    chState.alloc = CH_ALLOC.map(function (a) { return { sym: a[0], name: a[1], per: P.map(function (p) { return chPeriodRet(a[0], p[1]); }) }; });
+    // 맞춤 구성
+    plan.rows = plan.items.map(function (it) { return { sym: it[0], w: it[1], why: it[2], name: chName(it[0]), per: P.map(function (p) { return chPeriodRet(it[0], p[1]); }) }; });
+    plan.port = P.map(function (p) { return chPortfolio(plan.items, p[1]); });
+    var b6040 = [["SPY", 60], ["IEF", 40]], spy = [["SPY", 100]];
+    plan.b6040 = P.map(function (p) { return chPortfolio(b6040, p[1]); });
+    plan.spy = P.map(function (p) { return chPortfolio(spy, p[1]); });
+    // 6가지 구성 비교
+    chState.cmp = Object.keys(CH_PLANS).map(function (k) { return { key: k, label: CH_PLAN_LABEL[k], res: P.map(function (p) { return chPortfolio(CH_PLANS[k].items, p[1]); }) }; });
+    chRenderAlloc();
+    chRenderWhy();
+    if (typeof snapAttach === "function") snapAttach();
+  });
+}
+function chPortCells(arr) {
+  return arr.map(function (x) {
+    if (!x) return '<td>-</td>';
+    return '<td><b style="color:' + (x.ret >= 0 ? "var(--up)" : "var(--down)") + '">' + chPct(x.ret) + '</b><div class="chMdd">최대 ' + chPct(x.mdd, 0) + '</div></td>';
+  }).join("");
+}
+function chRenderAlloc() {
+  var plan = chState.plan, P = CH_PERIODS;
   var why = (chState.now && chState.now.why.length) ? chState.now.why.join(" / ") : "두드러진 신호 없음";
+  // 기간별 1위 요약
+  var lines = P.map(function (p, i) {
+    var ok = chState.cmp.filter(function (c) { return c.res[i]; });
+    if (!ok.length) return "";
+    var best = ok.slice().sort(function (a, b) { return b.res[i].ret - a.res[i].ret; })[0];
+    var safe = ok.slice().sort(function (a, b) { return b.res[i].mdd - a.res[i].mdd; })[0];
+    return '<li><b>' + p[0] + '</b>: 수익 1위 <b>' + best.label + '</b> ' + chPct(best.res[i].ret) + ' · 낙폭 가장 작은 <b>' + safe.label + '</b> ' + chPct(safe.res[i].mdd, 0) + '</li>';
+  }).filter(Boolean);
+  chState.cmpLines = lines.map(function (l) { return l.replace(/<[^>]+>/g, ""); });
   $("chAlloc").innerHTML =
-    '<h4 class="chSub">대표 자산</h4><div class="tableWrap"><table><tr><th>자산</th><th>하루</th><th>1주</th><th>1개월</th><th>3개월</th></tr>' +
-    rows.map(function (r) { return '<tr><td><b>' + r.name + '</b></td>' + chTd(r.d1) + chTd(r.w1) + chTd(r.m1) + chTd(r.m3) + '</tr>'; }).join("") + '</table></div>' +
+    '<h4 class="chSub">대표 자산 <small>기간별 등락</small></h4><div class="tableWrap"><table><tr><th>자산</th>' + chPerHead() + '</tr>' +
+    chState.alloc.map(function (r) { return '<tr><td><b>' + r.name + '</b></td>' + r.per.map(chTd).join("") + '</tr>'; }).join("") + '</table></div>' +
+
     '<h4 class="chSub">🎯 지금 상황 맞춤 구성 <small>' + plan.title + '</small></h4>' +
     '<div class="chWhyBox">판단 근거: ' + why + '</div>' +
-    '<div class="tableWrap"><table id="chPlan"><tr><th>자산</th><th>비중</th><th>1개월</th><th>3개월</th></tr>' +
-    items.map(function (it) {
-      return '<tr class="chHasWhy"><td><b>' + it.name + '</b><div class="briefDim">' + it.sym + '</div></td><td><b>' + it.w + '%</b></td>' +
-        (it.r ? chTd(it.r.m1) + chTd(it.r.m3) : '<td>-</td><td>-</td>') + '</tr>' +
-        '<tr class="chWhyRow"><td colspan="4"><div class="chWhyTxt">💡 ' + it.why + '</div></td></tr>';
-    }).join("") + '</table></div>' +
-    '<div class="briefDim" style="margin-top:6px">이 구성의 최근 3개월 <b>' + chPct(plan.m3) + '</b>' + (b6040 != null ? ' · 같은 기간 주식60/채권40 <b>' + chPct(b6040) + '</b>' : '') +
-    ' — 최근 숫자일 뿐 앞으로를 보장하지 않아요. 상황 규칙에 따라 자동으로 고른 <b>예시</b>이고, 추천이 아니에요.</div>';
-  if (typeof snapAttach === "function") snapAttach();
+    '<div class="tableWrap"><table id="chPlan"><tr><th>자산</th><th>비중</th>' + chPerHead() + '</tr>' +
+    plan.rows.map(function (it) {
+      return '<tr class="chHasWhy"><td><b>' + it.name + '</b><div class="briefDim">' + it.sym + '</div></td><td><b>' + it.w + '%</b></td>' + it.per.map(chTd).join("") + '</tr>' +
+        '<tr class="chWhyRow"><td colspan="' + (2 + P.length) + '"><div class="chWhyTxt">💡 ' + it.why + '</div></td></tr>';
+    }).join("") +
+    '<tr class="chPortRow"><td colspan="2"><b>이 구성</b></td>' + chPortCells(plan.port) + '</tr>' +
+    '<tr class="chPortRow sub"><td colspan="2">주식60/채권40</td>' + chPortCells(plan.b6040) + '</tr>' +
+    '<tr class="chPortRow sub"><td colspan="2">S&P500 100%</td>' + chPortCells(plan.spy) + '</tr>' +
+    '</table></div>' +
+
+    '<h4 class="chSub">⚖️ 6가지 구성 비교 <small>같은 기간에 각 구성으로 샀다면 · 수익률 / 그 사이 최대 낙폭</small></h4>' +
+    '<div class="tableWrap"><table id="chCmp"><tr><th>구성</th>' + chPerHead() + '</tr>' +
+    chState.cmp.map(function (c) { return '<tr' + (c.key === plan.key ? ' class="chCur"' : '') + '><td><b>' + c.label + '</b>' + (c.key === plan.key ? ' <span class="chNowBadge">지금</span>' : '') + '</td>' + chPortCells(c.res) + '</tr>'; }).join("") +
+    '</table></div>' +
+    '<ul class="chCmpSum">' + lines.join("") + '</ul>' +
+    '<div class="briefDim" style="margin-top:6px">짧은 기간 1위와 긴 기간 1위가 다르다면, 그게 "상황에 맞춰 비중을 조절하는 이유"이자 "한 구성에 다 걸지 않는 이유"예요. 수익만 보지 말고 최대 낙폭(버틸 수 있는 하락인지)을 같이 보세요. 처음 비중으로 사서 그대로 둔 기준이며, 상황 규칙에 따라 고른 <b>예시</b>이지 추천이 아니에요.</div>';
 }
 function chAllocText() {
   var rs = chState.alloc || [], plan = chState.plan; if (!rs.length) return "";
-  var L = ["⚖️ 자산 스냅샷 (1주 / 1개월 / 3개월)"].concat(rs.map(function (r) { return "· " + r.name + " " + chPct(r.w1) + " / " + chPct(r.m1) + " / " + chPct(r.m3); }));
-  if (plan) {
+  var heads = CH_PERIODS.map(function (p) { return p[0]; }).join(" / ");
+  var L = ["⚖️ 자산 스냅샷 (" + heads + ")"].concat(rs.map(function (r) { return "· " + r.name + " " + r.per.map(function (x) { return chPct(x, 0); }).join(" / "); }));
+  if (plan && plan.rows) {
     L.push(""); L.push("🎯 지금 상황 맞춤 구성 예시 — " + plan.title);
     if (chState.now && chState.now.why.length) L.push("근거: " + chState.now.why.join(" / "));
-    plan.items.forEach(function (it) { L.push("· " + chName(it[0]) + " " + it[1] + "% — " + it[2]); });
-    if (plan.m3 != null) L.push("최근 3개월 " + chPct(plan.m3) + (plan.b6040 != null ? " (주식60/채권40 " + chPct(plan.b6040) + ")" : ""));
-    L.push("※ 규칙 기반 예시이며 추천이 아님.");
+    plan.rows.forEach(function (it) { L.push("· " + it.name + " " + it.w + "% — " + it.why); });
+    L.push("이 구성 (" + heads + "): " + plan.port.map(function (x) { return x ? chPct(x.ret, 0) + "(최대 " + chPct(x.mdd, 0) + ")" : "-"; }).join(" / "));
+    L.push("주식60/채권40: " + plan.b6040.map(function (x) { return x ? chPct(x.ret, 0) : "-"; }).join(" / "));
   }
+  if (chState.cmpLines && chState.cmpLines.length) { L.push(""); L.push("📊 6가지 구성 비교 — 기간별 1위"); chState.cmpLines.forEach(function (l) { L.push("· " + l); }); }
+  // 왜 움직였나 (선택한 기간)
+  var pi = chState.whyPeriod, days = CH_PERIODS[pi][1];
+  L.push(""); L.push("🔎 왜 움직였나 (" + CH_PERIODS[pi][0] + ")");
+  CH_WHY_ASSETS.forEach(function (a) {
+    var big = chBigDays(a[0], days, 2);
+    L.push("· " + a[1] + " " + chPct(chPeriodRet(a[0], days)) + (big.length ? " — 큰 움직임 " + big.map(function (b) { return chFmtDay(b.t) + " " + chPct(b.ch); }).join(", ") : ""));
+    L.push("  " + a[3]);
+  });
+  var t0 = Date.now() - days * 86400000;
+  var evs = (typeof EVENTS !== "undefined" ? EVENTS : []).filter(function (e) { return e.ts >= t0; });
+  if (evs.length) L.push("이 기간 사건: " + evs.map(function (e) { return e.date.slice(2).replace(/-/g, ".") + " " + e.name; }).join(", "));
+  L.push("※ 규칙 기반 예시이며 추천이 아님.");
   return L.join("\n");
 }
 
@@ -375,7 +516,6 @@ function renderChannel() {
   dataReady().then(function () {
     return Promise.all([chLoadDaily(false), chPrepare()]);
   }).then(function () {
-    chLoadAlloc();
-    return chLoadMdd();
+    return Promise.all([chLoadAlloc(), chLoadMdd()]);
   }).then(chLoadScenarios).then(chUpdateCount);
 }
