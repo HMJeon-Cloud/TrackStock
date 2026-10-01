@@ -44,8 +44,11 @@ export function stats(sym, d, names) {
 export function composeDaily(recent, names, news) {
   const by = {}; const rows = [];
   for (const sym of Object.keys(recent.symbols || {})) { const s = stats(sym, recent.symbols[sym], names); if (s) { by[sym] = s; rows.push(s); } }
-  const us = rows.filter((s) => !KR.test(s.sym) && !EXCLUDE.test(s.sym) && !/-USD$|=X$|=F$|^\^/.test(s.sym));
-  let asOf = 0; us.forEach((s) => { if (s.lastT > asOf) asOf = s.lastT; });
+  // 데이터 점검: 최신 기준일보다 4일 넘게 뒤처진 종목(수집 실패 잔존)·하루 ±40% 초과(오류 의심)·중복 종목은 순위에서 뺀다
+  const DUP = { GOOG: 1, "BRK-A": 1, VOO: 1 };
+  let asOf = 0; rows.forEach((s) => { if (!KR.test(s.sym) && !/-USD$|=X$|=F$/.test(s.sym) && s.lastT > asOf) asOf = s.lastT; });
+  const us = rows.filter((s) => !KR.test(s.sym) && !EXCLUDE.test(s.sym) && !/-USD$|=X$|=F$|^\^/.test(s.sym) && !DUP[s.sym] &&
+    asOf - s.lastT <= 4 * 86400000 && Math.abs(s.ret1) <= 0.4);
   const vix = by["^VIX"];
 
   const L = [];
