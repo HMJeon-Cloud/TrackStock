@@ -51,7 +51,11 @@ function briefStats(sym, d, mode) {
   var ma20 = 0; for (var i = n - 20; i < n; i++) ma20 += c[i]; ma20 /= 20;
   var ma5 = 0; for (i = n - 5; i < n; i++) ma5 += c[i]; ma5 /= 5;
   var hi = d.meta && d.meta.fiftyTwoWeekHigh, vsHi = hi > 0 ? last / hi - 1 : null;
-  var hi90 = Math.max.apply(null, c), vs90 = last / hi90 - 1;
+  var hi90 = Math.max.apply(null, c);
+  if (vsHi != null && hi90 > hi * 1.02) vsHi = last / hi90 - 1;      // 야후 52주 고점이 최근 90일 고점보다 낮으면(갱신 지연) 90일 고점으로
+  if (vsHi != null && vsHi > 0) vsHi = 0;
+  if (vsHi != null && vsHi < -0.95) vsHi = null;                        // 액면분할 미반영 등으로 의심되면 쓰지 않음
+  var vs90 = last / hi90 - 1;
   var rsi = typeof rsiWilder === "function" ? rsiWilder(c, 14) : null;
   var v5 = 0, v20 = 0;
   for (i = n - 5; i < n; i++) v5 += v[i] || 0;
@@ -88,6 +92,25 @@ if (typeof TICKER_DICT !== "undefined") TICKER_DICT.forEach(function (t) { BRIEF
 function briefName(s) { var n = BRIEF_KO[s.sym] || s.name || s.sym; return String(n).replace(/\s*\(.*?\)\s*/g, "").trim() || s.sym; }
 function briefPct(x, digits) { if (x == null || !isFinite(x)) return "-"; var d = digits == null ? 1 : digits; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
 
+/* ---------- 데이터 점검 ----------
+   ① 오래된 데이터: 같은 시장의 최신 기준일보다 4일 넘게 뒤처진 종목(수집 실패로 지난 값이 남은 것) → 순위에서 뺌
+   ② 비정상 급변: 하루 ±40% 넘는 움직임(코인 제외 ±40%, 코인 ±60%) → 오류 가능성이 커 순위에서 뺌
+   ③ 같은 회사 중복: GOOG/GOOGL, BRK-A/BRK-B, 삼성전자/삼성전자우, 같은 지수 ETF(SPY/VOO) → 하나만 순위에 */
+var BRIEF_DUP = { GOOG: "GOOGL", "BRK-A": "BRK-B", "005935.KS": "005930.KS", VOO: "SPY", "GC=F": "GLD" };
+function briefQuality(rows) {
+  var mk = function (s) { return /\.K[SQ]$|^\^KS|^\^KQ/.test(s.sym) ? "kr" : /-USD$/.test(s.sym) ? "coin" : /=X$|=F$/.test(s.sym) ? "fx" : "us"; };
+  var newest = {};
+  rows.forEach(function (s) { var k = mk(s); if (s.lastT && (!newest[k] || s.lastT > newest[k])) newest[k] = s.lastT; });
+  var stale = [], spike = [], bad = {};
+  rows.forEach(function (s) {
+    var k = mk(s);
+    if (s.lastT && newest[k] && newest[k] - s.lastT > 4 * 86400000) { stale.push(s); bad[s.sym] = "stale"; }
+    var lim = k === "coin" ? 0.6 : 0.4;
+    if (Math.abs(s.ret1) > lim) { spike.push(s); bad[s.sym] = "spike"; }
+  });
+  return { stale: stale, spike: spike, bad: bad, total: rows.length };
+}
+
 function briefCompute(recent, opts) {
   opts = opts || {};
   var mode = opts.mode === "week" ? "week" : "day";
@@ -99,7 +122,8 @@ function briefCompute(recent, opts) {
     rows.push(s); bySym[sym] = s;
     if (s.lastT && s.lastT > asOf) asOf = s.lastT;
   });
-  var stocks = rows.filter(function (s) { return !BRIEF_EXCLUDE.test(s.sym); });
+  var quality = briefQuality(rows);
+  var stocks = rows.filter(function (s) { return !BRIEF_EXCLUDE.test(s.sym) && !quality.bad[s.sym] && !BRIEF_DUP[s.sym]; });
   var label = mode === "week" ? "이번 주" : "오늘";
 
   /* 1. 온도계 */
@@ -171,7 +195,7 @@ function briefCompute(recent, opts) {
   /* 4-b. 인기 종목 + 거래대금 순위 */
   var fx = bySym["KRW=X"] ? bySym["KRW=X"].last : 1400;
   function amtKrw(s) { return s.amt * (/\.K[SQ]$/.test(s.sym) || s.cur === "KRW" ? 1 : fx); }
-  var withAmt = rows.filter(function (s) { return s.amt > 0 && !/^\^|=X$|=F$/.test(s.sym) && !BRIEF_EXCLUDE.test(s.sym); });
+  var withAmt = rows.filter(function (s) { return s.amt > 0 && !/^\^|=X$|=F$/.test(s.sym) && !BRIEF_EXCLUDE.test(s.sym) && !quality.bad[s.sym] && !BRIEF_DUP[s.sym]; });
   var turnover = {
     kr: withAmt.filter(function (s) { return /\.K[SQ]$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
     us: withAmt.filter(function (s) { return !/\.K[SQ]$|-USD$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
@@ -229,7 +253,7 @@ function briefCompute(recent, opts) {
       if (diff <= 14 && d.getFullYear() < now.getFullYear()) hist.push({ date: e.date, name: e.name, type: e.type, years: now.getFullYear() - d.getFullYear() });
     });
   }
-  return { mode: mode, label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
+  return { quality: quality, mode: mode, label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
 }
 
 /* 뉴스 제목 묶음 → 키워드 순위 (NEWS_TAGS 재사용) */
@@ -298,7 +322,9 @@ function renderBrief() {
   var R = briefState.result, box = $("briefBody");
   if (!R || !box) return;
   var L = R.label;
-  $("briefAsOf").textContent = "종가 기준 — 한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs) + " · " + R.count + "개 자산 · 사람이 고른 추천이 아니라 숫자 기준으로 걸러낸 참고 목록이에요";
+  var qn = R.quality ? R.quality.stale.length + R.quality.spike.length : 0;
+  $("briefAsOf").textContent = "종가 기준 — 한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs) + " · " + R.count + "개 자산" +
+    (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "") + " · 사람이 고른 추천이 아니라 숫자 기준으로 걸러낸 참고 목록이에요";
 
   /* 온도계 */
   var t = R.temp;

@@ -57,6 +57,17 @@ function chPrepare() {
     });
   });
 }
+/* 데이터 점검 결과 표시 */
+function chRenderQuality() {
+  var R = chState.brief, box = $("chQuality"); if (!R || !box) return;
+  var q = R.quality, n = q.stale.length + q.spike.length;
+  var gen = chState.recent && chState.recent.generated ? chState.recent.generated.replace("T", " ").slice(0, 16) + " UTC" : "-";
+  box.innerHTML = '<b>🩺 데이터 점검</b> 수집 ' + gen + ' · ' + q.total + '개 자산 · ' +
+    (n ? '<span style="color:#b45309">확인 필요 ' + n + '개 — 순위·카드에서 제외했어요</span>' : '<span style="color:var(--good)">이상 없음</span>') +
+    (n ? '<div class="briefDim" style="margin-top:4px">' +
+      (q.stale.length ? '오래된 데이터(수집 실패로 지난 값): ' + q.stale.map(function (s) { return briefName(s) + " " + new Date(s.lastT).toISOString().slice(5, 10); }).join(", ") + '<br>' : '') +
+      (q.spike.length ? '하루 ±40% 넘는 급변(오류 의심): ' + q.spike.map(function (s) { return briefName(s) + " " + chPct(s.ret1); }).join(", ") : '') + '</div>' : '');
+}
 function chStat(sym) { var d = chState.recent && chState.recent.symbols[sym]; return d ? briefStats(sym, d, "day") : null; }
 
 /* ---------- ② MDD 분석 (10년치 데이터) ---------- */
@@ -380,16 +391,16 @@ var CH_ASSETS = [["SPY", "S&P500"], ["QQQ", "나스닥100"], ["^KS11", "코스�
 var CH_POP_DEFAULT = ["NVDA", "TSLA", "AAPL", "MSFT", "005930.KS", "000660.KS", "PLTR", "AMZN"];
 var CH_SCEN = [
   { id: "rateUp", tag: "금리 급등", icon: "📈",
-    lesson: "금리가 오르면 채권 가격은 떨어져요(금리와 채권 가격은 반대로 움직임). 성장주·기술주가 특히 크게 빠졌고, 이런 구간에서 채권은 피난처가 되지 못했어요.",
+    lesson: "금리가 오르면 채권 가격은 떨어져요(금리와 채권 가격은 반대로 움직임). 성장주·기술주가 특히 크게 빠지는 경향이 있고, 2022년처럼 채권이 주식과 같이 빠지면 피난처가 되지 못했어요. 다만 2018년 말처럼 주식 급락이 깊어지면 채권이 다시 오르기도 했어요 — 아래 숫자로 확인하세요.",
     eps: [["2022 연준 급격한 금리인상", "2022-01-03", "2022-10-12"], ["2018 파월 쇼크(긴축 지속)", "2018-10-01", "2018-12-24"], ["2013 테이퍼 탠트럼", "2013-05-21", "2013-06-24"]] },
   { id: "rateDown", tag: "금리 인하 전환", icon: "📉",
-    lesson: "금리 인하 국면에서는 채권 가격이 오르는 경향이 있어요. 2022년처럼 채권이 같이 빠진 뒤라면, 금리 방향이 바뀌는 시점에 주식·채권 비중을 다시 맞추는 근거가 돼요.",
+    lesson: "금리가 내리면 채권 가격이 오르는 경향이 있어요. 하지만 기준금리 인하가 곧 장기금리 하락은 아니에요 — 2024년처럼 인하를 시작했는데도 장기금리가 올라 장기채가 빠진 경우도 있었어요. 아래 숫자로 두 사례를 비교해 보세요.",
     eps: [["2019 연준 금리인하 전환", "2019-07-31", "2019-12-31"], ["2024 연준 금리인하 시작", "2024-09-18", "2024-12-31"]] },
   { id: "panic", tag: "공포 급락 (VIX 급등)", icon: "😱",
-    lesson: "짧고 깊은 급락은 대부분 몇 주~몇 달 안에 저점을 찍었어요. 이때 금·장기채가 상대적으로 버틴 경우가 많아, '버틴 자산 일부를 팔아 빠진 주식을 사는' 리밸런싱이 결과적으로 유리했던 구간이에요.",
+    lesson: "짧고 깊은 급락은 대부분 몇 주~몇 달 안에 저점을 찍었어요. 이때 금·장기채가 상대적으로 버틴 경우가 많았지만 항상은 아니었어요. '버틴 자산 일부를 팔아 빠진 자산을 사는' 리밸런싱이 1년 뒤 어땠는지 아래 숫자로 확인하세요.",
     eps: [["2020 코로나 폭락", "2020-02-19", "2020-03-23"], ["2024 엔캐리 청산 급락", "2024-07-16", "2024-08-05"], ["2025 미국 상호관세 발표", "2025-04-02", "2025-04-08"]] },
   { id: "oilUp", tag: "유가 급등·전쟁", icon: "🛢️",
-    lesson: "유가가 뛰면 물가 걱정 → 금리 상승 압력으로 이어져 주식과 채권이 같이 약해질 수 있어요. 금과 에너지 업종이 상대적으로 강했던 사례가 많아요.",
+    lesson: "유가가 뛰면 물가 걱정 → 금리 상승 압력으로 이어져 주식과 채권이 같이 약해질 수 있어요. 원자재·에너지가 상대적으로 강한 경향이 있어요.",
     eps: [["2022 러-우 전쟁", "2022-02-24", "2022-06-08"], ["2023 이스라엘-하마스 전쟁", "2023-10-06", "2023-10-27"]] },
   { id: "dollarUp", tag: "달러 강세", icon: "💵",
     lesson: "달러가 강할 때 원화로 투자한 미국 자산은 환율 덕에 손실이 줄어드는 '자연 헷지' 효과가 있었어요. 반대로 코스피 같은 원화 자산은 외국인 매도로 약한 경우가 많아요.",
@@ -532,6 +543,7 @@ function renderChannel() {
   dataReady().then(function () {
     return Promise.all([chLoadDaily(false), chPrepare()]);
   }).then(function () {
+    chRenderQuality();
     return Promise.all([chLoadAlloc(), chLoadMdd()]);
   }).then(chLoadScenarios).then(chUpdateCount);
 }
