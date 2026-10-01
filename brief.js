@@ -129,7 +129,11 @@ function briefCompute(recent, opts) {
   var movers = { up: sorted.slice(0, BRIEF_MAX.movers), down: sorted.slice(-BRIEF_MAX.movers).reverse() };
   // 시장별 기준일 (한국·미국은 마감 시각이 달라 하루 차이 날 수 있다)
   var asOfKr = 0, asOfUs = 0;
-  rows.forEach(function (s) { if (!s.lastT) return; if (/\.K[SQ]$|^\^KS|^\^KQ/.test(s.sym)) { if (s.lastT > asOfKr) asOfKr = s.lastT; } else if (s.lastT > asOfUs) asOfUs = s.lastT; });
+  rows.forEach(function (s) {
+    if (!s.lastT) return;
+    if (/\.K[SQ]$|^\^KS|^\^KQ/.test(s.sym)) { if (s.lastT > asOfKr) asOfKr = s.lastT; }
+    else if (!/-USD$|=X$|=F$|^\^(N225|HSI|VIX)$/.test(s.sym) && s.lastT > asOfUs) asOfUs = s.lastT;   // 코인·환율은 주말에도 움직여 기준일이 앞서 보이므로 뺀다
+  });
 
   /* 4. 참고 종목 (규칙) */
   function take(list, n) { return list.slice(0, n); }
