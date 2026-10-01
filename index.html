@@ -581,6 +581,49 @@
     #chAlloc .briefDim { font-size: 10px; }
   }
   .chQuality { background: var(--soft); border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-top: 10px; line-height: 1.6; }
+  /* 투자 마음 테스트 */
+  .mindProg { height: 6px; background: #eef1f4; border-radius: 3px; overflow: hidden; }
+  .mindProg div { height: 100%; background: linear-gradient(90deg, #c9a24f, #e8c97a); border-radius: 3px; transition: width .3s; }
+  .mindStep { font-size: 12px; color: var(--sub); margin: 12px 0 4px; font-weight: 600; }
+  .mindQ { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.4px; }
+  .mindSub { font-size: 13px; color: var(--sub); margin-bottom: 14px; }
+  .mindOpts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mindOpt { display: flex; align-items: center; gap: 12px; text-align: left; padding: 14px 14px; border-radius: 14px; background: var(--card2); border: 1.5px solid var(--line); line-height: 1.35; }
+  .mindOpt b { display: block; font-size: 15px; color: var(--txt); }
+  .mindOpt small { display: block; font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .mindOpt.on { border-color: #c9a24f; background: #fffaf0; }
+  .mindEmo { font-size: 24px; flex: 0 0 auto; }
+  .mindNav { justify-content: space-between; margin-top: 16px; }
+  .mindHero { display: flex; gap: 16px; align-items: center; padding: 22px 20px; border-radius: 18px; background: linear-gradient(135deg, #111013, #2a2418); color: #f4f1ea; margin-bottom: 14px; }
+  .mindHero small { color: #d6b464; font-weight: 700; font-size: 12px; letter-spacing: .5px; }
+  .mindHero h2 { margin: 2px 0 4px; font-size: 26px; color: #f1dca2; }
+  .mindHero p { margin: 0; color: #b9b3a8; font-size: 14px; }
+  .mindHeroEmo { font-size: 52px; }
+  .mindBox { border: 1px solid var(--line); border-radius: 16px; padding: 16px 16px 12px; margin-bottom: 12px; background: var(--card); }
+  .mindBox p { font-size: 14px; line-height: 1.7; margin: 6px 0 10px; color: #333d4b; }
+  .mindBoxT { font-weight: 800; font-size: 16px; margin-bottom: 4px; }
+  .mindTwo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mindTwo > div { background: var(--card2); border-radius: 12px; padding: 10px 12px; }
+  .mindTwo b { font-size: 13px; color: #a8833a; }
+  .mindTwo p { font-size: 13px; margin: 4px 0 0; }
+  .mindVs { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; }
+  .mindVs > div:not(.mindVsArrow) { flex: 1; background: var(--card2); border-radius: 12px; padding: 10px 12px; }
+  .mindVs small { display: block; font-size: 11px; color: var(--sub); }
+  .mindVs b { font-size: 14px; }
+  .mindVsArrow { font-size: 26px; font-weight: 800; color: #c9a24f; }
+  .mindFoot { font-size: 12px !important; color: var(--sub) !important; }
+  .mindList { margin: 6px 0 8px; padding-left: 18px; font-size: 14px; line-height: 1.7; }
+  .mindRules ol { margin: 8px 0 4px; padding-left: 20px; font-size: 15px; line-height: 1.9; font-weight: 600; }
+  .mindBarsT { font-size: 13px; font-weight: 700; margin: 12px 0 6px; color: var(--sub); }
+  .mindBar { display: grid; grid-template-columns: minmax(0, 1.4fr) 1fr 40px; gap: 8px; align-items: center; font-size: 13px; margin: 5px 0; }
+  .mindBar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mindBar div { height: 8px; background: #eef1f4; border-radius: 4px; overflow: hidden; }
+  .mindBar i { display: block; height: 100%; background: #c5cbd2; border-radius: 4px; }
+  .mindBar.me i { background: #c9a24f; }
+  .mindBar.me span { font-weight: 700; }
+  .mindBar em { font-style: normal; font-size: 10px; background: #c9a24f; color: #fff; border-radius: 6px; padding: 1px 5px; }
+  .mindBar b { text-align: right; }
+  @media (max-width: 640px) { .mindOpts, .mindTwo { grid-template-columns: 1fr; } .mindHeroEmo { font-size: 42px; } }
   .cardsWrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
   .cardsWrap figure { margin: 0; }
   .cardsWrap img { width: 100%; border-radius: 12px; border: 1px solid var(--line); display: block; }
@@ -1525,6 +1568,13 @@
 </div>
 </div><!-- /tab-brief -->
 
+<div id="tab-mind" class="hidden">
+<div class="card" id="mindCard">
+  <h2 style="margin:0">투자 마음 테스트 <small>나는 왜 사고, 어떻게 고를까 · 질문 5개 · 1분</small></h2>
+  <div id="mindBody" style="margin-top:14px"></div>
+</div>
+</div><!-- /tab-mind -->
+
 <div id="tab-channel" class="hidden">
 <div class="card" id="channelCard">
   <h2>채널 발행 자료 <small>매일 아침 자동 집계된 데이터를 붙여 넣을 수 있는 글로 · 운영자용</small></h2>
@@ -1591,6 +1641,11 @@
     <button class="startCard" id="startBrowse">
       <span class="startIcon" style="background:#fff4e6">🔍</span>
       <span class="startText"><b>종목 둘러보기</b><small>삼성전자·S&amp;P500의 지난 기록 보기</small></span>
+      <span class="startArrow">›</span>
+    </button>
+    <button class="startCard" id="startMind">
+      <span class="startIcon" style="background:#fff8e6">💛</span>
+      <span class="startText"><b>투자 마음 테스트</b><small>나는 왜 사고, 어떻게 고를까 · 질문 5개</small></span>
       <span class="startArrow">›</span>
     </button>
     <button class="startCard" id="startChannel">
@@ -1763,7 +1818,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button> · v7.0<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> · <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button> · v7.1<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1777,7 +1832,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script src="tickers.js?v=7.0"></script>
+<script src="tickers.js?v=7.1"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -3335,7 +3390,7 @@ function renderRecent() {
 renderRecent();
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel"];
+var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind"];
 var currentTab = "home";
 
 var SUBS = ["chart", "history", "insight", "tech", "company"];
@@ -3387,6 +3442,7 @@ function switchTab(target, sub, noScroll) {
   if (target === "watch" && typeof renderWatchTab === "function") renderWatchTab(false);
   if (target === "brief" && typeof loadBrief === "function") loadBrief(false);
   if (target === "channel" && typeof renderChannel === "function") renderChannel();
+  if (target === "mind" && typeof renderMind === "function") renderMind();
   document.querySelectorAll(".tabItem.open").forEach(function (el) { el.classList.remove("open"); });
   resizeVisibleCharts();
   if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -3505,6 +3561,7 @@ $("startGuide").onclick = function () { navTo("guide"); };
 $("startBrief").onclick = function () { navTo("brief"); };
 $("footChannel").onclick = function () { navTo("channel"); };
 $("startChannel").onclick = function () { navTo("channel"); };
+$("startMind").onclick = function () { navTo("mind"); };
 $("briefToChannel").onclick = function () { navTo("channel"); };
 
 /* ---------- 앱 설치(PWA) — 설치 버튼은 두지 않고 브라우저 메뉴의 '앱 설치'만 쓴다.
@@ -4070,18 +4127,19 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=7.0"></script>
-<script src="technical.js?v=7.0"></script>
-<script src="company.js?v=7.0"></script>
-<script src="compare.js?v=7.0"></script>
-<script src="sim.js?v=7.0"></script>
-<script src="insight.js?v=7.0"></script>
-<script src="guide.js?v=7.0"></script>
-<script src="watch.js?v=7.0"></script>
-<script src="holdings.js?v=7.0"></script>
-<script src="brief.js?v=7.0"></script>
-<script src="channel.js?v=7.0"></script>
-<script src="cards.js?v=7.0"></script>
-<script src="snapshot.js?v=7.0"></script>
+<script src="metrics.js?v=7.1"></script>
+<script src="technical.js?v=7.1"></script>
+<script src="company.js?v=7.1"></script>
+<script src="compare.js?v=7.1"></script>
+<script src="sim.js?v=7.1"></script>
+<script src="insight.js?v=7.1"></script>
+<script src="guide.js?v=7.1"></script>
+<script src="watch.js?v=7.1"></script>
+<script src="holdings.js?v=7.1"></script>
+<script src="brief.js?v=7.1"></script>
+<script src="channel.js?v=7.1"></script>
+<script src="cards.js?v=7.1"></script>
+<script src="mind.js?v=7.1"></script>
+<script src="snapshot.js?v=7.1"></script>
 </body>
 </html>
