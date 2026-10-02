@@ -1,0 +1,19 @@
+StockMind 전체 파일 (v7.8) — GitHub 저장소에 이 구조 그대로 올리면 됩니다.
+
+[루트]  ← 저장소 맨 위 (index.html이 있는 곳)
+  index.html  manifest.webmanifest  sw.js  vercel.json  package.json
+  tickers.js  brief.js  cards.js  channel.js  company.js  compare.js  guide.js
+  holdings.js  insight.js  metrics.js  mind.js  sim.js  snapshot.js  technical.js  watch.js
+  icon-192.png  icon-512.png  maskable-192.png  maskable-512.png  apple-touch-icon.png
+
+[api 폴더]  ← 반드시 api 폴더 안에
+  _compose.js  _owner.js  _redis.js  _tickers.js
+  channel.js  chart.js  config.js  cron-snapshot.js  fund.js  hit.js
+  news.js  owner.js  poll.js  search.js  snap.js  user.js
+
+[루트에 있으면 지워도 되는 것]  (예전 작업의 남은 파일, 앱은 안 씀)
+  루트의 chart.js, search.js  (api 폴더 안의 같은 이름 파일은 꼭 남겨두세요)
+  icons 폴더, TrackStock_소개.md, 그 밖에 위 목록에 없는 .js 파일
+
+[건드리지 말 것]
+  Vercel 환경변수 (CRON_SECRET, USER_SALT, KV_REST_API_URL/TOKEN, NAVER_* 등) — 파일이 아니라 Vercel 설정이라 그대로 유지됩니다.
