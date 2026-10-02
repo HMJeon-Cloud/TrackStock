@@ -34,6 +34,14 @@ export async function getJsonGzText(conf, key) {
   return gunzipSync(Buffer.from(gz, "base64")).toString("utf8");
 }
 
+/* UTC ISO → "2026-10-02 08:31 (한국)" */
+export function kst(iso) {
+  if (!iso) return null;
+  const d = new Date(new Date(iso).getTime() + 9 * 3600 * 1000);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 16).replace("T", " ") + " (한국)";
+}
+
 export const KEY = {
   recent: "sm:recent",          // 전 종목 최근 90일 (gzip)
   manifest: "sm:manifest",      // 종목별 갱신일 목록 (gzip)

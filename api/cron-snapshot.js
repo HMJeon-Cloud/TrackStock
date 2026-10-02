@@ -11,7 +11,7 @@
 //
 // 클라이언트가 ①+②를 합쳐 쓰므로 ①이 며칠 지나도 화면 데이터는 항상 최신이다. 실행당 명령 ≈ 43회, 하루 2회 → 월 약 2,600회.
 import { loadTickerPairs } from "./_tickers.js";
-import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY } from "./_redis.js";
+import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY, kst } from "./_redis.js";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
@@ -218,6 +218,7 @@ export default async function handler(req, res) {
   res.status(200).json({
     ok: true,
     store: "redis",
+    at: kst(new Date().toISOString()),
     symbols: symbols.length, symbolsFrom: symSource,
     redisWrites: writes,
     historyUpdated: done.length,

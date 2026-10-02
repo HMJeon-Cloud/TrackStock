@@ -1,6 +1,6 @@
 // /api/config — 클라이언트가 데이터 준비 상태를 알아내는 용도 (CDN 1시간 캐시).
 //   스냅샷은 Upstash Redis에 있고 /api/snap 으로 읽는다. 여기서는 목록(manifest)의 요약만 돌려준다.
-import { redisConf, redisCmd, getJsonGzText, KEY } from "./_redis.js";
+import { redisConf, redisCmd, getJsonGzText, KEY, kst } from "./_redis.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       const m = t ? JSON.parse(t) : null;
       if (!m) out.reason = "NO_MANIFEST";
       else {
-        out.updated = m.generated || null;
+        out.updated = kst(m.generated) || null;   // 한국 시간
         out.symbols = m.symbols ? Object.keys(m.symbols).length : 0;
         out.withHistory = m.symbols ? Object.keys(m.symbols).filter((k) => m.symbols[k].history).length : 0;
         out.complete = !!m.complete;
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       out.detail = String(e.message).slice(0, 160);
     }
     // 마지막 자동 수집 결과 (문제 진단용)
-    try { const l = await redisCmd(redis, ["GET", "sm:cronlog"]); if (l) out.lastRun = JSON.parse(l); } catch (e) {}
+    try { const l = await redisCmd(redis, ["GET", "sm:cronlog"]); if (l) { out.lastRun = JSON.parse(l); if (out.lastRun.at) out.lastRun.at = kst(out.lastRun.at); } } catch (e) {}
     try { out.recentExists = !!(await redisCmd(redis, ["EXISTS", KEY.recent])); } catch (e) {}
   }
 
