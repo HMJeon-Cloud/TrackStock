@@ -525,13 +525,13 @@ function mindRenderAnswer(q, el, fearMode) {
       var it = (j && j.items || []).slice(0, 7);
       $("mindPop").innerHTML = it.length ? '<p>이 앱에서 최근 2주간 많이 조회되고 관심 담긴 종목이에요.</p>' + it.map(function (x, i) { return mRow((i + 1) + ". " + mName(x.s), "", "", ""); }).join("") +
         '<p class="mindFoot">남들이 많이 본다는 건 "관심"이지 "정답"은 아니에요. 화제가 된 종목은 이미 오른 뒤인 경우가 많았어요.</p>'
-        : '<p>아직 집계가 적어요. 오늘 탭의 "돈이 몰리는 곳"에서 거래대금 순위를 볼 수 있어요.</p>';
+        : '<p>아직 집계가 적어요. 조금 더 모이면 보여드릴게요.</p>';
     }).catch(function () { $("mindPop").innerHTML = '<p>지금은 불러올 수 없어요.</p>'; });
-    h += '<p><button class="linkBtn" id="mindGoBrief">오늘의 인기 종목·거래대금 순위 보기 ›</button></p>';
+    if (typeof isOwner === "function" && isOwner()) h += '<p><button class="linkBtn" id="mindGoBrief">오늘의 인기 종목·거래대금 순위 보기 ›</button></p>';
   } else if (q === "why") {
     h += '<p>주가가 움직인 이유는 크게 두 가지예요.</p><ul class="mindList"><li><b>시장 전체가 움직였는지</b> — 대부분 종목이 같이 내렸다면 금리·환율·전쟁 같은 큰 이유예요. 내 종목 탓이 아니에요.</li>' +
       '<li><b>그 종목만 움직였는지</b> — 실적, 계약, 소송처럼 회사만의 뉴스가 있었을 가능성이 커요.</li></ul>' +
-      '<p>오늘 탭에서 "오른 종목 비율"과 급등·급락 종목의 기사 제목을 같이 보면 어느 쪽인지 바로 보여요. <button class="linkBtn" id="mindGoBrief">오늘의 브리핑 보기 ›</button></p>';
+      '<p>같은 날 다른 종목들도 같이 움직였는지, 그 종목 기사 제목에 실적·계약 같은 단어가 있는지 보면 어느 쪽인지 대부분 보여요. ' + (typeof isOwner === "function" && isOwner() ? '<button class="linkBtn" id="mindGoBrief">오늘의 브리핑 보기 ›</button>' : '') + '</p>';
   } else if (q === "tax") {
     h += '<ul class="mindList"><li><b>해외주식</b> — 1년 동안 번 돈(손익 합산)에서 250만원을 뺀 나머지에 약 22% 양도소득세. 다음 해 5월에 직접 신고해요.</li>' +
       '<li><b>국내주식</b> — 대주주가 아니면 사고팔아 번 돈엔 세금이 없지만, 팔 때마다 거래세가 조금 붙어요.</li>' +
