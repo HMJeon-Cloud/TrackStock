@@ -2,12 +2,12 @@
 //   아침 수집 데이터(Redis) + 네이버 뉴스 제목으로 만든다. CDN 30분 캐시. 운영자 페이지(채널 탭)가 보여준다.
 import { redisConf, getJsonGzText, KEY } from "./_redis.js";
 import { composeDaily } from "./_compose.js";
+import { loadTickerPairs } from "./_tickers.js";
 
 export async function loadNames(origin) {
-  const r = await fetch(origin + "/tickers.js", { cache: "no-store" });
-  const src = await r.text();
-  const out = {}; const re = /\[\s*"([^"]+)"\s*,\s*"([^"]*)"/g; let m;
-  while ((m = re.exec(src))) out[m[1]] = m[2].replace(/\s*\(.*?\)\s*/g, "").trim() || m[2];
+  const { pairs } = await loadTickerPairs(origin);
+  const out = {};
+  pairs.forEach(([sym, name]) => { if (!out[sym]) out[sym] = name.replace(/\s*\(.*?\)\s*/g, "").trim() || name; });
   return out;
 }
 export async function buildDaily(origin) {

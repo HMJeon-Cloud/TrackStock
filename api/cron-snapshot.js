@@ -10,6 +10,7 @@
 //   값은 전부 gzip+base64. 읽기는 /api/snap 이 풀어서 주고 CDN이 캐시한다.
 //
 // 클라이언트가 ①+②를 합쳐 쓰므로 ①이 며칠 지나도 화면 데이터는 항상 최신이다. 실행당 명령 ≈ 43회, 하루 2회 → 월 약 2,600회.
+import { loadTickerPairs } from "./_tickers.js";
 import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY } from "./_redis.js";
 
 const UA =
@@ -22,13 +23,8 @@ const HISTORY_PER_RUN = 20;       // 남은 시간에 과거 전체를 받을 �
 const RECENT_DAYS = 90;       // recent.json이 담는 최근 일수
 
 async function loadSymbols(origin) {
-  const r = await fetch(origin + "/tickers.js", { cache: "no-store" });
-  const src = await r.text();
-  const out = [];
-  const re = /\[\s*"([^"]+)"\s*,\s*"[^"]*"/g;
-  let m;
-  while ((m = re.exec(src))) out.push(m[1]);
-  return Array.from(new Set(out));
+  const { pairs, source } = await loadTickerPairs(origin);
+  return { list: Array.from(new Set(pairs.map((p) => p[0]))), source };
 }
 
 /* Yahoo 일봉. range=max 는 interval을 무시하고 월봉을 주므로 날짜 범위로 요청한다. */
@@ -117,11 +113,15 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Redis가 연결되지 않았습니다 (KV_REST_API_URL / KV_REST_API_TOKEN 필요)." });
   }
 
-  let symbols;
+  // 종목 목록이 이상하면(로그인 페이지 등) 데이터를 하나도 건드리지 않고 멈추고, 이유를 실행 기록에 남긴다
+  let symbols, symSource;
   try {
-    symbols = await loadSymbols(origin);
-    if (!symbols.length) throw new Error("no symbols");
+    const r = await loadSymbols(origin);
+    symbols = r.list; symSource = r.source;
   } catch (e) {
+    const log = { at: new Date().toISOString(), elapsedMs: Date.now() - started, symbols: 0, recentOk: 0, kept: 0,
+      recentSaved: { ok: false, error: "종목 목록을 읽지 못해 이번 실행은 건너뜀 — 지난 데이터 유지" }, symbolsError: String(e.message).slice(0, 300) };
+    try { await redisCmd(redis, ["SET", "sm:cronlog", JSON.stringify(log), "EX", String(14 * 86400)]); } catch (x) {}
     return res.status(500).json({ error: "심볼 목록을 읽지 못했습니다: " + e.message });
   }
 
@@ -209,7 +209,7 @@ export default async function handler(req, res) {
   /* ④ 실행 기록 — /api/config 에서 비밀값 없이 확인할 수 있게 남긴다 */
   const log = {
     at: new Date().toISOString(), elapsedMs: Date.now() - started,
-    symbols: symbols.length, recentOk, kept, recentSaved, historyUpdated: done.length,
+    symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, recentSaved, historyUpdated: done.length,
     historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
     failedSample: failed.slice(0, 5)
   };
@@ -218,6 +218,7 @@ export default async function handler(req, res) {
   res.status(200).json({
     ok: true,
     store: "redis",
+    symbols: symbols.length, symbolsFrom: symSource,
     redisWrites: writes,
     historyUpdated: done.length,
     historyRemaining: symbols.length - withHistory,
