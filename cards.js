@@ -134,7 +134,8 @@ function cHero(c, tag, small, big, bigColor, sub, page, total) {
   c.y = y + 30;
 }
 /* 바닥: 계정 표기 (모든 카드 공통) */
-function cFoot(c, note) {
+function cFoot(c, note, tipKey) {
+  if (tipKey) cFill(c, CARD_TIP[tipKey]);
   var g = c.g, P = CARD.PAD, y = CARD.H - 86;
   g.fillStyle = CARD_C.line; g.fillRect(P, y - 50, CARD.W - P * 2, 1);
   g.fillStyle = CARD_C.gold; g.fillRect(P, y - 51, 64, 3);
@@ -173,7 +174,7 @@ function cTiles(c, tiles) {   // 2×N 숫자 타일
 }
 /* 남은 공간에 n줄이 들어가도록 행 높이 계산 (note=true면 하단 안내 한 줄 자리 확보) */
 function cH(c, n, max, note, extra) { return Math.max(48, Math.min(max, Math.floor((CARD.H - (note ? 220 : 170) - c.y - (extra || 0)) / Math.max(1, n)))); }
-function cNote(c, s) { var g = c.g, P = CARD.PAD; cText(g, cFit(g, s, CARD.W - P * 2, 25, 500), P, CARD.H - 182, 25, 500, CARD_C.gold); }
+function cNote(c, s) { var g = c.g, P = CARD.PAD; c.hasNote = true; cText(g, cFit(g, s, CARD.W - P * 2, 25, 500), P, CARD.H - 182, 25, 500, CARD_C.gold); }
 function cPara(c, s) { c.y = cWrap(c.g, s, CARD.PAD, c.y + 40, CARD.W - CARD.PAD * 2, 28, 500, CARD_C.txt2, 40, 3) + 10; }
 function cLabel(c, s, color) { cText(c.g, s, CARD.PAD, c.y + 30, 28, 800, color || CARD_C.txt2); c.y += 44; }
 function cBar(c, pct, h) {   // 금색 진행 막대
@@ -184,6 +185,74 @@ function cBar(c, pct, h) {   // 금색 진행 막대
   c.y += h;
 }
 
+
+/* ---------- 빈 공간 채우기 ----------
+   카드마다 결과값(종목 수·제목 길이)이 달라 아래쪽이 비는 날이 있다.
+   다 그린 뒤 남은 높이를 재서 ① 그 카드의 '읽는 법' 해설 박스 → ② 그래도 남으면 우상향 산 일러스트 순으로 채운다. */
+var CARD_TIP = {
+  "1_시장온도": ["오른 종목 비율을 보는 이유", "지수는 큰 회사 몇 개가 끌어올릴 수 있어요. 오른 종목 비율은 시장 전체가 같이 움직였는지를 보여줘요. 지수는 올랐는데 비율이 낮다면, 일부 대형주만 오른 날이에요."],
+  "2_테마흐름": ["업종 흐름 읽는 법", "막대는 업종 평균 등락이에요. 업종 1등이 크게 올랐는데 평균이 낮다면, 업종 전체가 아니라 그 종목만의 이슈일 가능성이 커요."],
+  "2_전체시세": ["코인 시세 읽는 법", "코인은 24시간 거래돼서 '하루 등락'은 매일 같은 시각을 기준으로 잘라 계산해요. 주식보다 하루 변동이 훨씬 큰 편이라, 하루 숫자보다 한 달 흐름을 같이 보는 게 좋아요."],
+  "3_급등급락": ["급등·급락을 볼 때", "먼저 이유를 나눠 보세요. 실적·계약 같은 회사 뉴스인지, 시장 전체 분위기인지. 뒤따라 사기 전에는 '이미 얼마나 올랐나'부터 확인하는 습관이 가장 큰 방패예요."],
+  "4_인기종목": ["'평소의 몇 배'란", "최근 거래대금을 지난 한 달 평균과 비교한 값이에요. 2배가 넘으면 평소보다 관심이 확 몰렸다는 뜻이고, 그만큼 가격도 크게 흔들리기 쉬워요."],
+  "5_오늘의숫자": ["52주 최고가 대비란", "지난 1년 중 가장 비쌌던 가격과 비교해 지금 얼마나 내려와 있는지예요. 많이 내려왔다는 건 '싸졌다'는 사실일 뿐, 바닥이라는 뜻은 아니에요."],
+  "6_심리온도": ["이 온도계 쓰는 법", "'공포일 때 사고 탐욕일 때 조심하라'는 말이 있지만, 온도는 며칠씩 극단에 머물기도 해요. 매매 신호보다 지금 내 감정을 점검하는 거울로 쓰세요."],
+  "7_1년전100만원": ["같은 1년, 다른 결과", "같은 기간에도 자산마다 결과가 크게 갈렸어요. 1년은 운이 크게 작용하는 짧은 기간이에요. 3년·5년으로 늘리면 순위가 또 바뀌어요."],
+  "8_매달10만원": ["적립식의 핵심", "가격이 떨어진 달엔 같은 돈으로 더 많이 사게 돼요. 그래서 중간에 크게 떨어졌다가 회복한 자산일수록 적립식 결과가 좋아지는 경우가 많아요."],
+  "1_미국증시": ["한국 투자자가 같이 볼 것", "미국 주식은 주가와 환율이 함께 수익률을 정해요. S&P500이 올라도 달러/원이 내리면 원화로 계산한 수익은 줄어들어요."],
+  "2_MDD": ["MDD(최대 낙폭)란", "가장 높았던 때보다 지금 얼마나 내려와 있는지예요. '○위/○회'는 지난 10년간 10% 넘게 빠졌던 구간 중 지금이 몇 번째로 깊은지를 뜻해요."],
+  "3_자산배분": ["왜 나눠 담을까", "주식·채권·금은 서로 다른 이유로 오르내려요. 한쪽이 빠질 때 다른 쪽이 버텨주면 계좌 전체의 흔들림이 줄어, 끝까지 버티기 쉬워져요."],
+  "4_구성비교": ["낙폭을 같이 보는 이유", "수익률이 높아도 중간에 -30%를 견디지 못하면 그 수익은 내 것이 되지 않아요. 괄호 속 최대 낙폭을 함께 보세요."],
+  "5_과거사례": ["과거 사례 보는 법", "비슷한 상황이라도 결과는 매번 조금씩 달랐어요. 정답을 찾기보다 '그때 무엇이 버텨줬나'를 확인하는 용도예요."],
+  "mind": ["4글자 읽는 법", "P 지키기 · G 불리기  /  D 숫자 · S 이야기  /  C 침착 · R 민감  /  L 장기 · T 타이밍. 정답 유형은 없어요. 내 성향의 약점을 아는 게 핵심이에요."]
+};
+function cFill(c, tip) {
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, bottom = CARD.H - (c.hasNote ? 214 : 162), top = c.y + 22;
+  function nLines(txt) {
+    cFont(g, 26, 500); var n = 0, line = "", ch = txt.split("");
+    for (var i = 0; i < ch.length; i++) { var t = line + ch[i]; if (g.measureText(t).width > W - 64 && line) { n++; line = ch[i]; } else line = t; }
+    return n + 1;
+  }
+  if (tip && bottom - top >= 122) {
+    // 문장 단위로, 공간에 들어가는 만큼만 (중간에 잘린 '…' 없이)
+    var sent = tip[1].match(/[^.!?]+[.!?]?\s*/g) || [tip[1]], pick = null;
+    for (var k = sent.length; k >= 1 && !pick; k--) {
+      var txt = sent.slice(0, k).join("").trim(), L = nLines(txt), bh = 84 + L * 38;
+      if (bh <= bottom - top) pick = { txt: txt, L: L, bh: bh };
+    }
+    if (pick) {
+      var by = bottom - top - pick.bh > 220 ? top + 4 : bottom - pick.bh;   // 공간이 많이 남으면 위에 붙이고 아래는 일러스트
+      cRound(g, P, by, W, pick.bh, 22, "rgba(214,180,100,0.07)", "rgba(214,180,100,0.28)");
+      cRound(g, P, by + 22, 5, pick.bh - 44, 3, CARD_C.gold);
+      cText(g, "💡 " + tip[0], P + 32, by + 50, 27, 800, CARD_C.gold2);
+      cWrap(g, pick.txt, P + 32, by + 92, W - 64, 26, 500, CARD_C.txt2, 38, pick.L);
+      if (by > top + 4) return;   // 아래에 붙였으면 끝
+      top = by + pick.bh + 24;
+    }
+  }
+  if (bottom - top >= 56) cArt(g, P, top, W, Math.min(360, bottom - top));
+}
+/* 우상향 산 일러스트 — 겹친 능선 + 정상까지 오르는 금색 길 + 깃발 */
+function cArt(g, x, y, w, h) {
+  g.save();
+  var base = y + h, peakX = x + w * 0.66, peakY = y + h * 0.12 + Math.min(56, h * 0.28) * 0.6;
+  function ridge(pts, fill) { g.beginPath(); g.moveTo(x, base); pts.forEach(function (p) { g.lineTo(x + w * p[0], y + h * p[1]); }); g.lineTo(x + w, base); g.closePath(); g.fillStyle = fill; g.fill(); }
+  ridge([[0, 0.72], [0.18, 0.5], [0.3, 0.62], [0.48, 0.34], [0.66, 0.12], [0.8, 0.4], [0.92, 0.3], [1, 0.46]], "rgba(214,180,100,0.07)");
+  ridge([[0, 0.86], [0.22, 0.66], [0.38, 0.78], [0.56, 0.56], [0.74, 0.7], [1, 0.6]], "rgba(214,180,100,0.10)");
+  // 오르는 길 (점선 → 정상)
+  g.strokeStyle = "rgba(241,220,162,0.75)"; g.lineWidth = 4; g.setLineDash([10, 10]); g.lineCap = "round";
+  g.beginPath(); g.moveTo(x + w * 0.04, base - h * 0.06);
+  [[0.2, 0.74], [0.34, 0.6], [0.46, 0.5], [0.56, 0.3], [0.64, 0.16]].forEach(function (p) { g.lineTo(x + w * p[0], y + h * p[1]); });
+  g.stroke(); g.setLineDash([]);
+  // 깃발
+  var fh = Math.max(18, Math.min(56, h * 0.28)), fw = fh * 0.72;
+  g.strokeStyle = CARD_C.gold2; g.lineWidth = 3; g.beginPath(); g.moveTo(peakX, peakY); g.lineTo(peakX, peakY - fh); g.stroke();
+  g.beginPath(); g.moveTo(peakX, peakY - fh); g.lineTo(peakX + fw, peakY - fh + fh * 0.22); g.lineTo(peakX, peakY - fh + fh * 0.44); g.closePath(); g.fillStyle = CARD_C.gold; g.fill();
+  // 바닥선 + 문구
+  g.fillStyle = "rgba(214,180,100,0.25)"; g.fillRect(x, base, w, 1);
+  if (h >= 180) { try { g.letterSpacing = "6px"; } catch (e) {} cText(g, "UPHILL, STEP BY STEP", x, base - 14, 20, 700, "rgba(214,180,100,0.45)"); try { g.letterSpacing = "0px"; } catch (e) {} }
+  g.restore();
+}
 /* ---------- 긴 기간 데이터 (1년 전·적립식 카드용) ---------- */
 var CARD_SETS = {
   all: ["SPY", "QQQ", "005930.KS", "000660.KS", "NVDA", "TSLA", "BTC-USD", "GLD"],
@@ -286,7 +355,7 @@ function cardsBrief() {
   var ir = R.indexRow.slice(0, 6), ih = cH(c, ir.length, 72, false, 100);
   ir.forEach(function (x) { cRow(c, x.name, cPct(x.ret), cCol(x.ret), { h: ih, price: cPrice(x.sym, x.last) }); });
   cPara(c, t.desc);
-  cFoot(c); out.push({ name: "1_시장온도", cv: c.cv });
+  cFoot(c, null, "1_시장온도"); out.push({ name: "1_시장온도", cv: c.cv });
   // 2. 테마 — 업종 평균 + 그 업종 1등 종목과 주가 (코인처럼 업종이 2개 미만이면 전체 시세표)
   c = cNew(); var th = R.themes, top = th[0], bot = th[th.length - 1];
   if (th.length < 2) {
@@ -294,13 +363,13 @@ function cardsBrief() {
     cHead(c, TG("PRICE"), MN + "전체 " + L + " 등락", "종목 · 지금 가격 · " + L + " 등락", 2, T);
     var ah = cH(c, all.length, 84);
     all.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), cCol(s.ret), { rank: i + 1, h: ah, price: cPrice(s.sym, s.last) }); });
-    cFoot(c); out.push({ name: "2_전체시세", cv: c.cv });
+    cFoot(c, null, "2_전체시세"); out.push({ name: "2_전체시세", cv: c.cv });
   } else {
     cHead(c, TG("MONEY FLOW"), "[[" + top.name + "]] 강세, " + bot.name + " 약세", "업종 평균 등락 · 업종 안에서 가장 많이 오른 종목과 주가", 2, T);
     var mx = Math.max.apply(null, th.map(function (x) { return Math.abs(x.ret); })) || 0.01;
     var th10 = th.slice(0, 10), hh = cH(c, th10.length, 84);
     th10.forEach(function (x) { var b = x.best; cRow(c, x.name, cPct(x.ret), cCol(x.ret), { bar: x.ret / mx, h: hh, noLine: true, priceSize: 22, price: b ? briefName(b) + " " + cPrice(b.sym, b.last) + " " + cPct(b.ret) : "" }); });
-    cFoot(c); out.push({ name: "2_테마흐름", cv: c.cv });
+    cFoot(c, null, "2_테마흐름"); out.push({ name: "2_테마흐름", cv: c.cv });
   }
   // 3. 급등·급락
   c = cNew(); var up = R.movers.up.slice(0, 5), dn = R.movers.down.slice(0, 5);
@@ -312,14 +381,14 @@ function cardsBrief() {
   up.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), CARD_C.up, { rank: i + 1, h: mh, price: cPrice(s.sym, s.last) }); });
   if (dn.length) { c.y += 14; cLabel(c, "▼ 급락", CARD_C.down); }
   dn.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), CARD_C.down, { rank: i + 1, h: mh, price: cPrice(s.sym, s.last) }); });
-  cFoot(c); out.push({ name: "3_급등급락", cv: c.cv });
+  cFoot(c, null, "3_급등급락"); out.push({ name: "3_급등급락", cv: c.cv });
   // 4. 인기 종목
   c = cNew(); var pop = R.popular.filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 8);
   var hot = pop.filter(function (s) { return s.amtX != null && s.amtX >= 1.5; }).sort(function (a, b) { return b.amtX - a.amtX; });
   cHead(c, TG("HOT"), hot.length ? "[[" + briefName(hot[0]) + "]]에 돈이 몰렸어요" : "많이 찾는 종목의 " + L, "주가 · 등락 (작은 글씨: 거래대금이 평소의 몇 배인지)", 4, T);
   var ph = cH(c, pop.length, 84);
   pop.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), cCol(s.ret), { rank: i + 1, h: ph, price: cPrice(s.sym, s.last), mid: s.amtX != null ? s.amtX.toFixed(1) + "배" : "" }); });
-  cFoot(c, R.popSrc === "ranked" ? "앱 조회 순위 · 투자 조언 아님" : "거래대금 기준 · 투자 조언 아님"); out.push({ name: "4_인기종목", cv: c.cv });
+  cFoot(c, R.popSrc === "ranked" ? "앱 조회 순위 · 투자 조언 아님" : "거래대금 기준 · 투자 조언 아님", "4_인기종목"); out.push({ name: "4_인기종목", cv: c.cv });
   // 5. 숫자 + 세일 폭 큰 종목
   c = cNew(); var nums = R.numbers.slice(0, 4), sale = (nums[0].list || []).filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 3);
   cHead(c, TG("NUMBERS"), "세일 중인 종목 [[" + nums[0].v + "]]", "52주 최고가보다 20% 넘게 싼 종목 수 · 시장 전체를 네 숫자로", 5, T);
@@ -330,7 +399,7 @@ function cardsBrief() {
     sale.forEach(function (s) { cRow(c, briefName(s), cPct(s.vsHi, 0), CARD_C.down, { h: sh, price: cPrice(s.sym, s.last) }); });
   }
   cNote(c, "싸졌다는 건 사실이지만, 더 내리지 않는다는 뜻은 아니에요.");
-  cFoot(c); out.push({ name: "5_오늘의숫자", cv: c.cv });
+  cFoot(c, null, "5_오늘의숫자"); out.push({ name: "5_오늘의숫자", cv: c.cv });
   // 6. 시장 심리 온도계 (자체 계산)
   c = cNew(); var md = cMood(R);
   cHead(c, TG("MOOD"), MN + "시장 심리는 [[" + md.word + "]]", "0 = 극도의 공포, 100 = 극도의 탐욕 · 아래 " + md.parts.length + "가지 숫자로 계산", 6, T);
@@ -338,7 +407,7 @@ function cardsBrief() {
   var gh = cH(c, md.parts.length, 70, true);
   md.parts.forEach(function (p) { cRow(c, p.k, p.txt, CARD_C.gold, { h: gh, mid: "온도 " + Math.round(p.s * 100) }); });
   cNote(c, "극단일수록 감정적으로 사고팔기 쉬운 때예요. 방향을 맞히는 지표는 아니에요.");
-  cFoot(c, "StockMind 자체 계산 · CNN 공포탐욕지수 아님"); out.push({ name: "6_심리온도", cv: c.cv });
+  cFoot(c, "StockMind 자체 계산 · CNN 공포탐욕지수 아님", "6_심리온도"); out.push({ name: "6_심리온도", cv: c.cv });
   // 7. 1년 전에 100만원 샀다면 (원화 기준)
   if (ya.length >= 3) {
     c = cNew(); var w1 = ya[0];
@@ -346,7 +415,7 @@ function cardsBrief() {
     var yh = cH(c, ya.length, 84, true);
     ya.forEach(function (x, i) { cRow(c, x.name, cMan(x.val), cCol(x.ret), { rank: i + 1, h: yh, price: cPct(x.ret, 0), mid: cPrice(x.sym, x.px), hi: i === 0 }); });
     cNote(c, "지금 유명한 종목만 고른 것 자체가 결과를 알고 고른 거예요(생존자 편향).");
-    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님"); out.push({ name: "7_1년전100만원", cv: c.cv });
+    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "7_1년전100만원"); out.push({ name: "7_1년전100만원", cv: c.cv });
   }
   // 8. 매달 10만원씩 적립했다면
   if (dca) {
@@ -355,7 +424,7 @@ function cardsBrief() {
     var dh = cH(c, dca.rows.length, 84, true);
     dca.rows.forEach(function (x, i) { cRow(c, x.name, cMan(x.val), x.val >= x.principal ? CARD_C.up : CARD_C.down, { rank: i + 1, h: dh, price: (x.val / x.principal).toFixed(1) + "배", hi: i === 0 }); });
     cNote(c, "나눠 사면 고점에 몰아 살 걱정이 줄어요. 지난 성과가 미래를 보장하진 않아요.");
-    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님"); out.push({ name: "8_매달10만원", cv: c.cv });
+    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "8_매달10만원"); out.push({ name: "8_매달10만원", cv: c.cv });
   }
   return out;
 }
@@ -375,14 +444,14 @@ function cardsChannel() {
   urow.forEach(function (x) { cRow(c, x.name, cPct(x.ret), cCol(x.ret), { h: ih, price: cPrice(x.sym, x.last) }); });
   var th = U.themes;
   if (th.length >= 2) cNote(c, "강세 " + th.slice(0, 2).map(function (x) { return x.name; }).join("·") + "  /  약세 " + th.slice(-2).map(function (x) { return x.name; }).join("·"));
-  cFoot(c); out.push({ name: "1_미국증시", cv: c.cv });
+  cFoot(c, null, "1_미국증시"); out.push({ name: "1_미국증시", cv: c.cv });
   // 2. MDD
   c = cNew(); var rs = (chState.mdd || []).concat(chState.mddPick || []).filter(function (r) { return !r.err; }).slice(0, 9);
   var deep = rs.filter(function (r) { return r.cur <= -0.1; }).sort(function (a, b) { return a.cur - b.cur; })[0];
   cHead(c, "MDD · " + date, deep ? deep.name + " 고점 대비 [[" + cPct(deep.cur, 0) + "]]" : "대표 자산 대부분 [[고점 근처]]", "지금 주가 · 고점 대비 위치 · 작은 글씨는 역대 하락 중 깊이 순위", 2, T);
   var rh = cH(c, rs.length, 84);
   rs.forEach(function (r) { cRow(c, r.name, cPct(r.cur, 0), r.cur <= -0.1 ? CARD_C.down : CARD_C.txt, { h: rh, price: cPrice(r.sym, cLast(r.sym)), mid: r.cur <= -0.1 ? (r.deeper + 1) + "위/" + r.eps + "회" : "", bar: r.cur }); });
-  cFoot(c, "10년치 데이터 · 투자 조언 아님"); out.push({ name: "2_MDD", cv: c.cv });
+  cFoot(c, "10년치 데이터 · 투자 조언 아님", "2_MDD"); out.push({ name: "2_MDD", cv: c.cv });
   // 3. 지금 상황 맞춤 구성 — 4번 카드 맨 윗줄과 같은 구성
   var plan = chState.plan, pLabel = CH_PLAN_LABEL[plan.key]; c = cNew();
   cHead(c, "ALLOCATION · 지금 상황", "지금은 " + plan.title.split(" — ")[0] + " → [[" + pLabel + "]]", (chState.now && chState.now.why.length) ? "근거: " + chState.now.why.join(" / ") : "두드러진 신호가 없어 평소 균형형을 보여줘요", 3, T);
@@ -400,7 +469,7 @@ function cardsChannel() {
     c.y += per;
   });
   cNote(c, "규칙 기반 예시이며 추천이 아니에요. 다음 카드에서 다른 구성과 비교해요.");
-  cFoot(c); out.push({ name: "3_자산배분", cv: c.cv });
+  cFoot(c, null, "3_자산배분"); out.push({ name: "3_자산배분", cv: c.cv });
   // 4. 6가지 구성 비교 (1년·3년) — 구성별 종목·비중 함께, 지금 구성을 맨 위에
   c = cNew(); var cmp = (chState.cmp || []).slice().sort(function (a, b) { return (b.key === plan.key) - (a.key === plan.key); });
   function best(i) { var ok = cmp.filter(function (x) { return x.res[i]; }); return ok.slice().sort(function (a, b) { return b.res[i].ret - a.res[i].ret; })[0]; }
@@ -426,7 +495,7 @@ function cardsChannel() {
     c.y += ch;
   });
   cNote(c, "기간마다 1위가 바뀌어요 — 한 가지에 몰지 않고 나눠 담는 이유예요.");
-  cFoot(c, "숫자는 비중(%) · 과거 데이터 · 투자 조언 아님"); out.push({ name: "4_구성비교", cv: c.cv });
+  cFoot(c, "숫자는 비중(%) · 과거 데이터 · 투자 조언 아님", "4_구성비교"); out.push({ name: "4_구성비교", cv: c.cv });
   // 5. 과거 사례 (지금과 비슷한 것, 없으면 첫 사례)
   var sc = (chState.scen || [])[0]; c = cNew();
   if (sc) {
@@ -440,7 +509,7 @@ function cardsChannel() {
       pops.forEach(function (x) { cRow(c, x.name, chFmtRec(x), CARD_C.txt2, { h: sh2, valW: 220, price: cPct(x.dd, 0) }); });
     }
   }
-  cFoot(c, "과거 데이터 · 투자 조언 아님"); out.push({ name: "5_과거사례", cv: c.cv });
+  cFoot(c, "과거 데이터 · 투자 조언 아님", "5_과거사례"); out.push({ name: "5_과거사례", cv: c.cv });
   return out;
 }
 

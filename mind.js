@@ -463,7 +463,7 @@ function mindCardOpen() {
     cText(g, "닮은 투자 대가  ", P, c.y + 28, 26, 700, CARD_C.gold);
     cText(g, master[0], P + cW(g, "닮은 투자 대가  ", 26, 700), c.y + 28, 28, 800, CARD_C.txt);
     cNote(c, "당신의 4글자는? 댓글로 알려주세요");
-    cFoot(c, "우상향연구소 투자 유형 테스트 · 16유형");
+    cFoot(c, "우상향연구소 투자 유형 테스트 · 16유형", "mind");
     return c.cv;
   }
   ready.then(function () {
