@@ -32,7 +32,7 @@ function chLoadDaily(force) {
     if (!d.ok) { box.innerHTML = '<div class="briefDim">아직 데이터가 없어요 (' + (d.reason || "") + '). 아침 수집 뒤에 생겨요.</div>'; return; }
     box.innerHTML = '<pre class="chText" id="chDailyText"></pre>';
     $("chDailyText").textContent = d.text;
-    $("chDailyMeta").textContent = d.text.length + "자 · 데이터 " + (d.generated || "").replace("T", " ").slice(0, 16) + " 수집";
+    $("chDailyMeta").textContent = d.text.length + "자 · 데이터 " + kstFmt(d.generated) + " 수집 (한국 시간)";
   }).catch(function () { box.innerHTML = '<div class="briefDim">글을 불러오지 못했어요.</div>'; });
 }
 
@@ -61,11 +61,11 @@ function chPrepare() {
 function chRenderQuality() {
   var R = chState.brief, box = $("chQuality"); if (!R || !box) return;
   var q = R.quality, n = q.stale.length + q.spike.length;
-  var gen = chState.recent && chState.recent.generated ? chState.recent.generated.replace("T", " ").slice(0, 16) + " UTC" : "-";
+  var gen = chState.recent && chState.recent.generated ? kstFmt(chState.recent.generated) + " (한국 시간)" : "-";
   box.innerHTML = '<b>🩺 데이터 점검</b> 수집 ' + gen + ' · ' + q.total + '개 자산 · ' +
     (n ? '<span style="color:#b45309">확인 필요 ' + n + '개 — 순위·카드에서 제외했어요</span>' : '<span style="color:var(--good)">이상 없음</span>') +
     (n ? '<div class="briefDim" style="margin-top:4px">' +
-      (q.stale.length ? '오래된 데이터(수집 실패로 지난 값): ' + q.stale.map(function (s) { return briefName(s) + " " + new Date(s.lastT).toISOString().slice(5, 10); }).join(", ") + '<br>' : '') +
+      (q.stale.length ? '오래된 데이터(수집 실패로 지난 값): ' + q.stale.map(function (s) { return briefName(s) + " " + kstFmt(new Date(s.lastT).toISOString(), false).slice(5); }).join(", ") + '<br>' : '') +
       (q.spike.length ? '하루 ±40% 넘는 급변(오류 의심): ' + q.spike.map(function (s) { return briefName(s) + " " + chPct(s.ret1); }).join(", ") : '') + '</div>' : '');
 }
 function chStat(sym) { var d = chState.recent && chState.recent.symbols[sym]; return d ? briefStats(sym, d, "day") : null; }

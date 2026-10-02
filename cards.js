@@ -16,7 +16,7 @@ var CARD_TXT = "";   // 그린 글자 모음 — 웹폰트가 필요한 글자�
 
 function cPct(x, d) { if (x == null || !isFinite(x)) return "-"; d = d == null ? 1 : d; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
 function cCol(x) { return x > 0 ? CARD_C.up : x < 0 ? CARD_C.down : CARD_C.sub; }
-function cDate(ms) { var d = new Date(ms || Date.now()); return (d.getMonth() + 1) + "." + d.getDate() + "(" + "일월화수목금토"[d.getDay()] + ")"; }
+function cDate(ms) { var d = new Date((ms || Date.now()) + 9 * 3600 * 1000); return (d.getUTCMonth() + 1) + "." + d.getUTCDate() + "(" + "일월화수목금토"[d.getUTCDay()] + ")"; }   // 한국 시간 기준
 function cMan(v) {   // 원 → "3,120만원" / "1.24억원"
   if (v == null || !isFinite(v)) return "-";
   if (Math.abs(v) >= 1e8) return (v / 1e8).toFixed(v >= 1e9 ? 1 : 2).replace(/\.?0+$/, "") + "억원";

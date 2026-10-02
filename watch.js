@@ -375,7 +375,7 @@ function renderMarketMap() {
   });
   box.innerHTML = html + "</tbody>";
   $("mapStatus").textContent = list.length + "개 표시 · " +
-    (mapState.rows._gen ? mapState.rows._gen.slice(0, 10) + " 기준" : "");
+    (mapState.rows._gen ? kstFmt(mapState.rows._gen, false) + " 기준" : "");
 
   Array.prototype.forEach.call(box.querySelectorAll(".mapSort"), function (th) {
     th.onclick = function () {

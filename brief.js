@@ -309,7 +309,7 @@ function briefFmtAmt(krw) {
   return Math.round(krw / 1e4).toLocaleString() + "만원";
 }
 
-function briefFmtDate(ms) { if (!ms) return ""; var d = new Date(ms); return d.getFullYear() + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + String(d.getDate()).padStart(2, "0"); }
+function briefFmtDate(ms) { if (!ms) return ""; var d = new Date(ms + 9 * 3600 * 1000); return d.getUTCFullYear() + "." + String(d.getUTCMonth() + 1).padStart(2, "0") + "." + String(d.getUTCDate()).padStart(2, "0"); }   // 한국 시간 기준
 function briefColor(x) { return x > 0 ? "var(--up)" : x < 0 ? "var(--down)" : "var(--sub)"; }
 function briefSymLink(s) {
   return '<button class="linkBtn briefSym" data-sym="' + s.sym + '" title="종목 탭에서 보기">' + escapeHtml(briefName(s)) + '</button>';
