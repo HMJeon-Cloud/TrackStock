@@ -515,7 +515,16 @@ function cardsChannel() {
 
 /* ---------- 미리보기·저장 ---------- */
 function cardsOpen(kind) {
-  var make = kind === "brief" ? cardsBrief : cardsChannel;
+  var make0 = kind === "brief" ? cardsBrief : cardsChannel;
+  var make = function () {   // 맨 앞에 '오늘의 핵심 이슈 5' 표지 카드
+    var list = make0();
+    try {
+      var iss = kind === "brief" ? (typeof issuesCompute === "function" && briefState.recent ? issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }) : null)
+        : (chState && chState.issues);
+      if (list.length && iss && iss.length) list.unshift({ name: "0_핵심이슈5", cv: issuesCard(iss) });
+    } catch (e) { console.warn(e); }
+    return list;
+  };
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   var btn = document.getElementById(kind === "brief" ? "briefCards" : "chCards"), old = btn ? btn.textContent : "";
   if (btn) btn.textContent = "만드는 중…";

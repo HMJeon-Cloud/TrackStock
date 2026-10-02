@@ -344,6 +344,7 @@ function openBriefList(n, R) {
 function renderBrief() {
   var R = briefState.result, box = $("briefBody");
   if (!R || !box) return;
+  if (typeof issuesForBrief === "function") try { issuesForBrief(); } catch (e) { console.warn(e); }
   var L = R.label;
   var qn = R.quality ? R.quality.stale.length + R.quality.spike.length : 0;
   $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs) : R.market === "coin" ? "코인은 24시간 거래 · 매일 오전 9시(한국) 기준" : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +

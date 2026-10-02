@@ -515,6 +515,7 @@ function chScenText(onlyNow) {
 /* ---------- 전체 글 ---------- */
 function chFullText(short) {
   var d = chState.daily, parts = [];
+  if (!short && chState.issues && chState.issues.length && typeof issuesText === "function") parts.push(issuesText(chState.issues).replace(/\n@uphill\.lab$/, ""));   // 맨 앞: 핵심 이슈 5
   if (d && d.ok) parts.push(short ? d.text.split("\n■ 종목")[0].trim() : d.text);
   if (!short) {
     var mdd = chMddText(); if (mdd) parts.push(mdd);
@@ -544,6 +545,8 @@ function renderChannel() {
     return Promise.all([chLoadDaily(false), chPrepare()]);
   }).then(function () {
     chRenderQuality();
+    if (typeof issuesForChannel === "function") try { issuesForChannel(); } catch (e) { console.warn(e); }
     return Promise.all([chLoadAlloc(), chLoadMdd()]);
-  }).then(chLoadScenarios).then(chUpdateCount);
+  }).then(function () { if (typeof issuesForChannel === "function") try { issuesForChannel(); } catch (e) { console.warn(e); } })   // MDD·시장 신호 반영해 다시
+    .then(chLoadScenarios).then(chUpdateCount);
 }
