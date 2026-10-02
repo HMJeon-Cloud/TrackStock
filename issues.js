@@ -127,15 +127,15 @@ function issuesCard(list, page, total) {
   var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2;
   var mk = list.market && list.market !== "all" ? list.mktName + " · " : "";
   cHead(c, "TODAY'S TOP 5 · " + mk + cDate(list.asOf), "오늘의 핵심 이슈 [[5]]", "자료 전체에서 평소보다 이례적인 움직임 순", page || 0, total || 0);
-  var per = Math.floor((CARD.H - 175 - c.y) / list.length);
+  var per = Math.min(150, Math.floor((CARD.H - 110 - c.y) / list.length));
   list.forEach(function (it, i) {
-    var y = c.y, mid = y + per / 2;
-    if (i) { g.fillStyle = CARD_C.line; g.fillRect(P, y, W, 1); }
-    cText(g, String(i + 1), P + 22, mid + 22, 64, 800, i === 0 ? CARD_C.gold2 : CARD_C.gold, "center");
-    var tx = P + 76, tw = W - 76;
-    var ts = 36; while (ts > 26 && cW(g, it.emoji + " " + it.title, ts, 800) > tw) ts -= 1;
-    cText(g, cFit(g, it.emoji + " " + it.title, tw, ts, 800), tx, mid - 6, ts, 800, CARD_C.txt);
-    cText(g, cFit(g, it.sub, tw, 24, 500), tx, mid + 32, 24, 500, CARD_C.txt2);
+    var y = c.y, bh = per - 12, mid = y + bh / 2;
+    cBox(g, P, y, W, bh, 16);
+    cText(g, String(i + 1), P + 44, mid + 18, 50, 800, CARD_C.gold, "center");
+    var tx = P + 92, tw = W - 116;
+    var ts = 31; while (ts > 23 && cW(g, it.emoji + " " + it.title, ts, 800) > tw) ts -= 1;
+    cText(g, cFit(g, it.emoji + " " + it.title, tw, ts, 800), tx, mid - 4, ts, 800, CARD_C.txt);
+    cText(g, cFit(g, it.sub, tw, 22, 500), tx, mid + 30, 22, 500, CARD_C.sub);
     c.y += per;
   });
   cFoot(c, "종가 기준 자동 집계 · 투자 조언 아님");

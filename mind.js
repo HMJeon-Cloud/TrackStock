@@ -434,34 +434,35 @@ function mindCardOpen() {
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   function draw() {
     var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2;
-    cHead(c, "INVESTOR TYPE · 나의 투자 유형", "", null, 0, 0);
-    // 큰 코드 4글자
-    var cw = W / 4;
-    code.split("").forEach(function (ch, i) { cText(g, ch, P + cw * i + cw / 2, 380, 140, 800, CARD_C.gold, "center"); });
-    cText(g, T.emoji + " " + T.name, P, 466, 58, 800, CARD_C.txt);
-    cText(g, T.line, P, 516, 29, 500, CARD_C.txt2);
-    // 4개 축 막대 — 기운 쪽에서부터 채움
-    c.y = 540;
+    cHead(c, "나의 투자 유형", "", null, 0, 0);
+    // 머리: 4글자 코드(금색) + 유형 이름(흰색)
+    cText(g, code.split("").join("  "), P - 2, 190, 86, 800, CARD_C.gold2);
+    cText(g, T.emoji + " " + T.name, P, 256, 44, 800, CARD_C.onNavy);
+    cSummary(c, T.line);
+    // 4개 축 막대 — 기운 쪽에서부터 채움 (흰 박스 안)
+    cBox(g, P, c.y, W, MIND_AXES.length * 80 + 24, 16); c.y += 20;
     MIND_AXES.forEach(function (x) {
-      var p = ax.pct[x.k], L = mindAxisLine(x, p), y = c.y;
-      cText(g, x.a + " " + x.an, P, y + 30, 26, 700, L.first ? CARD_C.gold2 : CARD_C.sub);
-      cText(g, x.bn + " " + x.b, CARD.W - P, y + 30, 26, 700, L.first ? CARD_C.sub : CARD_C.gold2, "right");
-      cText(g, L.v + "%", CARD.W / 2, y + 30, 26, 800, CARD_C.txt, "center");
-      cRound(g, P, y + 48, W, 12, 6, CARD_C.soft);
-      var lg = g.createLinearGradient(P, 0, P + W, 0);
-      lg.addColorStop(0, L.first ? CARD_C.gold2 : "#8c7340"); lg.addColorStop(1, L.first ? "#8c7340" : CARD_C.gold2);
-      if (L.first) cRound(g, P, y + 48, Math.max(12, W * p), 12, 6, lg); else cRound(g, P + W * p, y + 48, Math.max(12, W * (1 - p)), 12, 6, lg);
+      var p = ax.pct[x.k], L = mindAxisLine(x, p), y = c.y, bx = P + 28, bw2 = W - 56;
+      cText(g, x.a + " " + x.an, bx, y + 30, 24, 700, L.first ? CARD_C.navy : CARD_C.sub);
+      cText(g, x.bn + " " + x.b, bx + bw2, y + 30, 24, 700, L.first ? CARD_C.sub : CARD_C.navy, "right");
+      cText(g, L.v + "%", CARD.W / 2, y + 30, 24, 800, CARD_C.txt, "center");
+      cRound(g, bx, y + 46, bw2, 12, 6, "#e3ddd0");
+      var lg = g.createLinearGradient(bx, 0, bx + bw2, 0);
+      lg.addColorStop(0, L.first ? CARD_C.gold2 : "#b08d3e"); lg.addColorStop(1, L.first ? "#b08d3e" : CARD_C.gold2);
+      if (L.first) cRound(g, bx, y + 46, Math.max(12, bw2 * p), 12, 6, lg); else cRound(g, bx + bw2 * p, y + 46, Math.max(12, bw2 * (1 - p)), 12, 6, lg);
       c.y += 80;
     });
-    c.y += 14;
-    cLabel(c, "나만의 규칙", CARD_C.gold);
+    c.y += 26;
+    cLabel(c, "나만의 규칙");
     T.rules.forEach(function (r, i) {
-      cText(g, String(i + 1), P + 12, c.y + 28, 27, 800, CARD_C.gold, "center");
-      cText(g, cFit(g, r, W - 46, 28, 600), P + 44, c.y + 28, 28, 600, CARD_C.txt); c.y += 46;
+      cBox(g, P, c.y, W, 52, 12);
+      cText(g, String(i + 1), P + 30, c.y + 35, 24, 800, CARD_C.gold, "center");
+      cText(g, cFit(g, r, W - 80, 24, 600), P + 56, c.y + 35, 24, 600, CARD_C.txt); c.y += 60;
     });
-    c.y += 10;
-    cText(g, "닮은 투자 대가  ", P, c.y + 28, 26, 700, CARD_C.gold);
-    cText(g, master[0], P + cW(g, "닮은 투자 대가  ", 26, 700), c.y + 28, 28, 800, CARD_C.txt);
+    c.y += 6;
+    cBox(g, P, c.y, W, 56, 12);
+    cText(g, "닮은 투자 대가  ", P + 24, c.y + 37, 23, 700, CARD_C.warmTxt);
+    cText(g, master[0], P + 24 + cW(g, "닮은 투자 대가  ", 23, 700), c.y + 37, 25, 800, CARD_C.txt); c.y += 56;
     cNote(c, "당신의 4글자는? 댓글로 알려주세요");
     cFoot(c, "우상향연구소 투자 유형 테스트 · 16유형", "mind");
     return c.cv;

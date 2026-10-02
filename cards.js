@@ -4,13 +4,14 @@
    인스타 프로필 격자는 4:5 게시물을 3:4로 잘라 보여주므로(좌우 약 34px) 글자는 좌우 96px 안쪽에만 둔다.
    한 장에 메시지 하나: 큰 제목이 "이 카드가 말하려는 것", 금색 글씨가 핵심 숫자.
    ============================================================ */
-var CARD = { W: 1080, H: 1350, PAD: 96 };
+var CARD = { W: 1080, H: 1350, PAD: 60, HEAD: 300 };   // TrackApt 카드와 같은 틀: 남색 머리(위 300px) + 베이지 바탕 + 흰 박스
 var CARD_C = {
-  bg: "#0c0c0e", bg2: "#16151a", txt: "#f4f1ea", txt2: "#b9b3a8", sub: "#7d786f", line: "rgba(255,255,255,0.09)",
-  up: "#ff5f5f", down: "#5b9bff", gold: "#d6b464", gold2: "#f1dca2", goldDim: "rgba(214,180,100,0.16)",
-  soft: "rgba(255,255,255,0.07)", tile: "rgba(255,255,255,0.045)"
+  navy: "#1f2a44", navy2: "#2a3659", bg: "#f3efe6", box: "#ffffff", line: "#e6e1d6",
+  txt: "#1c2333", txt2: "#5b6474", sub: "#8a92a3", onNavy: "#ffffff", onNavy2: "#c9d0de",
+  up: "#d9342b", down: "#2f6fd6", gold: "#c9a24f", gold2: "#e6c57a", goldDim: "rgba(201,162,79,0.16)",
+  soft: "#f3efe6", tile: "#ffffff", tagBg: "rgba(255,255,255,0.14)"
 };
-CARD_C.accent = CARD_C.gold; CARD_C.warmTxt = CARD_C.gold; CARD_C.warm = CARD_C.goldDim;
+CARD_C.accent = CARD_C.gold; CARD_C.warmTxt = "#8a6a1f"; CARD_C.warm = CARD_C.goldDim; CARD_C.card = CARD_C.box;
 var CARD_FONT = '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 var CARD_TXT = "";   // 그린 글자 모음 — 웹폰트가 필요한 글자만 내려받으므로, 한 번 그려 글자를 모은 뒤 폰트를 받고 다시 그린다
 
@@ -39,13 +40,18 @@ function cLast(sym) {   // 최근 90일 데이터의 마지막 종가 (실제 �
 }
 function cNm(sym) { return typeof chName === "function" ? chName(sym) : sym; }
 
-/* ---------- 그리기 도구 ---------- */
+/* ---------- 그리기 도구 (TrackApt 카드 틀) ---------- */
 var CARD_SNS = "@uphill.lab";
 function cRound(g, x, y, w, h, r, fill, stroke) {
   r = Math.min(r, h / 2, w / 2);
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
   if (fill) { g.fillStyle = fill; g.fill(); }
   if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); }
+}
+/* 흰 박스 (아주 옅은 그림자) */
+function cBox(g, x, y, w, h, r) {
+  g.save(); g.shadowColor = "rgba(31,42,68,0.08)"; g.shadowBlur = 14; g.shadowOffsetY = 4;
+  cRound(g, x, y, w, h, r || 18, CARD_C.box); g.restore();
 }
 function cFont(g, size, weight) { g.font = (weight || 400) + " " + size + "px " + CARD_FONT; }
 function cW(g, s, size, weight) { cFont(g, size, weight); return g.measureText(s).width; }
@@ -60,131 +66,155 @@ function cWrap(g, s, x, y, maxW, size, weight, color, lh, maxLines) {
   lines.forEach(function (l, k) { cText(g, l, x, y + k * (lh || size * 1.45), size, weight, color); });
   return y + lines.length * (lh || size * 1.45);
 }
-/* 금색 강조: 제목 안의 [[…]] 부분만 금색 */
+/* 강조: 제목 안의 [[…]] 부분만 금색 (머리 위에서는 밝은 금색) */
 function cPlain(s) { return String(s).replace(/\[\[|\]\]/g, ""); }
-function cRich(g, s, x, y, size, weight, color) {
+function cRich(g, s, x, y, size, weight, color, hi) {
   var parts = String(s).split(/\[\[|\]\]/), cx = x;
-  parts.forEach(function (p, i) { if (!p) return; cText(g, p, cx, y, size, weight, i % 2 ? CARD_C.gold : (color || CARD_C.txt)); cx += cW(g, p, size, weight); });
+  parts.forEach(function (p, i) { if (!p) return; cText(g, p, cx, y, size, weight, i % 2 ? (hi || CARD_C.gold2) : (color || CARD_C.txt)); cx += cW(g, p, size, weight); });
 }
-/* 배경: 짙은 검정 + 오른쪽 위 은은한 금빛 + 얇은 금테 */
+/* 배경: 위 남색 머리 + 금색 곡선, 아래 베이지 */
 function cNew() {
   var cv = document.createElement("canvas"); cv.width = CARD.W; cv.height = CARD.H;
   var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
-  var lg = g.createLinearGradient(0, 0, 0, CARD.H); lg.addColorStop(0, CARD_C.bg); lg.addColorStop(1, CARD_C.bg2);
-  g.fillStyle = lg; g.fillRect(0, 0, CARD.W, CARD.H);
-  var rg = g.createRadialGradient(CARD.W - 60, 40, 0, CARD.W - 60, 40, 760);
-  rg.addColorStop(0, "rgba(214,180,100,0.20)"); rg.addColorStop(0.45, "rgba(214,180,100,0.05)"); rg.addColorStop(1, "rgba(214,180,100,0)");
-  g.fillStyle = rg; g.fillRect(0, 0, CARD.W, CARD.H);
-  g.strokeStyle = "rgba(214,180,100,0.28)"; g.lineWidth = 2; g.strokeRect(28, 28, CARD.W - 56, CARD.H - 56);
-  return { cv: cv, g: g, y: 150 };
+  g.fillStyle = CARD_C.bg; g.fillRect(0, 0, CARD.W, CARD.H);
+  var lg = g.createLinearGradient(0, 0, CARD.W, CARD.HEAD); lg.addColorStop(0, CARD_C.navy); lg.addColorStop(1, CARD_C.navy2);
+  g.fillStyle = lg; g.fillRect(0, 0, CARD.W, CARD.HEAD);
+  // 금색 우상향 곡선 (머리 배경 장식)
+  g.save(); g.beginPath(); g.rect(0, 0, CARD.W, CARD.HEAD); g.clip();
+  g.strokeStyle = "rgba(201,162,79,0.45)"; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(CARD.W * 0.42, CARD.HEAD + 10); g.bezierCurveTo(CARD.W * 0.62, CARD.HEAD - 40, CARD.W * 0.72, 150, CARD.W + 10, 40); g.stroke();
+  g.strokeStyle = "rgba(201,162,79,0.22)"; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(CARD.W * 0.5, CARD.HEAD + 10); g.bezierCurveTo(CARD.W * 0.7, CARD.HEAD - 10, CARD.W * 0.8, 200, CARD.W + 10, 110); g.stroke();
+  g.restore();
+  return { cv: cv, g: g, y: CARD.HEAD + 40 };
 }
-/* 로고: 우상향 화살표 + UPHILL LAB */
+/* 로고: ↗ 우상향연구소 (머리 왼쪽 위) */
 function cLogo(g, x, y) {
-  g.strokeStyle = CARD_C.gold; g.lineWidth = 4; g.lineJoin = "round"; g.lineCap = "round";
-  g.beginPath(); g.moveTo(x, y); g.lineTo(x + 14, y - 12); g.lineTo(x + 24, y - 5); g.lineTo(x + 42, y - 24); g.stroke();
-  g.beginPath(); g.moveTo(x + 30, y - 25); g.lineTo(x + 43, y - 25); g.lineTo(x + 43, y - 12); g.stroke();
-  try { g.letterSpacing = "5px"; } catch (e) {}
-  cText(g, "UPHILL LAB", x + 60, y - 2, 24, 800, CARD_C.gold);
-  try { g.letterSpacing = "0px"; } catch (e) {}
+  g.strokeStyle = CARD_C.onNavy; g.lineWidth = 4; g.lineJoin = "round"; g.lineCap = "round";
+  g.beginPath(); g.moveTo(x, y + 2); g.lineTo(x + 26, y - 20); g.stroke();
+  g.beginPath(); g.moveTo(x + 12, y - 20); g.lineTo(x + 26, y - 20); g.lineTo(x + 26, y - 6); g.stroke();
+  cText(g, "우상향연구소", x + 40, y, 30, 800, CARD_C.onNavy);
 }
-/* 제목: 한 줄에 들어가면 한 줄(크기를 줄여 맞춤). 안 되면 구분점에서 길이가 비슷하게 두 줄, 두 줄 같은 크기 */
+/* 제목(머리 안, 흰 글씨): 한 줄에 들어가면 한 줄, 안 되면 구분점에서 길이가 비슷하게 두 줄 */
 function cTitle(g, title, y, maxSize) {
-  var maxW = CARD.W - CARD.PAD * 2, lines, top = maxSize || 64;
+  var maxW = CARD.W - CARD.PAD * 2, lines, top = maxSize || 58;
   if (Array.isArray(title)) lines = title;
   else {
-    for (var sz = top; sz >= top - 14; sz -= 2) if (cW(g, cPlain(title), sz, 800) <= maxW) { cRich(g, title, CARD.PAD, y, sz, 800); return y + 24; }
-    var best = null, seps = [" → ", " · ", ", ", " "];
+    for (var sz = top; sz >= top - 10; sz -= 2) if (cW(g, cPlain(title), sz, 800) <= maxW) { cRich(g, title, CARD.PAD, y, sz, 800, CARD_C.onNavy); return y + 24; }
+    var best = null, seps = [" → ", " · ", ", ", " — ", " "];
     for (var k = 0; k < seps.length && !best; k++) {
       var parts = title.split(seps[k]); if (parts.length < 2) continue;
       for (var i = 1; i < parts.length; i++) {
         var a = parts.slice(0, i).join(seps[k]) + (seps[k] === ", " ? "," : ""), b = (seps[k] === " → " ? "→ " : "") + parts.slice(i).join(seps[k]);
-        if ((a.match(/\[\[/g) || []).length !== (a.match(/\]\]/g) || []).length) continue;   // 금색 구간을 반으로 자르지 않음
-        var d = Math.abs(cW(g, cPlain(a), 60, 800) - cW(g, cPlain(b), 60, 800));
+        if ((a.match(/\[\[/g) || []).length !== (a.match(/\]\]/g) || []).length) continue;
+        var d = Math.abs(cW(g, cPlain(a), 54, 800) - cW(g, cPlain(b), 54, 800));
         if (!best || d < best.d) best = { d: d, l: [a, b] };
       }
     }
     lines = best ? best.l : [title];
   }
-  var size = top; while (size > 44 && lines.some(function (l) { return cW(g, cPlain(l), size, 800) > maxW; })) size -= 2;
-  lines.forEach(function (l, i) { cRich(g, l, CARD.PAD, y + i * size * 1.3, size, 800); });
-  return y + (lines.length - 1) * size * 1.3 + 24;
+  var size = top; while (size > 40 && lines.some(function (l) { return cW(g, cPlain(l), size, 800) > maxW; })) size -= 2;
+  var y0 = lines.length > 1 ? y - size * 0.65 : y;
+  lines.forEach(function (l, i) { cRich(g, l, CARD.PAD, y0 + i * size * 1.25, size, 800, CARD_C.onNavy); });
+  return y0 + (lines.length - 1) * size * 1.25 + 24;
 }
-/* 머리: 로고 · 쪽번호 / 금테 꼬리표 / 큰 제목 / 부제 */
+/* 머리: 로고 · 꼬리표 · 날짜(쪽번호) / 큰 제목 / 부제는 본문 첫 요약 박스로 */
 function cHead(c, tag, title, sub, page, total) {
   var g = c.g, P = CARD.PAD;
-  cLogo(g, P, 118);
-  if (page) cText(g, (page < 10 ? "0" : "") + page + "  /  " + (total < 10 ? "0" : "") + total, CARD.W - P, 114, 24, 600, CARD_C.sub, "right");
-  cFont(g, 26, 700); var tw = g.measureText(tag).width + 40;
-  cRound(g, P, 160, tw, 50, 25, CARD_C.goldDim, "rgba(214,180,100,0.55)");
-  cText(g, tag, P + 20, 194, 26, 700, CARD_C.gold2);
-  if (!title) { c.y = 240; return; }
-  var y = cTitle(g, title, 300);
-  if (sub) y = cWrap(g, sub, P, y + 28, CARD.W - P * 2, 29, 400, CARD_C.txt2, 42, 2);
-  c.y = y + 36;
+  cLogo(g, P, 84);
+  // 꼬리표(둥근 흰 테두리) — 날짜 부분은 꼬리표에서 떼어 오른쪽에
+  var m = String(tag).match(/^(.*?)\s*·\s*([0-9]{1,2}\.[0-9]{1,2}\([일월화수목금토]\)[^·]*)$/);
+  var tagTxt = m ? m[1] : tag, dateTxt = m ? m[2] : "";
+  var lx = P + 40 + cW(g, "우상향연구소", 30, 800) + 22;
+  cFont(g, 24, 700); var tw = g.measureText(tagTxt).width + 36;
+  cRound(g, lx, 56, tw, 42, 21, CARD_C.tagBg, "rgba(255,255,255,0.55)");
+  cText(g, tagTxt, lx + 18, 85, 24, 700, CARD_C.onNavy);
+  var right = dateTxt + (page ? "  ·  " + page + "/" + total : "");
+  if (right) cText(g, right, CARD.W - P, 85, 26, 700, CARD_C.onNavy, "right");
+  c.y = CARD.HEAD + 40;
+  if (!title) return;
+  cTitle(g, title, 215);
+  if (sub) cSummary(c, sub);
 }
-/* 표지형 머리: 작은 문장 + 아주 큰 한 단어/숫자 */
+/* 첫 요약 박스: 왼쪽 금색 세로줄 + 한 줄 요약 (TrackApt의 "한 줄 요약") */
+function cSummary(c, text, color) {
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, h = 64;
+  cFont(g, 26, 600); if (g.measureText(text).width > W - 70) h = 100;
+  cBox(g, P, c.y, W, h, 16); cRound(g, P, c.y + 10, 6, h - 20, 3, CARD_C.gold);
+  if (h === 64) cText(g, cFit(g, text, W - 70, 26, 600), P + 32, c.y + 41, 26, 600, color || CARD_C.txt);
+  else cWrap(g, text, P + 32, c.y + 38, W - 70, 26, 600, color || CARD_C.txt, 34, 2);
+  c.y += h + 22;
+}
+/* 표지형 머리: 머리에 작은 문장 + 아주 큰 단어/숫자 */
 function cHero(c, tag, small, big, bigColor, sub, page, total) {
   var g = c.g, P = CARD.PAD;
   cHead(c, tag, "", null, page, total);
-  cText(g, small, P, 300, 40, 600, CARD_C.txt2);
-  var size = 150; while (size > 70 && cW(g, big, size, 800) > CARD.W - P * 2) size -= 4;
-  cText(g, big, P - 4, 300 + size, size, 800, bigColor || CARD_C.gold);
-  var y = 300 + size + 22;
-  if (sub) y = cWrap(g, sub, P, y + 46, CARD.W - P * 2, 30, 500, CARD_C.txt2, 42, 2);
-  c.y = y + 30;
+  cText(g, small, P, 160, 32, 600, CARD_C.onNavy2);
+  var size = 92; while (size > 56 && cW(g, big, size, 800) > CARD.W - P * 2) size -= 4;
+  cText(g, big, P - 2, 265, size, 800, bigColor === CARD_C.up || bigColor === CARD_C.down ? bigColor : CARD_C.gold2);
+  c.y = CARD.HEAD + 40;
+  if (sub) cSummary(c, sub);
 }
-/* 바닥: 계정 표기 (모든 카드 공통) */
+/* 바닥: 출처·면책(왼쪽 회색) + @uphill.lab(오른쪽 굵게) */
 function cFoot(c, note, tipKey) {
   if (tipKey) cFill(c, CARD_TIP[tipKey]);
-  var g = c.g, P = CARD.PAD, y = CARD.H - 86;
-  g.fillStyle = CARD_C.line; g.fillRect(P, y - 50, CARD.W - P * 2, 1);
-  g.fillStyle = CARD_C.gold; g.fillRect(P, y - 51, 64, 3);
-  cText(g, CARD_SNS, P, y, 32, 800, CARD_C.gold);
-  cText(g, "우상향연구소", P + cW(g, CARD_SNS, 32, 800) + 16, y, 23, 600, CARD_C.txt2);
-  cText(g, note || "종가 기준 · 투자 조언 아님", CARD.W - P, y, 21, 400, CARD_C.sub, "right");
+  var g = c.g, P = CARD.PAD, y = CARD.H - 44;
+  cText(g, "StockMind 자동 집계 · " + (note || "종가 기준 · 투자 조언 아님").replace(/ · 투자 조언 아님$/, "") + " · 투자 권유 아님", P, y, 22, 500, CARD_C.sub);
+  cText(g, CARD_SNS, CARD.W - P, y, 28, 800, CARD_C.txt, "right");
 }
-/* 한 줄: 이름 | (부가) | 주가 | 등락 — 열 위치를 고정해 줄마다 숫자가 같은 자리에 */
+/* 한 줄: [순위.] 이름(굵게) · 회색 부가 · 주가 | 오른쪽 큰 값 — 각 줄이 흰 박스 */
 function cRow(c, name, val, color, opt) {
-  opt = opt || {}; var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, h = opt.h || 76;
-  var fs = h >= 76 ? 36 : h >= 64 ? 32 : 29, by = c.y + (opt.bar != null ? h * 0.56 : h * 0.62);
-  if (opt.hi) cRound(g, P - 18, c.y + 4, W + 36, h - 8, 16, CARD_C.goldDim);
-  if (opt.rank != null) cText(g, String(opt.rank), P + 16, by - 2, fs - 8, 700, opt.rank === 1 ? CARD_C.gold : CARD_C.sub, "center");
-  var nx = P + (opt.rank != null ? 54 : 0), right = P + W - Math.max(opt.valW || 150, cW(g, val, fs + 2, 800)) - 22;
-  cText(g, val, P + W, by, fs + 2, 800, color || CARD_C.txt, "right");
-  if (opt.price) { var pf = opt.priceSize || fs - 7; cText(g, opt.price, right, by - 1, pf, 500, CARD_C.txt2, "right"); right -= cW(g, opt.price, pf, 500) + 22; }
-  if (opt.mid) { cText(g, opt.mid, right, by - 2, fs - 12, 500, CARD_C.sub, "right"); right -= cW(g, opt.mid, fs - 12, 500) + 18; }
-  cText(g, cFit(g, name, Math.max(120, right - nx), fs, 600), nx, by, fs, 600, opt.hi ? CARD_C.gold2 : CARD_C.txt);
-  if (opt.bar != null) {
-    var bw = Math.max(6, Math.min(1, Math.abs(opt.bar)) * (W - (nx - P)));
-    cRound(g, nx, by + 14, W - (nx - P), 8, 4, CARD_C.soft); cRound(g, nx, by + 14, bw, 8, 4, color || CARD_C.gold);
+  opt = opt || {}; var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, h = Math.max(56, (opt.h || 76));
+  var fs = h >= 76 ? 30 : h >= 64 ? 27 : 24, gap = h >= 64 ? 10 : 6, bh = h - gap;
+  cBox(g, P, c.y, W, bh, 14);
+  if (opt.hi) { cRound(g, P, c.y, W, bh, 14, "#fff7e4"); cRound(g, P, c.y + 8, 6, bh - 16, 3, CARD_C.gold); }
+  var by = c.y + bh * 0.5 + (opt.bar != null ? -6 : 0) + fs * 0.36;
+  var nx = P + 24 + (opt.hi ? 10 : 0);
+  if (opt.rank != null) { cText(g, opt.rank + ".", nx, by, fs, 800, CARD_C.txt); nx += cW(g, opt.rank + ".", fs, 800) + 10; }
+  var vf = fs + 6, vw = Math.max(opt.valW ? opt.valW * 0.8 : 0, cW(g, val, vf, 800));
+  cText(g, val, P + W - 24, by, vf, 800, color || CARD_C.txt, "right");
+  var right = P + W - 24 - vw - 22;
+  var metaParts = []; if (opt.mid) metaParts.push(opt.mid); if (opt.price) metaParts.push(opt.price);
+  var nameW = cW(g, name, fs, 700), meta = metaParts.join(" · "), ms = Math.max(18, fs - 8);
+  var avail = right - nx;
+  if (meta && nameW + 14 + cW(g, meta, ms, 500) <= avail) {   // 한 줄: 이름 + 회색 부가
+    cText(g, name, nx, by, fs, 700, CARD_C.txt);
+    cText(g, meta, nx + nameW + 14, by, ms, 500, CARD_C.sub);
+  } else if (meta && bh >= 66) {                                  // 두 줄: 이름 / 회색 부가
+    cText(g, cFit(g, name, avail, fs - 2, 700), nx, c.y + bh * 0.5 - 2, fs - 2, 700, CARD_C.txt);
+    cText(g, cFit(g, meta, avail, ms, 500), nx, c.y + bh * 0.5 + ms + 6, ms, 500, CARD_C.sub);
+  } else {
+    cText(g, cFit(g, name + (meta ? "  " + meta : ""), avail, fs, 700), nx, by, fs, 700, CARD_C.txt);
   }
-  if (!opt.noLine && !opt.hi) { g.fillStyle = CARD_C.line; g.fillRect(P, c.y + h, W, 1); }
+  if (opt.bar != null) {
+    var bw = Math.max(6, Math.min(1, Math.abs(opt.bar)) * (avail));
+    cRound(g, nx, c.y + bh - 16, avail, 6, 3, CARD_C.soft); cRound(g, nx, c.y + bh - 16, bw, 6, 3, color || CARD_C.gold);
+  }
   c.y += h + (opt.gap || 0);
 }
-function cColHead(c, cols) { cols.forEach(function (x) { cText(c.g, x[0], x[1], c.y + 4, 22, 700, CARD_C.sub, "right"); }); c.y += 14; }
-function cTiles(c, tiles) {   // 2×N 숫자 타일
-  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, gap = 22, tw = (W - gap) / 2, th = 186;
+function cColHead(c, cols) { cols.forEach(function (x) { cText(c.g, x[0], x[1] - 24, c.y + 4, 22, 700, CARD_C.sub, "right"); }); c.y += 16; }
+function cTiles(c, tiles) {   // 2×N 숫자 타일 (흰 박스)
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, gap = 18, tw = (W - gap) / 2, th = 170;
   tiles.forEach(function (t, i) {
     var x = P + (i % 2) * (tw + gap), y = c.y + Math.floor(i / 2) * (th + gap);
-    cRound(g, x, y, tw, th, 24, CARD_C.tile, "rgba(214,180,100,0.22)");
-    cText(g, t.v, x + 30, y + 82, 56, 800, t.color || CARD_C.gold);
-    cWrap(g, t.l, x + 30, y + 126, tw - 60, 25, 500, CARD_C.txt2, 33, 2);
+    cBox(g, x, y, tw, th, 18);
+    cText(g, t.v, x + 28, y + 76, 50, 800, t.color || CARD_C.navy);
+    cWrap(g, t.l, x + 28, y + 118, tw - 56, 23, 500, CARD_C.txt2, 30, 2);
   });
   c.y += Math.ceil(tiles.length / 2) * (th + gap);
 }
 /* 남은 공간에 n줄이 들어가도록 행 높이 계산 (note=true면 하단 안내 한 줄 자리 확보) */
-function cH(c, n, max, note, extra) { return Math.max(48, Math.min(max, Math.floor((CARD.H - (note ? 220 : 170) - c.y - (extra || 0)) / Math.max(1, n)))); }
-function cNote(c, s) { var g = c.g, P = CARD.PAD; c.hasNote = true; cText(g, cFit(g, s, CARD.W - P * 2, 25, 500), P, CARD.H - 182, 25, 500, CARD_C.gold); }
-function cPara(c, s) { c.y = cWrap(c.g, s, CARD.PAD, c.y + 40, CARD.W - CARD.PAD * 2, 28, 500, CARD_C.txt2, 40, 3) + 10; }
-function cLabel(c, s, color) { cText(c.g, s, CARD.PAD, c.y + 30, 28, 800, color || CARD_C.txt2); c.y += 44; }
+function cH(c, n, max, note, extra) { return Math.max(56, Math.min(max, Math.floor((CARD.H - (note ? 150 : 100) - c.y - (extra || 0)) / Math.max(1, n)))); }
+function cNote(c, s) { var g = c.g, P = CARD.PAD; c.hasNote = true; cWrap(g, s, P, CARD.H - 118, CARD.W - P * 2, 22, 500, CARD_C.txt2, 30, 2); }
+function cPara(c, s) { var g = c.g, P = CARD.PAD, W = CARD.W - P * 2; var y1 = cWrap(g, s, P + 28, c.y + 44, W - 56, 25, 500, CARD_C.txt2, 36, 3); cBox(g, P, c.y + 6, W, y1 - c.y + 4, 16); cWrap(g, s, P + 28, c.y + 44, W - 56, 25, 500, CARD_C.txt2, 36, 3); c.y = y1 + 26; }
+function cLabel(c, s, color) { cText(c.g, s, CARD.PAD + 4, c.y + 28, 24, 800, color && color !== CARD_C.txt2 && color !== CARD_C.gold ? color : CARD_C.navy); c.y += 40; }
 function cBar(c, pct, h) {   // 금색 진행 막대
-  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2; h = h || 18;
-  cRound(g, P, c.y, W, h, 9, CARD_C.soft);
-  var lg = g.createLinearGradient(P, 0, P + W, 0); lg.addColorStop(0, "#8c7340"); lg.addColorStop(1, CARD_C.gold2);
-  cRound(g, P, c.y, Math.max(h, W * Math.max(0, Math.min(1, pct))), h, 9, lg);
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2; h = h || 16;
+  cRound(g, P, c.y, W, h, 8, "#e3ddd0");
+  var lg = g.createLinearGradient(P, 0, P + W, 0); lg.addColorStop(0, "#b08d3e"); lg.addColorStop(1, CARD_C.gold2);
+  cRound(g, P, c.y, Math.max(h, W * Math.max(0, Math.min(1, pct))), h, 8, lg);
   c.y += h;
 }
-
 
 /* ---------- 빈 공간 채우기 ----------
    카드마다 결과값(종목 수·제목 길이)이 달라 아래쪽이 비는 날이 있다.
@@ -207,50 +237,35 @@ var CARD_TIP = {
   "mind": ["4글자 읽는 법", "P 지키기 · G 불리기  /  D 숫자 · S 이야기  /  C 침착 · R 민감  /  L 장기 · T 타이밍. 정답 유형은 없어요. 내 성향의 약점을 아는 게 핵심이에요."]
 };
 function cFill(c, tip) {
-  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, bottom = CARD.H - (c.hasNote ? 214 : 162), top = c.y + 22;
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, bottom = CARD.H - (c.hasNote ? 150 : 96), top = c.y + 6;
   function nLines(txt) {
-    cFont(g, 26, 500); var n = 0, line = "", ch = txt.split("");
+    cFont(g, 23, 500); var n = 0, line = "", ch = txt.split("");
     for (var i = 0; i < ch.length; i++) { var t = line + ch[i]; if (g.measureText(t).width > W - 64 && line) { n++; line = ch[i]; } else line = t; }
     return n + 1;
   }
-  if (tip && bottom - top >= 122) {
-    // 문장 단위로, 공간에 들어가는 만큼만 (중간에 잘린 '…' 없이)
+  if (tip && bottom - top >= 110) {
     var sent = tip[1].match(/[^.!?]+[.!?]?\s*/g) || [tip[1]], pick = null;
     for (var k = sent.length; k >= 1 && !pick; k--) {
-      var txt = sent.slice(0, k).join("").trim(), L = nLines(txt), bh = 84 + L * 38;
+      var txt = sent.slice(0, k).join("").trim(), L = nLines(txt), bh = 74 + L * 33;
       if (bh <= bottom - top) pick = { txt: txt, L: L, bh: bh };
     }
     if (pick) {
-      var by = bottom - top - pick.bh > 220 ? top + 4 : bottom - pick.bh;   // 공간이 많이 남으면 위에 붙이고 아래는 일러스트
-      cRound(g, P, by, W, pick.bh, 22, "rgba(214,180,100,0.07)", "rgba(214,180,100,0.28)");
-      cRound(g, P, by + 22, 5, pick.bh - 44, 3, CARD_C.gold);
-      cText(g, "💡 " + tip[0], P + 32, by + 50, 27, 800, CARD_C.gold2);
-      cWrap(g, pick.txt, P + 32, by + 92, W - 64, 26, 500, CARD_C.txt2, 38, pick.L);
-      if (by > top + 4) return;   // 아래에 붙였으면 끝
-      top = by + pick.bh + 24;
+      var by = top;   // 본문 바로 아래에 붙이고, 남는 공간은 아래 장식으로
+      cBox(g, P, by, W, pick.bh, 16);
+      cText(g, "알아두면 좋은 점", P + 28, by + 42, 23, 800, CARD_C.warmTxt);
+      cWrap(g, pick.txt, P + 28, by + 80, W - 56, 23, 500, CARD_C.txt2, 33, pick.L);
+      top = by + pick.bh + 18;
     }
   }
-  if (bottom - top >= 56) cArt(g, P, top, W, Math.min(360, bottom - top));
+  if (bottom - top >= 56) cArt(g, P, top, W, Math.min(260, bottom - top));
 }
-/* 우상향 산 일러스트 — 겹친 능선 + 정상까지 오르는 금색 길 + 깃발 */
+/* 우상향 막대 + 금색 곡선 (TrackApt 카드 아래쪽 장식과 같은 느낌) */
 function cArt(g, x, y, w, h) {
   g.save();
-  var base = y + h, peakX = x + w * 0.66, peakY = y + h * 0.12 + Math.min(56, h * 0.28) * 0.6;
-  function ridge(pts, fill) { g.beginPath(); g.moveTo(x, base); pts.forEach(function (p) { g.lineTo(x + w * p[0], y + h * p[1]); }); g.lineTo(x + w, base); g.closePath(); g.fillStyle = fill; g.fill(); }
-  ridge([[0, 0.72], [0.18, 0.5], [0.3, 0.62], [0.48, 0.34], [0.66, 0.12], [0.8, 0.4], [0.92, 0.3], [1, 0.46]], "rgba(214,180,100,0.07)");
-  ridge([[0, 0.86], [0.22, 0.66], [0.38, 0.78], [0.56, 0.56], [0.74, 0.7], [1, 0.6]], "rgba(214,180,100,0.10)");
-  // 오르는 길 (점선 → 정상)
-  g.strokeStyle = "rgba(241,220,162,0.75)"; g.lineWidth = 4; g.setLineDash([10, 10]); g.lineCap = "round";
-  g.beginPath(); g.moveTo(x + w * 0.04, base - h * 0.06);
-  [[0.2, 0.74], [0.34, 0.6], [0.46, 0.5], [0.56, 0.3], [0.64, 0.16]].forEach(function (p) { g.lineTo(x + w * p[0], y + h * p[1]); });
-  g.stroke(); g.setLineDash([]);
-  // 깃발
-  var fh = Math.max(18, Math.min(56, h * 0.28)), fw = fh * 0.72;
-  g.strokeStyle = CARD_C.gold2; g.lineWidth = 3; g.beginPath(); g.moveTo(peakX, peakY); g.lineTo(peakX, peakY - fh); g.stroke();
-  g.beginPath(); g.moveTo(peakX, peakY - fh); g.lineTo(peakX + fw, peakY - fh + fh * 0.22); g.lineTo(peakX, peakY - fh + fh * 0.44); g.closePath(); g.fillStyle = CARD_C.gold; g.fill();
-  // 바닥선 + 문구
-  g.fillStyle = "rgba(214,180,100,0.25)"; g.fillRect(x, base, w, 1);
-  if (h >= 180) { try { g.letterSpacing = "6px"; } catch (e) {} cText(g, "UPHILL, STEP BY STEP", x, base - 14, 20, 700, "rgba(214,180,100,0.45)"); try { g.letterSpacing = "0px"; } catch (e) {} }
+  var base = y + h, n = 7, bw = w * 0.07, gapx = (w * 0.6 - bw * n) / (n - 1), hs = [0.12, 0.2, 0.16, 0.3, 0.26, 0.42, 0.5];
+  for (var i = 0; i < n; i++) { var bh = h * hs[i] * 0.9; cRound(g, x + i * (bw + gapx), base - bh, bw, bh, 4, "rgba(31,42,68,0.07)"); }
+  g.strokeStyle = CARD_C.gold; g.lineWidth = 4; g.lineCap = "round";
+  g.beginPath(); g.moveTo(x + w * 0.55, base - h * 0.1); g.bezierCurveTo(x + w * 0.75, base - h * 0.12, x + w * 0.85, base - h * 0.55, x + w, base - h * 0.82); g.stroke();
   g.restore();
 }
 /* ---------- 긴 기간 데이터 (1년 전·적립식 카드용) ---------- */
@@ -324,7 +339,7 @@ function cMood(R) {
   return { score: score, word: word, parts: parts };
 }
 function cGauge(c, score, word) {
-  var g = c.g, cx = CARD.W / 2, cy = c.y + 270, r = 270, cols = ["#5b9bff", "#8fa9c9", "#a8a29a", CARD_C.gold, CARD_C.up];
+  var g = c.g, cx = CARD.W / 2, cy = c.y + 250, r = 250, cols = ["#2f6fd6", "#8fa9c9", "#b9b3a8", CARD_C.gold, CARD_C.up];
   g.lineWidth = 44; g.lineCap = "butt";
   for (var i = 0; i < 5; i++) {
     g.beginPath(); g.strokeStyle = cols[i]; g.globalAlpha = 0.85;
@@ -332,13 +347,13 @@ function cGauge(c, score, word) {
   }
   g.globalAlpha = 1;
   var a = Math.PI + Math.PI * Math.max(0, Math.min(100, score)) / 100;
-  g.strokeStyle = CARD_C.txt; g.lineWidth = 8; g.lineCap = "round";
+  g.strokeStyle = CARD_C.navy; g.lineWidth = 8; g.lineCap = "round";
   g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * (r - 64), cy + Math.sin(a) * (r - 64)); g.stroke();
   g.beginPath(); g.arc(cx, cy, 16, 0, Math.PI * 2); g.fillStyle = CARD_C.gold; g.fill();
   cText(g, "공포", cx - r, cy + 50, 24, 600, CARD_C.sub, "center"); cText(g, "탐욕", cx + r, cy + 50, 24, 600, CARD_C.sub, "center");
-  cText(g, String(score), cx, cy + 112, 84, 800, CARD_C.gold2, "center");
+  cText(g, String(score), cx, cy + 112, 84, 800, CARD_C.navy, "center");
   cText(g, "/ 100", cx + cW(g, String(score), 84, 800) / 2 + 12, cy + 112, 26, 600, CARD_C.sub);
-  c.y = cy + 140;
+  c.y = cy + 136;
 }
 
 /* ---------- 오늘의 브리핑 카드 (8장) ---------- */
@@ -430,7 +445,7 @@ function cardsBrief() {
 }
 
 /* ---------- 채널 브리핑 자료 카드 (5장) ---------- */
-var CARD_PLAN_COL = ["#d6b464", "#f1dca2", "#9c8350", "#7d8fa6", "#c9c2b4"];
+var CARD_PLAN_COL = ["#c9a24f", "#1f2a44", "#8a6a1f", "#5b7fb0", "#9aa3b2"];
 function cMixName(sym) { return (typeof CH_SHORT !== "undefined" && CH_SHORT[sym]) || cNm(sym); }
 function cardsChannel() {
   var R = chState.brief, out = [], T = 5; if (!R) return [];
@@ -459,13 +474,14 @@ function cardsChannel() {
   var prow = plan.items.map(function (it) { return { sym: it[0], name: cMixName(it[0]) + " (" + it[0] + ")", w: it[1], why: it[2] }; });
   prow.forEach(function (it, i) { var w = W * it.w / 100; cRound(g, x, c.y, Math.max(8, w - 6), 36, 8, CARD_PLAN_COL[i % 5]); x += w; });
   c.y += 66;
-  var per = (CARD.H - 220 - c.y) / prow.length, two = per >= 124;
+  var per = Math.min(120, Math.floor((CARD.H - 160 - c.y) / prow.length)), two = per >= 112;
   prow.forEach(function (it, i) {
-    cRound(g, P, c.y + 12, 22, 22, 6, CARD_PLAN_COL[i % 5]);
-    cText(g, it.name, P + 38, c.y + 33, 31, 700, CARD_C.txt);
-    cText(g, it.w + "%", CARD.W - P, c.y + 34, 34, 800, CARD_PLAN_COL[i % 5], "right");
-    cText(g, cPrice(it.sym, cLast(it.sym)), CARD.W - P - 110, c.y + 33, 25, 500, CARD_C.txt2, "right");
-    cWrap(g, it.why, P + 38, c.y + 71, W - 38, 24, 400, CARD_C.txt2, 32, two ? 2 : 1);
+    cBox(g, P, c.y, W, per - 10, 14);
+    cRound(g, P + 22, c.y + 20, 18, 18, 5, CARD_PLAN_COL[i % 5]);
+    cText(g, it.name, P + 52, c.y + 37, 28, 700, CARD_C.txt);
+    cText(g, it.w + "%", CARD.W - P - 22, c.y + 38, 32, 800, CARD_C.txt, "right");
+    cText(g, cPrice(it.sym, cLast(it.sym)), CARD.W - P - 110, c.y + 37, 22, 500, CARD_C.sub, "right");
+    cWrap(g, it.why, P + 52, c.y + 68, W - 80, 22, 400, CARD_C.txt2, 29, two ? 2 : 1);
     c.y += per;
   });
   cNote(c, "규칙 기반 예시이며 추천이 아니에요. 다음 카드에서 다른 구성과 비교해요.");
@@ -481,17 +497,18 @@ function cardsChannel() {
   var ch = cH(c, cmp.length, 112, true);
   cmp.forEach(function (x) {
     var a = x.res[2], b = x.res[3], gg = c.g, now = x.key === plan.key, y0 = c.y;
-    if (now) cRound(gg, P - 18, y0 + 4, W + 36, ch - 8, 16, CARD_C.goldDim);
-    cText(gg, x.label, P, y0 + 44, 32, 800, now ? CARD_C.gold2 : CARD_C.txt);
-    if (now) { var lw = cW(gg, x.label, 32, 800); cRound(gg, P + lw + 12, y0 + 17, 62, 34, 17, CARD_C.gold); cText(gg, "지금", P + lw + 43, y0 + 42, 21, 800, CARD_C.bg, "center"); }
+    cBox(gg, P, y0, W, ch - 10, 14);
+    if (now) { cRound(gg, P, y0, W, ch - 10, 14, "#fff7e4"); cRound(gg, P, y0 + 8, 6, ch - 26, 3, CARD_C.gold); }
+    var lx0 = P + 24 + (now ? 10 : 0);
+    cText(gg, x.label, lx0, y0 + 42, 30, 800, CARD_C.txt);
+    if (now) { var lw = cW(gg, x.label, 30, 800); cRound(gg, lx0 + lw + 12, y0 + 18, 58, 30, 15, CARD_C.gold); cText(gg, "지금", lx0 + lw + 41, y0 + 40, 19, 800, "#fff", "center"); }
     var mix = CH_PLANS[x.key].items.map(function (it) { return cMixName(it[0]) + " " + it[1]; }).join(" · "), mw = c1 - P - 90, ms = 23;
     while (ms > 17 && cW(gg, mix, ms, 500) > mw) ms--;
-    cText(gg, cFit(gg, mix, mw, ms, 500), P, y0 + 80, ms, 500, CARD_C.txt2);
+    cText(gg, cFit(gg, mix, mw, ms, 500), lx0, y0 + 74, ms, 500, CARD_C.sub);
     [[a, c1], [b, c2]].forEach(function (z) {
-      cText(gg, z[0] ? cPct(z[0].ret, 0) : "-", z[1], y0 + 46, 33, 800, z[0] ? cCol(z[0].ret) : CARD_C.sub, "right");
-      if (z[0]) cText(gg, "(" + cPct(z[0].mdd, 0) + ")", z[1], y0 + 78, 21, 400, CARD_C.sub, "right");
+      cText(gg, z[0] ? cPct(z[0].ret, 0) : "-", z[1] - 24, y0 + 44, 31, 800, z[0] ? cCol(z[0].ret) : CARD_C.sub, "right");
+      if (z[0]) cText(gg, "(" + cPct(z[0].mdd, 0) + ")", z[1] - 24, y0 + 74, 20, 400, CARD_C.sub, "right");
     });
-    if (!now) { gg.fillStyle = CARD_C.line; gg.fillRect(P, y0 + ch - 2, W, 1); }
     c.y += ch;
   });
   cNote(c, "기간마다 1위가 바뀌어요 — 한 가지에 몰지 않고 나눠 담는 이유예요.");
