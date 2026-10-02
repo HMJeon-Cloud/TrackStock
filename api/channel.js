@@ -3,6 +3,7 @@
 import { redisConf, getJsonGzText, KEY } from "./_redis.js";
 import { composeDaily } from "./_compose.js";
 import { loadTickerPairs } from "./_tickers.js";
+import { reqIsOwner } from "./_owner.js";
 
 export async function loadNames(origin) {
   const { pairs } = await loadTickerPairs(origin);
@@ -26,10 +27,11 @@ export async function buildDaily(origin) {
   return { ok: true, ...out, generated: recent.generated };
 }
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // 운영자 전용: 토큰이 없으면 내용 없이 거절 (CDN에도 남기지 않음)
+  if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
   const proto = req.headers["x-forwarded-proto"] || "https";
   const origin = proto + "://" + req.headers.host;
   const d = await buildDaily(origin);
-  res.setHeader("Cache-Control", d.ok ? "s-maxage=1800, stale-while-revalidate=3600" : "no-store");
+  res.setHeader("Cache-Control", d.ok ? "private, max-age=600" : "no-store");   // 운영자 전용이라 공용 캐시엔 두지 않음
   return res.status(200).json(d);
 }
