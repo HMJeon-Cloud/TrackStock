@@ -1,5 +1,5 @@
 // /api/poll — '투자 마음 테스트' 응답 집계 (개인 정보 없이 "어떤 보기가 몇 번"만 센다)
-//   기록: /api/poll?m=cash,fomo&s=good&b=news&f=buy&q=dip  → HINCRBY sm:mind (항목마다 1)
+//   기록: /api/poll?m=cash,fomo&s=good&b=news&f=buy&q=now&t=GSRT (t = 16유형 코드)  → HINCRBY sm:mind (항목마다 1)
 //   조회: /api/poll                                        → { total, counts } (CDN 10분 캐시)
 //   브라우저가 하루 한 번만 보내므로(클라이언트 제한) 명령 수는 응답 1건당 2~3회 수준이다.
 import { redisConf, redisCmd } from "./_redis.js";
@@ -11,12 +11,13 @@ const ALLOWED = {
   b: ["news", "rise", "friend", "dip", "leader", "study", "none"],
   f: ["buy", "hold", "sell", "panic"],
   q: ["now", "why", "drop", "others", "monthly", "diff", "tax"],
+  t: ["P", "G"].flatMap((x) => ["D", "S"].flatMap((y) => ["C", "R"].flatMap((z) => ["L", "T"].map((w) => x + y + z + w)))),
 };
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   const redis = redisConf();
-  const write = ["m", "s", "b", "f", "q"].some((k) => req.query[k]);
+  const write = ["m", "s", "b", "f", "q", "t"].some((k) => req.query[k]);
   if (!write) {
     res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=600");
     if (!redis) return res.status(200).json({ ok: false, total: 0, counts: {} });
