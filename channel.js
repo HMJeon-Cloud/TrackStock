@@ -30,7 +30,8 @@ function chLoadDaily(force) {
   return fetch("/api/channel" + (force ? "?r=" + Date.now() : ""), { headers: ownerHeaders() }).then(function (r) { return r.json(); }).then(function (d) {
     chState.daily = d;
     if (!d.ok) { box.innerHTML = '<div class="briefDim">아직 데이터가 없어요 (' + (d.reason || "") + '). 아침 수집 뒤에 생겨요.</div>'; return; }
-    box.innerHTML = '<pre class="chText" id="chDailyText"></pre>';
+    var first = d.text.split("\n").filter(Boolean).slice(0, 3).join("  ·  ");
+    box.innerHTML = '<details class="chFold"><summary>' + escapeHtml(first).slice(0, 120) + '… <span class="briefDim">(' + d.text.length + '자 · 펼쳐 보기)</span></summary><pre class="chText" id="chDailyText"></pre></details>';
     $("chDailyText").textContent = d.text;
     $("chDailyMeta").textContent = d.text.length + "자 · 데이터 " + kstFmt(d.generated) + " 수집 (한국 시간)";
   }).catch(function () { box.innerHTML = '<div class="briefDim">글을 불러오지 못했어요.</div>'; });
@@ -115,16 +116,20 @@ function chPickMdd() {
 }
 function chMddTable(rs, withWhy, id) {
   var ok = rs.filter(function (r) { return !r.err; });
-  return '<div class="tableWrap"><table' + (id ? ' id="' + id + '"' : '') + '><tr><th>종목</th><th>전고점 대비</th><th>고점 후</th><th>역대 순위</th><th>역대 최악</th><th>회복 중앙값</th></tr>' +
-    ok.map(function (r) {
-      return '<tr' + (withWhy && r.why ? ' class="chHasWhy"' : '') + '><td><b>' + r.name + '</b><div class="briefDim">' + r.sym + ' · ' + r.years.toFixed(0) + '년치</div></td>' +
+  return '<div class="tableWrap"><table class="chMddT"' + (id ? ' id="' + id + '"' : '') + '><tr><th>종목</th><th>고점比</th><th>역대</th><th>최악/회복</th></tr>' +
+    ok.map(function (r, i) {
+      return '<tr' + (r.group ? ' class="chGroupRow"' : '') + '><td><b>' + r.name + '</b>' + (r.why ? ' <button class="chInfo" data-why="' + escapeHtml(r.why) + '" title="선정 이유">ⓘ</button>' : '') +
+        '<div class="briefDim">' + r.sym + (r.cur > -0.005 ? " · 신고가 부근" : " · 고점 후 " + r.days + "일") + '</div></td>' +
         '<td style="color:' + (r.cur < -0.1 ? "var(--down)" : "var(--txt)") + ';font-weight:700">' + chPct(r.cur) + '</td>' +
-        '<td>' + (r.cur > -0.005 ? "신고가 부근" : r.days + "일") + '</td>' +
-        '<td>' + (r.cur <= -0.1 ? (r.deeper + 1) + "위 / " + r.eps + "회" : "10% 미만") + '</td>' +
-        '<td>' + chPct(r.worst) + '</td><td>' + (r.medRec != null ? r.medRec + "일" : "-") + '</td></tr>' +
-        (withWhy && r.why ? '<tr class="chWhyRow"><td colspan="6"><div class="chWhyTxt">💡 ' + r.why + '</div></td></tr>' : '');
+        '<td>' + (r.cur <= -0.1 ? (r.deeper + 1) + "위 / " + r.eps + "회" : '<span class="briefDim">10% 미만</span>') + '</td>' +
+        '<td>' + chPct(r.worst, 0) + (r.medRec != null ? ' <span class="briefDim">/ ' + r.medRec + '일</span>' : '') + '</td></tr>';
     }).join("") + '</table></div>' +
     (rs.length > ok.length ? '<div class="briefDim" style="margin-top:6px">데이터 부족: ' + rs.filter(function (r) { return r.err; }).map(function (r) { return r.sym; }).join(", ") + '</div>' : "");
+}
+function chBindInfo(root) {
+  Array.prototype.forEach.call(root.querySelectorAll(".chInfo"), function (b) {
+    b.onclick = function (e) { e.stopPropagation(); var d = document.createElement("div"); d.style.cssText = "font-size:14px;line-height:1.7"; d.textContent = b.getAttribute("data-why"); infoModal.open("💡 선정 이유", d); };
+  });
 }
 function chLoadMdd() {
   var box = $("chMdd"), picks = chPickMdd();
@@ -134,9 +139,14 @@ function chLoadMdd() {
     Promise.all(picks.map(function (p) { return chMddRow(p.sym, p.why); }))
   ]).then(function (arr) {
     chState.mdd = arr[0]; chState.mddPick = arr[1];
-    box.innerHTML = '<h4 class="chSub">대표 자산</h4>' + chMddTable(arr[0], false, "chMddTable") +
-      '<h4 class="chSub">🎯 지금 상황 맞춤 <small>오늘 데이터로 자동 선정 · 이유 포함</small></h4>' + chMddTable(arr[1], true, "chMddPick") +
-      '<div class="briefDim" style="margin-top:6px">역대 순위 = 10% 이상 하락 구간들 중 지금 낙폭이 몇 번째로 깊은지. 회복 중앙값 = 저점에서 전고점 회복까지 걸린 날의 중앙값.</div>';
+    // 대표 자산 + 맞춤 종목을 한 표로 (맞춤 종목은 ⓘ로 이유)
+    var seen = {}, rows = [];
+    arr[0].forEach(function (r) { if (!seen[r.sym]) { seen[r.sym] = 1; rows.push(r); } });
+    var picks = arr[1].filter(function (r) { if (seen[r.sym]) return false; seen[r.sym] = 1; return true; });
+    if (picks.length) { picks[0] = Object.assign({ group: true }, picks[0]); rows = rows.concat(picks); }
+    box.innerHTML = '<div class="briefDim" style="margin-bottom:6px">위 ' + arr[0].length + '개는 대표 자산, 아래 ' + picks.length + '개는 오늘 데이터로 고른 종목(ⓘ 이유) · 역대 순위 = 10%+ 하락 중 지금이 몇 번째로 깊은지 · 최악/회복 = 역대 최대 낙폭 / 회복까지 걸린 날(중앙값)</div>' +
+      chMddTable(rows, true, "chMddTable");
+    chBindInfo(box);
     if (typeof snapAttach === "function") snapAttach();
   });
 }
@@ -325,23 +335,13 @@ function chRenderAlloc() {
   }).filter(Boolean);
   chState.cmpLines = lines.map(function (l) { return l.replace(/<[^>]+>/g, ""); });
   $("chAlloc").innerHTML =
-    '<h4 class="chSub">대표 자산 <small>기간별 등락</small></h4><div class="tableWrap"><table><tr><th>자산</th>' + chPerHead() + '</tr>' +
-    chState.alloc.map(function (r) { return '<tr><td><b>' + r.name + '</b></td>' + r.per.map(chTd).join("") + '</tr>'; }).join("") + '</table></div>' +
-
     '<h4 class="chSub">🎯 지금 상황 맞춤 구성 <small>' + plan.title + '</small></h4>' +
     '<div class="chWhyBox">판단 근거: ' + why + '</div>' +
-    '<div class="tableWrap"><table id="chPlan"><tr><th>자산</th><th>비중</th>' + chPerHead() + '</tr>' +
-    plan.rows.map(function (it) {
-      return '<tr class="chHasWhy"><td><b>' + it.name + '</b><div class="briefDim">' + it.sym + '</div></td><td><b>' + it.w + '%</b></td>' + it.per.map(chTd).join("") + '</tr>' +
-        '<tr class="chWhyRow"><td colspan="' + (2 + P.length) + '"><div class="chWhyTxt">💡 ' + it.why + '</div></td></tr>';
-    }).join("") +
-    '<tr class="chPortRow"><td colspan="2"><b>이 구성</b></td>' + chPortCells(plan.port) + '</tr>' +
-    '<tr class="chPortRow sub"><td colspan="2">주식60/채권40<div class="chMix">SPY 60 · IEF 40</div></td>' + chPortCells(plan.b6040) + '</tr>' +
-    '<tr class="chPortRow sub"><td colspan="2">S&P500 100%<div class="chMix">SPY 100</div></td>' + chPortCells(plan.spy) + '</tr>' +
-    '</table></div>' +
+    '<div class="chPlanList">' + plan.rows.map(function (it) {
+      return '<div class="chPlanItem"><div class="chPlanTop"><b>' + it.name + '</b> <span class="briefDim">' + it.sym + '</span><b class="chPlanW">' + it.w + '%</b></div><div class="chPlanWhy">' + it.why + '</div></div>';
+    }).join("") + '</div>' +
 
-    '<h4 class="chSub">⚖️ 6가지 구성 비교 <small>같은 기간에 각 구성으로 샀다면 · 수익률 / 그 사이 최대 낙폭</small></h4>' +
-    '<div class="briefDim" style="margin-bottom:6px">구성 아래 숫자는 비중(%) · ' + CH_LEGEND + '</div>' +
+    '<h4 class="chSub">⚖️ 이 구성을 다른 구성과 비교하면 <small>같은 기간에 샀다면 · 수익률 / 최대 낙폭</small></h4>' +
     '<div class="tableWrap"><table id="chCmp"><tr><th>구성</th>' + chPerHead() + '</tr>' +
     chState.cmp.map(function (c) {
       return '<tr' + (c.key === plan.key ? ' class="chCur"' : '') + '><td><b>' + c.label + '</b>' + (c.key === plan.key ? ' <span class="chNowBadge">지금</span>' : '') +
@@ -351,8 +351,10 @@ function chRenderAlloc() {
     '<tr class="chPortRow sub"><td>S&P500 100%<div class="chMix">SPY 100</div></td>' + chPortCells(plan.spy) + '</tr>' +
     '</table></div>' +
     '<ul class="chCmpSum">' + lines.join("") + '</ul>' +
-    '<div class="chWhyBox" style="margin-top:8px">💬 <b>\'지금\' 표시가 1위가 아닌 이유</b> — 이 표는 <b>지난</b> 3개월~3년 동안 각 구성을 들고 있었다면 어땠을지를 보여줘요. \'지금\' 구성은 오늘의 신호(금리·공포·유가·달러)를 보고 <b>앞으로</b>를 대비해 고른 것이라, 지난 기간 성적과 순위가 다를 수 있어요. 지난 기간 1위를 따라가면 이미 오른 자산을 뒤늦게 사는 셈이 되기 쉬워요.</div>' +
-    '<div class="briefDim" style="margin-top:6px">짧은 기간 1위와 긴 기간 1위가 다르다면, 그게 "상황에 맞춰 비중을 조절하는 이유"이자 "한 구성에 다 걸지 않는 이유"예요. 수익만 보지 말고 최대 낙폭(버틸 수 있는 하락인지)을 같이 보세요. 처음 비중으로 사서 그대로 둔 기준이며, 상황 규칙에 따라 고른 <b>예시</b>이지 추천이 아니에요.</div>';
+    '<details class="chFold"><summary>💬 \'지금\' 표시가 1위가 아닌 이유 · 표 읽는 법 · 약어</summary><div class="chFoldBody">' +
+    '이 표는 <b>지난</b> 3개월~3년 동안 각 구성을 들고 있었다면 어땠을지예요. \'지금\' 구성은 오늘의 신호(금리·공포·유가·달러)를 보고 <b>앞으로</b>를 대비해 고른 것이라 지난 성적과 순위가 다를 수 있어요. 지난 1위를 따라가면 이미 오른 자산을 뒤늦게 사는 셈이 되기 쉬워요.<br>' +
+    '짧은 기간 1위와 긴 기간 1위가 다르다면 그게 "상황에 맞춰 비중을 조절하는 이유"이자 "한 구성에 다 걸지 않는 이유"예요. 수익만 보지 말고 최대 낙폭(버틸 수 있는 하락인지)을 같이 보세요. 처음 비중으로 사서 그대로 둔 기준이며 <b>예시</b>이지 추천이 아니에요.<br>' +
+    '<span class="briefDim">구성 아래 숫자는 비중(%) · ' + CH_LEGEND + '</span></div></details>';
 }
 function chAllocText() {
   var rs = chState.alloc || [], plan = chState.plan; if (!rs.length) return "";
@@ -475,19 +477,23 @@ function chCells(list) {
 function chRenderScenarios() {
   var scen = chState.scen || [], now = chState.now || { why: [] };
   var html = '<div class="chNowBox"><b>지금 시장</b> ' + (now.why.length ? now.why.map(function (w) { return '<span class="chNowTag">' + w + '</span>'; }).join("") : '<span class="briefDim">특별히 두드러진 신호 없음 — 평소 구간</span>') + '</div>';
-  html += scen.map(function (sc) {
-    return '<div class="chScen' + (sc.now ? " now" : "") + '">' +
-      '<div class="chScenHead"><span>' + sc.icon + '</span><b>' + sc.tag + '</b>' + (sc.now ? '<span class="chNowBadge">지금과 비슷</span>' : '') + '</div>' +
+  // 지금과 비슷한 상황만 펼치고 나머지는 접음. 에피소드는 한 줄 요약(버틴/빠진) + '자세히'
+  html += scen.map(function (sc, si) {
+    var open = sc.now || (si === 0 && !scen.some(function (x) { return x.now; }));
+    return '<details class="chScen' + (sc.now ? " now" : "") + '"' + (open ? ' open' : '') + '>' +
+      '<summary class="chScenHead"><span>' + sc.icon + '</span><b>' + sc.tag + '</b>' + (sc.now ? '<span class="chNowBadge">지금과 비슷</span>' : '') + '<small class="briefDim">사례 ' + sc.eps.length + '개</small></summary>' +
       '<div class="chScenLesson">' + sc.lesson + '</div>' +
       sc.eps.map(function (ep) {
-        return '<div class="chEp"><div class="chEpHead">' + ep.name + ' <small>' + ep.s.replace(/-/g, ".") + ' ~ ' + ep.e.replace(/-/g, ".") + '</small></div>' +
+        return '<div class="chEp"><div class="chEpHead">' + ep.name + ' <small>' + ep.s.replace(/-/g, ".") + ' ~ ' + ep.e.slice(2).replace(/-/g, ".") + '</small></div>' +
+          '<div class="chEpNote">🛡 버틴 <b>' + ep.best.name + ' ' + chPct(ep.best.ret, 0) + '</b> · 💥 빠진 <b>' + ep.worst.name + ' ' + chPct(ep.worst.ret, 0) + '</b>' +
+          (ep.pop.length ? ' · 🔥 ' + ep.pop.slice(0, 2).map(function (x) { return x.name + ' ' + chPct(x.ret, 0); }).join(", ") : '') + '</div>' +
+          '<details class="chEpMore"><summary>자세히 — 자산 ' + (ep.st.length + ep.pop.length) + '개 · 그 뒤 1년 · 회복 기간</summary>' +
           '<div class="chGroup">대표 자산</div>' + chCells(ep.st) +
           (ep.pop.length ? '<div class="chGroup">🔥 지금 인기 자산은 그때</div>' + chCells(ep.pop) : '') +
-          '<div class="chEpNote">🛡 가장 버틴 <b>' + ep.best.name + ' ' + chPct(ep.best.ret, 0) + '</b> · 💥 가장 빠진 <b>' + ep.worst.name + ' ' + chPct(ep.worst.ret, 0) + '</b>' +
-          (ep.worst.fwd != null && ep.best.fwd != null ? '<br>↻ 끝난 시점에 버틴 자산을 팔아 빠진 자산을 샀다면, 1년 뒤 ' + ep.worst.name + ' <b>' + chPct(ep.worst.fwd, 0) + '</b> vs 그대로 둔 ' + ep.best.name + ' <b>' + chPct(ep.best.fwd, 0) + '</b>' : '') + '</div>' +
+          (ep.worst.fwd != null && ep.best.fwd != null ? '<div class="chEpNote">↻ 끝난 시점에 버틴 자산을 팔아 빠진 자산을 샀다면, 1년 뒤 ' + ep.worst.name + ' <b>' + chPct(ep.worst.fwd, 0) + '</b> vs 그대로 둔 ' + ep.best.name + ' <b>' + chPct(ep.best.fwd, 0) + '</b></div>' : '') +
           (ep.pop.length ? '<div class="chEpNote">🧠 ' + ep.pop.map(function (x) { return x.name + ' 최대 ' + chPct(x.dd, 0) + ' → ' + chFmtRec(x); }).join(" · ") + '</div>' : '') +
-          '</div>';
-      }).join("") + '</div>';
+          '</details></div>';
+      }).join("") + '</details>';
   }).join("");
   html += '<div class="noteLine" style="margin-top:10px">⚠️ 과거 사례예요. 같은 상황에서 같은 결과가 나온다는 보장은 없어요. 2배·3배 레버리지 상품은 하락 폭이 더 크고, 오르내림을 반복하면 지수가 제자리여도 손실이 쌓여요(변동성 손실) — 회복용으로 쓸 땐 비중과 기간을 더 보수적으로 잡으세요.</div>';
   $("chScen").innerHTML = html;
