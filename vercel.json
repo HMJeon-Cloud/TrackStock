@@ -1,9 +1,21 @@
 {
   "crons": [
-    { "path": "/api/cron-snapshot", "schedule": "30 22 * * *" },
-    { "path": "/api/cron-snapshot", "schedule": "30 23 * * *" }
+    {
+      "path": "/api/cron-snapshot",
+      "schedule": "30 22 * * *"
+    },
+    {
+      "path": "/api/cron-snapshot",
+      "schedule": "30 23 * * *"
+    }
   ],
   "functions": {
-    "api/cron-snapshot.js": { "maxDuration": 60 }
+    "api/cron-snapshot.js": {
+      "maxDuration": 60,
+      "includeFiles": "tickers.js"
+    },
+    "api/channel.js": {
+      "includeFiles": "tickers.js"
+    }
   }
 }
