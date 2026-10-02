@@ -1658,6 +1658,11 @@
     <p class="heroSub">과거 데이터로 "얼마나 떨어지고, 얼마 만에 회복했는지" 쉽게 보여드려요</p>
   </section>
   <div class="startCards">
+    <button class="startCard" id="startMind">
+      <span class="startIcon" style="background:#fff8e6">💛</span>
+      <span class="startText"><b>투자 유형 테스트</b><small>16가지 중 나는? · 질문 12개 · 2분</small></span>
+      <span class="startArrow">›</span>
+    </button>
     <button class="startCard" id="startGuide">
       <span class="startIcon" style="background:#e8f3ff">🧭</span>
       <span class="startText"><b>나에게 맞는 투자법 찾기</b><small>질문 4개면 충분해요</small></span>
@@ -1666,11 +1671,6 @@
     <button class="startCard" id="startBrowse">
       <span class="startIcon" style="background:#fff4e6">🔍</span>
       <span class="startText"><b>종목 둘러보기</b><small>삼성전자·S&amp;P500의 지난 기록 보기</small></span>
-      <span class="startArrow">›</span>
-    </button>
-    <button class="startCard" id="startMind">
-      <span class="startIcon" style="background:#fff8e6">💛</span>
-      <span class="startText"><b>투자 유형 테스트</b><small>16가지 중 나는? · 질문 12개 · 2분</small></span>
       <span class="startArrow">›</span>
     </button>
     <button class="startCard ownerOnly" id="startChannel">
@@ -1843,7 +1843,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v7.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v7.8<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1857,7 +1857,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script src="tickers.js?v=7.6"></script>
+<script src="tickers.js?v=7.8"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -3530,10 +3530,12 @@ function ownerUnlockDialog() {
   function go() {
     msg.textContent = "확인 중…";
     fetch("/api/owner", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: inp.value.trim() }) })
-      .then(function (r) { return r.json(); }).then(function (j) {
+      .then(function (r) {
+        return r.json().catch(function () { throw new Error(r.status === 404 ? "404 — 서버에 api/owner.js 파일이 없어요 (api 폴더에 owner.js·_owner.js 업로드 필요)" : "서버 응답 " + r.status); });
+      }).then(function (j) {
         if (j.ok && j.token) { ownerSet(j.token); msg.textContent = "✓ 운영자 모드가 켜졌어요."; setTimeout(function () { infoModal.close && infoModal.close(); navTo("channel"); }, 600); }
         else msg.textContent = j.reason === "NO_KEY" ? "서버에 운영자 키(OWNER_KEY 또는 CRON_SECRET)가 설정되어 있지 않아요." : "키가 맞지 않아요.";
-      }).catch(function () { msg.textContent = "지금은 확인할 수 없어요."; });
+      }).catch(function (e) { msg.textContent = "확인할 수 없어요: " + (e && e.message && /\d{3}/.test(e.message) ? e.message : "인터넷 연결 또는 배포 상태를 확인해 주세요"); });
   }
   box.querySelector("#ownerKeyGo").onclick = go;
   inp.onkeydown = function (e) { if (e.key === "Enter") go(); };
@@ -4206,19 +4208,19 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=7.6"></script>
-<script src="technical.js?v=7.6"></script>
-<script src="company.js?v=7.6"></script>
-<script src="compare.js?v=7.6"></script>
-<script src="sim.js?v=7.6"></script>
-<script src="insight.js?v=7.6"></script>
-<script src="guide.js?v=7.6"></script>
-<script src="watch.js?v=7.6"></script>
-<script src="holdings.js?v=7.6"></script>
-<script src="brief.js?v=7.6"></script>
-<script src="channel.js?v=7.6"></script>
-<script src="cards.js?v=7.6"></script>
-<script src="mind.js?v=7.6"></script>
-<script src="snapshot.js?v=7.6"></script>
+<script src="metrics.js?v=7.8"></script>
+<script src="technical.js?v=7.8"></script>
+<script src="company.js?v=7.8"></script>
+<script src="compare.js?v=7.8"></script>
+<script src="sim.js?v=7.8"></script>
+<script src="insight.js?v=7.8"></script>
+<script src="guide.js?v=7.8"></script>
+<script src="watch.js?v=7.8"></script>
+<script src="holdings.js?v=7.8"></script>
+<script src="brief.js?v=7.8"></script>
+<script src="channel.js?v=7.8"></script>
+<script src="cards.js?v=7.8"></script>
+<script src="mind.js?v=7.8"></script>
+<script src="snapshot.js?v=7.8"></script>
 </body>
 </html>
