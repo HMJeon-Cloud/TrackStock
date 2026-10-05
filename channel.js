@@ -552,7 +552,8 @@ function renderChannel() {
   }).then(function () {
     chRenderQuality();
     if (typeof issuesForChannel === "function") try { issuesForChannel(); } catch (e) { console.warn(e); }
+    if (typeof pubRender === "function") try { pubRender(); } catch (e) { console.warn(e); }
     return Promise.all([chLoadAlloc(), chLoadMdd()]);
-  }).then(function () { if (typeof issuesForChannel === "function") try { issuesForChannel(); } catch (e) { console.warn(e); } })   // MDD·시장 신호 반영해 다시
+  }).then(function () { if (typeof issuesForChannel === "function") try { issuesForChannel(); } catch (e) { console.warn(e); } if (typeof pubRender === "function") try { pubRender(); } catch (e) { console.warn(e); } })   // MDD·시장 신호 반영해 다시
     .then(chLoadScenarios).then(chUpdateCount);
 }
