@@ -217,14 +217,24 @@ if (typeof CARD_TIP !== "undefined") CARD_TIP.term = ["이 시리즈를 보는 �
 var pubState = { tab: "plan", termOffset: 0 };
 function pubRender() {
   var box = $("pubBox"); if (!box) return;
-  var tabs = [["plan", "오늘 뭐 올리지"], ["caption", "캡션"], ["cal", "이번 주 일정"], ["term", "용어 한 입"]];
+  var tabs = [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["topics", "주제 은행"], ["caption", "캡션"], ["cal", "이번 주 일정"], ["term", "용어 한 입"]];
   var h = '<div class="pills" style="margin-bottom:10px">' + tabs.map(function (t) { return '<button data-pt="' + t[0] + '"' + (t[0] === pubState.tab ? ' class="active"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div>';
   if (pubState.tab === "plan") {
-    var ck = pubChecklist(), pl = pubPlan();
+    var ck = pubChecklist(), pl = pubPlan(), today = typeof perToday === "function" ? perToday() : [];
+    if (today.length) h += '<div class="perToday">' + today.map(function (k) { var S = PER_SETS[k]; return '<div class="pubPlanItem per"><div><b>' + S.t + ' 올리는 날</b><small>' + S.when + ' 정기 세트 · 카드 ' + (k === "weekReview" || k === "monthReview" ? 7 : 5) + '장 + 캡션</small></div><button class="primary" data-per="' + k + '">🃏 세트 만들기</button></div>'; }).join("") + '</div>';
     h += '<div class="pubCk">' + ck.map(function (c) { return '<div class="pubCkRow ' + (c.ok ? "ok" : c.w ? "bad" : "warn") + '"><span>' + (c.ok ? "✅" : c.w ? "⛔" : "⚠️") + '</span><span>' + escapeHtml(c.t) + '</span></div>'; }).join("") + '</div>';
     h += '<h4 class="chSub">' + pl.dow + '요일 추천 세트' + (pl.why.length ? ' <small>오늘 신호: ' + pl.why.join(" · ") + '</small>' : '') + '</h4>';
     h += '<div class="pubPlan">' + pl.plan.map(function (p) { return '<div class="pubPlanItem"><div><b>' + p.t + '</b><small>' + p.d + '</small></div><button class="chip" data-make="' + p.kind + '" data-pick="' + (p.pick || "") + '">🃏 만들기</button></div>'; }).join("") + '</div>';
     h += '<div class="briefDim" style="margin-top:8px">권장 리듬: 인스타 캐러셀 주 3~4회(핵심 이슈 5 + 그날 1~2장) · 스레드 매일 1개(캡션 탭의 500자 버전) · 용어 카드는 저장용으로 매일 또는 격일</div>';
+  } else if (pubState.tab === "per") {
+    var td = typeof perToday === "function" ? perToday() : [];
+    h += '<div class="briefDim" style="margin-bottom:8px">매일은 "오늘 뭐 올리지" 탭(전일 이슈 정리). 아래 4종은 요일·날짜에 맞춰 올리되, 언제든 만들 수 있어요. 기간 숫자는 최근 5거래일(주) / 21거래일(월) 기준이에요.</div>';
+    var perRows = [{ when: "매일 아침", t: "📰 전일 이슈 정리", cards: "핵심 이슈 5 · 시장 온도 · 자금 흐름 · 급등락 · 돈이 몰린 곳 · 숫자 · 심리 온도계 (8장)", make: "brief" }].concat(Object.keys(PER_SETS).map(function (k) { var S = PER_SETS[k]; return { k: k, when: S.when, t: S.t, now: td.indexOf(k) >= 0, cards: { weekReview: "핵심 이슈 5 · 자산 성적표 · 테마 · 급등락 · 가장 큰 하루/VIX · 숫자 · 돈이 몰린 곳 (7장)", weekPreview: "이번 주 일정 · 볼 것 3~4가지 · 지난주 흐름 이어질까 · 적립 체크 · 용어 (5장)", monthReview: "핵심 이슈 5 · 자산 성적표 · 테마 · 급등락 · 가장 큰 하루/VIX · 숫자 · 돈이 몰린 곳 + 과거 같은 달 (7장)", monthPreview: "이달 일정 · 과거 같은 달 계절성 · 역사 속 이달 · 지난달 요약→이달 볼 것 · 적립 계획 (5장)" }[k] }; }));
+    h += '<div class="perCal">' + perRows.map(function (r) { return '<div class="perRow' + (r.now ? ' now' : '') + '"><div class="perWhen">' + r.when + (r.now ? ' <b>← 오늘</b>' : '') + '</div><div class="perBody"><b>' + r.t + '</b><small>' + r.cards + '</small></div>' + (r.k ? '<button class="chip" data-per="' + r.k + '">🃏 만들기</button>' : '<button class="chip" data-make="brief">🃏 만들기</button>') + '</div>'; }).join("") + '</div>';
+    h += '<div class="briefDim" style="margin-top:8px">월간 세트는 S&P500·코스피·금·비트코인 10년치를 처음 한 번 불러와서 몇 초 걸릴 수 있어요. 예상 세트는 "무엇을 볼지"만 담고 방향 예측은 하지 않아요(채널 원칙).</div>';
+  } else if (pubState.tab === "topics") {
+    h += '<div class="briefDim" style="margin-bottom:8px">카드로 바로 만들 수 있는 주제와, 손으로 보충하면 좋은 주제(수동)를 리듬별로 모았어요. 소재가 떠오르지 않는 날 펼쳐 보세요.</div>';
+    h += PER_TOPICS.map(function (g, i) { return '<details class="chFold"' + (i === 0 ? ' open' : '') + '><summary>' + g.when + ' <small class="briefDim">' + g.items.length + '개</small></summary><ul class="perTopics">' + g.items.map(function (t) { return '<li>' + escapeHtml(t) + '</li>'; }).join("") + '</ul></details>'; }).join("");
   } else if (pubState.tab === "caption") {
     var cap = pubCaption();
     h += (cap.warn.length ? '<div class="chWhyBox">⚠️ ' + cap.warn.join(" / ") + '</div>' : '') +
@@ -244,6 +254,7 @@ function pubRender() {
   }
   box.innerHTML = h;
   Array.prototype.forEach.call(box.querySelectorAll("[data-pt]"), function (b) { b.onclick = function () { pubState.tab = b.getAttribute("data-pt"); pubRender(); }; });
+  Array.prototype.forEach.call(box.querySelectorAll("[data-per]"), function (b) { b.onclick = function () { perOpen(b.getAttribute("data-per")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-term]"), function (b) { b.onclick = function () { pubState.termOffset += +b.getAttribute("data-term"); pubRender(); }; });
   if ($("pubIg")) { var cap2 = pubCaption(); $("pubIg").textContent = cap2.ig; $("pubTh").textContent = cap2.th; }
   Array.prototype.forEach.call(box.querySelectorAll("[data-copy]"), function (b) {

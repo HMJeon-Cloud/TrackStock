@@ -14,17 +14,20 @@ var ISS_MACRO = [
 var ISS_MKT = { fx: ["all", "kr", "us", "coin"], vix: ["all", "us"], rate: ["all", "us"], gold: ["all", "us"], oil: ["all", "us"], btc: ["all", "coin"] };
 
 function issPct(x, d) { return (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 1 : d) + "%"; }
-function issZ(s) { return s && s.sd > 0 ? Math.abs(s.ret1) / s.sd : 0; }
-function issTimes(z) { return z >= 1.5 ? " · 평소 하루 변동의 " + z.toFixed(1) + "배" : ""; }
+/* 기간: day(하루) · week(5거래일) · month(21거래일) — ISS_MODE에 따라 등락과 "평소 변동폭" 기준이 바뀐다 */
+var ISS_MODE = "day", ISS_BACK = { day: 1, week: 5, month: 21 }, ISS_LBL = { day: "오늘", week: "이번 주", month: "이번 달" };
+function issRet(s) { return ISS_MODE === "day" ? s.ret1 : s.ret; }
+function issZ(s) { return s && s.sd > 0 ? Math.abs(issRet(s)) / (s.sd * Math.sqrt(ISS_BACK[ISS_MODE])) : 0; }
+function issTimes(z) { return z >= 1.5 ? " · 평소 " + (ISS_MODE === "day" ? "하루" : ISS_MODE === "week" ? "한 주" : "한 달") + " 변동의 " + z.toFixed(1) + "배" : ""; }
 function issAdj(z) { return z >= 2.5 ? "급" : z >= 1.5 ? "큰 폭 " : ""; }
 
 /* 후보 만들기 → 점수순 정렬 → 종류별 상한을 지키며 5개 */
 function issuesCompute(recent, opt) {
   opt = opt || {};
   if (!recent || !recent.symbols) return [];
-  var market = opt.market || "all";
-  var R = briefCompute(recent, { mode: "day", market: market, popular: opt.popular });
-  function st(sym) { var d = recent.symbols[sym]; if (!d) return null; var s = briefStats(sym, d, "day"); return s && !(R.quality && R.quality.bad[sym]) ? s : null; }
+  var market = opt.market || "all"; ISS_MODE = opt.mode === "week" || opt.mode === "month" ? opt.mode : "day";
+  var R = briefCompute(recent, { mode: ISS_MODE, market: market, popular: opt.popular });
+  function st(sym) { var d = recent.symbols[sym]; if (!d) return null; var s = briefStats(sym, d, ISS_MODE); return s && !(R.quality && R.quality.bad[sym]) ? s : null; }
   var C = [];
   // ① 증시 (미국·한국 각각 한 줄)
   ["us", "kr"].forEach(function (reg) {
@@ -32,20 +35,20 @@ function issuesCompute(recent, opt) {
     var a = ISS_INDEX[reg].map(function (p) { var s = st(p[0]); return s ? { p: p, s: s, z: issZ(s) } : null; }).filter(Boolean);
     if (!a.length) return;
     a.sort(function (x, y) { return y.z - x.z; });
-    var m = a[0], other = a[1], up = m.s.ret1 >= 0;
+    var m = a[0], other = a[1], up = issRet(m.s) >= 0;
     C.push({ cat: "idx-" + reg, emoji: up ? "📈" : "📉", score: m.z * 1.25 + 0.3,
-      title: (reg === "us" ? "미국" : "한국") + " 증시 " + issAdj(m.z) + (up ? "상승" : "하락") + " — " + m.p[1] + " " + issPct(m.s.ret1),
-      sub: (other ? other.p[1] + " " + issPct(other.s.ret1) : "") + issTimes(m.z), sym: m.p[0] });
+      title: (reg === "us" ? "미국" : "한국") + " 증시 " + issAdj(m.z) + (up ? "상승" : "하락") + " — " + m.p[1] + " " + issPct(issRet(m.s)),
+      sub: (other ? other.p[1] + " " + issPct(issRet(other.s)) : "") + issTimes(m.z), sym: m.p[0] });
   });
   // ② 거시 지표
   ISS_MACRO.forEach(function (x) {
     if (ISS_MKT[x[1]].indexOf(market) < 0) return;
     var s = st(x[0]); if (!s) return;
-    var z = issZ(s), up = s.ret1 >= 0, t, sub;
-    if (x[1] === "fx") { t = "원/달러 환율 " + Math.round(s.last).toLocaleString() + "원 (" + issPct(s.ret1) + ")"; sub = (up ? "달러 강세 — 해외 자산의 원화 가치는 올라요" : "달러 약세 — 해외 자산의 원화 수익은 줄어요") + issTimes(z); }
-    else if (x[1] === "vix") { var v = s.last; z = Math.max(z, v >= 30 ? 3 : v >= 25 ? 2.2 : v >= 20 ? 1.2 : v < 13 ? 1 : 0.4); t = "공포지수 VIX " + v.toFixed(1) + " — " + (v >= 30 ? "공포 구간" : v >= 20 ? "불안 구간" : v < 13 ? "아주 평온" : "평온"); sub = "하루 " + issPct(s.ret1) + (v >= 25 ? " · 과거엔 이런 때 저점 근처였던 적이 많았지만, 바닥은 지나서야 알 수 있어요" : ""); }
-    else if (x[1] === "rate") { t = "미국 장기채 " + issPct(s.ret1) + " → 금리 " + (up ? "하락" : "상승"); sub = (up ? "채권값이 오르면 금리는 내려요 — 성장주에 우호적" : "채권값이 내리면 금리는 올라요 — 성장주엔 부담") + issTimes(z); }
-    else { t = x[3] + " " + issPct(s.ret1) + " (" + cPrice(x[0], s.last) + ")"; sub = (z >= 1.5 ? "평소 하루 변동의 " + z.toFixed(1) + "배" : "52주 최고 대비 " + (s.vsHi != null ? issPct(s.vsHi, 0) : "-")); }
+    var z = issZ(s), up = issRet(s) >= 0, t, sub;
+    if (x[1] === "fx") { t = "원/달러 환율 " + Math.round(s.last).toLocaleString() + "원 (" + issPct(issRet(s)) + ")"; sub = (up ? "달러 강세 — 해외 자산의 원화 가치는 올라요" : "달러 약세 — 해외 자산의 원화 수익은 줄어요") + issTimes(z); }
+    else if (x[1] === "vix") { var v = s.last; z = Math.max(z, v >= 30 ? 3 : v >= 25 ? 2.2 : v >= 20 ? 1.2 : v < 13 ? 1 : 0.4); t = "공포지수 VIX " + v.toFixed(1) + " — " + (v >= 30 ? "공포 구간" : v >= 20 ? "불안 구간" : v < 13 ? "아주 평온" : "평온"); sub = "하루 " + issPct(issRet(s)) + (v >= 25 ? " · 과거엔 이런 때 저점 근처였던 적이 많았지만, 바닥은 지나서야 알 수 있어요" : ""); }
+    else if (x[1] === "rate") { t = "미국 장기채 " + issPct(issRet(s)) + " → 금리 " + (up ? "하락" : "상승"); sub = (up ? "채권값이 오르면 금리는 내려요 — 성장주에 우호적" : "채권값이 내리면 금리는 올라요 — 성장주엔 부담") + issTimes(z); }
+    else { t = x[3] + " " + issPct(issRet(s)) + " (" + cPrice(x[0], s.last) + ")"; sub = (z >= 1.5 ? "평소 하루 변동의 " + z.toFixed(1) + "배" : "52주 최고 대비 " + (s.vsHi != null ? issPct(s.vsHi, 0) : "-")); }
     C.push({ cat: x[1], emoji: x[2], score: z, title: t, sub: sub, sym: x[0] });
   });
   // ③ 오른 종목 비율 (시장 전체가 같이 움직였나)
@@ -62,15 +65,15 @@ function issuesCompute(recent, opt) {
   }
   // ⑤ 급등·급락 종목 (개별 종목만, 평소 변동 대비)
   var mv = (R.movers.up || []).concat(R.movers.down || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym) && (typeof classifySymbol !== "function" || classifySymbol(s.sym) === "us" || classifySymbol(s.sym) === "kr") && !/^(069500|360750|133690|122630|114800|132030)\.KS$/.test(s.sym); });   // ETF·지수 제외
-  mv.sort(function (a, b) { return Math.abs(b.ret1) * (1 + Math.min(issZ(b), 6) / 6) - Math.abs(a.ret1) * (1 + Math.min(issZ(a), 6) / 6); });
+  mv.sort(function (a, b) { return Math.abs(issRet(b)) * (1 + Math.min(issZ(b), 6) / 6) - Math.abs(issRet(a)) * (1 + Math.min(issZ(a), 6) / 6); });
   mv.slice(0, 3).forEach(function (s) {
     var z = issZ(s);
-    C.push({ cat: "mover", emoji: s.ret1 >= 0 ? "🚀" : "🔻", score: Math.min(z, 6) * 0.55 + Math.abs(s.ret1) * 12,
-      title: briefName(s) + " " + issPct(s.ret1) + " " + (s.ret1 >= 0 ? "급등" : "급락"), sub: cPrice(s.sym, s.last) + issTimes(z) + (s.amtX >= 1.5 ? " · 거래대금 평소의 " + s.amtX.toFixed(1) + "배" : ""), sym: s.sym });
+    C.push({ cat: "mover", emoji: issRet(s) >= 0 ? "🚀" : "🔻", score: Math.min(z, 6) * 0.55 + Math.abs(issRet(s)) * 12,
+      title: briefName(s) + " " + issPct(issRet(s)) + " " + (issRet(s) >= 0 ? "급등" : "급락"), sub: cPrice(s.sym, s.last) + issTimes(z) + (s.amtX >= 1.5 ? " · 거래대금 평소의 " + s.amtX.toFixed(1) + "배" : ""), sym: s.sym });
   });
   // ⑥ 돈이 몰린 곳 (거래대금 급증)
   var hv = (R.hotVol || [])[0];
-  if (hv) C.push({ cat: "hot", emoji: "💰", score: Math.min(hv.amtX, 8) * 0.6, title: briefName(hv) + "에 돈이 몰렸어요 — 거래대금 평소의 " + hv.amtX.toFixed(1) + "배", sub: "주가 " + issPct(hv.ret1) + " · " + cPrice(hv.sym, hv.last), sym: hv.sym });
+  if (hv) C.push({ cat: "hot", emoji: "💰", score: Math.min(hv.amtX, 8) * 0.6, title: briefName(hv) + "에 돈이 몰렸어요 — 거래대금 평소의 " + hv.amtX.toFixed(1) + "배", sub: "주가 " + issPct(issRet(hv)) + " · " + cPrice(hv.sym, hv.last), sym: hv.sym });
   // ⑦ 채널 전용: 깊은 하락(MDD)·시장 신호
   (opt.mdd || []).forEach(function (r) {
     if (!r || r.err || r.cur > -0.15) return;
@@ -89,14 +92,14 @@ function issuesCompute(recent, opt) {
     if (c.sym && syms[c.sym]) return;
     used[k]++; if (c.sym) syms[c.sym] = 1; out.push(c);
   });
-  out.asOf = R.market === "kr" ? R.asOfKr : (R.asOfUs || R.asOf);
+  out.asOf = R.market === "kr" ? R.asOfKr : (R.asOfUs || R.asOf); out.mode = ISS_MODE;
   out.market = R.market; out.mktName = R.mktName;
   return out;
 }
 
 function issuesText(list) {
   var d = typeof cDate === "function" ? cDate(list.asOf) : "";
-  return "📌 오늘의 핵심 이슈 5" + (list.market && list.market !== "all" ? " (" + list.mktName + ")" : "") + " — " + d + "\n\n" +
+  return "📌 " + (ISS_LBL[list.mode] || "오늘") + "의 핵심 이슈 5" + (list.market && list.market !== "all" ? " (" + list.mktName + ")" : "") + " — " + d + "\n\n" +
     list.map(function (it, i) { return (i + 1) + ". " + it.emoji + " " + it.title + "\n   " + it.sub; }).join("\n") +
     "\n\n※ 종가 기준 자동 집계 · 평소 대비 이례적인 순 · 투자 조언 아님\n@uphill.lab";
 }
@@ -105,7 +108,7 @@ function issuesText(list) {
 function issuesRender(boxId, list) {
   var box = $(boxId); if (!box) return;
   if (!list || !list.length) { box.innerHTML = ""; return; }
-  box.innerHTML = '<div class="issHead"><b>📌 오늘의 핵심 이슈 5</b><small>' + (list.market && list.market !== "all" ? list.mktName + " · " : "") + '자료 전체에서 평소보다 이례적인 순</small>' +
+  box.innerHTML = '<div class="issHead"><b>📌 ' + (ISS_LBL[list.mode] || "오늘") + '의 핵심 이슈 5</b><small>' + (list.market && list.market !== "all" ? list.mktName + " · " : "") + '자료 전체에서 평소보다 이례적인 순</small>' +
     '<span class="issBtns"><button class="chip" data-act="copy">📋 복사</button><button class="chip" data-act="card">🃏 카드</button></span></div>' +
     '<ol class="issList">' + list.map(function (it, i) {
       return '<li><span class="issNo">' + (i + 1) + '</span><span class="issEmo">' + it.emoji + '</span><div><b>' + escapeHtml(it.title) + '</b><small>' + escapeHtml(it.sub) + '</small></div>' +
@@ -126,7 +129,8 @@ function issCopy(text, btn) {
 function issuesCard(list, page, total) {
   var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2;
   var mk = list.market && list.market !== "all" ? list.mktName + " · " : "";
-  cHead(c, "TODAY'S TOP 5 · " + mk + cDate(list.asOf), "오늘의 핵심 이슈 [[5]]", "자료 전체에서 평소보다 이례적인 움직임 순", page || 0, total || 0);
+  var lbl = ISS_LBL[list.mode] || "오늘", tag = list.mode === "week" ? "WEEKLY TOP 5" : list.mode === "month" ? "MONTHLY TOP 5" : "TODAY'S TOP 5";
+  cHead(c, tag + " · " + mk + cDate(list.asOf), lbl + "의 핵심 이슈 [[5]]", "자료 전체에서 평소보다 이례적인 움직임 순", page || 0, total || 0);
   var per = Math.min(150, Math.floor((CARD.H - 110 - c.y) / list.length));
   list.forEach(function (it, i) {
     var y = c.y, bh = per - 12, mid = y + bh / 2;
@@ -158,7 +162,7 @@ function issuesCardOpen(list) {
     box.querySelector('[data-act="save"]').onclick = function () { var l = document.createElement("a"); l.href = url; l.download = file; document.body.appendChild(l); l.click(); l.remove(); };
     var sh = box.querySelector('[data-act="share"]');
     if (sh) sh.onclick = function () { cv.toBlob(function (b) { var f = new File([b], file, { type: "image/png" }); if (navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(function () {}); }); };
-    infoModal.open("📌 오늘의 핵심 이슈 5", box);
+    infoModal.open("📌 " + (ISS_LBL[list.mode] || "오늘") + "의 핵심 이슈 5", box);
   });
 }
 

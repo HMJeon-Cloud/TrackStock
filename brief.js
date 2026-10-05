@@ -56,7 +56,7 @@ function briefStats(sym, d, mode) {
   var c = d.c || [], v = d.v || [], n = c.length;
   if (n < 22 || c[n - 1] == null) return null;
   var last = c[n - 1];
-  var back = mode === "week" ? 5 : 1;
+  var back = mode === "week" ? 5 : mode === "month" ? 21 : 1;
   if (n - 1 - back < 0) return null;
   var ret = last / c[n - 1 - back] - 1;
   var ret1 = last / c[n - 2] - 1, ret5 = n > 5 ? last / c[n - 6] - 1 : null;
@@ -126,7 +126,7 @@ function briefQuality(rows) {
 
 function briefCompute(recent, opts) {
   opts = opts || {};
-  var mode = opts.mode === "week" ? "week" : "day";
+  var mode = opts.mode === "week" ? "week" : opts.mode === "month" ? "month" : "day";
   var market = BRIEF_MKT[opts.market] && opts.market !== "all" ? opts.market : "all";
   function inMkt(sym) { return market === "all" || briefMkt(sym) === market; }
   var now = opts.now ? new Date(opts.now) : new Date();
@@ -139,7 +139,7 @@ function briefCompute(recent, opts) {
   });
   var quality = briefQuality(rows);
   var stocks = rows.filter(function (s) { return !BRIEF_EXCLUDE.test(s.sym) && !quality.bad[s.sym] && !BRIEF_DUP[s.sym] && inMkt(s.sym); });
-  var label = mode === "week" ? "이번 주" : "오늘";
+  var label = mode === "week" ? "이번 주" : mode === "month" ? "이번 달" : "오늘";
 
   /* 1. 온도계 */
   var up = 0, above = 0;
