@@ -97,6 +97,7 @@ export default async function handler(req, res) {
     const items = (j.items || []).map((it) => {
       return {
         title: stripHtml(it.title),
+        desc: stripHtml(it.description).slice(0, 200),   // 기사 요약(네이버 제공 본문 일부) — 뉴스 브리핑 카드용
         press: pressFromUrl(it.originallink || it.link),
         time: it.pubDate || "",
         url: it.link || it.originallink,   // 네이버 뉴스 링크 우선, 없으면 원문
