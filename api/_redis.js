@@ -43,7 +43,7 @@ export function kst(iso) {
 }
 
 export const KEY = {
-  recent: "sm:recent",          // 전 종목 최근 90일 (gzip)
+  recent: "sm:recent",          // 전 종목 최근 400일 (gzip)
   manifest: "sm:manifest",      // 종목별 갱신일 목록 (gzip)
   chart: (sym) => "sm:chart:" + sym,   // 종목별 과거 전체 (gzip)
 };

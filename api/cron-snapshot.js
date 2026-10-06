@@ -11,6 +11,7 @@
 //
 // 클라이언트가 ①+②를 합쳐 쓰므로 ①이 며칠 지나도 화면 데이터는 항상 최신이다. 실행당 명령 ≈ 43회, 하루 2회 → 월 약 2,600회.
 import { loadTickerPairs } from "./_tickers.js";
+import { reqIsOwner } from "./_owner.js";
 import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY, kst } from "./_redis.js";
 
 const UA =
@@ -85,7 +86,8 @@ function toSnapshot(symbol, r, maxYears) {
   const adj = (r.indicators.adjclose && r.indicators.adjclose[0] && r.indicators.adjclose[0].adjclose) || null;
   const cutoff = Math.floor(Date.now() / 1000) - maxYears * 365.25 * 86400;
   const t = [], o = [], h = [], l = [], c = [], a = [], v = [];
-  const rnd = (x) => Math.round(x * 10000) / 10000;
+  // v9.4: 1 미만 가격은 유효숫자 6자리로 (예전엔 소수 4자리로 잘라 시바이누·페페·봉크 같은 코인이 0이 되는 오류가 있었다)
+  const rnd = (x) => { if (!isFinite(x)) return x; return Math.abs(x) >= 1 ? Math.round(x * 10000) / 10000 : Number(x.toPrecision(6)); };
   for (let i = 0; i < r.timestamp.length; i++) {
     const cl = q.close[i];
     if (cl == null || !isFinite(cl) || cl <= 0 || r.timestamp[i] < cutoff) continue;
@@ -105,7 +107,19 @@ function toSnapshot(symbol, r, maxYears) {
     }
     div.sort((x, y) => x[0] - y[0]);
   }
+  // v9.4: 아직 끝나지 않은 오늘 봉(장중·코인 진행 중인 UTC 하루)은 뺀다 → '종가'만 남긴다
+  //   야후 meta.currentTradingPeriod.regular {start,end}: 지금이 end 전이고 마지막 봉이 start 이후면 진행 중인 봉
+  let dropped = 0;
+  const nowS = Math.floor(Date.now() / 1000), ctp = r.meta && r.meta.currentTradingPeriod && r.meta.currentTradingPeriod.regular;
+  const coin = /-USD$/.test(symbol), utc0 = Math.floor(nowS / 86400) * 86400;
+  while (t.length > 1) {
+    const lt = t[t.length - 1];
+    const live = coin ? lt >= utc0 : !!(ctp && ctp.start && ctp.end && nowS < ctp.end && lt >= ctp.start - 3600);
+    if (!live) break;
+    [t, o, h, l, c, a, v].forEach((arr) => arr.pop()); dropped++;
+  }
   const meta = {};
+  if (dropped) meta.droppedLive = dropped;
   if (r.meta) {
     for (const k of ["currency", "shortName", "longName", "exchangeName", "fullExchangeName",
                      "firstTradeDate", "fiftyTwoWeekHigh", "fiftyTwoWeekLow"]) {
@@ -115,15 +129,90 @@ function toSnapshot(symbol, r, maxYears) {
   return { s: symbol, meta, t, o, h, l, c, a, v, div, updated: new Date().toISOString().slice(0, 10) };
 }
 
+/* ---------- 데이터 점검 (v9.4) — ?audit=1 : 저장된 과거 전체 + 최근 1년을 여러 방법으로 교차 검증 ----------
+   ① 날짜 순서·중복  ② 0·음수·비정상 값  ③ 정밀도(1 미만 가격이 0으로 뭉개졌나)  ④ 하루 급변(되돌림=오류, 지속=분할 미반영 의심, 수정종가로는 매끈하면 정상)
+   ⑤ 빈 기간(주식 10일·코인 3일 넘게 비었나)  ⑥ 과거 파일 ↔ 최근 파일 같은 날 종가 비교(1% 넘게 다르면)  ⑦ 야후 52주 고점 ↔ 직접 계산 비교
+   ⑧ 마지막 날짜가 오래됐나  ⑨ 과거 길이(1년 미만)  ⑩ 수정종가/종가 비율이 갑자기 튀나(배당·분할 반영 오류)
+   결과는 종목별 문제 목록 + 요약. 데이터를 고치지는 않는다(어디가 이상한지 알려 주기만). */
+function auditSeries(sym, snap, rec) {
+  const out = [], t = snap.t || [], c = snap.c || [], a = snap.a || [], n = c.length, coin = /-USD$/.test(sym), idx = /^\^|=X$|=F$/.test(sym);
+  if (n < 2) return [["short", "데이터 " + n + "개"]];
+  let unsorted = 0, dup = 0, bad = 0, gaps = 0, maxGap = 0;
+  for (let i = 1; i < n; i++) { if (t[i] < t[i - 1]) unsorted++; if (t[i] === t[i - 1]) dup++; const g = (t[i] - t[i - 1]) / 86400; if (g > (coin ? 3 : 10)) { gaps++; if (g > maxGap) maxGap = g; } }
+  for (let i = 0; i < n; i++) if (!(c[i] > 0) || !isFinite(c[i])) bad++;
+  if (unsorted) out.push(["order", "날짜 순서가 뒤바뀐 곳 " + unsorted]);
+  if (dup) out.push(["dup", "같은 날짜 중복 " + dup]);
+  if (bad) out.push(["value", "0·음수·비정상 종가 " + bad + "개"]);
+  if (gaps) out.push(["gap", "빈 기간 " + gaps + "곳 (최장 " + Math.round(maxGap) + "일)"]);
+  // ③ 정밀도: 최근 60개 중 서로 다른 값이 너무 적고 가격이 1 미만이면 반올림으로 뭉개진 것
+  const last60 = c.slice(-60), uniq = new Set(last60).size;
+  if (c[n - 1] < 1 && uniq < 15) out.push(["precision", "1 미만 가격인데 최근 60일 서로 다른 값이 " + uniq + "개뿐 — 소수점 잘림 의심"]);
+  // ④ 급변: 하루 ±40%(코인 ±60%) 넘는 날
+  const lim = coin ? 0.6 : idx ? 0.15 : 0.4; let revert = 0, persist = 0, splitOk = 0; const days = [];
+  for (let i = 1; i < n; i++) {
+    const r = c[i] / c[i - 1] - 1; if (!(Math.abs(r) > lim)) continue;
+    const ra = a.length === n && a[i - 1] > 0 ? a[i] / a[i - 1] - 1 : r;
+    const nx = i + 1 < n ? c[i + 1] / c[i] - 1 : 0;
+    if (Math.abs(ra) <= lim / 2) splitOk++;                                   // 수정종가는 매끈 → 분할이 수정종가에 반영됨(정상)
+    else if (Math.sign(nx) === -Math.sign(r) && Math.abs(nx) > lim / 2) { revert++; i++; }  // 다음 날 되돌아옴 → 오류 값 (되돌아온 날은 건너뜀)
+    else { persist++; if (days.length < 3) days.push(new Date(t[i] * 1000).toISOString().slice(0, 10) + " " + (r * 100).toFixed(0) + "%"); }
+  }
+  if (revert) out.push(["spike", "하루 튀었다 되돌아온 날 " + revert + "번 (오류 값 의심)"]);
+  if (persist) out.push(["jump", "하루 " + Math.round(lim * 100) + "% 넘게 움직이고 유지된 날 " + persist + "번 (" + days.join(", ") + ") — 실제 급변인지 분할 미반영인지 확인"]);
+  if (splitOk) out.push(["split-ok", "분할로 보이는 날 " + splitOk + "번 — 수정종가에 반영돼 정상"]);
+  // ⑩ 수정종가 비율 급변
+  if (a.length === n) { let jumps = 0; for (let i = 1; i < n; i++) { const p0 = a[i - 1] / c[i - 1], p1 = a[i] / c[i]; if (p0 > 0 && Math.abs(p1 / p0 - 1) > 0.25) jumps++; } if (jumps > 2) out.push(["adj", "수정종가/종가 비율이 25% 넘게 바뀐 날 " + jumps + "번"]); }
+  // ⑥ 과거 ↔ 최근 같은 날 비교
+  if (rec && rec.t && rec.c) {
+    const m = new Map(); for (let i = 0; i < n; i++) m.set(t[i], c[i]);
+    let cmp = 0, diff = 0, worst = 0;
+    for (let i = 0; i < rec.t.length; i++) { const v = m.get(rec.t[i]); if (v == null) continue; cmp++; const d = Math.abs(rec.c[i] / v - 1); if (d > 0.01) { diff++; if (d > worst) worst = d; } }
+    if (cmp >= 20 && diff > 2) out.push(["mismatch", "과거 파일과 최근 파일의 같은 날 종가가 1% 넘게 다른 날 " + diff + "/" + cmp + " (최대 " + (worst * 100).toFixed(0) + "%)"]);
+    if (cmp === 0 && rec.t.length && t.length) out.push(["nooverlap", "과거 파일과 최근 파일이 겹치는 날이 없음"]);
+  }
+  // ⑦ 52주 고점 비교 (최근 파일 기준)
+  const src = rec && rec.c && rec.c.length > 200 ? rec : null;
+  if (src && src.meta && src.meta.fiftyTwoWeekHigh > 0) { const hi = Math.max(...src.c.slice(-252)); const d = hi / src.meta.fiftyTwoWeekHigh - 1; if (Math.abs(d) > 0.08) out.push(["hi52", "야후 52주 고점 " + src.meta.fiftyTwoWeekHigh + " vs 직접 계산(종가) " + hi + " — " + (d * 100).toFixed(0) + "% 차이"]); }
+  // ⑧ ⑨
+  const lastT = (rec && rec.t && rec.t.length ? rec.t[rec.t.length - 1] : t[n - 1]), age = (Date.now() / 1000 - lastT) / 86400;
+  if (age > (coin ? 2 : 5)) out.push(["stale", "마지막 데이터가 " + Math.round(age) + "일 전"]);
+  const yrs = (t[n - 1] - t[0]) / (365.25 * 86400); if (yrs < 1) out.push(["short", "과거 데이터 " + yrs.toFixed(1) + "년치"]);
+  return out;
+}
+async function runAudit(redis, res) {
+  const t0 = Date.now(); let recent = null, manifest = null;
+  try { const x = await getJsonGzText(redis, KEY.recent); if (x) recent = JSON.parse(x); } catch (e) {}
+  try { const x = await getJsonGzText(redis, KEY.manifest); if (x) manifest = JSON.parse(x); } catch (e) {}
+  const syms = Object.keys((manifest && manifest.symbols) || (recent && recent.symbols) || {});
+  const report = {}, count = {}; let checked = 0, missingHist = [];
+  for (let i = 0; i < syms.length; i += 12) {
+    if (Date.now() - t0 > 50000) break;
+    await Promise.all(syms.slice(i, i + 12).map(async (sym) => {
+      let snap = null; try { const x = await getJsonGzText(redis, KEY.chart(sym)); if (x) snap = JSON.parse(x); } catch (e) {}
+      const rec = recent && recent.symbols && recent.symbols[sym];
+      if (!snap) { missingHist.push(sym); if (!rec) return; snap = rec; }
+      const iss = auditSeries(sym, snap, rec !== snap ? rec : null); checked++;
+      const real = iss.filter((x) => x[0] !== "split-ok");
+      if (iss.length) report[sym] = iss.map((x) => x[0] + ": " + x[1]);
+      real.forEach((x) => { count[x[0]] = (count[x[0]] || 0) + 1; });
+    }));
+  }
+  const serious = Object.keys(report).filter((s) => report[s].some((x) => /^(value|order|dup|spike|precision|mismatch|stale|adj)/.test(x)));
+  return res.status(200).json({ at: kst(), checked, total: syms.length, elapsedMs: Date.now() - t0, summary: count, serious, missingHistory: missingHist.slice(0, 50), recentFlags: (recent && recent.flags) || {}, report,
+    guide: "serious = 바로 확인할 종목. jump(유지된 급변)는 실제 사건(실적·상장폐지·액면분할 미반영)일 수 있어 차트로 확인. split-ok는 정상. 고치려면 해당 종목의 과거 파일을 다시 받으세요(같은 주소에 &force=1)." });
+}
+
 export default async function handler(req, res) {
   const started = Date.now();
-  if (process.env.CRON_SECRET) {
+  const ownerOk = req.query.audit === "1" && reqIsOwner(req);   // 데이터 점검은 운영자 토큰으로도 실행 가능 (수집은 CRON_SECRET만)
+  if (process.env.CRON_SECRET && !ownerOk) {
     const auth = req.headers.authorization || "";
     const key = req.query.key || "";
     if (auth !== "Bearer " + process.env.CRON_SECRET && key !== process.env.CRON_SECRET) {
       return res.status(401).json({ error: "unauthorized" });
     }
   }
+  if (req.query.audit === "1") { const rc = redisConf(); if (!rc) return res.status(500).json({ error: "Redis 없음" }); return runAudit(rc, res); }
 
   const proto = req.headers["x-forwarded-proto"] || "https";
   const origin = proto + "://" + req.headers.host;
