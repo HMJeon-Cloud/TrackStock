@@ -20,7 +20,26 @@ const TIME_BUDGET_MS = 52000;     // 함수 최대 60초 안에서 저장까지 
 const RECENT_BUDGET_MS = 32000;   // ① 최근 구간(가장 중요)에 먼저 쓰는 시간
 const FETCH_TIMEOUT_MS = 8000;    // 야후 한 건이 멈춰 있어도 8초면 포기
 const HISTORY_PER_RUN = 20;       // 남은 시간에 과거 전체를 받을 종목 수 (하루 2회 → 약 6일이면 전 종목 한 바퀴)
-const RECENT_DAYS = 90;       // recent.json이 담는 최근 일수
+const RECENT_DAYS = 400;      // recent.json이 담는 최근 일수 (v8.9: 90→400 — 200일선·52주 신고/신저가를 자체 데이터로 계산하고, 1년치로 오류를 검증)
+const RETRY_BAD = 1;              // 검증에 걸린 종목은 한 번 더 받아 본다
+
+/* 받은 일봉이 믿을 만한지 — 1년치로 검증 (v8.9)
+   frozen: 최근 5개 종가가 완전히 같음(거래 정지·멈춘 시세) / spike: 마지막 3일 중 하루가 40%(코인 60%) 넘게 움직였는데 다음 날 되돌아옴(액면분할·오류)
+   scale: 마지막 종가가 최근 1년 중앙값의 1/4 미만 또는 4배 초과(단위 오류) / gap: 마지막 날짜가 7일 넘게 오래됨(상장폐지·심볼 변경) */
+function validateSeries(sym, s) {
+  const c = s.c, t = s.t, n = c.length, flags = [];
+  if (n < 30) return ["short"];
+  const coin = /-USD$/.test(sym), lim = coin ? 0.6 : 0.4;
+  if (!coin && n >= 5 && c.slice(-5).every((x) => x === c[n - 1])) flags.push("frozen");
+  for (let i = Math.max(1, n - 3); i < n; i++) {
+    const r = c[i] / c[i - 1] - 1;
+    if (Math.abs(r) > lim) { const back = i + 1 < n ? c[i + 1] / c[i] - 1 : 0; flags.push(Math.sign(back) === -Math.sign(r) && Math.abs(back) > lim / 2 ? "spike" : "jump"); }
+  }
+  const sorted = c.slice(-250).slice().sort((x, y) => x - y), med = sorted[Math.floor(sorted.length / 2)];
+  if (med > 0 && (c[n - 1] < med / 4 || c[n - 1] > med * 4)) flags.push("scale");
+  if (Date.now() / 1000 - t[n - 1] > 7 * 86400) flags.push("gap");
+  return flags;
+}
 
 async function loadSymbols(origin) {
   const { pairs, source } = await loadTickerPairs(origin);
@@ -135,16 +154,31 @@ export default async function handler(req, res) {
   /* ① 최근 구간 — 가장 중요하므로 먼저. 이번에 못 받은 종목은 지난 값을 그대로 둔다 */
   let prevRecent = null;
   try { const t = await getJsonGzText(redis, KEY.recent); if (t) prevRecent = JSON.parse(t); } catch (e) { /* 없으면 새로 */ }
-  const recent = { generated: new Date().toISOString(), days: RECENT_DAYS, symbols: {} };
-  let recentOk = 0;
+  const recent = { generated: new Date().toISOString(), days: RECENT_DAYS, symbols: {}, flags: {} };
+  let recentOk = 0, flagged = 0;
   for (let i = 0; i < symbols.length; i += CONCURRENCY) {
     if (Date.now() - started > RECENT_BUDGET_MS) break;
     await Promise.all(symbols.slice(i, i + CONCURRENCY).map(async (sym) => {
       try {
-        const r = await fetchYahoo(sym, RECENT_DAYS);
-        if (!r) return;
-        const s = toSnapshot(sym, r, 1);
-        if (!s.t.length) return;
+        let s = null, flags = [];
+        for (let attempt = 0; attempt <= RETRY_BAD; attempt++) {
+          const r = await fetchYahoo(sym, RECENT_DAYS);
+          if (!r) continue;
+          const cand = toSnapshot(sym, r, 2);
+          if (!cand.t.length) continue;
+          flags = validateSeries(sym, cand);
+          s = cand;
+          if (!flags.some((f) => f === "spike" || f === "scale" || f === "frozen")) break;   // 의심스러우면 한 번 더
+        }
+        if (!s) return;
+        const prev = prevRecent && prevRecent.symbols && prevRecent.symbols[sym];
+        const bad = flags.filter((f) => f === "spike" || f === "scale" || f === "frozen");
+        if (bad.length && prev && prev.c && prev.c.length) {   // 검증 실패 → 지난 값을 유지하고 표시만
+          recent.symbols[sym] = prev; recent.flags[sym] = bad.join(",") + "(이전 값 유지)"; flagged++; return;
+        }
+        if (flags.length) recent.flags[sym] = flags.join(",");
+        // 이전 스냅샷과 같은 날짜의 종가가 1% 넘게 다르면(수정 데이터) 표시
+        if (prev && prev.t && prev.t.length) { const lt = prev.t[prev.t.length - 1], j = s.t.indexOf(lt); if (j >= 0 && Math.abs(s.c[j] / prev.c[prev.c.length - 1] - 1) > 0.01) recent.flags[sym] = (recent.flags[sym] ? recent.flags[sym] + "," : "") + "revised"; }
         recent.symbols[sym] = { t: s.t, o: s.o, h: s.h, l: s.l, c: s.c, a: s.a, v: s.v, div: s.div, meta: s.meta };
         recentOk++;
       } catch (e) { /* 건너뛴다 */ }
@@ -209,7 +243,7 @@ export default async function handler(req, res) {
   /* ④ 실행 기록 — /api/config 에서 비밀값 없이 확인할 수 있게 남긴다 */
   const log = {
     at: new Date().toISOString(), elapsedMs: Date.now() - started,
-    symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, recentSaved, historyUpdated: done.length,
+    symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, historyUpdated: done.length,
     historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
     failedSample: failed.slice(0, 5)
   };
