@@ -61,13 +61,13 @@ function cFont(g, size, weight) { g.font = (weight || 400) + " " + size + "px " 
 function cW(g, s, size, weight) { cFont(g, size, weight); return g.measureText(s).width; }
 function cText(g, s, x, y, size, weight, color, align) { s = String(s); CARD_TXT += s; cFont(g, size, weight); g.fillStyle = color || CARD_C.txt; g.textAlign = align || "left"; g.fillText(s, x, y); }
 function cFit(g, s, maxW, size, weight) { cFont(g, size, weight); var t = s; while (g.measureText(t).width > maxW && t.length > 1) t = t.slice(0, -1); return t === s ? s : t.slice(0, -1) + "…"; }
-function cWrap(g, s, x, y, maxW, size, weight, color, lh, maxLines) {
+function cWrap(g, s, x, y, maxW, size, weight, color, lh, maxLines, align) {
   cFont(g, size, weight);
   var ch = String(s).split(""), line = "", lines = [];
   for (var i = 0; i < ch.length; i++) { var t = line + ch[i]; if (g.measureText(t).width > maxW && line) { lines.push(line); line = ch[i]; } else line = t; }
   if (line) lines.push(line);
   if (maxLines && lines.length > maxLines) { lines = lines.slice(0, maxLines); lines[maxLines - 1] = lines[maxLines - 1].slice(0, -1) + "…"; }
-  lines.forEach(function (l, k) { cText(g, l, x, y + k * (lh || size * 1.45), size, weight, color); });
+  lines.forEach(function (l, k) { cText(g, l, x, y + k * (lh || size * 1.45), size, weight, color, align); });
   return y + lines.length * (lh || size * 1.45);
 }
 /* 강조: 제목 안의 [[…]] 부분만 금색 (머리 위에서는 밝은 금색) */
