@@ -292,27 +292,28 @@ function cHow(c, title, text) {
   cWrap(g, text, P + 28, c.y + 70, W - 56, 22, 500, CARD_C.txt2, 31, n);
   c.y += h + 18;
 }
-/* 두 칸 비교(초록/빨강 틴트) + 비율 띠 */
+/* 저울형 비교: 왼쪽 큰 숫자(초록) · 가운데 비율 막대(가운데 점선) · 오른쪽 큰 숫자(빨강) — 칸 채우기 대신 (v9.1) */
 function cCompare2(c, a, b) {
-  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, gap = 20, cw = (W - gap) / 2, h = 190, y = c.y;
-  [[a, P, "#e9f3ea", "#bcd8bf", "#2e7d4f"], [b, P + cw + gap, "#fbe9e8", "#e8b9b5", "#b4342b"]].forEach(function (k) {
-    cRound(g, k[1], y, cw, h, 16, k[2], k[3]); cText(g, k[0].l, k[1] + 24, y + 44, 24, 700, k[4]); cText(g, String(k[0].v), k[1] + 24, y + 128, 84, 800, k[4]); cText(g, k[0].s, k[1] + 24, y + 166, 20, 500, CARD_C.txt2);
-  });
-  var tot = Math.max(1, a.v + b.v), sy = y + h + 14; cRound(g, P, sy, W, 14, 7, "#b4342b"); cRound(g, P, sy, Math.max(0, W * a.v / tot), 14, 7, "#2e7d4f");
-  c.y = sy + 14 + 26;
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, y = c.y, tot = Math.max(1, a.v + b.v), p = a.v + b.v ? a.v / tot : 0.5;
+  cText(g, String(a.v), P, y + 84, 96, 800, "#2e7d4f"); cText(g, a.l, P, y + 118, 22, 700, "#2e7d4f"); cText(g, a.s, P, y + 146, 19, 500, CARD_C.txt2);
+  cText(g, String(b.v), P + W, y + 84, 96, 800, "#b4342b", "right"); cText(g, b.l, P + W, y + 118, 22, 700, "#b4342b", "right"); cText(g, b.s, P + W, y + 146, 19, 500, CARD_C.txt2, "right");
+  var lw = Math.max(cW(g, String(a.v), 96, 800), cW(g, a.l, 22, 700), cW(g, a.s, 19, 500)), rw = Math.max(cW(g, String(b.v), 96, 800), cW(g, b.l, 22, 700), cW(g, b.s, 19, 500));
+  var bx = P + lw + 30, bw = W - lw - rw - 60, by = y + 60;
+  if (bw > 120) { cRound(g, bx, by, bw, 22, 11, "#b4342b"); cRound(g, bx, by, Math.max(0, bw * p), 22, 11, "#2e7d4f"); g.save(); g.setLineDash([6, 6]); g.strokeStyle = "rgba(0,0,0,0.45)"; g.lineWidth = 3; g.beginPath(); g.moveTo(bx + bw / 2, by - 10); g.lineTo(bx + bw / 2, by + 32); g.stroke(); g.restore(); cText(g, Math.round(p * 100) + " : " + Math.round((1 - p) * 100), bx + bw / 2, by + 62, 20, 600, CARD_C.sub, "center"); }
+  c.y = y + 170;
 }
-/* 두 줄 목록 (좌: 신고가 / 우: 신저가) — [이름, 가격 텍스트, 거래대금] */
+/* 두 줄 목록 (좌/우) — 왼쪽 색 띠 + 이름 + 회색 부가 (v9.1) */
 function cTwoLists(c, L, R) {
-  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, gap = 24, cw = (W - gap) / 2, y0 = c.y;
-  [[L, P], [R, P + cw + gap]].forEach(function (k) {
-    var lst = k[0], x = k[1], y = y0;
-    cText(g, lst.title, x, y + 24, 22, 800, CARD_C.txt); g.fillStyle = CARD_C.txt; g.fillRect(x, y + 34, cw, 3); y += 44;
-    cText(g, cFit(g, lst.head, cw, 17, 500), x, y + 16, 17, 500, CARD_C.sub); y += 26;
-    if (!lst.items.length) { cText(g, "해당 없음", x, y + 26, 22, 500, CARD_C.sub); y += 40; }
-    lst.items.forEach(function (it, i) { cText(g, (i + 1) + ". " + it[0], x, y + 28, 23, 800, CARD_C.txt); var nw = cW(g, (i + 1) + ". " + it[0], 23, 800); cText(g, cFit(g, it[1] + " · " + it[2], cw - nw - 10, 18, 500), x + nw + 10, y + 28, 18, 500, CARD_C.txt2); g.strokeStyle = CARD_C.line; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y + 42); g.lineTo(x + cw, y + 42); g.stroke(); y += 46; });
-    if (y > c.y) c.y = y;
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, gap = 24, cw = (W - gap) / 2, y0 = c.y, maxY = c.y;
+  [[L, P, "#2e7d4f"], [R, P + cw + gap, "#b4342b"]].forEach(function (k) {
+    var lst = k[0], x = k[1], y = y0, col = k[2];
+    cText(g, lst.title, x, y + 22, 21, 800, col); y += 34;
+    if (lst.head) { cText(g, cFit(g, lst.head, cw, 16, 500), x, y + 14, 16, 500, CARD_C.sub); y += 24; }
+    if (!lst.items.length) { cText(g, "해당 없음", x + 14, y + 26, 20, 500, CARD_C.sub); y += 40; }
+    lst.items.forEach(function (it) { cRound(g, x, y + 6, 5, 50, 2, col); cText(g, cFit(g, it[0], cw - 20, 23, 800), x + 16, y + 28, 23, 800, CARD_C.txt); cText(g, cFit(g, it[1] + " · " + it[2], cw - 20, 17, 500), x + 16, y + 52, 17, 500, CARD_C.txt2); y += 64; });
+    if (y > maxY) maxY = y;
   });
-  c.y += 16;
+  c.y = maxY + 10;
 }
 /* 남은 공간에 n줄이 들어가도록 행 높이 계산 (note=true면 하단 안내 한 줄 자리 확보) */
 function cH(c, n, max, note, extra) { return Math.max(56, Math.min(max, Math.floor((CARD.H - (note ? 150 : 100) - c.y - (extra || 0)) / Math.max(1, n)))); }
@@ -554,8 +555,8 @@ function cardsBrief() {
     var f2 = nh === 0 && nl === 0 ? "오늘 52주 신고가·신저가 종목이 [[없어요]]" : nh >= nl ? "신고가 종목이 신저가보다 [[" + (nl ? (nh / nl).toFixed(1) + "배 많아요" : nh + "개 많아요") + "]]" : "신저가 종목이 신고가보다 [[" + (nh ? (nl / nh).toFixed(1) + "배 많아요" : nl + "개 많아요") + "]]";
     cHead(c, TG("신고가·신저가"), f2, "52주 종가 기준 신고가 " + nh + " · 신저가 " + nl + " · 근접(3% 이내) " + t.nearHigh.length + " / " + t.nearLow.length, 8, T);
     cCompare2(c, { l: "▲ 52주 종가 신고가", v: nh, s: "신고가 근접(3% 이내) " + t.nearHigh.length }, { l: "▼ 52주 종가 신저가", v: nl, s: "신저가 근접(3% 이내) " + t.nearLow.length });
-    cTwoLists(c, { title: "▲ 신고가 주요 5 · 거래대금 순", head: "종목 · 오늘 종가 / 1년 최고 · 거래대금", items: (nh ? t.newHigh : t.nearHigh).slice(0, 5).map(function (s) { return [briefName(s), cPrice(s.sym, s.last) + " / " + cPrice(s.sym, s.hi250), briefAmtTxt(s)]; }) },
-      { title: "▼ 신저가 주요 5 · 거래대금 순", head: "종목 · 오늘 종가 / 1년 최저 · 거래대금", items: (nl ? t.newLow : t.nearLow).slice(0, 5).map(function (s) { return [briefName(s), cPrice(s.sym, s.last) + " / " + cPrice(s.sym, s.lo250), briefAmtTxt(s)]; }) });
+    cTwoLists(c, { title: "▲ " + (nh ? "신고가" : "신고가 근접") + " 주요 5 · 거래대금 순", head: "종목 · 오늘 종가 / 1년 최고 · 거래대금", items: (nh ? t.newHigh : t.nearHigh).slice(0, 5).map(function (s) { return [briefName(s), cPrice(s.sym, s.last) + " / " + cPrice(s.sym, s.hi250), briefAmtTxt(s)]; }) },
+      { title: "▼ " + (nl ? "신저가" : "신저가 근접") + " 주요 5 · 거래대금 순", head: "종목 · 오늘 종가 / 1년 최저 · 거래대금", items: (nl ? t.newLow : t.nearLow).slice(0, 5).map(function (s) { return [briefName(s), cPrice(s.sym, s.last) + " / " + cPrice(s.sym, s.lo250), briefAmtTxt(s)]; }) });
     cHow(c, "읽는 법", "오늘 종가가 지난 1년 종가 중 최고/최저면 신고가/신저가예요. 신고가가 많다고 비싸다가 아니고, 신저가가 많다고 싸다가 아니에요 — 어느 쪽이 넓게 늘어나는지를 봐요.");
     cFoot(c, null); out.push({ name: "6_신고가신저가", cv: c.cv });
   } else {

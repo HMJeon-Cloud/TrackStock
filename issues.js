@@ -9,7 +9,7 @@
 var ISS_INDEX = { us: [["^GSPC", "S&P500"], ["^IXIC", "나스닥"]], kr: [["^KS11", "코스피"], ["^KQ11", "코스닥"]] };
 var ISS_MACRO = [
   ["KRW=X", "fx", "💱", "원/달러 환율"], ["^VIX", "vix", "😱", "공포지수 VIX"], ["TLT", "rate", "🏦", "미국 장기채"],
-  ["GLD", "gold", "🥇", "금"], ["USO", "oil", "🛢️", "원유"], ["BTC-USD", "btc", "🪙", "비트코인"]
+  ["GLD", "gold", "🥇", "금"], ["USO", "oil", "🛢️", "원유"], ["BTC-USD", "btc", "🟠", "비트코인"]
 ];
 var ISS_MKT = { fx: ["all", "kr", "us", "coin"], vix: ["all", "us"], rate: ["all", "us"], gold: ["all", "us"], oil: ["all", "us"], btc: ["all", "coin"] };
 

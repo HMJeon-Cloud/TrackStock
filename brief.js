@@ -405,19 +405,19 @@ function briefRenderHealth(R) {
   box.innerHTML = h;
   if (!hl) return;
   if (!t.n200) { hl.innerHTML = '<div class="fdHead"><span class="fdNo">06 · 신고가·신저가</span><span class="fdDate">' + briefDateLine(R) + '</span></div><div class="briefDim" style="font-size:12px">52주 신고가·신저가는 1년치 데이터가 쌓인 뒤 표시돼요.</div>'; return; }
-  var nh = t.newHigh.length, nl = t.newLow.length, ratio = nl ? (nh / nl) : null;
-  var find = nh === 0 && nl === 0 ? "오늘 52주 신고가·신저가 종목이 <b>없습니다</b>" : nh >= nl ? "신고가 종목이 신저가 종목보다 <b>" + (nl ? (nh / nl).toFixed(1) + "배 많았습니다" : nh + "개 많았습니다") + "</b>" : "신저가 종목이 신고가 종목보다 <b>" + (nh ? (nl / nh).toFixed(1) + "배 많았습니다" : nl + "개 많았습니다") + "</b>";
-  function li(list, hi) { return list.slice(0, 5).map(function (s, i) { return '<div class="li"><b>' + (i + 1) + '. ' + escapeHtml(briefName(s)) + '</b><span>' + briefPriceTxt(s.sym, s.last) + ' / ' + briefPriceTxt(s.sym, hi ? s.hi250 : s.lo250) + ' · ' + briefAmtTxt(s) + '</span></div>'; }).join("") || '<div class="briefDim" style="font-size:12px;padding:4px 0">해당 없음</div>'; }
-  var tot = Math.max(1, nh + nl);
+  var nh = t.newHigh.length, nl = t.newLow.length;
+  var find = nh === 0 && nl === 0 ? "오늘 52주 신고가·신저가 종목이 <b>없습니다</b>" : nh >= nl ? "신고가 종목이 신저가 종목보다 <b>" + (nl ? (nh / nl).toFixed(1) + "배 많아요" : nh + "개 많아요") + "</b>" : "신저가 종목이 신고가 종목보다 <b>" + (nh ? (nl / nh).toFixed(1) + "배 많아요" : nl + "개 많아요") + "</b>";
+  var tot = Math.max(1, nh + nl), p = nh + nl ? Math.round(nh / tot * 100) : 50;
+  function col(list, near, hi) { return list.slice(0, 5).map(function (s) { var ref = hi ? s.hi250 : s.lo250, d = ref ? s.last / ref - 1 : null; return '<div class="hlRow"><b>' + escapeHtml(briefName(s)) + '</b><span>' + briefPriceTxt(s.sym, s.last) + (near && d != null ? ' · 1년 ' + (hi ? '최고' : '최저') + '比 ' + briefPct(d) : '') + ' · 오늘 ' + briefPct(s.ret1) + ' · ' + briefAmtTxt(s) + '</span></div>'; }).join("") || '<div class="briefDim" style="font-size:12px">해당 없음</div>'; }
+  var hiList = nh ? t.newHigh : t.nearHigh, loList = nl ? t.newLow : t.nearLow;
   hl.innerHTML = '<div class="fdHead"><span class="fdNo">06 · 신고가·신저가</span><span class="fdDate">' + briefDateLine(R) + '</span></div>' +
     '<div class="fdTitle">' + find + '</div>' +
-    '<div class="fdDef">52주 종가 기준 신고가 ' + nh + '종목, 신저가 ' + nl + '종목. 신고가 근접(3% 이내) ' + t.nearHigh.length + '개, 신저가 근접(3% 이내) ' + t.nearLow.length + '개예요.</div>' +
-    '<div class="fdTwo"><div class="fdTile up"><div class="fdTl">▲ 52주 종가 신고가</div><div class="fdBig">' + nh + '</div><small>신고가 근접(3% 이내) ' + t.nearHigh.length + '</small></div>' +
-    '<div class="fdTile down"><div class="fdTl">▼ 52주 종가 신저가</div><div class="fdBig">' + nl + '</div><small>신저가 근접(3% 이내) ' + t.nearLow.length + '</small></div></div>' +
-    '<div class="fdSplit"><i class="a" style="width:' + Math.round(nh / tot * 100) + '%"></i><i class="b" style="width:' + Math.round(nl / tot * 100) + '%"></i></div>' +
-    '<div class="fdLists"><div class="fdList"><h5>▲ 신고가 주요 5 · 거래대금 순</h5><div class="lh">종목 · 오늘 종가 / 직전 1년 최고가 · 거래대금</div>' + li(t.newHigh.length ? t.newHigh : t.nearHigh, true) + '</div>' +
-    '<div class="fdList"><h5>▼ 신저가 주요 5 · 거래대금 순</h5><div class="lh">종목 · 오늘 종가 / 직전 1년 최저가 · 거래대금</div>' + li(t.newLow.length ? t.newLow : t.nearLow, false) + '</div></div>' +
-    '<div class="fdHow"><b>읽는 법</b> — 오늘 종가가 지난 1년(약 250거래일) 종가 중 최고/최저면 신고가/신저가로 세요. 신고가가 많다고 "비싸다"가 아니고, 신저가가 많다고 "싸다"가 아니에요. 어느 쪽이 넓게 늘어나는지를 봐요.</div>';
+    '<div class="fdDef">52주 종가 기준 · 오늘 종가가 지난 1년 종가 중 최고/최저인 종목을 세요.</div>' +
+    '<div class="hlScale"><div class="hn up">' + nh + '<small>▲ 신고가</small></div><div class="hlBar" style="--p:' + p + '%"></div><div class="hn down" style="text-align:right">' + nl + '<small>▼ 신저가</small></div></div>' +
+    '<div class="hlNear">근접(3% 이내) — 신고가 ' + t.nearHigh.length + '개 · 신저가 ' + t.nearLow.length + '개' + (!nh && t.nearHigh.length ? ' · 왼쪽 목록은 신고가 <b>근접</b> 종목' : '') + (!nl && t.nearLow.length ? ' · 오른쪽 목록은 신저가 <b>근접</b> 종목' : '') + '</div>' +
+    '<div class="hlCols"><div class="hlCol up"><h5>▲ ' + (nh ? '신고가' : '신고가 근접') + ' · 거래대금 순</h5>' + col(hiList, !nh, true) + '</div>' +
+    '<div class="hlCol down"><h5>▼ ' + (nl ? '신저가' : '신저가 근접') + ' · 거래대금 순</h5>' + col(loList, !nl, false) + '</div></div>' +
+    '<div class="fdHow"><b>읽는 법</b> — 신고가가 많다고 "비싸다"가 아니고, 신저가가 많다고 "싸다"가 아니에요. 어느 쪽이 넓게 늘어나는지를 봐요.</div>';
 }
 function briefPriceTxt(sym, v) { return typeof cPrice === "function" ? cPrice(sym, v) : String(v); }
 function briefAmtTxt(s) { var a = s.amt || 0; if (!a) return "-"; if (/\.K[SQ]$/.test(s.sym)) return a >= 1e12 ? (a / 1e12).toFixed(2) + "조" : (a / 1e8).toFixed(0) + "억"; return a >= 1e9 ? "$" + (a / 1e9).toFixed(2) + "B" : "$" + (a / 1e6).toFixed(0) + "M"; }
@@ -433,10 +433,20 @@ function renderBrief() {
     " · " + (R.market !== "all" ? R.mktName + " " : "") + R.count + "개 자산" + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "");
   var ML = R.market !== "all" ? R.mktName + " " : "";
 
-  /* ① 온도계 — 한 줄 문장 + 지표 칩 */
+  /* ① 한눈에 — KPI 띠 + 온도 한 줄 + 지표 칩 (v9.1) */
   var t = R.temp;
-  $("briefTempBox").innerHTML = '<div class="briefTemp">' +
-    '<div class="briefTempMain"><div class="briefTempWord">' + L + ' ' + ML + '시장은 <b>' + t.word + '</b> <small class="briefDim">오른 종목 ' + t.up + '/' + t.total + ' (' + Math.round(t.upPct * 100) + '%) · 20일선 위 ' + Math.round(t.abovePct * 100) + '%</small></div>' +
+  if ($("briefKpi")) {
+    var vixN = (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], nh = (t.newHigh || []).length, nl = (t.newLow || []).length;
+    var idx0 = R.indexRow[0];
+    $("briefKpi").innerHTML = [
+      { l: "오른 종목", v: Math.round(t.upPct * 100) + "%", s: t.up + "/" + t.total, p: t.upPct, cls: t.upPct >= 0.5 ? "up" : "down" },
+      { l: "20일선 위", v: Math.round(t.abovePct * 100) + "%", s: "추세", p: t.abovePct, cls: t.abovePct >= 0.5 ? "up" : "down" },
+      { l: "신고가 : 신저가", v: t.n200 ? nh + " : " + nl : "–", s: t.n200 ? "52주" : "1년치 후", p: t.n200 ? nh / Math.max(1, nh + nl) : 0, cls: nh > nl ? "up" : nl > nh ? "down" : "" },
+      { l: vixN ? "공포지수" : (idx0 ? idx0.name : "지수"), v: vixN ? vixN.v : (idx0 ? briefPct(idx0.ret) : "–"), s: vixN ? (parseFloat(vixN.v) >= 25 ? "공포" : parseFloat(vixN.v) >= 20 ? "불안" : "평온") : "", p: vixN ? Math.min(1, parseFloat(vixN.v) / 40) : 0.5, cls: vixN ? (parseFloat(vixN.v) >= 25 ? "down" : "") : (idx0 && idx0.ret < 0 ? "down" : "up") }
+    ].map(function (k) { return '<div class="kpi ' + k.cls + '"><div class="kl">' + k.l + '</div><div class="kv">' + k.v + '<small>' + k.s + '</small></div><div class="kb"><i style="width:' + Math.round(k.p * 100) + '%"></i></div></div>'; }).join("");
+  }
+  if ($("briefTempBox")) $("briefTempBox").innerHTML = '<div class="briefTemp">' +
+    '<div class="briefTempMain"><div class="briefTempWord">' + L + ' ' + ML + '시장은 <b>' + t.word + '</b></div>' +
     '<div class="briefTempBar"><div style="width:' + Math.round(t.upPct * 100) + '%"></div></div>' +
     '<div class="briefTempDesc">' + t.desc + '</div></div>' +
     '<div class="briefIdxRow">' + R.indexRow.map(function (x) {
