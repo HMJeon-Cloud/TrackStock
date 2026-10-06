@@ -10,7 +10,7 @@
                                    '버틴 자산을 팔아 빠진 자산을 샀다면' 1년 뒤 결과 (전부 실제 데이터로 계산)
    전체 글 복사 · 스레드용 짧은 글 · 각 섹션 이미지 저장
    ============================================================ */
-var CH_REP_MDD = ["SPY", "QQQ", "^KS11", "TLT", "GLD", "BTC-USD"];   // 대표 자산 (고정)
+var CH_REP_MDD = ["SPY", "QQQ", "^KS11", "TLT", "GLD", "SCHD"];   // 대표 자산 (고정) — v9.3: 코인은 코인 브리핑으로 분리
 var chState = { daily: null, mdd: null, mddPick: null, alloc: null, plan: null, now: null, scen: null, recent: null, popular: [] };
 
 function chLoad(k, def) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch (e) { return def; } }
@@ -49,7 +49,7 @@ function chPrepare() {
     return popP.then(function (pop) {
       var list = [];
       try {
-        var R = briefCompute(recent, { mode: "day", popular: pop });
+        var R = briefCompute(recent, { mode: "day", market: "stock", popular: pop });   // v9.3: 채널(주식) 자료엔 코인 제외
         chState.brief = R;
         list = R.popular.map(function (s) { return s.sym; }).filter(function (sym) { return !/^\^|=X$|=F$/.test(sym); });
       } catch (e) {}
@@ -389,7 +389,7 @@ function chAllocText() {
 
 /* ---------- ④ 상황별 과거 사례 ----------
    날짜 구간은 널리 알려진 사건 기준이고, 숫자(등락·낙폭·회복일·1년 뒤)는 전부 앱의 실제 가격 데이터로 계산한다. */
-var CH_ASSETS = [["SPY", "S&P500"], ["QQQ", "나스닥100"], ["^KS11", "코스피"], ["SCHD", "미국 배당주"], ["TLT", "장기채"], ["IEF", "중기채"], ["SHY", "단기채"], ["GLD", "금"], ["DBC", "원자재"], ["BTC-USD", "비트코인"], ["KRW=X", "달러/원"]];
+var CH_ASSETS = [["SPY", "S&P500"], ["QQQ", "나스닥100"], ["^KS11", "코스피"], ["SCHD", "미국 배당주"], ["TLT", "장기채"], ["IEF", "중기채"], ["SHY", "단기채"], ["GLD", "금"], ["DBC", "원자재"], ["KRW=X", "달러/원"]];   // v9.3: 비트코인 제외(코인은 따로)
 var CH_POP_DEFAULT = ["NVDA", "TSLA", "AAPL", "MSFT", "005930.KS", "000660.KS", "PLTR", "AMZN"];
 var CH_SCEN = [
   { id: "rateUp", tag: "금리 급등", icon: "📈",

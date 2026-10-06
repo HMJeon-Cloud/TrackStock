@@ -28,7 +28,17 @@ var BRIEF_THEMES = [
   ["지수·대표 ETF", ["^KS11", "^KQ11", "^GSPC", "^IXIC", "^NDX", "^DJI", "^N225", "^HSI", "SPY", "VOO", "QQQ", "VTI", "SCHD", "JEPI", "069500.KS", "360750.KS", "133690.KS"]],
   ["채권", ["TLT", "IEF", "SHY", "LQD"]],
   ["금·원자재", ["GLD", "GC=F", "SLV", "DBC", "USO", "132030.KS"]],
-  ["코인·관련주", ["BTC-USD", "ETH-USD", "MSTR", "COIN"]]
+  ["코인 관련주", ["MSTR", "COIN"]],
+  /* 코인 업종 (v9.3) — 코인 탭에서만 보이고(미국·국내 탭엔 해당 종목 없음) */
+  ["메이저 코인", ["BTC-USD", "ETH-USD", "XRP-USD", "SOL-USD"]],
+  ["레이어1", ["ADA-USD", "AVAX-USD", "DOT-USD", "NEAR-USD", "SUI20947-USD", "APT21794-USD", "TON11419-USD", "ICP-USD", "ATOM-USD", "ALGO-USD", "EGLD-USD", "SEI-USD", "TIA22861-USD", "KAS-USD", "HBAR-USD", "TRX-USD"]],
+  ["레이어2·인프라", ["ARB11841-USD", "OP-USD", "IMX10603-USD", "STX4847-USD", "LINK-USD", "QNT-USD", "FIL-USD", "GRT6719-USD", "VET-USD", "IOTA-USD"]],
+  ["디파이", ["UNI7083-USD", "AAVE-USD", "MKR-USD", "LDO-USD", "CRV-USD", "INJ-USD", "JUP29210-USD", "ENA-USD", "ONDO-USD", "1INCH-USD", "KAVA-USD"]],
+  ["밈코인", ["DOGE-USD", "SHIB-USD", "PEPE24478-USD", "BONK-USD", "FLOKI-USD", "WIF-USD"]],
+  ["AI 코인", ["FET-USD", "RENDER-USD", "TAO22974-USD", "WLD-USD"]],
+  ["게임·메타버스", ["SAND-USD", "MANA-USD", "AXS-USD", "GALA-USD", "CHZ-USD", "FLOW-USD", "THETA-USD"]],
+  ["결제·프라이버시", ["LTC-USD", "BCH-USD", "XLM-USD", "XMR-USD", "ETC-USD", "ZEC-USD", "DASH-USD", "XDC-USD"]],
+  ["거래소 코인", ["BNB-USD", "OKB-USD", "LEO-USD", "CRO-USD"]]
 ];
 /* 참고 종목에서 빼는 것: 레버리지·인버스·변동성지수·환율 (숫자 기준이 왜곡된다) */
 var BRIEF_EXCLUDE = /^(TQQQ|SOXL|122630\.KS|114800\.KS|\^VIX|DX-Y\.NYB|KRW=X|JPYKRW=X|EURKRW=X)$/;
@@ -152,8 +162,8 @@ function briefQuality(rows) {
 function briefCompute(recent, opts) {
   opts = opts || {};
   var mode = opts.mode === "week" ? "week" : opts.mode === "month" ? "month" : "day";
-  var market = BRIEF_MKT[opts.market] && opts.market !== "all" ? opts.market : "all";
-  function inMkt(sym) { return market === "all" || briefMkt(sym) === market; }
+  var market = opts.market === "stock" ? "stock" : BRIEF_MKT[opts.market] && opts.market !== "all" ? opts.market : "all";
+  function inMkt(sym) { return market === "all" || (market === "stock" ? briefMkt(sym) !== "coin" : briefMkt(sym) === market); }
   var now = opts.now ? new Date(opts.now) : new Date();
   var rows = [], bySym = {}, asOf = 0;
   Object.keys(recent.symbols || {}).forEach(function (sym) {
@@ -163,6 +173,8 @@ function briefCompute(recent, opts) {
     if (s.lastT && s.lastT > asOf) asOf = s.lastT;
   });
   var quality = briefQuality(rows);
+  // 수집 때 검증에 걸린 종목(다른 코인으로 바뀐 심볼 등)도 제외 (v9.3)
+  Object.keys(recent.flags || {}).forEach(function (sym) { if (/name\(/.test(recent.flags[sym]) && bySym[sym]) { quality.bad[sym] = "name"; quality.spike.push(bySym[sym]); } });
   var stocks = rows.filter(function (s) { return !BRIEF_EXCLUDE.test(s.sym) && !quality.bad[s.sym] && !BRIEF_DUP[s.sym] && inMkt(s.sym); });
   var label = mode === "week" ? "이번 주" : mode === "month" ? "이번 달" : "오늘";
 
@@ -274,7 +286,7 @@ function briefCompute(recent, opts) {
 
   // 시장을 고르면 인기 종목도 그 시장 것만 (부족하면 그 시장 거래대금 상위로 채움)
   if (market !== "all") {
-    popular = popular.filter(function (s) { return s && briefMkt(s.sym) === market; });
+    popular = popular.filter(function (s) { return s && inMkt(s.sym); });
     (turnover[market] || []).forEach(function (s) { if (popular.length < 10 && popular.indexOf(s) < 0) popular.push(s); });
   }
 
@@ -307,7 +319,7 @@ function briefCompute(recent, opts) {
       if (diff <= 14 && d.getFullYear() < now.getFullYear()) hist.push({ date: e.date, name: e.name, type: e.type, years: now.getFullYear() - d.getFullYear() });
     });
   }
-  return { quality: quality, mode: mode, market: market, mktName: BRIEF_MKT[market], label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
+  return { quality: quality, mode: mode, market: market, mktName: market === "stock" ? "주식" : BRIEF_MKT[market], label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
 }
 
 /* 뉴스 제목 묶음 → 키워드 순위 (NEWS_TAGS 재사용) */

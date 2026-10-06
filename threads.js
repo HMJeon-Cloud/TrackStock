@@ -32,7 +32,7 @@ function thrDaily(R, iss, names, opts) {
   var nums = R.numbers || [], saleN = nums[0] ? nums[0].v : null, vix = nums.filter(function (n) { return n.sym === "^VIX"; })[0];
   var nh = t.newHigh ? t.newHigh.length : 0, nl = t.newLow ? t.newLow.length : 0, has1y = !!t.n200;
   var top = iss && iss[0], zz = top && (top.sub || "").match(/평소[^0-9]*([0-9.]+)배/);
-  var N = names ? names.length : 0, mkName = mk === "all" ? "" : R.mktName + " ", unit = mk === "coin" ? "코인" : "종목", endTag = when === "어제" ? "" : when + " 끝 기준 ";
+  var N = names ? names.length : 0, mkName = mk === "all" || mk === "coin" ? "" : R.mktName + " ", unit = mk === "coin" ? "코인" : "종목", endTag = when === "어제" ? "" : when + " 끝 기준 ";
   function r1(s) { return s ? (s.ret1 != null && R.mode !== "week" && R.mode !== "month" ? s.ret1 : s.ret) : null; }
   // 한눈에 (숫자 5줄 이하)
   var L = [];

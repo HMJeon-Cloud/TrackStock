@@ -129,8 +129,10 @@ function cTitle(g, title, y, maxSize) {
   return y0 + (lines.length - 1) * size * 1.25 + 24;
 }
 /* 머리: 로고 · 꼬리표 · 날짜(쪽번호) / 큰 제목 / 부제는 본문 첫 요약 박스로 */
+var CARD_UNIT = "";   // "코인"이면 제목·부제의 '종목'을 '코인'으로 (코인 브리핑)
 function cHead(c, tag, title, sub, page, total) {
   var g = c.g, P = CARD.PAD, ev = CARD_STYLE === "event";
+  if (CARD_UNIT === "코인") { if (typeof title === "string") title = title.replace(/종목/g, "코인"); if (sub) sub = String(sub).replace(/종목/g, "코인"); }
   cLogo(g, P, 72);
   // 꼬리표(둥근 테두리) — 날짜 부분은 꼬리표에서 떼어 오른쪽에. 이벤트 카드는 금색 채움
   var m = String(tag).match(/^(.*?)\s*·\s*([0-9]{1,2}\.[0-9]{1,2}\([일월화수목금토]\)[^·]*)$/);
@@ -585,8 +587,15 @@ function cardsBrief() {
 var CARD_NEWS = { items: [], at: 0 };
 function cardsNewsFetch(R) {
   if (typeof fetchNews !== "function") return Promise.resolve([]);
-  if (Date.now() - CARD_NEWS.at < 20 * 60e3 && CARD_NEWS.items.length) return Promise.resolve(CARD_NEWS.items);
-  var qs = [{ type: "market", cat: "main", size: 6 }, { type: "market", cat: "world", size: 5 }, { type: "market", cat: "fx", size: 3 }, { type: "market", cat: "rate", size: 3 }];
+  var mk = (R && R.market) || "all";
+  if (CARD_NEWS.mk === mk && Date.now() - CARD_NEWS.at < 20 * 60e3 && CARD_NEWS.items.length) return Promise.resolve(CARD_NEWS.items);
+  // 시장별 기사 주제 (v9.3: 코인은 코인 기사만, 미국은 미국·금리·환율, 국내는 국내 위주)
+  var QS = {
+    coin: [{ type: "market", cat: "coin", size: 8 }, { type: "market", cat: "coin2", size: 6 }, { type: "market", cat: "fx", size: 2 }],
+    us: [{ type: "market", cat: "world", size: 8 }, { type: "market", cat: "rate", size: 4 }, { type: "market", cat: "fx", size: 3 }],
+    kr: [{ type: "market", cat: "main", size: 8 }, { type: "market", cat: "market", size: 5 }, { type: "market", cat: "fx", size: 3 }]
+  };
+  var qs = (QS[mk] || [{ type: "market", cat: "main", size: 6 }, { type: "market", cat: "world", size: 5 }, { type: "market", cat: "fx", size: 3 }, { type: "market", cat: "rate", size: 3 }]).map(function (q) { return Object.assign({}, q); });
   var mv = R ? R.movers.up.slice(0, 2).concat(R.movers.down.slice(0, 1)) : [];
   mv.forEach(function (s) { qs.push({ type: "stock", q: briefName(s), size: 2, sym: s.sym }); });
   return Promise.all(qs.map(function (q) { return fetchNews(q).then(function (items) { return (items || []).map(function (it) { it.cat = q.cat || "stock"; return it; }); }).catch(function () { return []; }); })).then(function (lists) {
@@ -600,7 +609,7 @@ function cardsNewsFetch(R) {
       lists.forEach(function (l, i) { while (idx[i] < l.length && out.length < 10) { var it = l[idx[i]++]; if (!it.title || dup(it.title) || /\[속보\]|\[포토\]|\[영상\]|\[사진\]/.test(it.title)) continue; seen.push(key(it.title)); out.push(it); added = true; break; } });
       if (!added) break;
     }
-    CARD_NEWS = { items: out, at: Date.now() };
+    CARD_NEWS = { items: out, at: Date.now(), mk: mk };
     return out;
   });
 }
@@ -721,6 +730,7 @@ function cardsOpen(kind) {
   var make = function () {   // 맨 앞에 '오늘의 핵심 이슈 5' 표지 카드
     CARD_STYLE = kind === "brief" ? "event" : "regular";   // 오늘의 브리핑(전일 정리)은 이벤트성 → 검정 머리, 채널 자료는 정기 → 남색 머리
     CARD_SERIES = kind === "brief" ? "DAILY · 전일 정리" : "CHANNEL · " + cDate(Date.now());
+    CARD_UNIT = kind === "brief" && briefState.market === "coin" ? "코인" : "";
     var list = make0();
     try {
       var iss = kind === "brief" ? (typeof issuesCompute === "function" && briefState.recent ? issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }) : null)
@@ -745,7 +755,7 @@ function cardsOpen(kind) {
     if (btn) btn.textContent = old;
     var list;
     try { list = make(); } catch (e) { console.warn(e); list = []; }
-    CARD_STYLE = "regular"; CARD_SERIES = "";
+    CARD_STYLE = "regular"; CARD_SERIES = ""; CARD_UNIT = "";
     if (!list.length) { alert("아직 데이터가 다 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요."); return; }
     var day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     var box = document.createElement("div");

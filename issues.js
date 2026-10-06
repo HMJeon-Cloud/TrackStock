@@ -11,7 +11,7 @@ var ISS_MACRO = [
   ["KRW=X", "fx", "💱", "원/달러 환율"], ["^VIX", "vix", "😱", "공포지수 VIX"], ["TLT", "rate", "🏦", "미국 장기채"],
   ["GLD", "gold", "🥇", "금"], ["USO", "oil", "🛢️", "원유"], ["BTC-USD", "btc", "🟠", "비트코인"]
 ];
-var ISS_MKT = { fx: ["all", "kr", "us", "coin"], vix: ["all", "us"], rate: ["all", "us"], gold: ["all", "us"], oil: ["all", "us"], btc: ["all", "coin"] };
+var ISS_MKT = { fx: ["all", "kr", "us", "coin", "stock"], vix: ["all", "us", "stock"], rate: ["all", "us", "stock"], gold: ["all", "us", "stock"], oil: ["all", "us", "stock"], btc: ["all", "coin"] };
 
 function issPct(x, d) { return (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 1 : d) + "%"; }
 /* 기간: day(하루) · week(5거래일) · month(21거래일) — ISS_MODE에 따라 등락과 "평소 변동폭" 기준이 바뀐다 */
@@ -31,7 +31,7 @@ function issuesCompute(recent, opt) {
   var C = [];
   // ① 증시 (미국·한국 각각 한 줄)
   ["us", "kr"].forEach(function (reg) {
-    if (market !== "all" && market !== reg) return;
+    if (market !== "all" && market !== "stock" && market !== reg) return;
     var a = ISS_INDEX[reg].map(function (p) { var s = st(p[0]); return s ? { p: p, s: s, z: issZ(s) } : null; }).filter(Boolean);
     if (!a.length) return;
     a.sort(function (x, y) { return y.z - x.z; });
@@ -187,6 +187,6 @@ function issuesForBrief() {
 }
 function issuesForChannel() {
   if (typeof chState === "undefined" || !chState.recent) return;
-  chState.issues = issuesCompute(chState.recent, { market: "all", popular: chState.popularRaw, mdd: (chState.mdd || []).concat(chState.mddPick || []), now: chState.now });
+  chState.issues = issuesCompute(chState.recent, { market: "stock", popular: chState.popularRaw, mdd: (chState.mdd || []).concat(chState.mddPick || []), now: chState.now });
   issuesRender("chTop5", chState.issues);
 }
