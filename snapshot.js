@@ -225,6 +225,8 @@
       tw.querySelectorAll(".evtMore").forEach(function (m) {
         if (m.dataset.more) { var s = document.createElement("span"); s.innerHTML = decodeURIComponent(m.dataset.more); m.replaceWith.apply(m, Array.prototype.slice.call(s.childNodes)); }
       });
+      tw.querySelectorAll(".slMore").forEach(function (m) { m.classList.add("open"); });   // v9.4 접힌 내용도 이미지엔 다 나오게
+      tw.querySelectorAll(".slToggle").forEach(function (b) { b.remove(); });
       // 입력칸은 지금 값 그대로 보이게
       var liveIn = wrap.querySelectorAll("input, select"), cloneIn = tw.querySelectorAll("input, select");
       cloneIn.forEach(function (c, i) {

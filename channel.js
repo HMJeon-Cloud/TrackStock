@@ -67,7 +67,29 @@ function chRenderQuality() {
     (n ? '<span style="color:#b45309">확인 필요 ' + n + '개 — 순위·카드에서 제외했어요</span>' : '<span style="color:var(--good)">이상 없음</span>') +
     (n ? '<div class="briefDim" style="margin-top:4px">' +
       (q.stale.length ? '오래된 데이터(수집 실패로 지난 값): ' + q.stale.map(function (s) { return briefName(s) + " " + kstFmt(new Date(s.lastT).toISOString(), false).slice(5); }).join(", ") + '<br>' : '') +
-      (q.spike.length ? '하루 ±40% 넘는 급변(오류 의심): ' + q.spike.map(function (s) { return briefName(s) + " " + chPct(s.ret1); }).join(", ") : '') + '</div>' : '');
+      (q.spike.length ? '하루 ±40% 넘는 급변(오류 의심): ' + q.spike.map(function (s) { return briefName(s) + " " + chPct(s.ret1); }).join(", ") : '') + '</div>' : '') +
+    '<div class="row" style="gap:6px;margin-top:6px"><button class="chip" id="chAuditBtn">과거 데이터까지 전체 점검</button><span class="briefDim" style="font-size:11.5px">25년치 · 9가지 방법으로 교차 확인 · 30~50초</span></div><div id="chAuditOut"></div>';
+  var ab = $("chAuditBtn"); if (ab) ab.onclick = chRunAudit;
+}
+/* v9.4 — 과거 데이터 전체 점검: 서버(/api/cron-snapshot?audit=1)가 저장된 모든 종목을 순서·중복·0/음수·자릿수·튀었다 돌아온 값·유지된 급변·
+   수정주가 비율·과거파일↔최근값 불일치·52주 최고가 교차확인·갱신 지연으로 검사한다. 운영자 토큰으로 실행(CRON_SECRET 불필요) */
+var CH_AUDIT_WORD = { order: "날짜 순서", dup: "중복 날짜", value: "0·음수 값", gap: "긴 공백", precision: "자릿수 손실", spike: "튀었다 돌아온 값", jump: "유지된 급변", "split-ok": "액면분할(정상)", adj: "수정주가 비율 이상", mismatch: "과거↔최근 값 불일치", nooverlap: "겹치는 날 없음", hi52: "52주 최고가 차이", stale: "갱신 지연", short: "데이터 짧음" };
+function chRunAudit() {
+  var out = $("chAuditOut"), btn = $("chAuditBtn"); if (!out) return;
+  var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
+  btn.disabled = true; btn.textContent = "점검 중… (최대 1분)"; out.innerHTML = "";
+  fetch("/api/cron-snapshot?audit=1", { headers: { "x-owner": tok }, cache: "no-store" }).then(function (r) { return r.json().then(function (j) { j._st = r.status; return j; }); }).then(function (j) {
+    btn.disabled = false; btn.textContent = "다시 점검";
+    if (j._st !== 200) { out.innerHTML = '<div class="chWhyBox">점검 실패: ' + escapeHtml(j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드(토큰)가 이 기기에 켜져 있어야 해요.' : '') + '</div>'; return; }
+    var sum = Object.keys(j.summary || {}).map(function (k) { return (CH_AUDIT_WORD[k] || k) + " " + j.summary[k]; }).join(" · ");
+    var ser = j.serious || [];
+    out.innerHTML = '<div class="chWhyBox" style="margin-top:6px"><b>' + j.checked + '/' + j.total + '개 종목 점검</b> · ' + escapeHtml(j.at || "") + '<br>' +
+      (ser.length ? '<span style="color:#b45309"><b>바로 확인할 종목 ' + ser.length + '개</b></span>' : '<span style="color:var(--good)"><b>바로 고칠 문제 없음</b></span>') + (sum ? ' <span class="briefDim">(' + escapeHtml(sum) + ')</span>' : '') +
+      (ser.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + ser.slice(0, 30).map(function (s) { return '<li><b>' + escapeHtml(chName(s)) + '</b> <span class="briefDim">' + escapeHtml(s) + '</span> — ' + escapeHtml((j.report[s] || []).map(function (x) { var k = x.split(":")[0]; return (CH_AUDIT_WORD[k] || k) + x.slice(k.length); }).join(" / ")) + '</li>'; }).join("") + '</ul>' : '') +
+      ((j.missingHistory || []).length ? '<div class="briefDim" style="margin-top:4px">과거 파일 없음 ' + j.missingHistory.length + '개: ' + escapeHtml(j.missingHistory.slice(0, 12).join(", ")) + '</div>' : '') +
+      (j.checked < j.total ? '<div class="briefDim">시간 제한으로 ' + (j.total - j.checked) + '개는 시간 제한(50초)으로 이번에 확인하지 못했어요. 한 번 더 누르면 다시 처음부터 점검해요.</div>' : '') +
+      '<div class="briefDim" style="margin-top:4px">' + escapeHtml(j.guide || "") + '</div></div>';
+  }).catch(function (e) { btn.disabled = false; btn.textContent = "다시 점검"; out.innerHTML = '<div class="chWhyBox">점검 실패: ' + escapeHtml(e.message) + '</div>'; });
 }
 function chStat(sym) { var d = chState.recent && chState.recent.symbols[sym]; return d ? briefStats(sym, d, "day") : null; }
 
@@ -551,9 +573,11 @@ function renderChannel() {
     return Promise.all([chLoadDaily(false), chPrepare()]);
   }).then(function () {
     chRenderQuality();
+    if (typeof slChannel === "function") try { slChannel(); } catch (e) { console.warn(e); }
     if (typeof issuesForChannel === "function") try { issuesForChannel(); } catch (e) { console.warn(e); }
     if (typeof pubRender === "function") try { pubRender(); } catch (e) { console.warn(e); }
     return Promise.all([chLoadAlloc(), chLoadMdd()]);
   }).then(function () { if (typeof issuesForChannel === "function") try { issuesForChannel(); } catch (e) { console.warn(e); } if (typeof pubRender === "function") try { pubRender(); } catch (e) { console.warn(e); } })   // MDD·시장 신호 반영해 다시
-    .then(chLoadScenarios).then(chUpdateCount);
+    .then(chLoadScenarios).then(chUpdateCount).then(slRun, slRun);
+  function slRun() { if (typeof slChannel === "function") try { slChannel(); } catch (e) { console.warn(e); } }
 }

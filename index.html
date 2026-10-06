@@ -534,6 +534,35 @@
   .thrPanel { background: #141317; color: #f4f1ea; border-radius: 16px; padding: 12px 12px 10px; margin-bottom: 12px; }
   .thrHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; } .thrHead b { color: #f1dca2; } .thrHead small { color: #b9b3a8; font-size: 11.5px; } .thrHead small b { color: #f1dca2; }
   .thrPanel .pills button { background: rgba(255,255,255,.08); color: #e9e4d8; } .thrPanel .pills button.active { background: #c9a24f; color: #141317; }
+  /* v9.4 — 한눈에 보기(발표 자료형): 3초 요약 슬라이드 + 섹션 핵심 한 줄 + 접기 */
+  .slHero { background: linear-gradient(160deg, #17161a 0%, #0b0b0d 70%) !important; color: #f4f1ea; border: 0 !important; padding: 20px 18px 16px !important; position: relative; overflow: hidden; }
+  .slHero:empty { display: none; }
+  .slHero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(201,162,79,.28), rgba(201,162,79,0) 70%); pointer-events: none; }
+  .slKick { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: #c9a24f; }
+  .slHead { font-size: 24px; line-height: 1.3; font-weight: 800; margin: 6px 0 12px; word-break: keep-all; }
+  .slHead em { font-style: normal; color: #f1d48a; } .slHead em.u { color: #ff6b61; } .slHead em.d { color: #6aa6ff; }
+  .slSub { color: #b9b3a8; font-size: 13px; margin: -6px 0 10px; }
+  .slKpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; } @media (min-width: 640px) { .slKpis { grid-template-columns: repeat(4, 1fr); } }
+  .slK { background: rgba(255,255,255,.06); border-radius: 12px; padding: 9px 11px; min-width: 0; }
+  .slK span { display: block; font-size: 11.5px; color: #b9b3a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slK b { display: block; font-size: 21px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .slK small { display: block; font-size: 11px; color: #8f897f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slK.u b { color: #ff6b61; } .slK.d b { color: #6aa6ff; }
+  .slPts { margin: 12px 0 0; padding: 0; list-style: none; counter-reset: sl; }
+  .slPts li { counter-increment: sl; position: relative; padding: 7px 0 7px 30px; font-size: 14px; line-height: 1.5; border-top: 1px solid rgba(255,255,255,.08); word-break: keep-all; }
+  .slPts li::before { content: counter(sl); position: absolute; left: 0; top: 8px; width: 20px; height: 20px; border-radius: 50%; background: #c9a24f; color: #141317; font-size: 12px; font-weight: 800; text-align: center; line-height: 20px; }
+  .slNav, .slActs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .slNav button { background: rgba(255,255,255,.08); color: #e9e4d8; border: 0; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+  .slActs .chip { background: rgba(255,255,255,.1); color: #f4f1ea; border-color: transparent; }
+  .slActs .primary { background: #c9a24f; color: #141317; }
+  .slKey { margin: 2px 0 10px; padding: 9px 12px; border-left: 4px solid #c9a24f; background: rgba(201,162,79,.10); border-radius: 0 10px 10px 0; font-size: 15px; font-weight: 800; line-height: 1.45; word-break: keep-all; }
+  .slMore { max-height: 168px; overflow: hidden; position: relative; transition: max-height .25s; -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+  .slMore.open { max-height: none; -webkit-mask-image: none; mask-image: none; }
+  .slToggle { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 1px solid var(--line); background: transparent; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--muted, #667); cursor: pointer; }
+  .reelWrap { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
+  .thrGrid { display: grid; grid-template-columns: 1fr; gap: 10px; } @media (min-width: 760px) { .thrGrid { grid-template-columns: 1fr 1fr; } }
+  .thrLbl { font-size: 12.5px; font-weight: 700; color: #f1dca2; margin-top: 4px; } .thrLbl span { font-weight: 400; margin-left: 6px; color: #b9b3a8; }
+  .thrGrid .primary { width: 100%; }
   .thrText { width: 100%; min-height: 230px; margin: 8px 0; background: #1f1d22; color: #f4f1ea; border: 1px solid #3a352c; border-radius: 12px; padding: 10px 12px; font: 13.5px/1.6 inherit; font-family: inherit; resize: vertical; box-sizing: border-box; }
   /* v9.1 — 브리핑 화면 정돈: 섹션을 카드로, 번호 배지, 한눈에 KPI 띠 */
   #briefBody .briefSec { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 18px; padding: 16px 16px 14px; margin-top: 12px; box-shadow: 0 1px 2px rgba(20,30,50,.04); }
@@ -1657,6 +1686,7 @@
   </div></details>
 
   <div id="briefBody" class="hidden">
+    <section class="briefSec slHero" id="briefHero"></section>
     <section class="briefSec issBox" id="briefTop5"></section>
 
     <section class="briefSec kpiSec snapTarget" data-snap-title="한눈에">
@@ -1736,6 +1766,7 @@
     </ul>
   </div></details>
 
+  <section class="briefSec slHero" id="chHero"></section>
   <div id="chQuality" class="chQuality"></div>
   <div id="chTop5" class="issBox" style="margin-top:12px"></div>
   <section class="briefSec" id="pubSec" style="margin-top:12px">
@@ -1966,7 +1997,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v9.3<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v9.4<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -1980,7 +2011,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script src="tickers.js?v=9.3"></script>
+<script src="tickers.js?v=9.4"></script>
 <script>
 "use strict";
 /* ================= CORE (순수 계산 함수) ================= */
@@ -2615,8 +2646,10 @@ function fmtDate(t) {
 }
 function fmtPrice(v) {
   if (v == null || !isFinite(v)) return "-";
-  if (state.displayCur === "KRW") return Math.round(v).toLocaleString("ko-KR");
-  var digits = Math.abs(v) < 10 ? 3 : 2;
+  var av = Math.abs(v);
+  if (av > 0 && av < 1) return v.toLocaleString(state.displayCur === "KRW" ? "ko-KR" : "en-US", { maximumSignificantDigits: 4 });   // v9.4 시바이누·페페처럼 1보다 작은 가격이 0으로 보이던 문제
+  if (state.displayCur === "KRW") return av < 100 ? v.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : Math.round(v).toLocaleString("ko-KR");
+  var digits = av < 10 ? 3 : 2;
   return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: digits });
 }
 function fmtPct(v) {
@@ -2908,7 +2941,7 @@ function fetchSnapFile(symbol) {
 /* 최근 1년 통합 파일 — 세션당 한 번만 받고 그 뒤엔 재사용한다 */
 function fetchRecent() {
   if (DATA.recentPromise) return DATA.recentPromise;
-  DATA.recentPromise = fetch("/api/snap?recent=1")
+  DATA.recentPromise = fetch("/api/snap?recent=1" + ((function () { try { return !!localStorage.getItem("sm.owner"); } catch (e) { return false; } })() ? "&fresh=" + Date.now() : ""))   // v9.4 운영자 기기는 CDN(1시간) 캐시를 건너뛰어 수동 수집 직후 바로 반영
     .then(function (r) { if (!r.ok) throw new Error("recent " + r.status); return r.json(); })
     .catch(function () { return null; });   // 없으면 과거 파일만 쓴다
   return DATA.recentPromise;
@@ -4332,24 +4365,26 @@ window.addEventListener("load", function () {
   if (saved) applyShareHash(saved);
 });
 </script>
-<script src="metrics.js?v=9.3"></script>
-<script src="technical.js?v=9.3"></script>
-<script src="company.js?v=9.3"></script>
-<script src="compare.js?v=9.3"></script>
-<script src="sim.js?v=9.3"></script>
-<script src="insight.js?v=9.3"></script>
-<script src="guide.js?v=9.3"></script>
-<script src="watch.js?v=9.3"></script>
-<script src="holdings.js?v=9.3"></script>
-<script src="brief.js?v=9.3"></script>
-<script src="channel.js?v=9.3"></script>
-<script src="cards.js?v=9.3"></script>
-<script src="mind.js?v=9.3"></script>
-<script src="issues.js?v=9.3"></script>
-<script src="publish.js?v=9.3"></script>
-<script src="periodic.js?v=9.3"></script>
-<script src="story.js?v=9.3"></script>
-<script src="threads.js?v=9.3"></script>
-<script src="snapshot.js?v=9.3"></script>
+<script src="metrics.js?v=9.4"></script>
+<script src="technical.js?v=9.4"></script>
+<script src="company.js?v=9.4"></script>
+<script src="compare.js?v=9.4"></script>
+<script src="sim.js?v=9.4"></script>
+<script src="insight.js?v=9.4"></script>
+<script src="guide.js?v=9.4"></script>
+<script src="watch.js?v=9.4"></script>
+<script src="holdings.js?v=9.4"></script>
+<script src="brief.js?v=9.4"></script>
+<script src="channel.js?v=9.4"></script>
+<script src="cards.js?v=9.4"></script>
+<script src="mind.js?v=9.4"></script>
+<script src="issues.js?v=9.4"></script>
+<script src="publish.js?v=9.4"></script>
+<script src="periodic.js?v=9.4"></script>
+<script src="story.js?v=9.4"></script>
+<script src="threads.js?v=9.4"></script>
+<script src="reels.js?v=9.4"></script>
+<script src="slides.js?v=9.4"></script>
+<script src="snapshot.js?v=9.4"></script>
 </body>
 </html>

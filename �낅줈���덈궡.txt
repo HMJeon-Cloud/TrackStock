@@ -1,0 +1,8 @@
+StockMind 전체 파일 (v9.4) — GitHub 저장소에 이 구조 그대로 올리면 됩니다.
+[루트]  index.html manifest.webmanifest sw.js vercel.json package.json tickers.js
+        brief.js cards.js channel.js company.js compare.js guide.js holdings.js insight.js
+        issues.js metrics.js mind.js periodic.js publish.js story.js threads.js reels.js slides.js sim.js snapshot.js technical.js watch.js
+        icon-192.png icon-512.png maskable-192.png maskable-512.png apple-touch-icon.png
+[api]   _compose.js _owner.js _redis.js _tickers.js channel.js chart.js config.js cron-snapshot.js
+        fund.js hit.js news.js owner.js poll.js search.js snap.js user.js   (12개 함수 그대로 · 새 api 파일 없음)
+일정 수정: publish.js 맨 위 PUB_CAL / 용어 추가: 같은 파일 PUB_TERMS / 상식 릴스 수정: reels.js의 REEL_FIX

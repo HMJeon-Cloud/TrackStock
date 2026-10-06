@@ -34,6 +34,7 @@ function cPrice(sym, v) {
   if (/=X$/.test(sym)) return f(v, v >= 100 ? 1 : 2) + "원";
   if (/^\^/.test(sym)) return f(v, sym === "^VIX" ? 1 : 2);
   if (/\.K[SQ]$/.test(sym)) return f(Math.round(v), 0) + "원";
+  if (v < 0.01) return "$" + Number(v.toPrecision(3)).toFixed(Math.min(12, Math.max(4, -Math.floor(Math.log10(v)) + 2)));   // 시바이누·페페 같은 아주 작은 가격
   return "$" + f(v, v >= 1000 ? 0 : v >= 1 ? 2 : 4);
 }
 function cLast(sym) {   // 최근 90일 데이터의 마지막 종가 (실제 가격, 수정주가 아님)

@@ -121,6 +121,8 @@ function briefStats(sym, d, mode) {
   // 오늘 20일선을 넘었나 (어제는 아래, 오늘은 위)
   var ma20y = (ma20 * 20 - c[n - 1] + c[n - 21]) / 20;
   var crossUp = c[n - 2] < ma20y && last >= ma20;
+  // v9.4: 계산값이 비정상이면(0으로 나눔·빈 값) 이 종목은 쓰지 않는다 — 막대가 화면 밖으로 튀는 오류 방지
+  if (!(last > 0) || !isFinite(ret) || !isFinite(ret1) || !isFinite(m1)) return null;
   return {
     sym: sym, name: (d.meta && (d.meta.shortName || d.meta.longName)) || sym, cur: (d.meta && d.meta.currency) || "",
     last: last, ret: ret, ret1: ret1, ret5: ret5, m1: m1, m3: m3, ma20: ma20, ma5: ma5, vsMa20: last / ma20 - 1,
@@ -200,6 +202,7 @@ function briefCompute(recent, opts) {
     var list = t[1].map(function (sym) { return quality.bad[sym] || BRIEF_DUP[sym] || !inMkt(sym) ? null : bySym[sym]; }).filter(Boolean);   // 점검 제외·중복 종목은 업종 평균에서도 뺀다
     if (list.length < 2) return null;
     var avg = 0; list.forEach(function (s) { avg += s.ret; }); avg /= list.length;
+    if (!isFinite(avg)) return null;
     var best = list.slice().sort(function (a, b) { return b.ret - a.ret; })[0];
     var worst = list.slice().sort(function (a, b) { return a.ret - b.ret; })[0];
     var upN = list.filter(function (s) { return s.ret > 0; }).length;
@@ -439,6 +442,7 @@ function renderBrief() {
   if (!R || !box) return;
   if (typeof issuesForBrief === "function") try { issuesForBrief(); } catch (e) { console.warn(e); }
   if (typeof pubBriefLine === "function") try { pubBriefLine(); } catch (e) { console.warn(e); }
+  if (typeof slBrief === "function") setTimeout(function () { try { slBrief(); } catch (e) { console.warn(e); } }, 0);
   var L = R.label;
   var qn = R.quality ? R.quality.stale.length + R.quality.spike.length : 0;
   $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs) : R.market === "coin" ? "코인은 24시간 거래 · 매일 오전 9시(한국) 기준" : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +

@@ -407,7 +407,7 @@ function perOpen(kind, force) {
     box.innerHTML = (draft ? '<div class="chWhyBox" style="margin-bottom:10px">⛔ 검토용이에요 — 데이터가 확정되지 않아 "발행 금지" 도장이 찍혀 있어요. 구간이 끝나고 아침 수집 뒤 다시 만드세요.</div>' : '') +
       '<div class="perVerify">' + V.items.map(function (x) { return '<div class="pubCkRow ' + (x.ok ? "ok" : x.w ? "bad" : "warn") + '"><span>' + (x.ok ? "✅" : x.w ? "⛔" : "⚠️") + '</span><span>' + escapeHtml(x.t) + '</span></div>'; }).join("") + '</div>' +
       '<div class="row" style="gap:8px;margin:10px 0 12px"><button class="primary" data-act="all">⬇ 전부 저장</button>' + (navigator.canShare && !draft ? '<button class="chip" data-act="share">↗ 공유</button>' : '') +
-      '<button class="chip" data-act="cap">📋 인스타 캡션 (' + cap.igLen + '자)</button></div>' + thrPanelHtml(/month/.test(kind) ? "재테크" : "주식") + '<div class="cardsWrap"></div>';
+      '</div>' + thrPanelHtml(/month/.test(kind) ? "재테크" : "주식") + '<div class="cardsWrap"></div>';
     var wrap = box.querySelector(".cardsWrap");
     list.forEach(function (it, i) {
       it.url = it.cv.toDataURL("image/png"); it.file = "uphill.lab_" + S.t.replace(/[^가-힣]/g, "") + "_" + day + "_" + it.name + (draft ? "_검토용" : "") + ".png";
@@ -416,8 +416,7 @@ function perOpen(kind, force) {
       f.querySelector("img").src = it.url; f.querySelector("button").onclick = function () { cardsDownload(it); }; wrap.appendChild(f);
     });
     box.querySelector('[data-act="all"]').onclick = function () { list.forEach(function (it, i) { setTimeout(function () { cardsDownload(it); }, i * 400); }); };
-    box.querySelector('[data-act="cap"]').onclick = function () { chCopy(cap.ig, this); };
-    try { thrBind(box, thrPeriodic(kind, list.map(function (it) { return it.name; }))); } catch (e) { console.warn(e); }
+    try { thrBind(box, thrOr(thrPeriodic(kind, list.map(function (it) { return it.name; })), cap)); } catch (e) { console.warn(e); }
     var sh = box.querySelector('[data-act="share"]');
     if (sh) sh.onclick = function () { Promise.all(list.map(function (it) { return new Promise(function (ok) { it.cv.toBlob(function (b) { ok(new File([b], it.file, { type: "image/png" })); }, "image/png"); }); })).then(function (files) { if (navigator.canShare({ files: files })) return navigator.share({ files: files }); }).catch(function () {}); };
     infoModal.open("🃏 " + S.t + " · " + list.length + "장" + (draft ? " (검토용)" : ""), box);

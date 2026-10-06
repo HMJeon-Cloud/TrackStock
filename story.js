@@ -104,12 +104,14 @@ function nbCards3(c, cards) {
   c.y = y + h + 20;
 }
 function nbBars(c, items) {
+  items = (items || []).filter(function (x) { return x && isFinite(x.v); });   // v9.4: 비정상 값은 빼고 그린다
+  if (!items.length) { c.y += 40; return; }
   var g = c.g, P = NB.PAD, W = NB.W - P * 2, n = items.length, bw = Math.min(150, (W - 30 * (n - 1)) / n), gap = n > 1 ? (W - bw * n) / (n - 1) : 0;
   var neg = items.some(function (x) { return x.v < 0; }), mn = Math.min.apply(null, items.map(function (x) { return x.v; }));
   var top = c.y + 50, H = neg ? 230 : 300, mxAbs = Math.max.apply(null, items.map(function (x) { return Math.abs(x.v); })) || 0.01;
   var base = neg ? top + H + 20 : top + H + 40, negH = neg ? Math.abs(mn) / mxAbs * H : 0;
   items.forEach(function (it, i) {
-    var x = P + i * (bw + gap), h = Math.max(6, Math.abs(it.v) / mxAbs * H), col = it.color || (it.v >= 0 ? NB_C.navy : NB_C.grey), y = it.v >= 0 ? base - h : base;
+    var x = P + i * (bw + gap), h = Math.min(H, Math.max(6, Math.abs(it.v) / mxAbs * H)), col = it.color || (it.v >= 0 ? NB_C.navy : NB_C.grey), y = it.v >= 0 ? base - h : base;
     g.fillStyle = col; g.fillRect(x, y, bw, h);
     cText(g, it.txt || cPct(it.v), x + bw / 2, it.v >= 0 ? y - 16 : y + h + 34, 28, 800, col, "center");
     cText(g, it.l, x + bw / 2, it.v >= 0 ? base + 40 : y - 14, 21, 600, NB_C.txt, "center");
@@ -603,12 +605,11 @@ function storyOpen(key) {
     if (!list.length) { alert("아직 데이터가 준비되지 않았어요. (뉴스 덱은 기사 제목에서 자산을 2개 이상 찾아야 만들어져요)"); return; }
     var cap = storyCaption(key), day = pubToday().replace(/-/g, ""), box = document.createElement("div"), slug = deck.t.replace(/[^가-힣A-Za-z0-9]/g, "").slice(0, 12);
     box.innerHTML = '<div class="briefDim" style="margin-bottom:8px">위 검정 = 결론 먼저, 아래 밝은 패널 = 근거. 추천·예측 문장은 없고 "과거엔 이랬다 · 지금 위치 · 무엇을 볼지"까지만 담았어요.</div>' +
-      '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button>' + (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유</button>' : '') + '<button class="chip" data-act="cap">📋 인스타 캡션 (' + cap.igLen + '자)</button></div>' + thrPanelHtml(key === "dca" ? "재테크" : "주식") + '<div class="cardsWrap"></div>';
+      '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button>' + (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유</button>' : '') + '</div>' + thrPanelHtml(key === "dca" ? "재테크" : "주식") + '<div class="cardsWrap"></div>';
     var wrap = box.querySelector(".cardsWrap");
     list.forEach(function (it, i) { it.url = it.cv.toDataURL("image/png"); it.file = "uphill.lab_연구노트_" + slug + "_" + day + "_" + (i + 1) + "_" + it.name + ".png"; var f = document.createElement("figure"); f.innerHTML = '<img alt=""><figcaption><span>' + (i + 1) + '. ' + it.name + '</span><button class="chip" style="padding:3px 10px;font-size:11px">저장</button></figcaption>'; f.querySelector("img").src = it.url; f.querySelector("button").onclick = function () { cardsDownload(it); }; wrap.appendChild(f); });
     box.querySelector('[data-act="all"]').onclick = function () { list.forEach(function (it, i) { setTimeout(function () { cardsDownload(it); }, i * 400); }); };
-    box.querySelector('[data-act="cap"]').onclick = function () { chCopy(cap.ig, this); };
-    try { thrBind(box, thrStory(key, list.map(function (it) { return it.name; }))); } catch (e) { console.warn(e); }
+    try { thrBind(box, thrOr(thrStory(key, list.map(function (it) { return it.name; })), cap)); } catch (e) { console.warn(e); }
     var sh = box.querySelector('[data-act="share"]');
     if (sh) sh.onclick = function () { Promise.all(list.map(function (it) { return new Promise(function (ok) { it.cv.toBlob(function (b) { ok(new File([b], it.file, { type: "image/png" })); }, "image/png"); }); })).then(function (files) { if (navigator.canShare({ files: files })) return navigator.share({ files: files }); }).catch(function () {}); };
     infoModal.open("📓 " + deck.t + " · " + list.length + "장", box);

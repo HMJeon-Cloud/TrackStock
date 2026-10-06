@@ -156,7 +156,7 @@ function pubCaption(opt) {
   var q = ["여러분 계좌는 오늘 어땠나요?", "이 중에 들고 계신 종목 있나요?", "오늘 가장 눈에 띈 건 뭐였어요?", "저장해 두고 내일 아침 숫자와 비교해 보세요."][Math.floor((Date.now() / 86400e3) % 4)];
   var up = pubUpcoming(3).filter(function (e) { return e.k !== "hol"; }), calLine = up.length ? "\n\n🗓️ 다가오는 일정: " + up.slice(0, 2).map(function (e) { return e.d.slice(5).replace("-", "/") + "(" + pubDow(e.d) + ") " + e.t.replace(/^[^\s]+\s/, ""); }).join(" · ") : "";
   var disc = "\n\n※ 전일 종가 기준 자동 집계" + (krHol ? " · 오늘 한국 " + krHol + "로 국내는 전 거래일 값" : "") + " · 투자 권유가 아니며 판단과 책임은 각자에게 있어요. 데이터 출처: 야후 파이낸스 · 네이버 뉴스 제목";
-  var tags = PUB_TAGS_BASE.concat(PUB_TAGS_POOL.daily.slice(0, 4), R.market && R.market !== "all" ? PUB_TAGS_POOL[R.market].slice(0, 2) : []);
+  var tags = PUB_TAGS_BASE.concat(PUB_TAGS_POOL.daily.slice(0, 4), R.market && PUB_TAGS_POOL[R.market] ? PUB_TAGS_POOL[R.market].slice(0, 2) : []);
   var newsLine = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items.length) ? "\n\n📰 아침 뉴스\n" + CARD_NEWS.items.slice(0, 3).map(function (it) { return "· " + cNewsClean(it.title); }).join("\n") : "";
   var ig = hookLine + "\n\n📌 오늘의 핵심 이슈 5 (" + date + ")\n" + body + "\n\n🌡️ 오른 종목 " + Math.round(t.upPct * 100) + "% — " + read + newsLine + "\n\n" + q + calLine + disc + "\n\n" + tags.map(function (x) { return "#" + x; }).join(" ");
   // 스레드: 500자 — 훅 + 상위 3 + 질문
@@ -278,12 +278,11 @@ function pubPolicyOpen(id) {
     .then(function () {
       var list; try { list = pubPolicyCards(pl); } catch (e) { console.warn(e); alert("카드를 만들지 못했어요: " + e.message); return; }
       var cap = pubPolicyCaption(pl), day = pubToday().replace(/-/g, ""), box = document.createElement("div");
-      box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button><button class="chip" data-act="cap">📋 캡션 (' + cap.igLen + '자)</button></div>' + thrPanelHtml("재테크") + '<div class="cardsWrap"></div>';
+      box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button></div>' + thrPanelHtml("재테크") + '<div class="cardsWrap"></div>';
       var wrap = box.querySelector(".cardsWrap");
       list.forEach(function (it, i) { it.url = it.cv.toDataURL("image/png"); it.file = "uphill.lab_정책_" + pl.id + "_" + day + "_" + it.name + ".png"; var f = document.createElement("figure"); f.innerHTML = '<img alt=""><figcaption><span>' + (i + 1) + '. ' + it.name.replace(/^\d_/, "") + '</span><button class="chip" style="padding:3px 10px;font-size:11px">저장</button></figcaption>'; f.querySelector("img").src = it.url; f.querySelector("button").onclick = function () { cardsDownload(it); }; wrap.appendChild(f); });
       box.querySelector('[data-act="all"]').onclick = function () { list.forEach(function (it, i) { setTimeout(function () { cardsDownload(it); }, i * 400); }); };
-      box.querySelector('[data-act="cap"]').onclick = function () { chCopy(cap.ig, this); };
-      try { thrBind(box, thrPolicy(pl, list.map(function (it) { return it.name; }))); } catch (e) { console.warn(e); }
+      try { thrBind(box, thrOr(thrPolicy(pl, list.map(function (it) { return it.name; })), cap)); } catch (e) { console.warn(e); }
       infoModal.open("🃏 " + pl.t + " · " + list.length + "장", box);
     });
 }
@@ -292,7 +291,7 @@ function pubPolicyOpen(id) {
 var pubState = { tab: "plan", termOffset: 0, policy: null };
 function pubRender() {
   var box = $("pubBox"); if (!box) return;
-  var tabs = [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["notes", "연구노트"], ["topics", "주제 은행"], ["policy", "정책 카드"], ["caption", "캡션"], ["cal", "이번 주 일정"], ["term", "용어 한 입"]];
+  var tabs = [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["notes", "연구노트"], ["topics", "주제 은행"], ["policy", "정책 카드"], ["reels", "릴스"], ["caption", "캡션"], ["cal", "이번 주 일정"], ["term", "용어 한 입"]];
   var h = '<div class="pills" style="margin-bottom:10px">' + tabs.map(function (t) { return '<button data-pt="' + t[0] + '"' + (t[0] === pubState.tab ? ' class="active"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div>';
   if (pubState.tab === "plan") {
     var ck = pubChecklist(), pl = pubPlan(), today = typeof perToday === "function" ? perToday() : [];
@@ -327,11 +326,12 @@ function pubRender() {
     if (cur) h += '<div class="chPlanItem"><div style="font-size:13.5px;line-height:1.7"><b>' + escapeHtml(cur.short || cur.t) + '</b> <span class="briefDim">' + escapeHtml(cur.eff || "") + ' · ' + escapeHtml(cur.src || "") + '</span><br>' + escapeHtml(cur.sub || "") + ' · 표 ' + cur.table.rows.length + '행' + (cur.table2 ? ' + 표 ' + cur.table2.rows.length + '행' : '') + (cur.bullets ? ' · 조건 ' + cur.bullets.items.length + '개' : '') + '<br><span class="briefDim">⚠️ ' + escapeHtml(cur.check || "") + '</span></div></div>' +
       '<div class="row" style="gap:6px;margin:8px 0"><button class="primary" data-make="policy" data-id="' + cur.id + '">🃏 카드 만들기</button><button class="chip" data-act="poledit">✏️ 편집 / 새 항목</button></div>';
     h += '<details class="chFold" id="polEditor"><summary>편집창 (JSON · 이 기기에 저장)</summary><div class="briefDim" style="margin:6px 0">아래 형식 그대로 복사해 숫자만 바꾸면 돼요. id가 같으면 덮어쓰고, 새 id면 추가돼요. 표의 값에 [[ ]]를 두르면 금색 강조.</div><textarea id="polJson" style="width:100%;min-height:220px;font:12px/1.5 ui-monospace,monospace;border:1px solid var(--line);border-radius:10px;padding:8px"></textarea><div class="row" style="gap:6px;margin-top:6px"><button class="primary" data-act="polsave">저장</button><button class="chip" data-act="poldel">이 항목 삭제(내 기기 저장분만)</button><span id="polMsg" class="briefDim"></span></div></details>';
+  } else if (pubState.tab === "reels") {
+    h += typeof reelTabHtml === "function" ? reelTabHtml() : "";
   } else if (pubState.tab === "caption") {
     var cap = pubCaption();
     h += (cap.warn.length ? '<div class="chWhyBox">⚠️ ' + cap.warn.join(" / ") + '</div>' : '') +
-      '<div class="row" style="gap:6px;margin-bottom:6px"><b>인스타그램 캡션</b><span class="briefDim">' + (cap.igLen || 0) + '자 / 2,200</span><button class="chip" data-copy="ig">📋 복사</button></div><pre class="chText" id="pubIg"></pre>' +
-      '<div style="margin-top:12px">' + thrPanelHtml("주식") + '</div>' +
+      thrPanelHtml("주식") +
       '<div class="briefDim" style="margin-top:8px">훅 문장과 질문은 날마다 자동으로 바뀌어요. 종목 이름을 직접 언급할 땐 "추천"처럼 읽히지 않게 사실(숫자)만 쓰세요. 해시태그는 5~10개가 적당해요.</div>';
   } else if (pubState.tab === "cal") {
     var up = pubUpcoming(14);
@@ -358,11 +358,12 @@ function pubRender() {
     };
     box.querySelector('[data-act="poldel"]').onclick = function () { var arr = []; try { arr = JSON.parse(localStorage.getItem("sm.policy") || "[]"); } catch (e) {} pubPolicySave(arr.filter(function (p) { return p.id !== pubState.policy; })); pubState.policy = null; pubRender(); };
   }
+  Array.prototype.forEach.call(box.querySelectorAll("[data-reel]"), function (b) { b.onclick = function () { reelOpen(b.getAttribute("data-reel")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-story]"), function (b) { b.onclick = function () { storyOpen(b.getAttribute("data-story")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-per]"), function (b) { b.onclick = function () { perOpen(b.getAttribute("data-per")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-term]"), function (b) { b.onclick = function () { pubState.termOffset += +b.getAttribute("data-term"); pubRender(); }; });
-  if ($("pubIg")) { var cap2 = pubCaption(); $("pubIg").textContent = cap2.ig;
-    try { var Rb = (typeof briefState !== "undefined" && briefState.result) || chState.brief, ib = (typeof briefState !== "undefined" && briefState.recent) ? issuesCompute(briefState.recent, { market: briefState.market }) : (chState.issues || []); thrBind(box, thrDaily(Rb, ib, null)); } catch (e) { console.warn(e); } }
+  if (pubState.tab === "caption") { var cap2 = pubCaption();
+    try { var Rb = (typeof briefState !== "undefined" && briefState.result) || chState.brief, ib = (typeof briefState !== "undefined" && briefState.recent) ? issuesCompute(briefState.recent, { market: briefState.market }) : (chState.issues || []); thrBind(box, thrOr(thrDaily(Rb, ib, null), cap2)); } catch (e) { console.warn(e); thrBind(box, thrOr([], cap2)); } }
   Array.prototype.forEach.call(box.querySelectorAll("[data-copy]"), function (b) {
     b.onclick = function () { var k = b.getAttribute("data-copy"), cap3 = pubCaption(); chCopy(k === "ig" ? cap3.ig : pubTermCaption(pubTerm(pubState.termOffset)), b); };
   });
