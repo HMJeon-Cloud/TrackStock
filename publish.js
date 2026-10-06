@@ -157,7 +157,8 @@ function pubCaption(opt) {
   var up = pubUpcoming(3).filter(function (e) { return e.k !== "hol"; }), calLine = up.length ? "\n\n🗓️ 다가오는 일정: " + up.slice(0, 2).map(function (e) { return e.d.slice(5).replace("-", "/") + "(" + pubDow(e.d) + ") " + e.t.replace(/^[^\s]+\s/, ""); }).join(" · ") : "";
   var disc = "\n\n※ 전일 종가 기준 자동 집계" + (krHol ? " · 오늘 한국 " + krHol + "로 국내는 전 거래일 값" : "") + " · 투자 권유가 아니며 판단과 책임은 각자에게 있어요. 데이터 출처: 야후 파이낸스 · 네이버 뉴스 제목";
   var tags = PUB_TAGS_BASE.concat(PUB_TAGS_POOL.daily.slice(0, 4), R.market && R.market !== "all" ? PUB_TAGS_POOL[R.market].slice(0, 2) : []);
-  var ig = hookLine + "\n\n📌 오늘의 핵심 이슈 5 (" + date + ")\n" + body + "\n\n🌡️ 오른 종목 " + Math.round(t.upPct * 100) + "% — " + read + "\n\n" + q + calLine + disc + "\n\n" + tags.map(function (x) { return "#" + x; }).join(" ");
+  var newsLine = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items.length) ? "\n\n📰 아침 뉴스\n" + CARD_NEWS.items.slice(0, 3).map(function (it) { return "· " + cNewsClean(it.title); }).join("\n") : "";
+  var ig = hookLine + "\n\n📌 오늘의 핵심 이슈 5 (" + date + ")\n" + body + "\n\n🌡️ 오른 종목 " + Math.round(t.upPct * 100) + "% — " + read + newsLine + "\n\n" + q + calLine + disc + "\n\n" + tags.map(function (x) { return "#" + x; }).join(" ");
   // 스레드: 500자 — 훅 + 상위 3 + 질문
   var th = hookLine + "\n\n" + iss.slice(0, 3).map(function (it, i) { return (i + 1) + ". " + it.emoji + " " + it.title; }).join("\n") + "\n\n" + read + "\n\n" + q + "\n\n(전일 종가 기준 · 투자 권유 아님)";
   if (th.length > 500) th = th.slice(0, 490).replace(/\n[^\n]*$/, "") + "…";

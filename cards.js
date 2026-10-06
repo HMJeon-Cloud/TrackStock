@@ -318,7 +318,7 @@ function cFill(c, tip) {
       top = by + pick.bh + 18;
     }
   }
-  if (bottom - top >= 56) cArt(g, P, top, W, Math.min(260, bottom - top));
+  // v8.5: 빈 공간 장식(막대+곡선)은 산만해서 뺐다 — 남는 공간은 비워 둔다
 }
 /* 우상향 막대 + 금색 곡선 (TrackApt 카드 아래쪽 장식과 같은 느낌) */
 function cArt(g, x, y, w, h) {
@@ -330,11 +330,12 @@ function cArt(g, x, y, w, h) {
   g.restore();
 }
 /* ---------- 긴 기간 데이터 (1년 전·적립식 카드용) ---------- */
+/* 1년 전 100만원 / 매달 10만원 카드에 쓰는 종목 — 사람들이 실제로 많이 사는 대표 ETF 위주 + 대표 종목 둘 + 비트코인 (v8.5) */
 var CARD_SETS = {
-  all: ["SPY", "QQQ", "005930.KS", "000660.KS", "NVDA", "TSLA", "BTC-USD", "GLD"],
-  kr: ["069500.KS", "005930.KS", "000660.KS", "005380.KS", "035420.KS", "207940.KS", "105560.KS", "373220.KS"],
-  us: ["SPY", "QQQ", "SCHD", "NVDA", "AAPL", "MSFT", "TSLA", "GLD"],
-  coin: ["BTC-USD", "ETH-USD", "XRP-USD", "SOL-USD", "DOGE-USD", "ADA-USD", "BNB-USD"]
+  all: ["SPY", "QQQ", "SCHD", "TLT", "GLD", "360750.KS", "133690.KS", "069500.KS", "005930.KS", "BTC-USD"],
+  kr: ["069500.KS", "360750.KS", "133690.KS", "132030.KS", "005930.KS", "000660.KS", "005380.KS", "035420.KS", "207940.KS", "373220.KS"],
+  us: ["SPY", "QQQ", "SCHD", "TLT", "GLD", "JEPI", "NVDA", "AAPL", "MSFT", "TSLA"],
+  coin: ["BTC-USD", "ETH-USD", "XRP-USD", "SOL-USD", "BNB-USD", "DOGE-USD", "ADA-USD", "TRX-USD", "LINK-USD", "AVAX-USD"]
 };
 var CARD_HIST = {};
 function cardsPrefetch(market) {
@@ -422,7 +423,7 @@ function cardsBrief() {
   var R = briefState.result; if (!R) return [];
   var M = R.market || "all", MN = M !== "all" ? R.mktName + " " : "";
   var ya = cYearAgo(R.market || "all"), dca = cDca(R.market || "all");
-  var out = [], T = 6 + (ya.length >= 3 ? 1 : 0) + (dca ? 1 : 0), date = cDate(M === "kr" ? R.asOfKr : (R.asOfUs || R.asOf)), L = R.label, P = CARD.PAD;
+  var out = [], T = 7 + (ya.length >= 3 ? 1 : 0) + (dca ? 1 : 0), date = cDate(M === "kr" ? R.asOfKr : (R.asOfUs || R.asOf)), L = R.label, P = CARD.PAD;
   var TG = function (s) { return s + (MN ? " · " + MN.trim() : "") + " · " + date; };
   // 1. 표지 — 시장 온도
   var c = cNew(), t = R.temp;
@@ -469,29 +470,37 @@ function cardsBrief() {
   c = cNew(); var nums = R.numbers.slice(0, 4), sale = (nums[0].list || []).filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 3);
   cHead(c, TG("NUMBERS"), "세일 중인 종목 [[" + nums[0].v + "]]", "52주 최고가보다 20% 넘게 싼 종목 수 · 시장 전체를 네 숫자로", 5, T);
   cTiles(c, nums.map(function (n) { return { v: n.v, l: n.l }; }));
-  if (sale.length) {
-    c.y += 4; cLabel(c, "가장 많이 할인된 종목 (52주 최고 대비)");
-    var sh = cH(c, sale.length, 70, true);
-    sale.forEach(function (s) { cRow(c, briefName(s), cPct(s.vsHi, 0), CARD_C.down, { h: sh, price: cPrice(s.sym, s.last) }); });
-  }
-  cNote(c, "싸졌다는 건 사실이지만, 더 내리지 않는다는 뜻은 아니에요.");
+  cNote(c, "싸졌다는 건 사실이지만, 더 내리지 않는다는 뜻은 아니에요. 종목은 다음 장에.");
   cFoot(c, null, "5_오늘의숫자"); out.push({ name: "5_오늘의숫자", cv: c.cv });
+  // 5-2. 숫자 뒤의 종목 — 세일 중 · 신고가 근처 · 20일선 위 (v8.5)
+  c = cNew(); var ath = (nums[1].list || []).slice(0, 4), abv = (nums[2].list || []).slice().sort(function (a, b) { return (b.amt || 0) - (a.amt || 0); }).slice(0, 4), sale4 = sale.slice(0, 4);
+  cHead(c, TG("NUMBERS · 종목"), "숫자 뒤의 [[종목]]", "세일 중 " + nums[0].v + " · 신고가 근처 " + nums[1].v + " · 20일선 위 " + nums[2].v + " — 각각 대표 종목", 6, T);
+  var groups = [["🏷️ 세일 중 — 52주 최고 대비 가장 많이 내린 순", sale4, function (x) { return cPct(x.vsHi, 0); }, CARD_C.down], ["🏔️ 신고가 근처 — 52주 최고 대비", ath, function (x) { return cPct(x.vsHi, 1); }, CARD_C.up], ["📈 20일선 위 — 거래대금 큰 순 · 20일 평균 대비", abv, function (x) { return cPct(x.vsMa20, 1); }, CARD_C.navy]];
+  var nRows = groups.reduce(function (a, g) { return a + g[1].length; }, 0), gh = Math.max(50, Math.min(62, Math.floor((CARD.H - 150 - c.y - groups.length * 48) / Math.max(1, nRows))));
+  groups.forEach(function (gr) {
+    cLabel(c, gr[0], gr[3]);
+    if (!gr[1].length) { cSummary(c, "해당 종목 없음"); return; }
+    gr[1].forEach(function (x) { cRow(c, briefName(x), gr[2](x), gr[3], { h: gh, price: cPrice(x.sym, x.last), mid: L + " " + cPct(x.ret1 != null ? x.ret1 : x.ret) }); });
+    c.y += 6;
+  });
+  cNote(c, "세일은 '더 안 내린다'는 뜻이 아니고, 신고가는 '비싸다'는 뜻이 아니에요. 위치를 아는 게 먼저예요.");
+  cFoot(c, null); out.push({ name: "6_숫자뒤종목", cv: c.cv });
   // 6. 시장 심리 온도계 (자체 계산)
   c = cNew(); var md = cMood(R);
-  cHead(c, TG("MOOD"), MN + "시장 심리는 [[" + md.word + "]]", "0 = 극도의 공포, 100 = 극도의 탐욕 · 아래 " + md.parts.length + "가지 숫자로 계산", 6, T);
+  cHead(c, TG("MOOD"), MN + "시장 심리는 [[" + md.word + "]]", "0 = 극도의 공포, 100 = 극도의 탐욕 · 아래 " + md.parts.length + "가지 숫자로 계산", 7, T);
   cGauge(c, md.score, md.word);
   var gh = cH(c, md.parts.length, 70, true);
   md.parts.forEach(function (p) { cRow(c, p.k, p.txt, CARD_C.gold, { h: gh, mid: "온도 " + Math.round(p.s * 100) }); });
   cNote(c, "극단일수록 감정적으로 사고팔기 쉬운 때예요. 방향을 맞히는 지표는 아니에요.");
-  cFoot(c, "StockMind 자체 계산 · CNN 공포탐욕지수 아님", "6_심리온도"); out.push({ name: "6_심리온도", cv: c.cv });
+  cFoot(c, "StockMind 자체 계산 · CNN 공포탐욕지수 아님", "6_심리온도"); out.push({ name: "7_심리온도", cv: c.cv });
   // 7. 1년 전에 100만원 샀다면 (원화 기준)
   if (ya.length >= 3) {
     c = cNew(); var w1 = ya[0];
-    cHead(c, TG("1 YEAR AGO"), "1년 전 100만원 → [[" + w1.name + " " + cMan(w1.val) + "]]", "1년 전에 100만원어치 샀다면 지금 얼마? · 작은 숫자는 지금 주가", 7, T);
+    cHead(c, TG("1 YEAR AGO"), "1년 전 100만원 → [[" + w1.name + " " + cMan(w1.val) + "]]", "1년 전에 100만원어치 샀다면 지금 얼마? · 작은 숫자는 지금 주가", 8, T);
     var yh = cH(c, ya.length, 84, true);
     ya.forEach(function (x, i) { cRow(c, x.name, cMan(x.val), cCol(x.ret), { rank: i + 1, h: yh, price: cPct(x.ret, 0), mid: cPrice(x.sym, x.px), hi: i === 0 }); });
     cNote(c, "지금 유명한 종목만 고른 것 자체가 결과를 알고 고른 거예요(생존자 편향).");
-    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "7_1년전100만원"); out.push({ name: "7_1년전100만원", cv: c.cv });
+    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "7_1년전100만원"); out.push({ name: "8_1년전100만원", cv: c.cv });
   }
   // 8. 매달 10만원씩 적립했다면
   if (dca) {
@@ -500,11 +509,60 @@ function cardsBrief() {
     var dh = cH(c, dca.rows.length, 84, true);
     dca.rows.forEach(function (x, i) { cRow(c, x.name, cMan(x.val), x.val >= x.principal ? CARD_C.up : CARD_C.down, { rank: i + 1, h: dh, price: (x.val / x.principal).toFixed(1) + "배", hi: i === 0 }); });
     cNote(c, "나눠 사면 고점에 몰아 살 걱정이 줄어요. 지난 성과가 미래를 보장하진 않아요.");
-    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "8_매달10만원"); out.push({ name: "8_매달10만원", cv: c.cv });
+    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "8_매달10만원"); out.push({ name: "9_매달10만원", cv: c.cv });
   }
   return out;
 }
 
+/* ---------- 뉴스 브리핑 카드 (v8.5) — 머니투데이식: 번호 + 굵은 제목 + 두 줄 요약, 한 장에 5개 ----------
+   출처: 네이버 뉴스 검색(공식 API). 증시 마감·미국 증시·환율·금리 + 그날 급등락 종목 기사를 모아 중복을 빼고 10개. */
+var CARD_NEWS = { items: [], at: 0 };
+function cardsNewsFetch(R) {
+  if (typeof fetchNews !== "function") return Promise.resolve([]);
+  if (Date.now() - CARD_NEWS.at < 20 * 60e3 && CARD_NEWS.items.length) return Promise.resolve(CARD_NEWS.items);
+  var qs = [{ type: "market", cat: "main", size: 6 }, { type: "market", cat: "world", size: 5 }, { type: "market", cat: "fx", size: 3 }, { type: "market", cat: "rate", size: 3 }];
+  var mv = R ? R.movers.up.slice(0, 2).concat(R.movers.down.slice(0, 1)) : [];
+  mv.forEach(function (s) { qs.push({ type: "stock", q: briefName(s), size: 2, sym: s.sym }); });
+  return Promise.all(qs.map(function (q) { return fetchNews(q).then(function (items) { return (items || []).map(function (it) { it.cat = q.cat || "stock"; return it; }); }).catch(function () { return []; }); })).then(function (lists) {
+    var out = [], seen = [];
+    function key(t) { return String(t).replace(/\[.*?\]|\(.*?\)|[^가-힣A-Za-z0-9]/g, "").slice(0, 18); }
+    function dup(t) { var k = key(t); return seen.some(function (x) { return x === k || (k.length > 8 && (x.indexOf(k.slice(0, 10)) >= 0 || k.indexOf(x.slice(0, 10)) >= 0)); }); }
+    // 카테고리를 번갈아 뽑아 한쪽으로 쏠리지 않게
+    var idx = lists.map(function () { return 0; }), guard = 0;
+    while (out.length < 10 && guard++ < 60) {
+      var added = false;
+      lists.forEach(function (l, i) { while (idx[i] < l.length && out.length < 10) { var it = l[idx[i]++]; if (!it.title || dup(it.title) || /\[속보\]|\[포토\]|\[영상\]|\[사진\]/.test(it.title)) continue; seen.push(key(it.title)); out.push(it); added = true; break; } });
+      if (!added) break;
+    }
+    CARD_NEWS = { items: out, at: Date.now() };
+    return out;
+  });
+}
+function cNewsClean(t) { return String(t).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim(); }
+function cardsNews(items, dateTxt) {
+  var out = [], pages = Math.ceil(items.length / 5); if (!items.length) return out;
+  for (var pg = 0; pg < pages; pg++) {
+    var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2, chunk = items.slice(pg * 5, pg * 5 + 5);
+    cHead(c, "NEWS BRIEFING · " + dateTxt, pg === 0 ? "아침 뉴스 브리핑 [[" + items.length + "]]" : "아침 뉴스 브리핑 [[" + (pg * 5 + 1) + "~" + Math.min(items.length, pg * 5 + 5) + "]]", null, pg + 1, pages);
+    c.y -= 6;
+    var avail = CARD.H - 100 - c.y, bh = Math.floor(avail / chunk.length) - 12;
+    chunk.forEach(function (it, i) {
+      var n = pg * 5 + i + 1, y = c.y, ttl = cNewsClean(it.title), desc = cNewsClean(it.desc || ""), meta = [it.press, it.cat === "stock" ? "종목" : ""].filter(Boolean).join(" · ");
+      cBox(g, P, y, W, bh, 16);
+      cText(g, String(n), P + 26, y + 52, 40, 800, CARD_C.gold);
+      var tx = P + 26 + cW(g, String(n), 40, 800) + 16, tw = W - (tx - P) - 26;
+      // 제목: 최대 2줄, 요약: 남는 줄 수만큼 (2~3줄)
+      var ty = cWrap(g, ttl, tx, y + 48, tw, 30, 800, CARD_C.txt, 38, 2);
+      var left = bh - (ty - y) - 26, dl = Math.max(0, Math.min(3, Math.floor(left / 29)));
+      if (desc && dl) cWrap(g, desc, tx, ty + 2, tw, 22, 500, CARD_C.txt2, 29, dl);
+      if (meta) cText(g, meta, P + W - 24, y + bh - 16, 19, 600, CARD_C.sub, "right");
+      c.y += bh + 12;
+    });
+    cFoot(c, "출처: 네이버 뉴스 검색(각 언론사) · 제목·요약은 기사 원문 그대로 · 투자 권유 아님");
+    out.push({ name: "N" + (pg + 1) + "_뉴스브리핑", cv: c.cv });
+  }
+  return out;
+}
 /* ---------- 채널 브리핑 자료 카드 (5장) ---------- */
 var CARD_PLAN_COL = ["#c9a24f", "#1f2a44", "#8a6a1f", "#5b7fb0", "#9aa3b2"];
 function cMixName(sym) { return (typeof CH_SHORT !== "undefined" && CH_SHORT[sym]) || cNm(sym); }
@@ -602,6 +660,7 @@ function cardsOpen(kind) {
       var iss = kind === "brief" ? (typeof issuesCompute === "function" && briefState.recent ? issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }) : null)
         : (chState && chState.issues);
       if (list.length && iss && iss.length) list.unshift({ name: "0_핵심이슈5", cv: issuesCard(iss) });
+      if (kind === "brief" && list.length && CARD_NEWS.items.length) list = list.concat(cardsNews(CARD_NEWS.items, cDate(Date.now()) + (new Date(Date.now() + 9 * 3600e3).getUTCHours() < 12 ? " 아침" : " 오후")));   // 맨 뒤에 뉴스 브리핑 1~2장
     } catch (e) { console.warn(e); }
     return list;
   };
@@ -609,7 +668,7 @@ function cardsOpen(kind) {
   var btn = document.getElementById(kind === "brief" ? "briefCards" : "chCards"), old = btn ? btn.textContent : "";
   if (btn) btn.textContent = "만드는 중…";
   var mkt = kind === "brief" && typeof briefState !== "undefined" ? (briefState.market || "all") : null;
-  ready.then(function () { return mkt ? cardsPrefetch(mkt) : null; }).then(function () {
+  ready.then(function () { return mkt ? cardsPrefetch(mkt) : null; }).then(function () { return kind === "brief" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : null; }).then(function () {
     // 1차로 그려 쓰인 글자를 모으고 → 그 글자의 웹폰트를 받아 → 다시 그린다 (폰트가 늦게 와서 기본 글꼴로 저장되는 것 방지)
     CARD_TXT = "";
     try { make(); } catch (e) {}
