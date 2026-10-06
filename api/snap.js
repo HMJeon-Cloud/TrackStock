@@ -1,5 +1,5 @@
 // /api/snap — Upstash Redis에 저장된 시세 스냅샷을 JSON으로 제공한다.
-//   ?recent=1     → 전 종목 최근 90일           (CDN 30분 캐시: 아침 수집 직후 빨리 반영)
+//   ?recent=1     → 전 종목 최근 400일          (CDN 1시간 캐시)
 //   ?manifest=1   → 종목별 갱신일 목록           (CDN 30분)
 //   ?symbol=SYM   → 그 종목 과거 전체(최대 25년) (CDN 24시간: 며칠에 한 번만 바뀐다)
 //   ?popular=1    → 이번 주·지난 주 조회 순위 (CDN 30분)
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   const symbol = (req.query.symbol || "").trim();
   let key = null, cache = null;
-  if (req.query.recent === "1") { key = KEY.recent; cache = "s-maxage=1800, stale-while-revalidate=3600"; }
+  if (req.query.recent === "1") { key = KEY.recent; cache = "s-maxage=3600, stale-while-revalidate=7200"; }   // v9.3: 1년치·코인 76개로 커져 Redis 대역폭 절약 (CDN 1시간)
   else if (req.query.manifest === "1") { key = KEY.manifest; cache = "s-maxage=1800, stale-while-revalidate=3600"; }
   else if (symbol) { key = KEY.chart(symbol); cache = "s-maxage=86400, stale-while-revalidate=172800"; }
   if (!key && req.query.popular !== "1") return res.status(400).json({ error: "symbol required" });

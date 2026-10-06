@@ -16,8 +16,9 @@ import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY, kst } from "./_redi
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const CONCURRENCY = 6;
+const RECENT_CONCURRENCY = 10;   // v9.3: 코인 76개 추가로 종목이 ~310개 → 최근 구간은 10개씩 동시에
 const TIME_BUDGET_MS = 52000;     // 함수 최대 60초 안에서 저장까지 끝나도록 여유를 둔다
-const RECENT_BUDGET_MS = 32000;   // ① 최근 구간(가장 중요)에 먼저 쓰는 시간
+const RECENT_BUDGET_MS = 38000;   // ① 최근 구간(가장 중요)에 먼저 쓰는 시간
 const FETCH_TIMEOUT_MS = 8000;    // 야후 한 건이 멈춰 있어도 8초면 포기
 const HISTORY_PER_RUN = 20;       // 남은 시간에 과거 전체를 받을 종목 수 (하루 2회 → 약 6일이면 전 종목 한 바퀴)
 const RECENT_DAYS = 400;      // recent.json이 담는 최근 일수 (v8.9: 90→400 — 200일선·52주 신고/신저가를 자체 데이터로 계산하고, 1년치로 오류를 검증)
@@ -43,7 +44,8 @@ function validateSeries(sym, s) {
 
 async function loadSymbols(origin) {
   const { pairs, source } = await loadTickerPairs(origin);
-  return { list: Array.from(new Set(pairs.map((p) => p[0]))), source };
+  const alias = {}; pairs.forEach((p) => { if (/-USD$/.test(p[0])) alias[p[0]] = p[2] || ""; });
+  return { list: Array.from(new Set(pairs.map((p) => p[0]))), source, alias };
 }
 
 /* Yahoo 일봉. range=max 는 interval을 무시하고 월봉을 주므로 날짜 범위로 요청한다. */
@@ -133,10 +135,10 @@ export default async function handler(req, res) {
   }
 
   // 종목 목록이 이상하면(로그인 페이지 등) 데이터를 하나도 건드리지 않고 멈추고, 이유를 실행 기록에 남긴다
-  let symbols, symSource;
+  let symbols, symSource, coinAlias = {};
   try {
     const r = await loadSymbols(origin);
-    symbols = r.list; symSource = r.source;
+    symbols = r.list; symSource = r.source; coinAlias = r.alias || {};
   } catch (e) {
     const log = { at: new Date().toISOString(), elapsedMs: Date.now() - started, symbols: 0, recentOk: 0, kept: 0,
       recentSaved: { ok: false, error: "종목 목록을 읽지 못해 이번 실행은 건너뜀 — 지난 데이터 유지" }, symbolsError: String(e.message).slice(0, 300) };
@@ -156,9 +158,11 @@ export default async function handler(req, res) {
   try { const t = await getJsonGzText(redis, KEY.recent); if (t) prevRecent = JSON.parse(t); } catch (e) { /* 없으면 새로 */ }
   const recent = { generated: new Date().toISOString(), days: RECENT_DAYS, symbols: {}, flags: {} };
   let recentOk = 0, flagged = 0;
-  for (let i = 0; i < symbols.length; i += CONCURRENCY) {
+  // 오래 못 받은 종목부터 (시간이 모자라 끝까지 못 가도 매번 같은 종목만 빠지지 않게)
+  const order = symbols.slice().sort((x, y) => { const a = (entries[x] && entries[x].recentAt) || "", b = (entries[y] && entries[y].recentAt) || ""; return a < b ? -1 : a > b ? 1 : 0; });
+  for (let i = 0; i < order.length; i += RECENT_CONCURRENCY) {
     if (Date.now() - started > RECENT_BUDGET_MS) break;
-    await Promise.all(symbols.slice(i, i + CONCURRENCY).map(async (sym) => {
+    await Promise.all(order.slice(i, i + RECENT_CONCURRENCY).map(async (sym) => {
       try {
         let s = null, flags = [];
         for (let attempt = 0; attempt <= RETRY_BAD; attempt++) {
@@ -176,10 +180,20 @@ export default async function handler(req, res) {
         if (bad.length && prev && prev.c && prev.c.length) {   // 검증 실패 → 지난 값을 유지하고 표시만
           recent.symbols[sym] = prev; recent.flags[sym] = bad.join(",") + "(이전 값 유지)"; flagged++; return;
         }
+        // 코인: 받은 데이터의 이름이 우리가 적어 둔 영어 이름과 하나도 안 겹치면(심볼이 다른 코인으로 바뀐 경우) 쓰지 않는다
+        if (coinAlias[sym] && s.meta) {
+          const nm = String((s.meta.longName || "") + " " + (s.meta.shortName || "")).toLowerCase(), words = coinAlias[sym].toLowerCase().split(/\s+/).filter((w) => w.length >= 3 && /[a-z]/.test(w));
+          const nw = nm.split(/[^a-z0-9.]+/).filter(Boolean);
+          if (nm.trim() && words.length && !words.some((w) => nw.some((x) => x === w || (w.length >= 4 && x.indexOf(w) === 0)))) { recent.flags[sym] = "name(" + nm.trim().slice(0, 30) + ")"; flagged++; return; }
+        }
         if (flags.length) recent.flags[sym] = flags.join(",");
+        // 배당·분할이 없어 수정종가가 종가와 같으면 a는 빼서 크기를 줄인다 (화면에서 c로 채움)
+        if (s.a && s.a.every((x, k) => x === s.c[k])) s.a = undefined;
         // 이전 스냅샷과 같은 날짜의 종가가 1% 넘게 다르면(수정 데이터) 표시
         if (prev && prev.t && prev.t.length) { const lt = prev.t[prev.t.length - 1], j = s.t.indexOf(lt); if (j >= 0 && Math.abs(s.c[j] / prev.c[prev.c.length - 1] - 1) > 0.01) recent.flags[sym] = (recent.flags[sym] ? recent.flags[sym] + "," : "") + "revised"; }
-        recent.symbols[sym] = { t: s.t, o: s.o, h: s.h, l: s.l, c: s.c, a: s.a, v: s.v, div: s.div, meta: s.meta };
+        recent.symbols[sym] = { t: s.t, o: s.o, h: s.h, l: s.l, c: s.c, v: s.v, div: s.div, meta: s.meta };
+        if (s.a) recent.symbols[sym].a = s.a;
+        entries[sym] = { ...(entries[sym] || {}), recentAt: new Date().toISOString() };
         recentOk++;
       } catch (e) { /* 건너뛴다 */ }
     }));

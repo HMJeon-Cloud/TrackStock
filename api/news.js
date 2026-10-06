@@ -14,7 +14,9 @@ const MARKET_QUERY = {
   world: "미국 증시 뉴욕증시",
   market: "코스피 전망",
   fx: "원달러 환율",
-  rate: "기준금리 연준 한국은행"
+  rate: "기준금리 연준 한국은행",
+  coin: "비트코인 가상자산 시세",     // v9.3: 코인 브리핑용
+  coin2: "알트코인 이더리움 리플"
 };
 
 function stripHtml(s) {

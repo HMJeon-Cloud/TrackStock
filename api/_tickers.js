@@ -11,8 +11,8 @@ const SYM_RE = /^[A-Z0-9^][A-Z0-9^.=\-]{0,15}$/;
 export const MIN_SYMBOLS = 100;
 
 function parse(src) {
-  const pairs = []; const re = /\[\s*"([^"]+)"\s*,\s*"([^"]*)"/g; let m;
-  while ((m = re.exec(src))) if (SYM_RE.test(m[1])) pairs.push([m[1], m[2]]);
+  const pairs = []; const re = /\[\s*"([^"]+)"\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?/g; let m;
+  while ((m = re.exec(src))) if (SYM_RE.test(m[1])) pairs.push([m[1], m[2], m[3] || ""]);
   return pairs;
 }
 export async function loadTickerPairs(reqOrigin) {

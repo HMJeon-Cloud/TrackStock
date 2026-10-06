@@ -19,7 +19,7 @@ const EXCLUDE = /^(TQQQ|SOXL|122630\.KS|114800\.KS|\^VIX|DX-Y\.NYB|KRW=X|JPYKRW=
 const KR = /\.K[SQ]$|^\^KS|^\^KQ/;
 const ETF = /^(SPY|QQQ|VOO|VTI|IVV|DIA|IWM|GLD|SLV|TLT|IEF|SHY|BND|AGG|LQD|SCHD|JEPI|VNQ|EFA|EEM|ARKK|SOXX|SMH|XL[A-Z]|DBC|USO)$/;
 const MACRO = [["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["^DJI", "다우"], ["^KS11", "코스피"], ["^KQ11", "코스닥"]];
-const MACRO2 = [["TLT", "미국 장기채(TLT)"], ["USO", "원유(USO)"], ["DX-Y.NYB", "달러인덱스"], ["KRW=X", "달러/원"], ["GLD", "금(GLD)"], ["BTC-USD", "비트코인"]];
+const MACRO2 = [["TLT", "미국 장기채(TLT)"], ["USO", "원유(USO)"], ["DX-Y.NYB", "달러인덱스"], ["KRW=X", "달러/원"], ["GLD", "금(GLD)"]];   // v9.3: 코인은 따로 올리므로 제외
 
 const pct = (x, d = 1) => (x == null || !isFinite(x)) ? "-" : (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%";
 const fmtDate = (ms) => { const d = new Date(ms + 9 * 3600 * 1000); return (d.getUTCMonth() + 1) + "." + d.getUTCDate() + "(" + "일월화수목금토"[d.getUTCDay()] + ")"; };
@@ -60,7 +60,7 @@ export function composeDaily(recent, names, news) {
   if (vix) L.push("VIX " + vix.last.toFixed(1) + " (" + (vix.last >= 30 ? "공포" : vix.last >= 20 ? "불안" : "평온") + ")");
   L.push("");
   // 거시 변수
-  L.push("■ 금리·유가·환율·금·코인");
+  L.push("■ 금리·유가·환율·금");
   L.push(MACRO2.filter((m) => by[m[0]]).map((m) => m[1] + " " + pct(by[m[0]].ret1)).join(" · "));
   L.push("");
   // 테마 (미국 종목만)
