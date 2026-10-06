@@ -52,14 +52,27 @@ var BRIEF_INDEX_BY_MKT = {
 var BRIEF_INDEX_ROW = [["^KS11", "코스피"], ["^KQ11", "코스닥"], ["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["KRW=X", "달러/원"], ["GLD", "금"], ["BTC-USD", "비트코인"], ["^VIX", "공포지수"]];
 
 /* ---------- 순수 계산 ---------- */
+/* 달력 구간 (v8.4): BRIEF_WIN = { from: ms, to: ms }가 설정돼 있으면 '구간 시작 전 마지막 종가 → 구간 안 마지막 종가'로 등락을 계산한다.
+   (한 주 정리 = 월~일, 한 달 정리 = 1일~말일처럼 달력 기준이 필요한 정기 세트용. 평소엔 null → 최근 N거래일) */
+var BRIEF_WIN = null;
 function briefStats(sym, d, mode) {
   var c = d.c || [], v = d.v || [], n = c.length;
   if (n < 22 || c[n - 1] == null) return null;
-  var last = c[n - 1];
+  var last = c[n - 1], start = null, winFrom = null, winTo = null;
   var back = mode === "week" ? 5 : mode === "month" ? 21 : 1;
-  if (n - 1 - back < 0) return null;
-  var ret = last / c[n - 1 - back] - 1;
-  var ret1 = last / c[n - 2] - 1, ret5 = n > 5 ? last / c[n - 6] - 1 : null;
+  if (BRIEF_WIN && d.t) {
+    var iN = -1, i0 = -1;
+    for (var k = n - 1; k >= 0; k--) { if (c[k] == null) continue; if (iN < 0 && d.t[k] * 1000 <= BRIEF_WIN.to) iN = k; if (d.t[k] * 1000 < BRIEF_WIN.from) { i0 = k; break; } }
+    if (iN < 0 || i0 < 0 || iN <= i0) return null;
+    last = c[iN]; start = c[i0]; back = iN - i0; winFrom = d.t[i0 + 1] * 1000; winTo = d.t[iN] * 1000;
+    var ret = last / start - 1;
+  } else {
+    if (n - 1 - back < 0) return null;
+    start = c[n - 1 - back];
+    var ret = last / start - 1;
+  }
+  var iL = BRIEF_WIN && typeof iN === "number" && iN >= 0 ? iN : n - 1;
+  var ret1 = last / c[iL - 1] - 1, ret5 = iL > 5 ? last / c[iL - 5] - 1 : null;
   var m1 = last / c[Math.max(0, n - 22)] - 1, m3 = last / c[0] - 1;
   var ma20 = 0; for (var i = n - 20; i < n; i++) ma20 += c[i]; ma20 /= 20;
   var ma5 = 0; for (i = n - 5; i < n; i++) ma5 += c[i]; ma5 /= 5;
@@ -96,6 +109,7 @@ function briefStats(sym, d, mode) {
     pctRank: rs.length ? 1 - bigger / rs.length : null, crossUp: crossUp,
     amt: amtLast, amtX: amtAvg > 0 ? amtLast / amtAvg : null,
     lastT: d.t && d.t.length ? d.t[d.t.length - 1] * 1000 : null,
+    start: start, winDays: back, winFrom: winFrom, winTo: winTo,
     bestDay: null
   };
 }

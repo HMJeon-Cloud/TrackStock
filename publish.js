@@ -213,11 +213,85 @@ function pubTermCard(term) {
 }
 if (typeof CARD_TIP !== "undefined") CARD_TIP.term = ["이 시리즈를 보는 법", "하루 한 개씩, 뉴스에 나온 말을 바로 찾아보는 용도예요. 외우기보다 '내 계좌에선 이 숫자가 얼마지?'를 한 번 확인해 보세요."];
 
+/* ---------- ⑥ 정책 카드 (v8.4) ----------
+   정책·제도 변경을 '표 + 조건'으로. 사람들이 실제로 찾는 숫자(구간별 금리·한도·요건)를 그대로 보여준다.
+   항목은 아래 PUB_POLICY에 추가하거나, 발행 도우미 '정책 카드' 탭의 편집창(JSON)에서 바로 추가·수정할 수 있다(이 기기 저장).
+   ※ 정책 숫자는 기관 공지 그대로 옮겨야 한다. src·eff(적용일)를 꼭 적고, 카드 바닥에 자동 표기된다. */
+var PUB_POLICY = [
+  {
+    id: "didimdol-2025-03", t: "디딤돌대출 금리", short: "내집마련 디딤돌대출", eff: "2025.3.24 적용", src: "주택도시기금 · 하나은행 상품안내",
+    title: "디딤돌대출, 내 소득이면 [[금리 몇 %]]?", sub: "부부합산 연소득 × 만기 — 일반 가구 기본금리",
+    table: { head: ["연소득(부부합산)", "10년", "15년", "20년", "30년"], rows: [["2천만원 이하", "2.85%", "2.95%", "3.05%", "3.10%"], ["2천~4천만원", "3.20%", "3.30%", "3.40%", "3.45%"], ["4천~7천만원", "3.35%", "3.65%", "3.75%", "3.80%"], ["7천~8.5천만원(신혼)", "3.90%", "4.00%", "4.10%", "4.15%"]] },
+    table2: { title: "신혼가구 특별금리 (부부합산 8.5천만원 이하)", head: ["연소득(부부합산)", "10년", "15년", "20년", "30년"], rows: [["2천만원 이하", "2.55%", "2.65%", "2.75%", "2.80%"], ["2천~4천만원", "2.90%", "3.00%", "3.10%", "3.15%"], ["4천~7천만원", "3.25%", "3.35%", "3.45%", "3.50%"], ["7천~8.5천만원", "3.60%", "3.70%", "3.80%", "3.85%"]] },
+    bullets: { title: "추가 할인 (우대금리 · 중복 가능 · 5년간)", items: ["다자녀 0.7%p · 2자녀 0.5%p · 1자녀 0.3%p", "생애최초 · 신혼 · 장애인 · 다문화 · 한부모 0.2~0.5%p", "청약저축 가입자 0.3~0.5%p (납입 기간·회차에 따라)", "부동산 전자계약 0.1%p · 지방 미분양주택 0.2%p", "저액 대출(한도의 30% 이하) 0.1%p · 중도상환 40% 이상 0.2%p"] },
+    notes: ["최저금리 하한: 일반 1.5% · 신혼 1.2%", "지방 주택 0.2%p 인하 · 5년 변동 +0.1%p · 10년 고정 +0.2%p · 순수 고정 +0.3%p", "신생아 특례는 별도 표 (소득 2억원까지, 1.80%~4.50%)"],
+    check: "금리는 분기마다 바뀔 수 있어요 — 발행 전 주택도시기금(nhuf.molit.go.kr) 공지에서 적용일을 확인하세요",
+    tags: ["디딤돌대출", "주택담보대출", "내집마련", "신혼부부대출"]
+  }
+];
+function pubPolicyAll() { var custom = []; try { custom = JSON.parse(localStorage.getItem("sm.policy") || "[]"); } catch (e) { custom = []; } var byId = {}; PUB_POLICY.concat(custom).forEach(function (p) { if (p && p.id) byId[p.id] = p; }); return Object.keys(byId).map(function (k) { return byId[k]; }); }
+function pubPolicySave(arr) { try { localStorage.setItem("sm.policy", JSON.stringify(arr)); } catch (e) {} }
+/* 정책 카드 묶음: ① 표 카드 (표 + 핵심 메모) ② 조건 카드 (두 번째 표 / 우대 조건 / 메모). 들어갈 게 적으면 1장으로 */
+function pubPolicyCards(pl) {
+  CARD_STYLE = "regular"; CARD_SERIES = "POLICY · " + (pl.eff || "");
+  var out = [], T = (pl.table2 ? 1 : 0) + (pl.bullets ? 1 : 0) + 1, c, n = 0;
+  function head(c, title, sub) { n++; cHead(c, "POLICY · " + cDate(Date.now()), title, sub, n, T); }
+  function foot(c) { cFoot(c, "출처: " + (pl.src || "기관 공지") + (pl.eff ? " · " + pl.eff : "") + " · 대출·투자 권유 아님"); }
+  function tbl(c, t, reserve) { var n = t.rows.length, rh = Math.max(56, Math.min(112, Math.floor((CARD.H - 170 - c.y - reserve) / (n + 1)))); cTable(c, t.head, t.rows, { hi: t.hi, rowH: rh, fs: rh >= 100 ? 32 : rh >= 84 ? 30 : rh >= 70 ? 27 : 24 }); }
+  c = cNew(); head(c, pl.title || pl.t, pl.sub || "");
+  tbl(c, pl.table, pl.notes && pl.notes.length ? 150 + Math.min(pl.notes.length, 2) * 36 : 0);
+  if (pl.notes && pl.notes.length && !pl.table2 && !pl.bullets) cBullets(c, "함께 알아둘 것", pl.notes, { fs: 25 });
+  else if (pl.notes && pl.notes.length) cBullets(c, "핵심 메모", pl.notes.slice(0, 2), { fs: 25 });
+  if (pl.check) cNote(c, "※ " + pl.check);
+  foot(c); out.push({ name: "1_" + pl.t.replace(/\s/g, ""), cv: c.cv });
+  if (pl.table2) {
+    c = cNew(); head(c, pl.table2.title.replace(/\(.*\)/, "").trim() + " [[금리표]]", pl.table2.title);
+    tbl(c, pl.table2, pl.notes && pl.notes.length > 2 ? 150 + (pl.notes.length - 2) * 36 : 0);
+    if (pl.notes && pl.notes.length > 2) cBullets(c, "함께 알아둘 것", pl.notes.slice(2), { fs: 25 });
+    if (pl.check) cNote(c, "※ " + pl.check); foot(c); out.push({ name: "2_" + pl.table2.title.slice(0, 8).replace(/\s/g, ""), cv: c.cv });
+  }
+  if (pl.bullets) {
+    c = cNew(); head(c, "[[" + pl.bullets.title.split(" (")[0] + "]] 조건", pl.bullets.title);
+    cBullets(c, null, pl.bullets.items, { fs: 27 });
+    if (pl.notes && pl.notes.length) cBullets(c, "함께 알아둘 것", pl.notes, { fs: 25 });
+    if (pl.check) cNote(c, "※ " + pl.check); foot(c); out.push({ name: (pl.table2 ? 3 : 2) + "_조건", cv: c.cv });
+  }
+  CARD_SERIES = "";
+  return out;
+}
+function pubPolicyCaption(pl) {
+  var lines = [pl.short || pl.t, "", "📋 " + (pl.sub || "")];
+  pl.table.rows.slice(0, 6).forEach(function (r) { lines.push("· " + r[0] + ": " + r.slice(1).join(" / ")); });
+  if (pl.bullets) { lines.push(""); lines.push("➕ " + pl.bullets.title); pl.bullets.items.slice(0, 4).forEach(function (t) { lines.push("· " + t); }); }
+  if (pl.notes) { lines.push(""); pl.notes.slice(0, 2).forEach(function (t) { lines.push("※ " + t); }); }
+  lines.push(""); lines.push("내 소득 구간은 어디인지 표에서 찾아보세요. 조건이 바뀌면 다시 정리해 올릴게요.");
+  var tags = PUB_TAGS_BASE.concat(pl.tags || []).map(function (x) { return "#" + x; }).join(" ");
+  var ig = lines.join("\n") + "\n\n※ 출처: " + (pl.src || "") + (pl.eff ? " · " + pl.eff : "") + " · 투자·대출 권유 아님, 최신 공지 확인 필수\n\n" + tags;
+  var th = lines.slice(0, 10).join("\n"); if (th.length > 480) th = th.slice(0, 470).replace(/\n[^\n]*$/, "") + "…";
+  return { ig: ig, th: th + "\n\n(출처: " + (pl.src || "") + ")", igLen: ig.length };
+}
+function pubPolicyOpen(id) {
+  var pl = pubPolicyAll().filter(function (p) { return p.id === id; })[0]; if (!pl) return;
+  var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+  ready.then(function () { CARD_TXT = ""; try { pubPolicyCards(pl); } catch (e) { console.warn(e); } if (!document.fonts || !document.fonts.load) return; var txt = CARD_TXT.replace(/\s+/g, ""); return Promise.all([500, 600, 700, 800].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); })); })
+    .then(function () {
+      var list; try { list = pubPolicyCards(pl); } catch (e) { console.warn(e); alert("카드를 만들지 못했어요: " + e.message); return; }
+      var cap = pubPolicyCaption(pl), day = pubToday().replace(/-/g, ""), box = document.createElement("div");
+      box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button><button class="chip" data-act="cap">📋 캡션 (' + cap.igLen + '자)</button><button class="chip" data-act="th">📋 스레드</button></div><div class="cardsWrap"></div>';
+      var wrap = box.querySelector(".cardsWrap");
+      list.forEach(function (it, i) { it.url = it.cv.toDataURL("image/png"); it.file = "uphill.lab_정책_" + pl.id + "_" + day + "_" + it.name + ".png"; var f = document.createElement("figure"); f.innerHTML = '<img alt=""><figcaption><span>' + (i + 1) + '. ' + it.name.replace(/^\d_/, "") + '</span><button class="chip" style="padding:3px 10px;font-size:11px">저장</button></figcaption>'; f.querySelector("img").src = it.url; f.querySelector("button").onclick = function () { cardsDownload(it); }; wrap.appendChild(f); });
+      box.querySelector('[data-act="all"]').onclick = function () { list.forEach(function (it, i) { setTimeout(function () { cardsDownload(it); }, i * 400); }); };
+      box.querySelector('[data-act="cap"]').onclick = function () { chCopy(cap.ig, this); };
+      box.querySelector('[data-act="th"]').onclick = function () { chCopy(cap.th, this); };
+      infoModal.open("🃏 " + pl.t + " · " + list.length + "장", box);
+    });
+}
+
 /* ---------- 화면 ---------- */
-var pubState = { tab: "plan", termOffset: 0 };
+var pubState = { tab: "plan", termOffset: 0, policy: null };
 function pubRender() {
   var box = $("pubBox"); if (!box) return;
-  var tabs = [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["topics", "주제 은행"], ["caption", "캡션"], ["cal", "이번 주 일정"], ["term", "용어 한 입"]];
+  var tabs = [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["topics", "주제 은행"], ["policy", "정책 카드"], ["caption", "캡션"], ["cal", "이번 주 일정"], ["term", "용어 한 입"]];
   var h = '<div class="pills" style="margin-bottom:10px">' + tabs.map(function (t) { return '<button data-pt="' + t[0] + '"' + (t[0] === pubState.tab ? ' class="active"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div>';
   if (pubState.tab === "plan") {
     var ck = pubChecklist(), pl = pubPlan(), today = typeof perToday === "function" ? perToday() : [];
@@ -228,13 +302,20 @@ function pubRender() {
     h += '<div class="briefDim" style="margin-top:8px">권장 리듬: 인스타 캐러셀 주 3~4회(핵심 이슈 5 + 그날 1~2장) · 스레드 매일 1개(캡션 탭의 500자 버전) · 용어 카드는 저장용으로 매일 또는 격일</div>';
   } else if (pubState.tab === "per") {
     var td = typeof perToday === "function" ? perToday() : [];
-    h += '<div class="briefDim" style="margin-bottom:8px">매일은 "오늘 뭐 올리지" 탭(전일 이슈 정리). 아래 4종은 요일·날짜에 맞춰 올리되, 언제든 만들 수 있어요. 기간 숫자는 최근 5거래일(주) / 21거래일(월) 기준이에요.</div>';
-    var perRows = [{ when: "매일 아침", t: "📰 전일 이슈 정리", cards: "핵심 이슈 5 · 시장 온도 · 자금 흐름 · 급등락 · 돈이 몰린 곳 · 숫자 · 심리 온도계 (8장)", make: "brief" }].concat(Object.keys(PER_SETS).map(function (k) { var S = PER_SETS[k]; return { k: k, when: S.when, t: S.t, now: td.indexOf(k) >= 0, cards: { weekReview: "핵심 이슈 5 · 자산 성적표 · 테마 · 급등락 · 가장 큰 하루/VIX · 숫자 · 돈이 몰린 곳 (7장)", weekPreview: "이번 주 일정 · 볼 것 3~4가지 · 지난주 흐름 이어질까 · 적립 체크 · 용어 (5장)", monthReview: "핵심 이슈 5 · 자산 성적표 · 테마 · 급등락 · 가장 큰 하루/VIX · 숫자 · 돈이 몰린 곳 + 과거 같은 달 (7장)", monthPreview: "이달 일정 · 과거 같은 달 계절성 · 역사 속 이달 · 지난달 요약→이달 볼 것 · 적립 계획 (5장)" }[k] }; }));
+    h += '<div class="briefDim" style="margin-bottom:8px">매일은 "오늘 뭐 올리지" 탭(전일 이슈 정리). 구간은 달력 기준이에요 — 한 주 = 월~일, 한 달 = 1일~말일. <b>정리</b> 세트는 구간 안 마지막 거래일 종가가 들어와 있어야만 발행용으로 만들어지고(아니면 "검토용 · 발행 금지" 도장), <b>예상</b> 세트는 일정과 지금 위치만 담고 방향 예측은 하지 않아요.</div>';
+    var perRows = [{ when: "매일 아침", t: "📰 전일 이슈 정리 (검정 머리 · 이벤트성)", cards: "핵심 이슈 5 · 시장 온도 · 자금 흐름 · 급등락 · 돈이 몰린 곳 · 숫자 · 심리 온도계 (8장)", make: "brief" }].concat(Object.keys(PER_SETS).map(function (k) { var S = PER_SETS[k]; return { k: k, when: S.when, t: S.t, now: td.indexOf(k) >= 0, cards: { weekReview: "핵심 이슈 5 · 자산 성적표(시작→끝 가격) · 테마 · 급등락 · 날짜별 흐름 표 · 숫자 · 돈이 몰린 곳 (7장)", weekPreview: "이번 주 일정 · 볼 것 3~4가지 · 지난주 흐름 이어질까 · 적립 체크 · 용어 (5장)", monthReview: "핵심 이슈 5 · 자산 성적표(시작→끝 가격) · 테마 · 급등락 · 주차별 흐름 표 · 숫자 · 돈이 몰린 곳 + 과거 같은 달 (7장)", monthPreview: "이달 일정 · 과거 같은 달 계절성 · 역사 속 이달 · 지난달 요약→이달 볼 것 · 적립 계획 (5장)" }[k] }; }));
     h += '<div class="perCal">' + perRows.map(function (r) { return '<div class="perRow' + (r.now ? ' now' : '') + '"><div class="perWhen">' + r.when + (r.now ? ' <b>← 오늘</b>' : '') + '</div><div class="perBody"><b>' + r.t + '</b><small>' + r.cards + '</small></div>' + (r.k ? '<button class="chip" data-per="' + r.k + '">🃏 만들기</button>' : '<button class="chip" data-make="brief">🃏 만들기</button>') + '</div>'; }).join("") + '</div>';
     h += '<div class="briefDim" style="margin-top:8px">월간 세트는 S&P500·코스피·금·비트코인 10년치를 처음 한 번 불러와서 몇 초 걸릴 수 있어요. 예상 세트는 "무엇을 볼지"만 담고 방향 예측은 하지 않아요(채널 원칙).</div>';
   } else if (pubState.tab === "topics") {
     h += '<div class="briefDim" style="margin-bottom:8px">카드로 바로 만들 수 있는 주제와, 손으로 보충하면 좋은 주제(수동)를 리듬별로 모았어요. 소재가 떠오르지 않는 날 펼쳐 보세요.</div>';
     h += PER_TOPICS.map(function (g, i) { return '<details class="chFold"' + (i === 0 ? ' open' : '') + '><summary>' + g.when + ' <small class="briefDim">' + g.items.length + '개</small></summary><ul class="perTopics">' + g.items.map(function (t) { return '<li>' + escapeHtml(t) + '</li>'; }).join("") + '</ul></details>'; }).join("");
+  } else if (pubState.tab === "policy") {
+    var pls = pubPolicyAll(), cur = pls.filter(function (p) { return p.id === pubState.policy; })[0] || pls[0];
+    h += '<div class="briefDim" style="margin-bottom:8px">정책·제도 변경은 "내 구간은 얼마?"가 핵심이라 표로 보여줘요. 숫자는 기관 공지를 그대로 옮기고 적용일·출처를 적어야 카드 바닥에 표기돼요.</div>';
+    h += '<div class="pills" style="margin-bottom:8px">' + pls.map(function (p) { return '<button data-pol="' + p.id + '"' + (cur && p.id === cur.id ? ' class="active"' : '') + '>' + escapeHtml(p.t) + '</button>'; }).join("") + '</div>';
+    if (cur) h += '<div class="chPlanItem"><div style="font-size:13.5px;line-height:1.7"><b>' + escapeHtml(cur.short || cur.t) + '</b> <span class="briefDim">' + escapeHtml(cur.eff || "") + ' · ' + escapeHtml(cur.src || "") + '</span><br>' + escapeHtml(cur.sub || "") + ' · 표 ' + cur.table.rows.length + '행' + (cur.table2 ? ' + 표 ' + cur.table2.rows.length + '행' : '') + (cur.bullets ? ' · 조건 ' + cur.bullets.items.length + '개' : '') + '<br><span class="briefDim">⚠️ ' + escapeHtml(cur.check || "") + '</span></div></div>' +
+      '<div class="row" style="gap:6px;margin:8px 0"><button class="primary" data-make="policy" data-id="' + cur.id + '">🃏 카드 만들기</button><button class="chip" data-act="poledit">✏️ 편집 / 새 항목</button></div>';
+    h += '<details class="chFold" id="polEditor"><summary>편집창 (JSON · 이 기기에 저장)</summary><div class="briefDim" style="margin:6px 0">아래 형식 그대로 복사해 숫자만 바꾸면 돼요. id가 같으면 덮어쓰고, 새 id면 추가돼요. 표의 값에 [[ ]]를 두르면 금색 강조.</div><textarea id="polJson" style="width:100%;min-height:220px;font:12px/1.5 ui-monospace,monospace;border:1px solid var(--line);border-radius:10px;padding:8px"></textarea><div class="row" style="gap:6px;margin-top:6px"><button class="primary" data-act="polsave">저장</button><button class="chip" data-act="poldel">이 항목 삭제(내 기기 저장분만)</button><span id="polMsg" class="briefDim"></span></div></details>';
   } else if (pubState.tab === "caption") {
     var cap = pubCaption();
     h += (cap.warn.length ? '<div class="chWhyBox">⚠️ ' + cap.warn.join(" / ") + '</div>' : '') +
@@ -254,6 +335,18 @@ function pubRender() {
   }
   box.innerHTML = h;
   Array.prototype.forEach.call(box.querySelectorAll("[data-pt]"), function (b) { b.onclick = function () { pubState.tab = b.getAttribute("data-pt"); pubRender(); }; });
+  Array.prototype.forEach.call(box.querySelectorAll("[data-pol]"), function (b) { b.onclick = function () { pubState.policy = b.getAttribute("data-pol"); pubRender(); }; });
+  if ($("polJson")) {
+    var curP = pubPolicyAll().filter(function (p) { return p.id === pubState.policy; })[0] || pubPolicyAll()[0];
+    $("polJson").value = JSON.stringify(curP, null, 1);
+    var ed = box.querySelector('[data-act="poledit"]'); if (ed) ed.onclick = function () { $("polEditor").open = true; $("polJson").focus(); };
+    box.querySelector('[data-act="polsave"]').onclick = function () {
+      var obj; try { obj = JSON.parse($("polJson").value); } catch (e) { $("polMsg").textContent = "JSON 형식 오류: " + e.message; return; }
+      if (!obj.id || !obj.t || !obj.table || !obj.table.head || !obj.table.rows) { $("polMsg").textContent = "id, t, table.head, table.rows는 꼭 필요해요"; return; }
+      var arr = []; try { arr = JSON.parse(localStorage.getItem("sm.policy") || "[]"); } catch (e) {} arr = arr.filter(function (p) { return p.id !== obj.id; }); arr.push(obj); pubPolicySave(arr); pubState.policy = obj.id; pubRender();
+    };
+    box.querySelector('[data-act="poldel"]').onclick = function () { var arr = []; try { arr = JSON.parse(localStorage.getItem("sm.policy") || "[]"); } catch (e) {} pubPolicySave(arr.filter(function (p) { return p.id !== pubState.policy; })); pubState.policy = null; pubRender(); };
+  }
   Array.prototype.forEach.call(box.querySelectorAll("[data-per]"), function (b) { b.onclick = function () { perOpen(b.getAttribute("data-per")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-term]"), function (b) { b.onclick = function () { pubState.termOffset += +b.getAttribute("data-term"); pubRender(); }; });
   if ($("pubIg")) { var cap2 = pubCaption(); $("pubIg").textContent = cap2.ig; $("pubTh").textContent = cap2.th; }
@@ -268,6 +361,7 @@ function pubRender() {
       else if (k === "channel") cardsOpen("channel");
       else if (k === "mind") navTo("mind");   // 유형 테스트 페이지에서 결과 카드 생성
       else if (k === "cal") pubSingleCard(pubCalCard, "uphill.lab_이번주일정_" + pubToday().replace(/-/g, "") + ".png", "🗓️ 이번 주 일정");
+      else if (k === "policy") pubPolicyOpen(b.getAttribute("data-id"));
       else if (k === "term") pubSingleCard(function () { return pubTermCard(pubTerm(pubState.termOffset)); }, "uphill.lab_용어_" + pubTerm(pubState.termOffset)[0].replace(/[^\w가-힣]/g, "") + ".png", "📖 용어 한 입");
     };
   });

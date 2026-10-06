@@ -17,7 +17,7 @@ function issPct(x, d) { return (x > 0 ? "+" : "") + (x * 100).toFixed(d == null 
 /* 기간: day(하루) · week(5거래일) · month(21거래일) — ISS_MODE에 따라 등락과 "평소 변동폭" 기준이 바뀐다 */
 var ISS_MODE = "day", ISS_BACK = { day: 1, week: 5, month: 21 }, ISS_LBL = { day: "오늘", week: "이번 주", month: "이번 달" };
 function issRet(s) { return ISS_MODE === "day" ? s.ret1 : s.ret; }
-function issZ(s) { return s && s.sd > 0 ? Math.abs(issRet(s)) / (s.sd * Math.sqrt(ISS_BACK[ISS_MODE])) : 0; }
+function issZ(s) { return s && s.sd > 0 ? Math.abs(issRet(s)) / (s.sd * Math.sqrt(ISS_MODE === "day" ? 1 : (s.winDays || ISS_BACK[ISS_MODE]))) : 0; }
 function issTimes(z) { return z >= 1.5 ? " · 평소 " + (ISS_MODE === "day" ? "하루" : ISS_MODE === "week" ? "한 주" : "한 달") + " 변동의 " + z.toFixed(1) + "배" : ""; }
 function issAdj(z) { return z >= 2.5 ? "급" : z >= 1.5 ? "큰 폭 " : ""; }
 

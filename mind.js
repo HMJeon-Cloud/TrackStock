@@ -436,8 +436,8 @@ function mindCardOpen() {
     var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2;
     cHead(c, "나의 투자 유형", "", null, 0, 0);
     // 머리: 4글자 코드(금색) + 유형 이름(흰색)
-    cText(g, code.split("").join("  "), P - 2, 190, 86, 800, CARD_C.gold2);
-    cText(g, T.emoji + " " + T.name, P, 256, 44, 800, CARD_C.onNavy);
+    cText(g, code.split("").join("  "), P - 2, 166, 76, 800, CARD_C.gold2);
+    cText(g, T.emoji + " " + T.name, P, 222, 40, 800, CARD_C.onNavy);
     cSummary(c, T.line);
     // 4개 축 막대 — 기운 쪽에서부터 채움 (흰 박스 안)
     cBox(g, P, c.y, W, MIND_AXES.length * 80 + 24, 16); c.y += 20;
