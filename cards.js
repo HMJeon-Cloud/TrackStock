@@ -266,14 +266,23 @@ function cBullets(c, title, items, opt) {
 function cWrapCount(g, s, maxW, size, weight) { cFont(g, size, weight); var n = 1, line = "", ch = String(s).split(""); for (var i = 0; i < ch.length; i++) { var t = line + ch[i]; if (g.measureText(t).width > maxW && line) { n++; line = ch[i]; } else line = t; } return n; }
 /* ---------- 한눈에 보는 판 도구 (v8.9) ---------- */
 /* 가로 막대 + 기준선(점선) + 오른쪽 큰 값 */
-function cBarH(c, label, sub, pct, ref, refLabel) {
+function cBarH(c, label, sub, pct, ref, refLabel, valTxt) {
   var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, y = c.y, v = Math.round(pct * 1000) / 10;
   cText(g, label, P, y + 34, 28, 800, CARD_C.txt); cText(g, sub, P + cW(g, label, 28, 800) + 12, y + 34, 20, 500, CARD_C.sub);
-  cText(g, v.toFixed(1) + "%", P + W, y + 40, 46, 800, CARD_C.warmTxt, "right");
+  cText(g, valTxt || (v.toFixed(1) + "%"), P + W, y + 40, 46, 800, CARD_C.warmTxt, "right");
   var ty = y + 58, th = 30;
   cRound(g, P, ty, W, th, 8, "#e9e4d8"); cRound(g, P, ty, Math.max(8, W * Math.min(1, pct)), th, 8, CARD_C.gold2);
   if (ref != null) { var rx = P + W * ref; g.save(); g.setLineDash([6, 6]); g.strokeStyle = "#444"; g.lineWidth = 3; g.beginPath(); g.moveTo(rx, ty - 8); g.lineTo(rx, ty + th + 8); g.stroke(); g.restore(); cText(g, refLabel || "", rx + 10, ty + th / 2 + 7, 19, 600, "#444"); }
   c.y = ty + th + 34;
+}
+/* 작은 가로 막대 (한 줄: 라벨 · 부가 · 막대 · 값) — 분포 같은 여러 줄용 */
+function cBarHS(c, label, sub, pct, valTxt) {
+  var g = c.g, P = CARD.PAD, W = CARD.W - P * 2, y = c.y, lw = 300;
+  cText(g, label, P, y + 30, 23, 800, CARD_C.txt); cText(g, sub, P, y + 56, 18, 500, CARD_C.sub);
+  var bx = P + lw, bw = W - lw - 130;
+  cRound(g, bx, y + 22, bw, 26, 6, "#e9e4d8"); cRound(g, bx, y + 22, Math.max(6, bw * Math.min(1, pct)), 26, 6, CARD_C.gold2);
+  cText(g, valTxt, P + W, y + 44, 30, 800, CARD_C.warmTxt, "right");
+  c.y = y + 74;
 }
 /* 읽는 법 상자 (회색) — 제목 줄 + 본문 */
 function cHow(c, title, text) {
@@ -463,14 +472,13 @@ function cGauge(c, score, word) {
 function cardsBrief() {
   var R = briefState.result; if (!R) return [];
   var M = R.market || "all", MN = M !== "all" ? R.mktName + " " : "";
-  var ya = cYearAgo(R.market || "all"), dca = cDca(R.market || "all");
-  var out = [], T = 8 + (ya.length >= 3 ? 1 : 0) + (dca ? 1 : 0), date = cDate(M === "kr" ? R.asOfKr : (R.asOfUs || R.asOf)), L = R.label, P = CARD.PAD;
+  var out = [], T = 9, date = cDate(M === "kr" ? R.asOfKr : (R.asOfUs || R.asOf)), L = R.label, P = CARD.PAD;
   var TG = function (s) { return s + (MN ? " · " + MN.trim() : "") + " · " + date; };
   // 1. 표지 — 시장 온도
   var c = cNew(), t = R.temp;
   cHero(c, TG("DAILY BRIEF"), L + " " + MN + "시장은", t.word, CARD_C.gold, "오른 종목 " + Math.round(t.upPct * 100) + "%  ·  " + t.up + " / " + t.total + "개", 1, T);
   cBar(c, t.upPct); c.y += 30;
-  var ir = R.indexRow.slice(0, 6), ih = cH(c, ir.length, 72, false, 100);
+  var ir = R.indexRow.slice(0, M === "coin" ? 9 : 6), ih = cH(c, ir.length, 72, false, 100);
   ir.forEach(function (x) { cRow(c, x.name, cPct(x.ret), cCol(x.ret), { h: ih, price: cPrice(x.sym, x.last) }); });
   cPara(c, t.desc);
   cFoot(c, null, "1_시장온도"); out.push({ name: "1_시장온도", cv: c.cv });
@@ -495,12 +503,12 @@ function cardsBrief() {
   } else {
     cHead(c, TG("MONEY FLOW"), "[[" + top.name + "]] 강세, " + bot.name + " 약세", "업종 평균 등락 · 업종 안에서 가장 많이 오른 종목과 주가", 3, T);
     var mx = Math.max.apply(null, th.map(function (x) { return Math.abs(x.ret); })) || 0.01;
-    var th10 = th.slice(0, 10), hh = cH(c, th10.length, 84);
+    var th10 = th.slice(0, 12), hh = cH(c, th10.length, 84);
     th10.forEach(function (x) { var b = x.best; cRow(c, x.name, cPct(x.ret), cCol(x.ret), { bar: x.ret / mx, h: hh, noLine: true, priceSize: 22, price: b ? briefName(b) + " " + cPrice(b.sym, b.last) + " " + cPct(b.ret) : "" }); });
     cFoot(c, null, "2_테마흐름"); out.push({ name: "2_테마흐름", cv: c.cv });
   }
   // 3. 급등·급락
-  c = cNew(); var up = R.movers.up.slice(0, 5), dn = R.movers.down.slice(0, 5);
+  c = cNew(); var up = R.movers.up.slice(0, 7), dn = R.movers.down.slice(0, 7);
   if (!up[0] && !dn[0]) return out;
   cHead(c, TG("TOP MOVERS"), up[0] ? "1위 [[" + briefName(up[0]) + " " + cPct(up[0].ret) + "]]" : "오른 종목이 없어요",
     dn[0] ? "가장 많이 내린 종목은 " + briefName(dn[0]) + " " + cPct(dn[0].ret) : "내린 종목이 없어요", 4, T);
@@ -511,24 +519,40 @@ function cardsBrief() {
   dn.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), CARD_C.down, { rank: i + 1, h: mh, price: cPrice(s.sym, s.last) }); });
   cFoot(c, null, "3_급등급락"); out.push({ name: "3_급등급락", cv: c.cv });
   // 4. 인기 종목
-  c = cNew(); var pop = R.popular.filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 8);
+  c = cNew(); var pop = R.popular.filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 10);
   var hot = pop.filter(function (s) { return s.amtX != null && s.amtX >= 1.5; }).sort(function (a, b) { return b.amtX - a.amtX; });
   cHead(c, TG("HOT"), hot.length ? "[[" + briefName(hot[0]) + "]]에 돈이 몰렸어요" : "많이 찾는 종목의 " + L, "주가 · 등락 (작은 글씨: 거래대금이 평소의 몇 배인지)", 5, T);
   var ph = cH(c, pop.length, 84);
   pop.forEach(function (s, i) { cRow(c, briefName(s), cPct(s.ret), cCol(s.ret), { rank: i + 1, h: ph, price: cPrice(s.sym, s.last), mid: s.amtX != null ? s.amtX.toFixed(1) + "배" : "" }); });
   cFoot(c, R.popSrc === "ranked" ? "앱 조회 순위 · 투자 조언 아님" : "거래대금 기준 · 투자 조언 아님", "4_인기종목"); out.push({ name: "4_인기종목", cv: c.cv });
   // 5. 숫자 + 세일 폭 큰 종목
-  c = cNew(); var nums = R.numbers.slice(0, 4), sale = (nums[0].list || []).filter(function (s) { return !/^\^|=X$/.test(s.sym); }).slice(0, 3);
-  cHead(c, TG("NUMBERS"), "세일 중인 종목 [[" + nums[0].v + "]]", "52주 최고가보다 20% 넘게 싼 종목 수 · 시장 전체를 네 숫자로", 6, T);
-  cTiles(c, nums.map(function (n) { return { v: n.v, l: n.l }; }));
-  cNote(c, "싸졌다는 건 사실이지만, 더 내리지 않는다는 뜻은 아니에요. 종목은 다음 장에.");
-  cFoot(c, null, "5_오늘의숫자"); out.push({ name: "5_오늘의숫자", cv: c.cv });
+  c = cNew(); var nums = R.numbers.slice(0, 4), sale = (nums[0].list || []).filter(function (s) { return !/^\^|=X$/.test(s.sym); });
+  // 5. 세일 중인 종목 — 상세 1쪽: 가장 많이 할인된 10개 (고점比 막대 · 가격 · 오늘 · 20일선)
+  var saleN = sale.length, s10 = sale.slice(0, 10);
+  cHead(c, TG("NUMBERS · 세일"), "세일 중인 종목 [[" + saleN + "개]] / " + R.count, "52주 최고가보다 20% 넘게 싼 종목 · 막대는 고점 대비 거리 · 회색은 지금 가격 · 오늘 등락 · 20일선", 6, T);
+  if (s10.length) {
+    var mxS = Math.max.apply(null, s10.map(function (x) { return Math.abs(x.vsHi); })) || 0.5, sh = cH(c, s10.length, 76, true);
+    s10.forEach(function (x, i) { cRow(c, briefName(x), cPct(x.vsHi, 0), CARD_C.down, { rank: i + 1, h: sh, bar: x.vsHi / mxS, price: cPrice(x.sym, x.last), mid: L + " " + cPct(x.ret1 != null ? x.ret1 : x.ret) + " · " + (x.above20 ? "20일선 위" : "20일선 아래"), noLine: true }); });
+  } else cSummary(c, "52주 고점 대비 -20% 아래인 종목이 없어요");
+  cNote(c, "싸졌다는 건 사실이지만 더 안 내린다는 뜻은 아니에요. 20일선 위로 올라선 종목은 '내림세가 멈췄나'의 첫 신호예요.");
+  cFoot(c, null); out.push({ name: "5_세일중", cv: c.cv });
+  // 5-2. 고점과의 거리 분포 — 상세 2쪽: 전체 종목이 고점에서 얼마나 떨어져 있나 (구간별 개수 막대) + 추세·심리 타일
+  c = cNew(); var allS = (nums[0].list || []).concat(nums[1].list || [], (nums[2].list || []), (nums[2].list2 || []));
+  var seen = {}, uni = []; allS.forEach(function (x) { if (!seen[x.sym] && x.vsHi != null && !/^\^|=X$/.test(x.sym)) { seen[x.sym] = 1; uni.push(x); } });
+  var bins = [["고점 근처 (0~-5%)", 0, -0.05], ["-5 ~ -10%", -0.05, -0.1], ["-10 ~ -20%", -0.1, -0.2], ["-20 ~ -30%", -0.2, -0.3], ["-30 ~ -50%", -0.3, -0.5], ["-50% 아래", -0.5, -1]];
+  var cnt = bins.map(function (b) { return uni.filter(function (x) { return x.vsHi <= b[1] + 1e-9 && x.vsHi > b[2]; }).length; }), mxC = Math.max.apply(null, cnt) || 1;
+  var med = uni.slice().sort(function (a, b) { return a.vsHi - b.vsHi; })[Math.floor(uni.length / 2)];
+  cHead(c, TG("NUMBERS · 분포"), "종목 절반이 고점 대비 [[" + (med ? cPct(med.vsHi, 0) : "-") + "]] 아래", uni.length + "개 종목이 52주 최고가에서 얼마나 떨어져 있나 — 구간별 개수 · 중앙값 " + (med ? cPct(med.vsHi, 0) : "-"), 7, T);
+  bins.forEach(function (b, i) { cBarHS(c, b[0], Math.round(cnt[i] / Math.max(1, uni.length) * 100) + "% of " + uni.length, cnt[i] / mxC, cnt[i] + "개"); });
+  c.y += 12; cTiles(c, [{ v: nums[2].v, l: "20일 평균선 위 종목 비율" }, { v: nums[3] ? nums[3].v : "-", l: nums[3] ? nums[3].l : "VIX 공포지수" }]);
+  cHow(c, "읽는 법", "왼쪽 구간일수록 고점 가까이, 오른쪽일수록 깊게 빠진 종목이에요. 오른쪽이 두꺼우면 시장이 넓게 눌려 있고, 왼쪽이 두꺼우면 넓게 강한 구간이에요. 매수·매도 기준이 아니에요.");
+  cFoot(c, null); out.push({ name: "5_고점거리분포", cv: c.cv });
   // 6. 신고가·신저가 (1년치가 있을 때) / 없으면 숫자 뒤의 종목
   c = cNew();
   if (t.n200) {
     var nh = t.newHigh.length, nl = t.newLow.length, tot2 = Math.max(1, nh + nl);
     var f2 = nh === 0 && nl === 0 ? "오늘 52주 신고가·신저가 종목이 [[없어요]]" : nh >= nl ? "신고가 종목이 신저가보다 [[" + (nl ? (nh / nl).toFixed(1) + "배 많아요" : nh + "개 많아요") + "]]" : "신저가 종목이 신고가보다 [[" + (nh ? (nl / nh).toFixed(1) + "배 많아요" : nl + "개 많아요") + "]]";
-    cHead(c, TG("신고가·신저가"), f2, "52주 종가 기준 신고가 " + nh + " · 신저가 " + nl + " · 근접(3% 이내) " + t.nearHigh.length + " / " + t.nearLow.length, 7, T);
+    cHead(c, TG("신고가·신저가"), f2, "52주 종가 기준 신고가 " + nh + " · 신저가 " + nl + " · 근접(3% 이내) " + t.nearHigh.length + " / " + t.nearLow.length, 8, T);
     cCompare2(c, { l: "▲ 52주 종가 신고가", v: nh, s: "신고가 근접(3% 이내) " + t.nearHigh.length }, { l: "▼ 52주 종가 신저가", v: nl, s: "신저가 근접(3% 이내) " + t.nearLow.length });
     cTwoLists(c, { title: "▲ 신고가 주요 5 · 거래대금 순", head: "종목 · 오늘 종가 / 1년 최고 · 거래대금", items: (nh ? t.newHigh : t.nearHigh).slice(0, 5).map(function (s) { return [briefName(s), cPrice(s.sym, s.last) + " / " + cPrice(s.sym, s.hi250), briefAmtTxt(s)]; }) },
       { title: "▼ 신저가 주요 5 · 거래대금 순", head: "종목 · 오늘 종가 / 1년 최저 · 거래대금", items: (nl ? t.newLow : t.nearLow).slice(0, 5).map(function (s) { return [briefName(s), cPrice(s.sym, s.last) + " / " + cPrice(s.sym, s.lo250), briefAmtTxt(s)]; }) });
@@ -536,7 +560,7 @@ function cardsBrief() {
     cFoot(c, null); out.push({ name: "6_신고가신저가", cv: c.cv });
   } else {
     var ath = (nums[1].list || []).slice(0, 4), abv = (nums[2].list || []).slice().sort(function (a, b) { return (b.amt || 0) - (a.amt || 0); }).slice(0, 4), sale4 = sale.slice(0, 4);
-    cHead(c, TG("NUMBERS · 종목"), "숫자 뒤의 [[종목]]", "세일 중 " + nums[0].v + " · 신고가 근처 " + nums[1].v + " · 20일선 위 " + nums[2].v + " — 각각 대표 종목", 7, T);
+    cHead(c, TG("NUMBERS · 종목"), "숫자 뒤의 [[종목]]", "세일 중 " + nums[0].v + " · 신고가 근처 " + nums[1].v + " · 20일선 위 " + nums[2].v + " — 각각 대표 종목", 8, T);
     var groups = [["🏷️ 세일 중 — 52주 최고 대비 가장 많이 내린 순", sale4, function (x) { return cPct(x.vsHi, 0); }, CARD_C.down], ["🏔️ 신고가 근처 — 52주 최고 대비", ath, function (x) { return cPct(x.vsHi, 1); }, CARD_C.up], ["📈 20일선 위 — 거래대금 큰 순 · 20일 평균 대비", abv, function (x) { return cPct(x.vsMa20, 1); }, CARD_C.navy]];
     var nRows = groups.reduce(function (a, g) { return a + g[1].length; }, 0), gh = Math.max(50, Math.min(62, Math.floor((CARD.H - 150 - c.y - groups.length * 48) / Math.max(1, nRows))));
     groups.forEach(function (gr) { cLabel(c, gr[0], gr[3]); if (!gr[1].length) { cSummary(c, "해당 종목 없음"); return; } gr[1].forEach(function (x) { cRow(c, briefName(x), gr[2](x), gr[3], { h: gh, price: cPrice(x.sym, x.last), mid: L + " " + cPct(x.ret1 != null ? x.ret1 : x.ret) }); }); c.y += 6; });
@@ -545,30 +569,13 @@ function cardsBrief() {
   }
   // 6. 시장 심리 온도계 (자체 계산)
   c = cNew(); var md = cMood(R);
-  cHead(c, TG("MOOD"), MN + "시장 심리는 [[" + md.word + "]]", "0 = 극도의 공포, 100 = 극도의 탐욕 · 아래 " + md.parts.length + "가지 숫자로 계산", 8, T);
+  cHead(c, TG("MOOD"), MN + "시장 심리는 [[" + md.word + "]]", "0 = 극도의 공포, 100 = 극도의 탐욕 · 아래 " + md.parts.length + "가지 숫자로 계산", 9, T);
   cGauge(c, md.score, md.word);
   var gh = cH(c, md.parts.length, 70, true);
   md.parts.forEach(function (p) { cRow(c, p.k, p.txt, CARD_C.gold, { h: gh, mid: "온도 " + Math.round(p.s * 100) }); });
   cNote(c, "극단일수록 감정적으로 사고팔기 쉬운 때예요. 방향을 맞히는 지표는 아니에요.");
   cFoot(c, "StockMind 자체 계산 · CNN 공포탐욕지수 아님", "6_심리온도"); out.push({ name: "7_심리온도", cv: c.cv });
-  // 7. 1년 전에 100만원 샀다면 (원화 기준)
-  if (ya.length >= 3) {
-    c = cNew(); var w1 = ya[0];
-    cHead(c, TG("1 YEAR AGO"), "1년 전 100만원 → [[" + w1.name + " " + cMan(w1.val) + "]]", "1년 전에 100만원어치 샀다면 지금 얼마? · 작은 숫자는 지금 주가", 9, T);
-    var yh = cH(c, ya.length, 84, true);
-    ya.forEach(function (x, i) { cRow(c, x.name, cMan(x.val), cCol(x.ret), { rank: i + 1, h: yh, price: cPct(x.ret, 0), mid: cPrice(x.sym, x.px), hi: i === 0 }); });
-    cNote(c, "지금 유명한 종목만 고른 것 자체가 결과를 알고 고른 거예요(생존자 편향).");
-    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "7_1년전100만원"); out.push({ name: "8_1년전100만원", cv: c.cv });
-  }
-  // 8. 매달 10만원씩 적립했다면
-  if (dca) {
-    c = cNew(); var d1 = dca.rows[0], prin = d1.principal;
-    cHead(c, TG("DCA"), "매달 10만원 " + dca.years + "년 → [[" + d1.name + " " + cMan(d1.val) + "]]", "적금처럼 매달 첫 거래일에 10만원씩 샀다면 · 넣은 돈 " + cMan(prin), T, T);
-    var dh = cH(c, dca.rows.length, 84, true);
-    dca.rows.forEach(function (x, i) { cRow(c, x.name, cMan(x.val), x.val >= x.principal ? CARD_C.up : CARD_C.down, { rank: i + 1, h: dh, price: (x.val / x.principal).toFixed(1) + "배", hi: i === 0 }); });
-    cNote(c, "나눠 사면 고점에 몰아 살 걱정이 줄어요. 지난 성과가 미래를 보장하진 않아요.");
-    cFoot(c, (cHasFx() ? "환율 포함 원화 기준" : "환율 변동 제외") + " · 배당 재투자 · 투자 조언 아님", "8_매달10만원"); out.push({ name: "9_매달10만원", cv: c.cv });
-  }
+  // (v9.0) 1년 전 100만원 · 매달 10만원 카드는 매일 올리기엔 맞지 않아 세트에서 뺐다 → 연구노트 "적금처럼 샀다면" 덱에서 만든다
   return out;
 }
 

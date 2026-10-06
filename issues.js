@@ -130,7 +130,20 @@ function issuesCard(list, page, total) {
   var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2;
   var mk = list.market && list.market !== "all" ? list.mktName + " · " : "";
   var lbl = ISS_LBL[list.mode] || "오늘", tag = list.mode === "week" ? "WEEKLY TOP 5" : list.mode === "month" ? "MONTHLY TOP 5" : "TODAY'S TOP 5";
-  cHead(c, tag + " · " + mk + cDate(list.asOf), lbl + "의 핵심 이슈 [[5]]", "자료 전체에서 평소보다 이례적인 움직임 순", page || 0, total || 0);
+  // 표지 제목: 1위 이슈로 궁금증을 만드는 한 줄 (사실만, 과장 없이) — 넘기게 하는 역할
+  var top = list[0], hook = lbl + "의 핵심 이슈 [[5]]";
+  if (top) {
+    var tt = String(top.title).replace(/\s*—.*$/, ""), k = (top.sub || "").match(/평소[^0-9]*([0-9.]+)배/);
+    if (/^idx/.test(top.cat)) hook = "[[" + tt + "]]" + (k ? " — 평소의 " + k[1] + "배, 왜?" : " — 무슨 일이?");
+    else if (/^theme/.test(top.cat)) hook = "[[" + tt + "]] — 돈이 움직였다";
+    else if (top.cat === "mover") hook = "[[" + tt.replace(/ 급[등락]$/, "") + "]]" + (k ? " — 평소의 " + k[1] + "배" : "") + ", 이유는?";
+    else if (top.cat === "hot") hook = "[[" + tt.split("에 돈이")[0] + "]]에 돈이 몰렸다 — 왜?";
+    else if (top.cat === "breadth") hook = "[[" + tt + "]] — 내 종목만 그런 게 아니다";
+    else if (/mdd|dd/.test(top.cat)) hook = "[[" + tt + "]] — 이제 어디쯤?";
+    else hook = "[[" + tt + "]]" + (k ? " — 평소의 " + k[1] + "배, 왜?" : " — 오늘 1위 이슈");
+    if (cW(g, cPlain(hook), 44, 800) > (CARD.W - P * 2) * 1.9) hook = "[[" + tt + "]]";
+  }
+  cHead(c, tag + " · " + mk + cDate(list.asOf), hook, (top ? "오늘 가장 이례적인 움직임 5가지 — 넘겨서 확인 →" : "자료 전체에서 평소보다 이례적인 움직임 순"), page || 0, total || 0);
   var per = Math.min(150, Math.floor((CARD.H - 110 - c.y) / list.length));
   list.forEach(function (it, i) {
     var y = c.y, bh = per - 12, mid = y + bh / 2;

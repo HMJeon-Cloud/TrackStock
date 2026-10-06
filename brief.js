@@ -47,7 +47,7 @@ function briefMkt(sym) {
 var BRIEF_INDEX_BY_MKT = {
   kr: [["^KS11", "코스피"], ["^KQ11", "코스닥"], ["KRW=X", "달러/원"], ["005930.KS", "삼성전자"], ["000660.KS", "SK하이닉스"]],
   us: [["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["^DJI", "다우"], ["^VIX", "공포지수"], ["TLT", "미국 장기채"], ["GLD", "금"]],
-  coin: [["BTC-USD", "비트코인"], ["ETH-USD", "이더리움"], ["XRP-USD", "리플"], ["SOL-USD", "솔라나"], ["KRW=X", "달러/원"]]
+  coin: [["BTC-USD", "비트코인"], ["ETH-USD", "이더리움"], ["XRP-USD", "리플"], ["SOL-USD", "솔라나"], ["BNB-USD", "바이낸스코인"], ["DOGE-USD", "도지코인"], ["ADA-USD", "에이다"], ["TRX-USD", "트론"], ["LINK-USD", "체인링크"], ["KRW=X", "달러/원"]]
 };
 var BRIEF_INDEX_ROW = [["^KS11", "코스피"], ["^KQ11", "코스닥"], ["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["KRW=X", "달러/원"], ["GLD", "금"], ["BTC-USD", "비트코인"], ["^VIX", "공포지수"]];
 
