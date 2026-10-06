@@ -236,7 +236,7 @@ function chPortfolio(items, days) {
 function chRet(sym) {
   var d = chState.recent && chState.recent.symbols[sym]; if (!d || !d.c || d.c.length < 22) return null;
   var c = d.c, n = c.length, last = c[n - 1];
-  return { d1: last / c[n - 2] - 1, w1: n > 5 ? last / c[n - 6] - 1 : null, m1: last / c[Math.max(0, n - 22)] - 1, m3: last / c[0] - 1 };
+  return { d1: last / c[n - 2] - 1, w1: n > 5 ? last / c[n - 6] - 1 : null, m1: last / c[Math.max(0, n - 22)] - 1, m3: last / c[Math.max(0, n - 64)] - 1 };
 }
 function chTd(x) { return '<td style="color:' + (x > 0 ? "var(--up)" : x < 0 ? "var(--down)" : "var(--sub)") + '">' + chPct(x) + '</td>'; }
 function chPerHead() { return CH_PERIODS.map(function (p) { return '<th>' + p[0] + '</th>'; }).join(""); }

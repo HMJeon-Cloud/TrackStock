@@ -73,14 +73,23 @@ function briefStats(sym, d, mode) {
   }
   var iL = BRIEF_WIN && typeof iN === "number" && iN >= 0 ? iN : n - 1;
   var ret1 = last / c[iL - 1] - 1, ret5 = iL > 5 ? last / c[iL - 5] - 1 : null;
-  var m1 = last / c[Math.max(0, n - 22)] - 1, m3 = last / c[0] - 1;
-  var ma20 = 0; for (var i = n - 20; i < n; i++) ma20 += c[i]; ma20 /= 20;
-  var ma5 = 0; for (i = n - 5; i < n; i++) ma5 += c[i]; ma5 /= 5;
-  var hi = d.meta && d.meta.fiftyTwoWeekHigh, vsHi = hi > 0 ? last / hi - 1 : null;
-  var hi90 = Math.max.apply(null, c);
-  if (vsHi != null && hi90 > hi * 1.02) vsHi = last / hi90 - 1;      // 야후 52주 고점이 최근 90일 고점보다 낮으면(갱신 지연) 90일 고점으로
-  if (vsHi != null && vsHi > 0) vsHi = 0;
+  // v8.9: 스냅샷이 1년치(약 250거래일)로 늘어 '최근 90일' 계산은 마지막 64거래일로, 52주 고·저가는 자체 데이터로 센다 (야후 meta는 보조)
+  var iL0 = BRIEF_WIN && typeof iN === "number" && iN >= 0 ? iN : n - 1, i90 = Math.max(0, iL0 - 63), i250 = Math.max(0, iL0 - 249);
+  if (iL0 < 21) return null;
+  var m1 = last / c[Math.max(0, iL0 - 21)] - 1, m3 = last / c[i90] - 1, y1 = iL0 - 250 >= 0 ? last / c[iL0 - 250] - 1 : null;
+  var ma20 = 0; for (var i = iL0 - 19; i <= iL0; i++) ma20 += c[i]; ma20 /= 20;
+  var ma5 = 0; for (i = iL0 - 4; i <= iL0; i++) ma5 += c[i]; ma5 /= 5;
+  var ma50 = null, ma200 = null;
+  if (iL0 >= 49) { ma50 = 0; for (i = iL0 - 49; i <= iL0; i++) ma50 += c[i]; ma50 /= 50; }
+  if (iL0 >= 199) { ma200 = 0; for (i = iL0 - 199; i <= iL0; i++) ma200 += c[i]; ma200 /= 200; }
+  var hi90 = -Infinity, hi250 = -Infinity, lo250 = Infinity, hiPrev = -Infinity, loPrev = Infinity;
+  for (i = i250; i <= iL0; i++) { var cv = c[i]; if (cv == null) continue; if (i >= i90 && cv > hi90) hi90 = cv; if (cv > hi250) hi250 = cv; if (cv < lo250) lo250 = cv; if (i < iL0) { if (cv > hiPrev) hiPrev = cv; if (cv < loPrev) loPrev = cv; } }
+  var longEnough = iL0 - i250 >= 200;   // 1년치가 있을 때만 '52주'라고 부른다
+  var hi = longEnough ? hi250 : (d.meta && d.meta.fiftyTwoWeekHigh > 0 ? Math.max(d.meta.fiftyTwoWeekHigh, hi90) : hi90);
+  var vsHi = hi > 0 ? Math.min(0, last / hi - 1) : null;
   if (vsHi != null && vsHi < -0.95) vsHi = null;                        // 액면분할 미반영 등으로 의심되면 쓰지 않음
+  var vsLo = longEnough && lo250 > 0 ? last / lo250 - 1 : null;
+  var newHigh = longEnough && last >= hiPrev, newLow = longEnough && last <= loPrev;   // 52주 종가 신고가 / 신저가 (오늘 종가가 지난 1년 중 최고/최저)
   var vs90 = last / hi90 - 1;
   var rsi = typeof rsiWilder === "function" ? rsiWilder(c, 14) : null;
   var v5 = 0, v20 = 0;
@@ -92,7 +101,7 @@ function briefStats(sym, d, mode) {
   var amtAvg = /-USD$/.test(sym) ? v20 : v20 * ma20;
   // 일간 수익률 변동성(90일) — 조용한 우상향 판단
   var rs = [], mean = 0;
-  for (i = 1; i < n; i++) { var r = c[i] / c[i - 1] - 1; rs.push(r); mean += r; }
+  for (i = Math.max(1, i90); i <= iL0; i++) { var r = c[i] / c[i - 1] - 1; rs.push(r); mean += r; }
   mean /= rs.length;
   var sd = 0; for (i = 0; i < rs.length; i++) sd += (rs[i] - mean) * (rs[i] - mean);
   sd = Math.sqrt(sd / Math.max(1, rs.length - 1));
@@ -105,7 +114,9 @@ function briefStats(sym, d, mode) {
   return {
     sym: sym, name: (d.meta && (d.meta.shortName || d.meta.longName)) || sym, cur: (d.meta && d.meta.currency) || "",
     last: last, ret: ret, ret1: ret1, ret5: ret5, m1: m1, m3: m3, ma20: ma20, ma5: ma5, vsMa20: last / ma20 - 1,
-    vsHi: vsHi, vs90: vs90, rsi: rsi, volX: v20 > 0 ? v5 / v20 : null, sd: sd, above20: last >= ma20,
+    vsHi: vsHi, vs90: vs90, vsLo: vsLo, hi250: longEnough ? hi250 : null, lo250: longEnough ? lo250 : null, newHigh: newHigh, newLow: newLow, longEnough: longEnough, y1: y1,
+    ma50: ma50, ma200: ma200, above50: ma50 != null ? last >= ma50 : null, above200: ma200 != null ? last >= ma200 : null,
+    rsi: rsi, volX: v20 > 0 ? v5 / v20 : null, sd: sd, above20: last >= ma20,
     pctRank: rs.length ? 1 - bigger / rs.length : null, crossUp: crossUp,
     amt: amtLast, amtX: amtAvg > 0 ? amtLast / amtAvg : null,
     lastT: d.t && d.t.length ? d.t[d.t.length - 1] * 1000 : null,
@@ -157,8 +168,14 @@ function briefCompute(recent, opts) {
 
   /* 1. 온도계 */
   var up = 0, above = 0;
-  stocks.forEach(function (s) { if (s.ret > 0) up++; if (s.above20) above++; });
-  var temp = { total: stocks.length, up: up, upPct: stocks.length ? up / stocks.length : 0, above20: above, abovePct: stocks.length ? above / stocks.length : 0 };
+  var a50 = 0, n50 = 0, a200 = 0, n200 = 0, nh = [], nl = [], nearH = [], nearL = [];
+  stocks.forEach(function (s) { if (s.ret > 0) up++; if (s.above20) above++; if (s.above50 != null) { n50++; if (s.above50) a50++; } if (s.above200 != null) { n200++; if (s.above200) a200++; }
+    if (s.newHigh) nh.push(s); else if (s.vsHi != null && s.longEnough && s.vsHi >= -0.03) nearH.push(s);
+    if (s.newLow) nl.push(s); else if (s.vsLo != null && s.vsLo <= 0.03) nearL.push(s); });
+  var byAmt = function (a, b) { return (b.amt || 0) - (a.amt || 0); }; nh.sort(byAmt); nl.sort(byAmt); nearH.sort(byAmt); nearL.sort(byAmt);
+  var temp = { total: stocks.length, up: up, upPct: stocks.length ? up / stocks.length : 0, above20: above, abovePct: stocks.length ? above / stocks.length : 0,
+    above50: a50, n50: n50, above50Pct: n50 ? a50 / n50 : null, above200: a200, n200: n200, above200Pct: n200 ? a200 / n200 : null,
+    newHigh: nh, newLow: nl, nearHigh: nearH, nearLow: nearL };
   temp.word = temp.upPct >= 0.65 ? "훈풍" : temp.upPct >= 0.5 ? "미지근" : temp.upPct >= 0.35 ? "쌀쌀" : "한파";
   temp.desc = temp.upPct >= 0.65 ? "대부분이 올랐어요. 이런 날엔 '나만 못 번 것 같은' 조급함을 조심하세요."
     : temp.upPct >= 0.5 ? "오른 종목과 내린 종목이 반반이에요. 종목별 이유가 갈리는 장이에요."
@@ -355,6 +372,56 @@ function openBriefList(n, R) {
   infoModal.open(n.v + " — " + n.l, box);
 }
 
+
+/* ---------- 한눈에 보는 판 (v8.9) ---------- */
+function briefDateLine(R) {
+  var us = R.asOfUs ? new Date(R.asOfUs + 9 * 3600e3).toISOString().slice(0, 10) : "", kr = R.asOfKr ? new Date(R.asOfKr + 9 * 3600e3).toISOString().slice(0, 10) : "", today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  return (R.market === "kr" ? "한국 거래일 " + kr : R.market === "us" ? "미국 거래일 " + us : "미국 " + us + " · 한국 " + kr) + " · 발행 " + today;
+}
+function briefBarHtml(label, sub, pct, refPct, refLabel) {
+  var p = Math.round(pct * 1000) / 10;
+  return '<div class="fdBar"><div class="fdBarTop"><div><b>' + label + '</b><small>' + sub + '</small></div><div class="fdVal">' + p.toFixed(1) + '%</div></div>' +
+    '<div class="fdTrack"><div class="fdFill" style="width:' + Math.min(100, p) + '%"></div>' + (refPct != null ? '<div class="fdRef" style="left:' + refPct + '%"><span>' + refLabel + '</span></div>' : '') + '</div></div>';
+}
+function briefHealthFinding(t) {
+  var p = t.abovePct, s = Math.round(p * 1000) / 10;
+  if (t.n200 && t.above200Pct != null) {
+    var l = Math.round(t.above200Pct * 1000) / 10;
+    if (p >= 0.6 && t.above200Pct >= 0.6) return "단기·장기 추세 모두 <b>절반을 넘습니다</b> — 20일선 위 " + s + "% · 200일선 위 " + l + "%";
+    if (p < 0.4 && t.above200Pct >= 0.5) return "장기 추세는 살아 있는데(200일선 위 " + l + "%) <b>단기는 눌렸습니다</b> — 20일선 위 " + s + "%";
+    if (p >= 0.5 && t.above200Pct < 0.4) return "단기 반등은 넓지만(20일선 위 " + s + "%) <b>장기 추세는 아직 아래</b> — 200일선 위 " + l + "%";
+  }
+  return "20일선 위 종목은 <b>" + s + "%</b>로 " + (p >= 0.5 ? "절반을 넘습니다" : "절반에 못 미칩니다");
+}
+function briefRenderHealth(R) {
+  var t = R.temp, box = $("briefHealth"), hl = $("briefHiLo"); if (!box || !t) return;
+  var h = '<div class="fdHead"><span class="fdNo">02 · 시장 체력</span><span class="fdDate">' + briefDateLine(R) + '</span></div>' +
+    '<div class="fdTitle">' + briefHealthFinding(t) + '</div>' +
+    '<div class="fdDef">여기서 \'추세 위\'는 주가가 20일·50일·200일 이동평균선 위에 있다는 뜻이에요. 비율이 높을수록 많은 종목이 같이 오르고 있다는 뜻이고, 지수만 오르고 비율이 낮으면 몇 개 큰 종목의 날이에요.</div>' +
+    briefBarHtml("20일선 위", "단기 추세", t.abovePct, 50, "절반 50%") +
+    (t.n50 ? briefBarHtml("50일선 위", "중기 추세", t.above50Pct, 50, "절반 50%") : "") +
+    (t.n200 ? briefBarHtml("200일선 위", "장기 추세", t.above200Pct, 50, "절반 50%") : '<div class="briefDim" style="font-size:12px">200일선은 1년치 데이터가 쌓인 뒤(수집 후 다음 날) 표시돼요.</div>') +
+    '<div class="fdHow"><b>읽는 법</b> — 20·50·200일 평균 가격보다 위에 있는 종목의 비율이에요(' + t.total + '개 집계). 50% 선은 종목의 절반을 나타내는 비교선이며 매수·매도 기준이 아니에요. 막대는 시장 참여 정도일 뿐 신호가 아니에요.</div>';
+  box.innerHTML = h;
+  if (!hl) return;
+  if (!t.n200) { hl.innerHTML = '<div class="fdHead"><span class="fdNo">06 · 신고가·신저가</span><span class="fdDate">' + briefDateLine(R) + '</span></div><div class="briefDim" style="font-size:12px">52주 신고가·신저가는 1년치 데이터가 쌓인 뒤 표시돼요.</div>'; return; }
+  var nh = t.newHigh.length, nl = t.newLow.length, ratio = nl ? (nh / nl) : null;
+  var find = nh === 0 && nl === 0 ? "오늘 52주 신고가·신저가 종목이 <b>없습니다</b>" : nh >= nl ? "신고가 종목이 신저가 종목보다 <b>" + (nl ? (nh / nl).toFixed(1) + "배 많았습니다" : nh + "개 많았습니다") + "</b>" : "신저가 종목이 신고가 종목보다 <b>" + (nh ? (nl / nh).toFixed(1) + "배 많았습니다" : nl + "개 많았습니다") + "</b>";
+  function li(list, hi) { return list.slice(0, 5).map(function (s, i) { return '<div class="li"><b>' + (i + 1) + '. ' + escapeHtml(briefName(s)) + '</b><span>' + briefPriceTxt(s.sym, s.last) + ' / ' + briefPriceTxt(s.sym, hi ? s.hi250 : s.lo250) + ' · ' + briefAmtTxt(s) + '</span></div>'; }).join("") || '<div class="briefDim" style="font-size:12px;padding:4px 0">해당 없음</div>'; }
+  var tot = Math.max(1, nh + nl);
+  hl.innerHTML = '<div class="fdHead"><span class="fdNo">06 · 신고가·신저가</span><span class="fdDate">' + briefDateLine(R) + '</span></div>' +
+    '<div class="fdTitle">' + find + '</div>' +
+    '<div class="fdDef">52주 종가 기준 신고가 ' + nh + '종목, 신저가 ' + nl + '종목. 신고가 근접(3% 이내) ' + t.nearHigh.length + '개, 신저가 근접(3% 이내) ' + t.nearLow.length + '개예요.</div>' +
+    '<div class="fdTwo"><div class="fdTile up"><div class="fdTl">▲ 52주 종가 신고가</div><div class="fdBig">' + nh + '</div><small>신고가 근접(3% 이내) ' + t.nearHigh.length + '</small></div>' +
+    '<div class="fdTile down"><div class="fdTl">▼ 52주 종가 신저가</div><div class="fdBig">' + nl + '</div><small>신저가 근접(3% 이내) ' + t.nearLow.length + '</small></div></div>' +
+    '<div class="fdSplit"><i class="a" style="width:' + Math.round(nh / tot * 100) + '%"></i><i class="b" style="width:' + Math.round(nl / tot * 100) + '%"></i></div>' +
+    '<div class="fdLists"><div class="fdList"><h5>▲ 신고가 주요 5 · 거래대금 순</h5><div class="lh">종목 · 오늘 종가 / 직전 1년 최고가 · 거래대금</div>' + li(t.newHigh.length ? t.newHigh : t.nearHigh, true) + '</div>' +
+    '<div class="fdList"><h5>▼ 신저가 주요 5 · 거래대금 순</h5><div class="lh">종목 · 오늘 종가 / 직전 1년 최저가 · 거래대금</div>' + li(t.newLow.length ? t.newLow : t.nearLow, false) + '</div></div>' +
+    '<div class="fdHow"><b>읽는 법</b> — 오늘 종가가 지난 1년(약 250거래일) 종가 중 최고/최저면 신고가/신저가로 세요. 신고가가 많다고 "비싸다"가 아니고, 신저가가 많다고 "싸다"가 아니에요. 어느 쪽이 넓게 늘어나는지를 봐요.</div>';
+}
+function briefPriceTxt(sym, v) { return typeof cPrice === "function" ? cPrice(sym, v) : String(v); }
+function briefAmtTxt(s) { var a = s.amt || 0; if (!a) return "-"; if (/\.K[SQ]$/.test(s.sym)) return a >= 1e12 ? (a / 1e12).toFixed(2) + "조" : (a / 1e8).toFixed(0) + "억"; return a >= 1e9 ? "$" + (a / 1e9).toFixed(2) + "B" : "$" + (a / 1e6).toFixed(0) + "M"; }
+
 function renderBrief() {
   var R = briefState.result, box = $("briefBody");
   if (!R || !box) return;
@@ -375,6 +442,9 @@ function renderBrief() {
     '<div class="briefIdxRow">' + R.indexRow.map(function (x) {
       return '<div class="briefIdx"><span>' + x.name + '</span><b style="color:' + briefColor(x.ret) + '">' + briefPct(x.ret) + '</b></div>';
     }).join("") + '</div></div>';
+
+  /* ①-2 시장 체력 · 신고가·신저가 (v8.9 — 한눈에 보는 판) */
+  try { briefRenderHealth(R); } catch (e) { console.warn(e); }
 
   /* ② 테마 — 상위·하위 위주, 나머지는 더보기 */
   var maxAbs = Math.max(0.005, Math.max.apply(null, R.themes.map(function (x) { return Math.abs(x.ret); })));
