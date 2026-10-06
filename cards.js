@@ -752,10 +752,16 @@ function cardsOpen(kind) {
     var mk = mkt;
     var mkHtml = mk ? '<div class="pills" style="margin-bottom:10px">' + Object.keys(BRIEF_MKT).map(function (k) {
       return '<button data-cm="' + k + '"' + (k === mk ? ' class="active"' : '') + '>' + BRIEF_MKT[k] + '</button>'; }).join("") + '</div>' : "";
-    box.innerHTML = mkHtml + '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button>' +
+    box.innerHTML = mkHtml + (typeof thrPanelHtml === "function" ? thrPanelHtml(kind === "brief" ? THR_TOPIC[mk || "all"] : "주식") : "") + '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button>' +
       (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유 (인스타·카톡)</button>' : '') +
       '<span class="briefDim">1080×1350 · 인스타 4:5 · 저장이 안 되면 이미지를 길게 눌러 저장 · 장마다 따로 올려도, 묶어서 올려도 돼요</span></div><div class="cardsWrap"></div>';
     var wrap = box.querySelector(".cardsWrap");
+    if (typeof thrBind === "function") try {
+      var names = list.map(function (it) { return it.name; });
+      var Rk = kind === "brief" ? briefState.result : chState.brief;
+      var issK = kind === "brief" ? (typeof issuesCompute === "function" && briefState.recent ? issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }) : []) : (chState.issues || []);
+      thrBind(box, thrDaily(Rk, issK, names));
+    } catch (e) { console.warn(e); }
     Array.prototype.forEach.call(box.querySelectorAll("[data-cm]"), function (b) {
       b.onclick = function () { switchBriefMarket(b.getAttribute("data-cm")); cardsOpen("brief"); };
     });

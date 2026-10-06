@@ -278,12 +278,12 @@ function pubPolicyOpen(id) {
     .then(function () {
       var list; try { list = pubPolicyCards(pl); } catch (e) { console.warn(e); alert("카드를 만들지 못했어요: " + e.message); return; }
       var cap = pubPolicyCaption(pl), day = pubToday().replace(/-/g, ""), box = document.createElement("div");
-      box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button><button class="chip" data-act="cap">📋 캡션 (' + cap.igLen + '자)</button><button class="chip" data-act="th">📋 스레드</button></div><div class="cardsWrap"></div>';
+      box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button><button class="chip" data-act="cap">📋 캡션 (' + cap.igLen + '자)</button></div>' + thrPanelHtml("재테크") + '<div class="cardsWrap"></div>';
       var wrap = box.querySelector(".cardsWrap");
       list.forEach(function (it, i) { it.url = it.cv.toDataURL("image/png"); it.file = "uphill.lab_정책_" + pl.id + "_" + day + "_" + it.name + ".png"; var f = document.createElement("figure"); f.innerHTML = '<img alt=""><figcaption><span>' + (i + 1) + '. ' + it.name.replace(/^\d_/, "") + '</span><button class="chip" style="padding:3px 10px;font-size:11px">저장</button></figcaption>'; f.querySelector("img").src = it.url; f.querySelector("button").onclick = function () { cardsDownload(it); }; wrap.appendChild(f); });
       box.querySelector('[data-act="all"]').onclick = function () { list.forEach(function (it, i) { setTimeout(function () { cardsDownload(it); }, i * 400); }); };
       box.querySelector('[data-act="cap"]').onclick = function () { chCopy(cap.ig, this); };
-      box.querySelector('[data-act="th"]').onclick = function () { chCopy(cap.th, this); };
+      try { thrBind(box, thrPolicy(pl, list.map(function (it) { return it.name; }))); } catch (e) { console.warn(e); }
       infoModal.open("🃏 " + pl.t + " · " + list.length + "장", box);
     });
 }
@@ -331,7 +331,7 @@ function pubRender() {
     var cap = pubCaption();
     h += (cap.warn.length ? '<div class="chWhyBox">⚠️ ' + cap.warn.join(" / ") + '</div>' : '') +
       '<div class="row" style="gap:6px;margin-bottom:6px"><b>인스타그램 캡션</b><span class="briefDim">' + (cap.igLen || 0) + '자 / 2,200</span><button class="chip" data-copy="ig">📋 복사</button></div><pre class="chText" id="pubIg"></pre>' +
-      '<div class="row" style="gap:6px;margin:12px 0 6px"><b>스레드</b><span class="briefDim">' + (cap.thLen || 0) + '자 / 500</span><button class="chip" data-copy="th">📋 복사</button></div><pre class="chText" id="pubTh"></pre>' +
+      '<div style="margin-top:12px">' + thrPanelHtml("주식") + '</div>' +
       '<div class="briefDim" style="margin-top:8px">훅 문장과 질문은 날마다 자동으로 바뀌어요. 종목 이름을 직접 언급할 땐 "추천"처럼 읽히지 않게 사실(숫자)만 쓰세요. 해시태그는 5~10개가 적당해요.</div>';
   } else if (pubState.tab === "cal") {
     var up = pubUpcoming(14);
@@ -361,9 +361,10 @@ function pubRender() {
   Array.prototype.forEach.call(box.querySelectorAll("[data-story]"), function (b) { b.onclick = function () { storyOpen(b.getAttribute("data-story")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-per]"), function (b) { b.onclick = function () { perOpen(b.getAttribute("data-per")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-term]"), function (b) { b.onclick = function () { pubState.termOffset += +b.getAttribute("data-term"); pubRender(); }; });
-  if ($("pubIg")) { var cap2 = pubCaption(); $("pubIg").textContent = cap2.ig; $("pubTh").textContent = cap2.th; }
+  if ($("pubIg")) { var cap2 = pubCaption(); $("pubIg").textContent = cap2.ig;
+    try { var Rb = (typeof briefState !== "undefined" && briefState.result) || chState.brief, ib = (typeof briefState !== "undefined" && briefState.recent) ? issuesCompute(briefState.recent, { market: briefState.market }) : (chState.issues || []); thrBind(box, thrDaily(Rb, ib, null)); } catch (e) { console.warn(e); } }
   Array.prototype.forEach.call(box.querySelectorAll("[data-copy]"), function (b) {
-    b.onclick = function () { var k = b.getAttribute("data-copy"), cap3 = pubCaption(); chCopy(k === "ig" ? cap3.ig : k === "th" ? cap3.th : pubTermCaption(pubTerm(pubState.termOffset)), b); };
+    b.onclick = function () { var k = b.getAttribute("data-copy"), cap3 = pubCaption(); chCopy(k === "ig" ? cap3.ig : pubTermCaption(pubTerm(pubState.termOffset)), b); };
   });
   Array.prototype.forEach.call(box.querySelectorAll("[data-make]"), function (b) {
     b.onclick = function () {
