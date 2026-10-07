@@ -112,14 +112,21 @@ function toSnapshot(symbol, r, maxYears) {
   let dropped = 0;
   const nowS = Math.floor(Date.now() / 1000), ctp = r.meta && r.meta.currentTradingPeriod && r.meta.currentTradingPeriod.regular;
   const coin = /-USD$/.test(symbol), utc0 = Math.floor(nowS / 86400) * 86400;
+  // v9.4.1 코인: 야후는 UTC 자정 직후 '어제' 일봉을 아직 어제 날짜(00:00)로 내주지 않고, 마지막 거래 시각(오늘 00:xx)으로 찍어 보내는 때가 있다.
+  //   그걸 '오늘 진행 중인 봉'으로 보고 버리면 어제(=한국 오전 9시 마감) 하루가 통째로 빠져 이틀 전 값이 최신이 된다 (10/7 09:08 실제 발생).
+  //   → 어제 봉이 없고 오늘 날짜로 찍힌 봉이 있으면, 그 봉을 어제 종가로 다시 찍는다(자정 직후 몇 분의 가격 차이는 다음 수집 때 확정값으로 교체).
+  let restamped = 0;
+  const y0 = utc0 - 86400;
   while (t.length > 1) {
     const lt = t[t.length - 1];
     const live = coin ? lt >= utc0 : !!(ctp && ctp.start && ctp.end && nowS < ctp.end && lt >= ctp.start - 3600);
     if (!live) break;
+    if (coin && t[t.length - 2] < y0) { t[t.length - 1] = y0; restamped = 1; break; }
     [t, o, h, l, c, a, v].forEach((arr) => arr.pop()); dropped++;
   }
   const meta = {};
   if (dropped) meta.droppedLive = dropped;
+  if (restamped) meta.provisional = 1;
   if (r.meta) {
     for (const k of ["currency", "shortName", "longName", "exchangeName", "fullExchangeName",
                      "firstTradeDate", "fiftyTwoWeekHigh", "fiftyTwoWeekLow"]) {
@@ -248,7 +255,11 @@ export default async function handler(req, res) {
   const recent = { generated: new Date().toISOString(), days: RECENT_DAYS, symbols: {}, flags: {} };
   let recentOk = 0, flagged = 0;
   // 오래 못 받은 종목부터 (시간이 모자라 끝까지 못 가도 매번 같은 종목만 빠지지 않게)
-  const order = symbols.slice().sort((x, y) => { const a = (entries[x] && entries[x].recentAt) || "", b = (entries[y] && entries[y].recentAt) || ""; return a < b ? -1 : a > b ? 1 : 0; });
+  // v9.4.1: UTC 0~2시(한국 9~11시) 수집은 코인 일봉이 막 마감된 때라 코인부터 받는다 (시간이 모자라도 코인은 빠지지 않게)
+  const coinFirst = new Date().getUTCHours() < 3;
+  const order = symbols.slice().sort((x, y) => {
+    if (coinFirst) { const cx = /-USD$/.test(x) ? 0 : 1, cy = /-USD$/.test(y) ? 0 : 1; if (cx !== cy) return cx - cy; }
+    const a = (entries[x] && entries[x].recentAt) || "", b = (entries[y] && entries[y].recentAt) || ""; return a < b ? -1 : a > b ? 1 : 0; });
   for (let i = 0; i < order.length; i += RECENT_CONCURRENCY) {
     if (Date.now() - started > RECENT_BUDGET_MS) break;
     await Promise.all(order.slice(i, i + RECENT_CONCURRENCY).map(async (sym) => {
