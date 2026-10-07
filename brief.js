@@ -437,6 +437,17 @@ function briefRenderHealth(R) {
 function briefPriceTxt(sym, v) { return typeof cPrice === "function" ? cPrice(sym, v) : String(v); }
 function briefAmtTxt(s) { var a = s.amt || 0; if (!a) return "-"; if (/\.K[SQ]$/.test(s.sym)) return a >= 1e12 ? (a / 1e12).toFixed(2) + "조" : (a / 1e8).toFixed(0) + "억"; return a >= 1e9 ? "$" + (a / 1e9).toFixed(2) + "B" : "$" + (a / 1e6).toFixed(0) + "M"; }
 
+/* v9.4.1 코인 기준 시각: 야후 코인 일봉은 UTC 하루(한국 오전 9시 ~ 다음 날 오전 9시). 마지막 봉의 '마감 시각'을 그대로 보여주고,
+   지금 시각에 있어야 할 봉보다 오래됐으면 경고 (예: 10/7 09:25인데 10/6 09:00 마감분이 최신이면 하루 빠진 것) */
+function briefCoinAsOf() {
+  var d = briefState.recent && briefState.recent.symbols && briefState.recent.symbols["BTC-USD"];
+  if (!d || !d.t || !d.t.length) return "코인은 24시간 거래 · 매일 오전 9시(한국) 마감 기준";
+  var lt = d.t[d.t.length - 1] * 1000, closeMs = Math.floor(lt / 86400e3) * 86400e3 + 86400e3, k = new Date(closeMs + 9 * 3600e3);
+  var txt = "코인 " + (k.getUTCMonth() + 1) + "/" + k.getUTCDate() + "(" + "일월화수목금토"[k.getUTCDay()] + ") 오전 9시 마감 기준 (달러)";
+  var expect = Math.floor((Date.now() - 20 * 60e3) / 86400e3) * 86400e3;   // 자정(UTC) 20분 뒤부터는 어제 봉까지 있어야 함
+  if (closeMs < expect) txt += " · ⚠️ 최신 마감분이 아직 안 들어왔어요(수동 수집 필요)";
+  return txt;
+}
 function renderBrief() {
   var R = briefState.result, box = $("briefBody");
   if (!R || !box) return;
@@ -445,7 +456,7 @@ function renderBrief() {
   if (typeof slBrief === "function") setTimeout(function () { try { slBrief(); } catch (e) { console.warn(e); } }, 0);
   var L = R.label;
   var qn = R.quality ? R.quality.stale.length + R.quality.spike.length : 0;
-  $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs) : R.market === "coin" ? "코인은 24시간 거래 · 매일 오전 9시(한국) 기준" : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +
+  $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs) : R.market === "coin" ? briefCoinAsOf() : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +
     " · " + (R.market !== "all" ? R.mktName + " " : "") + R.count + "개 자산" + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "");
   var ML = R.market !== "all" ? R.mktName + " " : "";
 
