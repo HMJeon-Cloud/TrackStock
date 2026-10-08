@@ -420,6 +420,7 @@ function perOpen(kind, force) {
     var sh = box.querySelector('[data-act="share"]');
     if (sh) sh.onclick = function () { Promise.all(list.map(function (it) { return new Promise(function (ok) { it.cv.toBlob(function (b) { ok(new File([b], it.file, { type: "image/png" })); }, "image/png"); }); })).then(function (files) { if (navigator.canShare({ files: files })) return navigator.share({ files: files }); }).catch(function () {}); };
     infoModal.open("🃏 " + S.t + " · " + list.length + "장" + (draft ? " (검토용)" : ""), box);
+    if (typeof ocHook === "function") try { ocHook("per:" + kind, list.map(function (it) { return it.name; }), box, { draft: !!draft }); } catch (e) { console.warn(e); }
   });
 }
 /* 정리 세트 생성 전 점검 창 */

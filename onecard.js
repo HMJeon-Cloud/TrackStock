@@ -37,7 +37,7 @@ function ocSpec(k) {
     if (!R) return null;
     sp.mk = mk; var srcDate = mk ? mk.date : "";
     var t = R.temp, i0 = R.indexRow[0], i1 = R.indexRow[1], th = R.themes || [], up = R.movers.up, dn = R.movers.down;
-    function r1(s) { return s.ret1 != null ? s.ret1 : s.ret; }
+    function r1(s) { return s.ret1 != null && R.mode !== "week" && R.mode !== "month" ? s.ret1 : s.ret; }   // 금주 모드면 한 주 수익률
     if (k === "today") {
       var a = i0 ? f(i0.name, ocPct(i0.ret), ocTone(i0.ret), "지수 종가 전일 대비") : null, b = i1 ? f(i1.name, ocPct(i1.ret), ocTone(i1.ret), "지수 종가 전일 대비") : null;
       var c = f("오른 " + unit + " 비율", Math.round(t.upPct * 100) + "%", t.upPct >= 0.5 ? "u" : "d", t.up + " / " + t.total + "개");
@@ -45,7 +45,7 @@ function ocSpec(k) {
       var e = th.length >= 2 ? f("1등 " + sec + " " + th[0].name, ocPct(th[0].ret), ocTone(th[0].ret), sec + " 평균 등락") : null, e2 = th.length >= 2 ? f("꼴찌 " + sec + " " + th[th.length - 1].name, ocPct(th[th.length - 1].ret), ocTone(th[th.length - 1].ret), sec + " 평균 등락") : null;
       var g1 = up[0] ? f("가장 많이 오른 " + briefName(up[0]), ocPct(r1(up[0])), "u", up[0].sym) : null, g2 = dn[0] ? f("가장 많이 내린 " + briefName(dn[0]), ocPct(r1(dn[0])), "d", dn[0].sym) : null;
       if (t.n200) f("52주 신고가 : 신저가", t.newHigh.length + " : " + t.newLow.length, "", "1년 최고·최저 경신 개수");
-      sp.kicker = "오늘의 " + mkName + " 시장"; sp.hero = a || c;
+      sp.kicker = (R.mode === "week" ? "이번 주 " : R.mode === "month" ? "이번 달 " : "오늘의 ") + mkName + " 시장"; sp.hero = a || c;
       sp.hook = i0 && i0.ret > 0 && t.upPct < 0.45 ? i0.name + " {" + a + "}인데\n오른 " + unit + "은 {" + c + "}뿐" : i0 && i0.ret < 0 && t.upPct > 0.55 ? i0.name + " {" + a + "}인데\n오른 " + unit + "이 {" + c + "}" : i0 ? i0.name + " {" + a + "},\n내 계좌는 어땠나요?" : "오늘 " + mkName + " 시장, 3초 정리";
       sp.rows = [b, c, e, e2, g1, g2].filter(Boolean).slice(0, 5); sp.teaser = "업종·급등락·세일 종목은 게시물 {n}장에서";
     }
@@ -170,7 +170,9 @@ function ocItemCard(sp) {
   rBrand(g, REEL.TOP + 30); ocBadge(g, mk, REEL.TOP);
   var y = REEL.TOP + 130;
   cText(g, sp.kicker, P, y, 36, 800, REEL_C.gold2); y += 40;
-  var lines = ocFill(sp, sp.hook).split("\n").slice(0, 3), size = rFitSize(g, lines, W, 88);
+  var lines = ocFill(sp, sp.hook).split("\n").slice(0, 3);
+  if (lines.length === 1 && cW(g, cPlain(lines[0]), 70, 900) > W) { var l0 = lines[0], k = l0.indexOf(" — "); if (k < 0) { var sp2 = l0.split(" "), half = Math.ceil(sp2.length / 2); lines = [sp2.slice(0, half).join(" "), sp2.slice(half).join(" ")]; } else lines = [l0.slice(0, k), l0.slice(k + 3)]; }
+  var size = rFitSize(g, lines, W, 88);
   lines.forEach(function (l, i) { rRich(g, l, P, y + size * 1.05 + i * size * 1.24, size, REEL_C.txt, REEL_C.gold2); });
   y += size * 1.05 + (lines.length - 1) * size * 1.24 + 50;
   // 주인공 숫자
@@ -185,7 +187,10 @@ function ocItemCard(sp) {
     y += hh + 30;
   }
   // 줄
-  var rows = (sp.rows || []).map(function (id) { return ocFact(sp, id); }).filter(Boolean).slice(0, sp.hideRest ? 1 : 4), room = REEL.BOT - 190 - y - (sp.hideRest ? 220 : 0), rh = Math.min(140, Math.floor(room / Math.max(1, rows.length)));
+  var rows = (sp.rows || []).map(function (id) { return ocFact(sp, id); }).filter(Boolean).slice(0, sp.hideRest ? 1 : 4), room = REEL.BOT - 190 - y - (sp.hideRest ? 220 : 0) - (sp.deck && sp.deck.length > 1 ? 165 : 0);
+  var anyLong = rows.some(function (x) { return sp.newsRows || x.value.length > 10; }), minH = anyLong ? 132 : 76;
+  while (rows.length > 1 && room / rows.length < minH) rows.pop();   // 칸이 좁으면 줄 수를 줄인다(숫자가 잘리지 않게)
+  var rh = Math.min(140, Math.floor(room / Math.max(1, rows.length)));
   rows.forEach(function (x, i) {
     var yy = y + i * rh, lbl = (sp.labels && sp.labels[x.id]) || x.label;
     if (i) { g.fillStyle = "rgba(255,255,255,0.10)"; g.fillRect(P, yy, W, 2); }
@@ -196,6 +201,12 @@ function ocItemCard(sp) {
     cText(g, x.value, REEL.W - P - 8, yy + rh / 2 + 16, 46, 900, ocToneC(x.tone), "right");
   });
   if (sp.hideRest) { var yy = y + rows.length * rh; ["3위", "4위", "5위"].forEach(function (r, i) { cRound(g, P, yy + 12 + i * 70, W, 56, 14, "rgba(255,255,255,0.05)"); cText(g, r + "  ????????", P + 24, yy + 52 + i * 70, 30, 800, REEL_C.dim); }); }
+  // 게시물 구성(목차) — '이 안에 뭐가 있지?'를 만들어 게시물로 넘어가게
+  if (sp.deck && sp.deck.length > 1) {
+    var dy = REEL.BOT - 300; cText(g, "게시물 " + sp.n + "장 구성", P, dy, 26, 800, REEL_C.gold2);
+    var dx = P, dl = 0; cFont(g, 26, 700);
+    sp.deck.forEach(function (nm, i) { var w = cW(g, nm, 26, 700) + 30; if (dx + w > P + W) { dx = P; dl++; } if (dl > 1) return; cRound(g, dx, dy + 16 + dl * 48, w, 40, 20, "rgba(255,255,255,0.08)"); cText(g, nm, dx + 15, dy + 45 + dl * 48, 26, 700, REEL_C.txt); dx += w + 8; });
+  }
   // 게시물로
   var ty = REEL.BOT - 170;
   cRound(g, P, ty, W, 150, 24, "rgba(201,162,79,0.14)", REEL_C.gold);
@@ -300,17 +311,18 @@ function ocShowItem(sp) {
     var cv = ocWithLog(function () { return ocItemCard(sp); }), drawn = OC_DRAWN.slice();
     var allowed = sp.facts.map(function (x) { return x.value + " " + x.label; }).join(" ") + " " + (sp.mk ? sp.mk.date : "") + " " + sp.src + " " + sp.n + " " + (sp.kicker || "") + " " + cPlain(ocFill(sp, sp.hook));
     // 문구(훅·머리말·이름표) 안의 숫자도 데이터에서 온 것만 허용: 데이터 값·이름표 + 날짜 + 장수
-    var bad = ocCheckNums(drawn, sp.facts.map(function (x) { return x.value + " " + x.label; }).join(" ") + " " + (sp.mk ? sp.mk.date : "") + " " + sp.src + " " + sp.n + " 1 2 3 4 5");
+    var bad = ocCheckNums(drawn, sp.facts.map(function (x) { return x.value + " " + x.label; }).join(" ") + " " + (sp.mk ? sp.mk.date : "") + " " + sp.src + " " + sp.n + " " + (sp.deck || []).join(" ") + " " + (sp.deck ? sp.deck.length : "") + " " + (sp.kicker || "") + " 1 2 3 4 5");
+    if (sp.draft && typeof perStamp === "function") perStamp(cv, "검토용 · 발행 금지");
     var used = {}; [sp.hero].concat(sp.rows || []).forEach(function (id) { used[id] = 1; }); (String(sp.hook).match(/\{(f\d+)\}/g) || []).forEach(function (p) { used[p.slice(1, -1)] = 1; });
     var url = cv.toDataURL("image/png"), day = pubToday().replace(/-/g, ""), box = document.createElement("div");
     var checks = [{ ok: !bad.length, t: bad.length ? "데이터에 없는 숫자 " + bad.length + "개: " + bad.map(function (b) { return b.n + " (" + b.where.slice(0, 24) + ")"; }).join(", ") : "카드의 모든 숫자가 데이터 값과 일치해요 (" + drawn.reduce(function (a, s) { return a + ocNum(s).length; }, 0) + "개 확인)" }]
-      .concat(sp.mk ? [{ ok: !!sp.mk.date, t: "시장·날짜: " + sp.mk.name + " · " + (sp.mk.date || "날짜 없음") }] : []).concat(sp.aiLog || [{ ok: true, t: "문구: 규칙(데이터 기반)" }]);
+      .concat(sp.draft ? [{ ok: false, t: "검토용 — 구간이 아직 안 끝나 확정 데이터가 아니에요(저장 잠김)" }] : []).concat(sp.deck ? [{ ok: true, t: "게시물 구성 " + sp.n + "장: " + sp.deck.join(" · ") }] : []).concat(sp.mk ? [{ ok: !!sp.mk.date, t: "시장·날짜: " + sp.mk.name + " · " + (sp.mk.date || "날짜 없음") }] : []).concat(sp.aiLog || [{ ok: true, t: "문구: 규칙(데이터 기반)" }]);
     box.innerHTML = '<div class="ocV"><div class="ocVL">' +
       '<div class="ocChk">' + checks.map(function (c) { return '<div class="' + (c.ok ? "ok" : "bad") + '">' + (c.ok ? "통과" : "확인") + ' · ' + escapeHtml(c.t) + '</div>'; }).join("") + '</div>' +
       '<table class="ocT"><thead><tr><th>id</th><th>항목</th><th>값</th><th>근거</th><th>카드</th></tr></thead><tbody>' + sp.facts.map(function (x) { return '<tr class="' + (used[x.id] ? "on" : "") + '"><td>' + x.id + '</td><td>' + escapeHtml(x.label) + '</td><td><b>' + escapeHtml(x.value) + '</b></td><td class="briefDim">' + escapeHtml(x.note || "") + '</td><td>' + (used[x.id] ? (x.id === sp.hero ? "주인공" : "사용") : "") + '</td></tr>'; }).join("") + '</tbody></table>' +
       '<details class="chFold"><summary>문구 고치기</summary><div class="ocEd"><label>머리말<input data-e="kicker"></label><label>훅 (숫자는 {f1}처럼)<textarea data-e="hook" rows="2"></textarea></label><label>게시물 안내<input data-e="teaser"></label><label>게시물 장수<input data-e="n" type="number" min="1" max="20"></label><label>주인공 id<input data-e="hero"></label><label>줄 id (쉼표로)<input data-e="rows"></label><button class="primary" data-act="re">다시 그리기</button></div></details>' +
       '<div class="thrLbl" style="color:inherit;margin-top:10px">릴스 캡션</div><textarea class="thrText ocCap" style="min-height:150px;background:var(--card);color:inherit;border-color:var(--line)"></textarea><button class="chip" data-act="cap">캡션 복사</button>' +
-      '</div><div class="ocVR"><img alt=""><div class="row" style="gap:6px;margin-top:8px"><button class="primary" data-act="save"' + (bad.length ? ' disabled title="숫자 대조를 통과해야 저장할 수 있어요"' : '') + '>이미지 저장</button><span class="briefDim">1080×1920 · 릴스 9:16</span></div></div></div>';
+      '</div><div class="ocVR"><img alt=""><div class="row" style="gap:6px;margin-top:8px"><button class="primary" data-act="save"' + (bad.length || sp.draft ? ' disabled title="숫자 대조를 통과해야 저장할 수 있어요"' : '') + '>이미지 저장</button><span class="briefDim">1080×1920 · 릴스 9:16</span></div></div></div>';
     box.querySelector("img").src = url;
     box.querySelector(".ocCap").value = ocCaption(sp);
     var E = function (k) { return box.querySelector('[data-e="' + k + '"]'); };
@@ -353,27 +365,179 @@ function ocShowCustom(cs, text, log) {
   });
 }
 
+/* ---------- 대표 카드 = '카드 묶음(게시물)'의 한 장 요약 (v9.5.2) ----------
+   카드 묶음을 만드는 모든 창(오늘의 브리핑·채널·정기 발행·연구노트·정책·일정·용어·핵심 이슈)에 '대표 카드' 버튼을 붙인다.
+   그 묶음의 데이터로 사실 목록을 만들고, 묶음의 장 이름을 '게시물 구성'으로 카드 아래에 보여준다. */
+var OC_PENDING = null;   // 대표 카드 페이지에서 누르면: 묶음을 먼저 만든 뒤 → 대표 카드로 바로 넘어간다
+var OC_DECK_WORD = { dd: "고점 대비", macro: "금리·환율", mover: "급등락", fx: "환율", news: "기사", numbers: "숫자", idx: "지수", theme: "업종", hot: "거래대금", breadth: "시장 폭" };
+function ocDeckName(n) { var k = String(n).replace(/^[0-9N]+[._]\s*/, "").trim(); if (OC_DECK_WORD[k]) return OC_DECK_WORD[k]; return String(n).replace(/^[0-9N]+[._]\s*/, "").replace(/^\d+\.\s*/, "").replace(/_/g, " ").replace(/([가-힣])(\d+)$/, "$1 $2").trim(); }
+function ocBase(title, kicker) {
+  var F = [], id = 0, sp = { k: "deck", title: title, mk: null, facts: F, n: 1, kicker: kicker, hook: "", hero: "", rows: [], teaser: "{n}장 전체는 게시물에서" };
+  sp.f = function (label, value, tone, note) { id = F.length + 1; F.push({ id: "f" + id, label: ocClean(label), value: ocClean(value), tone: tone || "", note: note || "" }); return "f" + id; };
+  return sp;
+}
+function ocAdd(sp, label, value, tone, note) { var id = "f" + (sp.facts.length + 1); sp.facts.push({ id: id, label: ocClean(label), value: ocClean(value), tone: tone || "", note: note || "" }); return id; }
+function ocDeckSpec(ctx, names, opt) {
+  opt = opt || {}; var sp = null, kind = ctx.split(":")[0], arg = ctx.split(":").slice(1).join(":");
+  if (kind === "brief" || kind === "channel") {
+    var keep = briefState.result;
+    if (kind === "channel") { if (!chState.brief) return null; briefState.result = chState.brief; }
+    try {
+      sp = ocSpec("today"); if (!sp) return null;
+      var R = briefState.result;
+      if (R.numbers && R.numbers[0] && R.numbers[0].list) ocAdd(sp, "52주 고점보다 20% 넘게 싼 " + (R.market === "coin" ? "코인" : "종목"), R.numbers[0].v, "", "세일 중");
+      var iss = []; try { iss = kind === "channel" ? (chState.issues || []) : issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular, mode: R.mode }); } catch (e) {}
+      if (iss[0]) ocAdd(sp, "1위 이슈", ocClean(iss[0].title), "", ocClean(iss[0].sub));
+      sp.title = kind === "channel" ? "채널 전일 정리" : ((sp.mk ? sp.mk.name + " " : "") + (R.mode === "week" ? "금주" : "금일") + " 브리핑");
+      if (kind === "channel") {
+        sp.kicker = "어제 주식 시장 (국내 + 미국)"; sp.mk = null;
+        var md = (chState.mdd || []).filter(function (x) { return x && !x.err; })[0]; if (md) ocAdd(sp, md.name + " 고점 대비", cPct(md.cur, 1), md.cur < -0.1 ? "d" : "", "");
+        sp.src = cDate(Date.now()) + " · 종가 기준 자동 집계 · 투자 권유 아님";
+      }
+    } finally { briefState.result = keep; }
+  } else if (kind === "issues") {
+    sp = ocSpec("issues");
+  } else if (kind === "per") {
+    var S = PER_SETS[arg], recent = typeof perRecent === "function" ? perRecent() : null; if (!S || !recent) return null;
+    var win = perWindow(arg), prev = perWindow(arg, true), isM = /month/.test(arg), unit = isM ? "달" : "주";
+    sp = ocBase(ocClean(S.t), ocClean(S.t) + " · " + win.short);
+    if (S.mode) {
+      BRIEF_WIN = { from: win.from, to: win.to };
+      try {
+        var R2 = briefCompute(recent, { mode: S.mode, popular: briefState.popular || null });
+        var rows = PER_ASSETS.map(function (a) { var d = recent.symbols[a[0]]; var st = d ? briefStats(a[0], d, S.mode) : null; return st ? { name: a[1], ret: st.ret } : null; }).filter(Boolean).sort(function (a, b) { return b.ret - a.ret; });
+        rows.slice(0, 3).forEach(function (x, i) { ocAdd(sp, (i + 1) + "위 " + x.name, ocPct(x.ret), ocTone(x.ret), "구간 첫 종가 → 마지막 종가"); });
+        if (rows.length > 3) ocAdd(sp, "꼴찌 " + rows[rows.length - 1].name, ocPct(rows[rows.length - 1].ret), ocTone(rows[rows.length - 1].ret), "구간 첫 종가 → 마지막 종가");
+        if (R2.themes && R2.themes.length) ocAdd(sp, "1등 업종 " + R2.themes[0].name, ocPct(R2.themes[0].ret), ocTone(R2.themes[0].ret), "업종 평균");
+        ocAdd(sp, "오른 종목 비율", Math.round(R2.temp.upPct * 100) + "%", "", R2.temp.up + " / " + R2.temp.total);
+      } finally { BRIEF_WIN = null; }
+      sp.hero = "f1"; sp.rows = ["f2", "f3", "f4", "f5"].filter(function (id) { return ocFact(sp, id); });
+      sp.hook = "이번 " + unit + " 1등 자산,\n예상하셨나요?"; sp.teaser = "업종·급등락·날짜별 흐름까지 {n}장";
+    } else {
+      var ym = win.s.slice(0, 7), up = PUB_CAL.filter(function (e) { return e.k !== "hol" && (isM ? e.d.slice(0, 7) === ym : e.d >= win.s && e.d <= win.e); }).sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+      var key = up.filter(function (e) { return /FOMC|CPI|고용|금통위|실적/.test(e.t); }), ev = (key.length ? key : up).slice(0, 5);
+      ev.forEach(function (e) { ocAdd(sp, ocClean(e.t) + (e.sure === false ? " (예정)" : ""), e.d.slice(5).replace("-", "/") + "(" + pubDow(e.d) + ")", "", "공개 일정"); });
+      var nw = typeof perNow === "function" ? perNow() : { why: [] };
+      nw.why.slice(0, 2).forEach(function (w) { var p2 = String(w).split("→"); ocAdd(sp, "지금 신호", ocClean(p2[1] || p2[0]), "", ocClean(p2[0])); });
+      if (!sp.facts.length) return null;
+      sp.hero = "f1"; sp.rows = sp.facts.slice(1, 5).map(function (x) { return x.id; });
+      sp.hook = "이번 " + unit + " 주식 앱,\n이 날은 꼭 보세요"; sp.teaser = "날짜별로 무엇을 볼지 {n}장에 정리";
+    }
+    sp.src = win.short + " · 종가 기준 · 공개 일정 · 예측 아님";
+  } else if (kind === "story") {
+    var cap = typeof storyCaption === "function" ? storyCaption(arg) : null; if (!cap) return null;
+    var dk = (storyDecks().filter(function (d) { return d.key === arg; })[0] || { t: "연구노트" });
+    sp = ocBase(ocClean(dk.t), "연구노트 · " + ocClean(dk.t));
+    var L = String(cap.ig).split("\n").map(function (l) { return ocClean(l).replace(/^·\s*/, ""); }).filter(Boolean);
+    var LL = []; L.slice(1).filter(function (l) { return /\d/.test(l) && !/^#|투자 권유|출처/.test(l); }).forEach(function (l) { var ci0 = l.indexOf(":"), pre = ci0 > 0 && ci0 < 30 ? l.slice(0, ci0 + 1) + " " : "", body = pre ? l.slice(ci0 + 1).trim() : l; body.split(" / ").forEach(function (b2) { LL.push(pre + b2.trim()); }); });
+    LL.slice(0, 7).forEach(function (l) {
+      var ci = l.indexOf(":"); if (ci > 0 && ci < 30) ocAdd(sp, l.slice(0, ci), l.slice(ci + 1).trim(), /(^|\s)-\d/.test(l.slice(ci)) ? "d" : "", "연구노트 계산값");
+      else ocAdd(sp, "", l, "", "연구노트 계산값");
+    });
+    if (!sp.facts.length) return null;
+    sp.hero = "f1"; sp.rows = sp.facts.slice(1, 5).map(function (x) { return x.id; });
+    sp.hook = L[0] && !/\d/.test(L[0]) ? L[0].slice(0, 40) : ocClean(dk.t) + ",\n과거엔 어땠을까?"; sp.teaser = "근거 데이터와 체크리스트는 게시물 {n}장에";
+    sp.src = "과거 데이터(종가) 자동 집계 · " + cDate(Date.now()) + " · 투자 권유 아님";
+  } else if (kind === "policy") {
+    var pl = pubPolicyAll().filter(function (p) { return p.id === arg; })[0]; if (!pl) return null;
+    var nm = pl.short || pl.t; sp = ocBase(nm, "정책 · " + nm);
+    pl.table.rows.slice(0, 6).forEach(function (r) { ocAdd(sp, cPlain(r[0]), cPlain(r[1]) + (r.length > 2 ? " ~ " + cPlain(r[r.length - 1]) : ""), "", pl.table.head ? pl.table.head.join(" / ") : ""); });
+    sp.hero = "f1"; sp.rows = sp.facts.slice(1, 5).map(function (x) { return x.id; });
+    sp.hook = "내 소득이면\n" + nm + " 금리는?"; sp.teaser = "우대 조건까지 {n}장으로 정리";
+    sp.src = "출처: " + (pl.src || "") + (pl.eff ? " · " + pl.eff : "") + " · 최신 공지 확인 필수";
+  } else if (kind === "cal") {
+    var up2 = pubUpcoming(7).filter(function (e) { return e.k !== "hol"; }).slice(0, 6); if (!up2.length) return null;
+    sp = ocBase("이번 주 일정", "이번 주 경제 일정");
+    up2.forEach(function (e) { ocAdd(sp, ocClean(e.t) + (e.sure === false ? " (예정)" : ""), e.d.slice(5).replace("-", "/") + "(" + pubDow(e.d) + ")", "", "공개 일정 · 한국 시간"); });
+    sp.hero = "f1"; sp.rows = sp.facts.slice(1, 5).map(function (x) { return x.id; });
+    sp.hook = "이번 주 주식 앱,\n이 날은 꼭 보세요"; sp.teaser = "날짜별 무엇을 볼지 게시물에서"; sp.src = "연준 · BLS · 한국은행 등 공개 일정 · 한국 시간";
+  } else if (kind === "term") {
+    var t = pubTerm(pubState.termOffset); sp = ocBase("용어 한 입", "용어 한 입");
+    ocAdd(sp, "오늘의 단어", t[0]); ocAdd(sp, "뜻", t[1]); ocAdd(sp, "쉽게 말하면", t[2]); ocAdd(sp, "알아두면 좋은 점", t[3]);
+    sp.hero = "f1"; sp.rows = ["f2", "f3"]; sp.hook = "이 단어 모르면\n주식 앱이 어려워요"; sp.teaser = "예시까지 게시물에서"; sp.src = "우상향연구소 용어 사전 · 투자 권유 아님";
+  }
+  if (!sp) return null;
+  var dn = (names || []).map(ocDeckName).filter(Boolean); sp.n = dn.length || sp.n;
+  sp.deck = dn.filter(function (x, i) { return dn.indexOf(x) === i; });   // 같은 이름(뉴스 브리핑 1·2장)은 한 번만 sp.ctx = ctx; sp.draft = !!opt.draft;
+  if (sp.deck.length <= 1) sp.deck = null;
+  return sp;
+}
+/* 카드 묶음 창에 '대표 카드' 버튼 붙이기 (+ 대표 카드 페이지에서 왔으면 바로 실행) */
+function ocHook(ctx, names, box, opt) {
+  if (!box) return;
+  var row = document.createElement("div"); row.className = "row ocHookRow"; row.style.cssText = "gap:6px;margin:0 0 10px";
+  row.innerHTML = '<b style="font-size:13px">📌 대표 카드(릴스 1장)</b><button class="chip" data-oh="0">규칙</button><button class="primary" data-oh="1">AI</button><span class="briefDim">이 ' + names.length + '장을 한 장으로 요약 → 게시물로 유입</span>';
+  box.insertBefore(row, box.firstChild);
+  Array.prototype.forEach.call(row.querySelectorAll("[data-oh]"), function (b) { b.onclick = function () { ocDeckOpen(ctx, names, b.getAttribute("data-oh") === "1", opt, b); }; });
+  if (OC_PENDING && OC_PENDING.ctx === ctx) { var ai = OC_PENDING.ai; OC_PENDING = null; setTimeout(function () { ocDeckOpen(ctx, names, ai, opt); }, 50); }
+}
+function ocDeckOpen(ctx, names, useAi, opt, btn) {
+  var sp = ocDeckSpec(ctx, names, opt);
+  if (!sp) { alert("이 묶음의 대표 카드에 필요한 데이터가 아직 없어요."); return; }
+  var old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
+  var p = useAi ? ocAi({ mode: "item", title: sp.title + " (게시물 " + sp.n + "장: " + (sp.deck || []).join(", ") + ")", facts: sp.facts.map(function (x) { return { id: x.id, label: x.label, value: x.value }; }) }).then(function (j) {
+    if (j && j.ok) { var nx = ocApplyAi(sp, j.out); nx.aiLog.unshift({ ok: true, t: "AI 모델: " + j.model + (j.tries && j.tries.length > 1 ? " (" + j.tries.join(" → ") + ")" : "") }); return nx; }
+    return Object.assign({}, sp, { aiLog: [{ ok: false, t: "AI 실패: " + (OC_REASON[j && j.reason] || (j && j.reason) || "알 수 없음") + (j && j.tries ? " [" + j.tries.join(" → ") + "]" : "") + " → 규칙 문구로 만들었어요" }] });
+  }).catch(function (e) { return Object.assign({}, sp, { aiLog: [{ ok: false, t: "AI 호출 실패: " + e.message + " → 규칙 문구" }] }); }) : Promise.resolve(sp);
+  p.then(function (s) { if (btn) btn.textContent = old; infoModal.close && infoModal.close(); ocShowItem(s); });
+}
+/* 대표 카드 페이지 → 묶음을 만들고 곧바로 대표 카드로 */
+function ocGo(ctx, ai, run) { OC_PENDING = { ctx: ctx, ai: ai }; try { run(); } catch (e) { OC_PENDING = null; alert("만들지 못했어요: " + e.message); } setTimeout(function () { if (OC_PENDING && OC_PENDING.ctx === ctx) OC_PENDING = null; }, 90000); }
+
 /* ---------- 탭 ---------- */
 function ocRender() {
   var box = $("ocBody"); if (!box) return;
   if (typeof briefState !== "undefined" && !briefState.result && typeof loadBrief === "function") { try { loadBrief(false); } catch (e) {} }
   if (typeof chState !== "undefined" && !chState._init && typeof renderChannel === "function") { try { renderChannel(); } catch (e) {} }
-  var R = briefState.result, mk = ocMk();
-  var h = '<div id="ocAiLine" class="briefDim" style="margin-bottom:10px">AI 연결 확인 중…</div>';
-  h += '<h3 class="chSub" style="margin-top:4px">① 항목별 대표 카드 <small>릴스 한 장 → 게시물(상세 카드)로 유입</small></h3>';
-  h += '<div class="pills" style="margin-bottom:8px">' + Object.keys(BRIEF_MKT).map(function (k) { return '<button data-ocm="' + k + '"' + (R && briefState.market === k ? ' class="active"' : '') + '>' + BRIEF_MKT[k] + '</button>'; }).join("") + '</div>';
-  h += '<div class="briefDim" style="margin-bottom:8px">' + (R ? (mk ? mk.name + " · " + mk.date : "전체 시장") + " 데이터 · 숫자는 언제나 데이터에서 채우고, AI는 문구와 순서만 골라요" : "오늘의 브리핑 데이터를 불러오는 중… 잠시 뒤 다시 열어 주세요") + '</div>';
-  ["brief", "channel"].forEach(function (gp) {
-    h += '<div class="perCal" style="margin-bottom:10px">' + OC_ITEMS.filter(function (x) { return x.g === gp; }).map(function (x) {
-      return '<div class="perRow"><div class="perBody"><b>' + escapeHtml(x.t) + (gp === "channel" ? ' <small class="briefDim">채널</small>' : '') + '</b><small>' + escapeHtml(x.d) + '</small></div><div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-oc="' + x.k + '" data-ai="0">규칙</button><button class="primary" data-oc="' + x.k + '" data-ai="1">AI</button></div></div>'; }).join("") + '</div>';
+  var R = briefState.result;
+  function two(ctx, run) { return '<div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-g="' + ctx + '" data-ai="0" data-run="' + run + '">규칙</button><button class="primary" data-g="' + ctx + '" data-ai="1" data-run="' + run + '">AI</button></div>'; }
+  function row(t, d, ctx, run, now) { return '<div class="perRow' + (now ? ' now' : '') + '"><div class="perBody"><b>' + escapeHtml(t) + (now ? ' <span style="color:var(--gold,#c9a24f)">← 오늘</span>' : '') + '</b><small>' + escapeHtml(d) + '</small></div>' + two(ctx, run) + '</div>'; }
+  var h = '<div id="ocAiLine" class="briefDim" style="margin-bottom:10px">AI 연결 확인 중…</div>' +
+    '<div class="briefDim" style="margin-bottom:10px">대표 카드 = 게시물에 올리는 <b>카드 묶음 전체를 한 장으로 요약</b>한 릴스용 카드예요. 버튼을 누르면 그 묶음을 먼저 만들고(게시물용) → 바로 대표 카드와 검증 화면이 열려요. 각 카드 묶음 창 맨 위의 "📌 대표 카드" 버튼으로도 만들 수 있어요.</div>';
+  // ① 오늘의 브리핑: 시장 × 금일/금주
+  h += '<h3 class="chSub" style="margin-top:4px">① 오늘의 브리핑 <small>국내 · 미국 · 코인 × 금일 · 금주</small></h3><div class="perCal" style="margin-bottom:12px">';
+  [["kr", "국내"], ["us", "미국"], ["coin", "코인"]].forEach(function (m) {
+    [["day", "금일"], ["week", "금주"]].forEach(function (md) { h += row(m[1] + " · " + md[1], md[0] === "day" ? "그날 마감 카드 묶음(게시물) → 한 장 요약" : "이번 주(월~) 카드 묶음 → 한 장 요약", "brief", "brief|" + m[0] + "|" + md[0]); });
   });
-  h += '<h3 class="chSub">② 내 글로 한 장 카드 <small>인스타 글 · 정책 내용 · 유튜브/책 메모</small></h3>' +
+  h += '</div>';
+  // ② 채널 브리핑
+  h += '<h3 class="chSub">② 채널 브리핑 <small>섹션별 · 항목별</small></h3>';
+  var plan = []; try { plan = pubPlan().plan || []; } catch (e) {}
+  var pmap = { issues: ["issues", "issues"], brief: ["brief", "brief|cur|cur"], channel: ["channel", "channel"], cal: ["cal", "cal"], term: ["term", "term"] };
+  h += '<div class="thrLbl" style="color:inherit;margin:6px 0">오늘 뭐 올리지</div><div class="perCal" style="margin-bottom:10px">' + row("채널 전일 정리 (주식 · 국내+미국)", "채널 카드 묶음 → 한 장", "channel", "channel") +
+    plan.filter(function (p) { return pmap[p.kind] && p.kind !== "channel"; }).map(function (p) { var m = pmap[p.kind]; return row(ocClean(p.t), ocClean(p.d), m[0], m[1]); }).join("") + '</div>';
+  var td = typeof perToday === "function" ? perToday() : [];
+  h += '<div class="thrLbl" style="color:inherit;margin:6px 0">정기 발행</div><div class="perCal" style="margin-bottom:10px">' + Object.keys(PER_SETS).map(function (k) { return row(ocClean(PER_SETS[k].t), PER_SETS[k].when, "per:" + k, "per|" + k, td.indexOf(k) >= 0); }).join("") + '</div>';
+  var decks = typeof storyDecks === "function" ? storyDecks() : [];
+  h += '<div class="thrLbl" style="color:inherit;margin:6px 0">연구노트</div><div class="perCal" style="margin-bottom:10px">' + decks.map(function (d) { return row(ocClean(d.t), ocClean(d.d) + (d.ready ? "" : " · 데이터 준비 중"), "story:" + d.key, "story|" + d.key, d.now); }).join("") + '</div>';
+  var pls = typeof pubPolicyAll === "function" ? pubPolicyAll() : [];
+  h += '<div class="thrLbl" style="color:inherit;margin:6px 0">정책 카드 · 이번 주 일정 · 용어 한 입</div><div class="perCal" style="margin-bottom:10px">' + pls.map(function (p) { return row(ocClean(p.t), ocClean(p.sub || p.eff || ""), "policy:" + p.id, "policy|" + p.id); }).join("") +
+    row("이번 주 일정", "앞으로 7일 공개 일정", "cal", "cal") + row("용어 한 입 · " + ocClean(pubTerm(pubState.termOffset)[0]), "오늘의 단어", "term", "term") + '</div>';
+  // ③ 섹션별(세부)
+  h += '<details class="chFold"><summary>③ 섹션 하나만 한 장으로 (세부)</summary><div class="perCal" style="margin-top:8px">' + OC_ITEMS.map(function (x) { return '<div class="perRow"><div class="perBody"><b>' + escapeHtml(x.t) + '</b><small>' + escapeHtml(x.d) + '</small></div><div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-oc="' + x.k + '" data-ai="0">규칙</button><button class="primary" data-oc="' + x.k + '" data-ai="1">AI</button></div></div>'; }).join("") + '</div></details>';
+  // ④ 내 글
+  h += '<h3 class="chSub">④ 내 글로 한 장 카드 <small>인스타 글 · 정책 내용 · 유튜브/책 메모</small></h3>' +
     '<div class="ocForm"><input id="ocHint" placeholder="주제 꼬리표 (예: 디딤돌대출, 책 메모) — 비워도 돼요">' +
     '<textarea id="ocText" placeholder="첫 줄 = 제목&#10;- 항목: 설명&#10;- 항목: 설명&#10;표는 | 로 칸을 나눠요 (예: 소득 | 금리)&#10;핵심: 마지막 한 줄 요약&#10;출처: 기관·책 이름"></textarea>' +
     '<div class="row" style="gap:6px"><select id="ocLayout"><option value="auto">모양 자동</option><option value="list">리스트</option><option value="table">표</option><option value="steps">순서(STEP)</option></select><button class="chip" id="ocGo">규칙으로 만들기</button><button class="primary" id="ocGoAi">AI로 정리해서 만들기</button></div>' +
     '<div class="briefDim" style="margin-top:6px">AI가 쓴 숫자는 입력한 글의 숫자와 하나하나 대조해요. 안 맞는 숫자가 있으면 저장 버튼이 잠겨요.</div></div>';
   box.innerHTML = h;
-  Array.prototype.forEach.call(box.querySelectorAll("[data-ocm]"), function (b) { b.onclick = function () { switchBriefMarket(b.getAttribute("data-ocm")); setTimeout(ocRender, 300); }; });
+  Array.prototype.forEach.call(box.querySelectorAll("[data-g]"), function (b) { b.onclick = function () {
+    var ctx = b.getAttribute("data-g"), ai = b.getAttribute("data-ai") === "1", r = b.getAttribute("data-run").split("|");
+    ocGo(ctx, ai, function () {
+      if (r[0] === "brief") {
+        if (!briefState.result) { alert("오늘의 브리핑 데이터를 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요."); OC_PENDING = null; return; }
+        if (r[1] !== "cur") { switchBriefMode(r[2]); switchBriefMarket(r[1]); }
+        setTimeout(function () { cardsOpen("brief"); }, 300);
+      } else if (r[0] === "channel") cardsOpen("channel");
+      else if (r[0] === "issues") issuesCardOpen(chState.issues || issuesCompute(briefState.recent, { market: briefState.market }));
+      else if (r[0] === "per") perOpen(r[1]);
+      else if (r[0] === "story") storyOpen(r[1]);
+      else if (r[0] === "policy") pubPolicyOpen(r[1]);
+      else if (r[0] === "cal") pubSingleCard(pubCalCard, "uphill.lab_이번주일정_" + pubToday().replace(/-/g, "") + ".png", "🗓️ 이번 주 일정", "cal");
+      else if (r[0] === "term") pubSingleCard(function () { return pubTermCard(pubTerm(pubState.termOffset)); }, "uphill.lab_용어.png", "📖 용어 한 입", "term");
+    });
+  }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-oc]"), function (b) { b.onclick = function () {
     var k = b.getAttribute("data-oc"), ai = b.getAttribute("data-ai") === "1";
     var go = function () { ocOpenItem(k, ai); };

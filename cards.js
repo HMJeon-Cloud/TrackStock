@@ -820,6 +820,7 @@ function cardsOpen(kind) {
         .catch(function () {});
     };
     infoModal.open("🃏 " + (kind === "brief" ? (mk && mk !== "all" ? BRIEF_MKT[mk] + " " : "") + "오늘의 브리핑" : "채널 브리핑") + " 카드 " + list.length + "장", box);
+    if (typeof ocHook === "function") try { ocHook(kind, list.map(function (it) { return it.name; }), box); } catch (e) { console.warn(e); }
   });
 }
 function cardsDownload(it) { var a = document.createElement("a"); a.href = it.url; a.download = it.file; document.body.appendChild(a); a.click(); a.remove(); }

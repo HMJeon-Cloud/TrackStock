@@ -284,6 +284,7 @@ function pubPolicyOpen(id) {
       box.querySelector('[data-act="all"]').onclick = function () { list.forEach(function (it, i) { setTimeout(function () { cardsDownload(it); }, i * 400); }); };
       try { thrBind(box, thrOr(thrPolicy(pl, list.map(function (it) { return it.name; })), cap)); } catch (e) { console.warn(e); }
       infoModal.open("🃏 " + pl.t + " · " + list.length + "장", box);
+      if (typeof ocHook === "function") try { ocHook("policy:" + pl.id, list.map(function (it) { return it.name; }), box); } catch (e) { console.warn(e); }
     });
 }
 
@@ -374,13 +375,13 @@ function pubRender() {
       else if (k === "brief") { if (typeof briefState !== "undefined" && !briefState.result && typeof loadBrief === "function") loadBrief(false); setTimeout(function () { cardsOpen("brief"); }, briefState.result ? 0 : 1500); }
       else if (k === "channel") cardsOpen("channel");
       else if (k === "mind") navTo("mind");   // 유형 테스트 페이지에서 결과 카드 생성
-      else if (k === "cal") pubSingleCard(pubCalCard, "uphill.lab_이번주일정_" + pubToday().replace(/-/g, "") + ".png", "🗓️ 이번 주 일정");
+      else if (k === "cal") pubSingleCard(pubCalCard, "uphill.lab_이번주일정_" + pubToday().replace(/-/g, "") + ".png", "🗓️ 이번 주 일정", "cal");
       else if (k === "policy") pubPolicyOpen(b.getAttribute("data-id"));
-      else if (k === "term") pubSingleCard(function () { return pubTermCard(pubTerm(pubState.termOffset)); }, "uphill.lab_용어_" + pubTerm(pubState.termOffset)[0].replace(/[^\w가-힣]/g, "") + ".png", "📖 용어 한 입");
+      else if (k === "term") pubSingleCard(function () { return pubTermCard(pubTerm(pubState.termOffset)); }, "uphill.lab_용어_" + pubTerm(pubState.termOffset)[0].replace(/[^\w가-힣]/g, "") + ".png", "📖 용어 한 입", "term");
     };
   });
 }
-function pubSingleCard(draw, file, title) {
+function pubSingleCard(draw, file, title, ctx) {
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   ready.then(function () { CARD_TXT = ""; draw(); if (!document.fonts || !document.fonts.load) return; var txt = CARD_TXT.replace(/\s+/g, ""); return Promise.all([500, 600, 700, 800].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); })); })
     .then(function () {
@@ -390,6 +391,7 @@ function pubSingleCard(draw, file, title) {
       box.querySelector('[data-act="save"]').onclick = function () { var l = document.createElement("a"); l.href = url; l.download = file; document.body.appendChild(l); l.click(); l.remove(); };
       var sh = box.querySelector('[data-act="share"]'); if (sh) sh.onclick = function () { cv.toBlob(function (b) { var f = new File([b], file, { type: "image/png" }); if (navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(function () {}); }); };
       infoModal.open(title, box);
+      if (ctx) if (typeof ocHook === "function") try { ocHook(ctx, [title.replace(/^\S+\s/, "")], box); } catch (e) { console.warn(e); }
     });
 }
 /* 오늘의 브리핑(공개)에도 이번 주 일정 한 줄 */

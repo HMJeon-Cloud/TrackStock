@@ -613,5 +613,6 @@ function storyOpen(key) {
     var sh = box.querySelector('[data-act="share"]');
     if (sh) sh.onclick = function () { Promise.all(list.map(function (it) { return new Promise(function (ok) { it.cv.toBlob(function (b) { ok(new File([b], it.file, { type: "image/png" })); }, "image/png"); }); })).then(function (files) { if (navigator.canShare({ files: files })) return navigator.share({ files: files }); }).catch(function () {}); };
     infoModal.open("📓 " + deck.t + " · " + list.length + "장", box);
+    if (typeof ocHook === "function") try { ocHook("story:" + key, list.map(function (it) { return it.name; }), box); } catch (e) { console.warn(e); }
   });
 }

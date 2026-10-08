@@ -176,6 +176,7 @@ function issuesCardOpen(list) {
     var sh = box.querySelector('[data-act="share"]');
     if (sh) sh.onclick = function () { cv.toBlob(function (b) { var f = new File([b], file, { type: "image/png" }); if (navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(function () {}); }); };
     infoModal.open("📌 " + (ISS_LBL[list.mode] || "오늘") + "의 핵심 이슈 5", box);
+    if (typeof ocHook === "function") try { ocHook("issues", ["핵심 이슈 5"], box); } catch (e) { console.warn(e); }
   });
 }
 
