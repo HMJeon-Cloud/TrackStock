@@ -81,7 +81,7 @@ async function aiHandler(req, res) {
     if (!text.trim()) return res.status(400).json({ ok: false, reason: "EMPTY" });
     schema = AI_SCHEMA_CUSTOM;
     user = "아래 글을 릴스용 한 장 카드로 정리해 줘. 숫자·날짜·금액·비율은 반드시 아래 글에 있는 표기 그대로만 쓰고, 계산하거나 새로 만들지 마. 글에 없는 내용은 넣지 마. " +
-      "비교·조건·구간이 많으면 layout=table, 순서가 있으면 steps, 아니면 list. 쓰지 않는 쪽(points 또는 table)은 빈 배열로.\n" + (b.hint ? "주제 힌트: " + String(b.hint).slice(0, 100) + "\n" : "") + "---\n" + text;
+      "비교·조건·구간이 많으면 layout=table, 순서가 있으면 steps, 아니면 list. 쓰지 않는 쪽(points 또는 table)은 빈 배열로.\n" + (b.hint ? "주제 꼬리표: " + String(b.hint).slice(0, 100) + "\n" : "") + (b.ask ? "운영자 요청(어떤 카드로 만들지): " + String(b.ask).slice(0, 500) + "\n" : "") + "---\n" + text;
   } else {
     const facts = (Array.isArray(b.facts) ? b.facts : []).slice(0, 40).map((f) => ({ id: String(f.id).slice(0, 6), label: String(f.label).slice(0, 60), value: String(f.value).slice(0, 40) }));
     if (!facts.length) return res.status(400).json({ ok: false, reason: "NO_FACTS" });
