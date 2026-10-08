@@ -574,6 +574,25 @@
   .ocForm { display: grid; gap: 8px; } .ocForm textarea { min-height: 220px; line-height: 1.6; }
   .ocIn { font-size: 13px; line-height: 1.7; max-height: 260px; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; } .ocIn mark { background: rgba(201,162,79,.35); padding: 0 2px; border-radius: 3px; }
   .ocJson { width: 100%; min-height: 220px; font: 12px/1.5 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 10px; padding: 8px; box-sizing: border-box; margin: 6px 0; }
+  /* v9.6 대표 카드 작업창 */
+  .ocStu { position: fixed; inset: 0; z-index: 400; background: rgba(10,10,12,.55); display: flex; align-items: stretch; justify-content: center; padding: 2vh 2vw; }
+  .ocStuIn { background: var(--card, #fff); color: var(--text, #1c2333); border-radius: 18px; width: min(1240px, 100%); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+  .ocStuHead { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .ocStuHead b { font-size: 17px; } .ocStuHead small { display: block; color: var(--muted, #667); font-size: 12px; margin-top: 2px; }
+  .ocStuGrid { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 14px 18px 18px; overflow: auto; flex: 1; }
+  @media (min-width: 900px) { .ocStuGrid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); } .ocStuR { position: sticky; top: 0; align-self: start; } }
+  .ocStep { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: rgba(201,162,79,.06); margin-bottom: 10px; }
+  .ocStepT { font-weight: 800; font-size: 14px; margin-bottom: 8px; } .ocStepT span { font-weight: 500; font-size: 12px; color: var(--muted, #667); margin-left: 6px; }
+  .ocOp { width: 100%; min-height: 76px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font: inherit; box-sizing: border-box; background: var(--card, #fff); color: inherit; resize: vertical; }
+  .ocEx { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .ocEx button { border: 1px solid var(--line); background: transparent; color: inherit; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .ocImgs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; } .ocImgBtn { cursor: pointer; }
+  .ocThumbs { display: flex; gap: 6px; width: 100%; } .ocThumbs span { position: relative; } .ocThumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+  .ocThumbs button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: #111; color: #fff; font-size: 11px; cursor: pointer; }
+  .ocMake { min-width: 140px; font-size: 15px; }
+  .ocStuR img { width: 100%; max-width: 400px; max-height: 76vh; object-fit: contain; display: block; margin: 0 auto; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
+  .ocPh { aspect-ratio: 9 / 16; max-width: 400px; max-height: 76vh; margin: 0 auto; border: 2px dashed var(--line); border-radius: 14px; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted, #667); font-size: 14px; line-height: 1.7; }
+  .ocStu [hidden] { display: none !important; } .ocChk .info { background: rgba(201,162,79,.12); color: #8a6a1f; }
+  .ocStuR .ocLay { justify-content: center; margin-top: 10px; }
   .reelWrap { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
   .thrGrid { display: grid; grid-template-columns: 1fr; gap: 10px; } @media (min-width: 760px) { .thrGrid { grid-template-columns: 1fr 1fr; } }
   .thrLbl { font-size: 12.5px; font-weight: 700; color: #f1dca2; margin-top: 4px; } .thrLbl span { font-weight: 400; margin-left: 6px; color: #b9b3a8; }
@@ -2019,7 +2038,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v9.5<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v9.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4408,7 +4427,7 @@ window.addEventListener("load", function () {
 <script src="threads.js?v=9.5"></script>
 <script src="reels.js?v=9.5.3"></script>
 <script src="slides.js?v=9.5"></script>
-<script src="onecard.js?v=9.5.3"></script>
+<script src="onecard.js?v=9.6"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>
