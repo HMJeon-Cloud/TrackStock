@@ -7,6 +7,21 @@
 var CARD = { W: 1080, H: 1350, PAD: 60, HEAD: 256 };   // TrackApt 카드와 같은 틀: 남색 머리 + 베이지 바탕 + 흰 박스 (v8.4: 머리를 300→256으로 줄여 본문 공간 확보)
 /* 카드 성격: regular = 정기(한 주·한 달 정리/예상, 채널) 남색 머리 / event = 이벤트성(오늘의 브리핑·전일 정리) 검정 머리 + 금색 꼬리표 */
 var CARD_STYLE = "regular";
+/* v9.5 시장 구분: 하루 3번(국내·미국·코인) 올리는 카드가 한눈에 구별되게 — 머리 색 + 왼쪽 띠 + 큰 시장 배지 + 마감 날짜 */
+var CARD_MKT = null;   // { k: "kr"|"us"|"coin", name, date } — cardsOpen이 채우고 끝나면 비운다
+var CARD_MKT_C = {
+  kr:   { name: "국내", c: "#e5484d", h1: "#2b0d10", h2: "#4a1419" },
+  us:   { name: "미국", c: "#3b82f6", h1: "#0a1630", h2: "#14305e" },
+  coin: { name: "코인", c: "#f5a524", h1: "#1d1404", h2: "#3d2a07" }
+};
+function cMktInfo(R) {
+  var k = R && R.market; if (!CARD_MKT_C[k]) return null;
+  var d = "";
+  if (k === "kr" && R.asOfKr) d = cDate(R.asOfKr - 9 * 3600e3 + 1) + " 마감";
+  else if (k === "us" && R.asOfUs) d = cDate(R.asOfUs) + " 마감";
+  else if (k === "coin") { var x = briefState.recent && briefState.recent.symbols && briefState.recent.symbols["BTC-USD"]; if (x && x.t && x.t.length) { var lt = x.t[x.t.length - 1] * 1000; d = cDate(Math.floor(lt / 86400e3) * 86400e3 + 86400e3 - 9 * 3600e3 + 60e3) + " 9시 마감"; } }
+  return { k: k, name: CARD_MKT_C[k].name, date: d, c: CARD_MKT_C[k].c, h1: CARD_MKT_C[k].h1, h2: CARD_MKT_C[k].h2 };
+}
 var CARD_SERIES = "";   // 머리 오른쪽 위 작은 시리즈 표시 (예: "WEEKLY REVIEW · 2026 W41")
 var CARD_C = {
   navy: "#1f2a44", navy2: "#2a3659", bg: "#f3efe6", box: "#ffffff", line: "#e6e1d6",
@@ -83,7 +98,8 @@ function cNew() {
   var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
   g.fillStyle = CARD_C.bg; g.fillRect(0, 0, CARD.W, CARD.H);
   var ev = CARD_STYLE === "event";
-  var lg = g.createLinearGradient(0, 0, CARD.W, CARD.HEAD); lg.addColorStop(0, ev ? CARD_C.black : CARD_C.navy); lg.addColorStop(1, ev ? CARD_C.black2 : CARD_C.navy2);
+  var mkc = CARD_MKT;
+  var lg = g.createLinearGradient(0, 0, CARD.W, CARD.HEAD); lg.addColorStop(0, mkc ? mkc.h1 : ev ? CARD_C.black : CARD_C.navy); lg.addColorStop(1, mkc ? mkc.h2 : ev ? CARD_C.black2 : CARD_C.navy2);
   g.fillStyle = lg; g.fillRect(0, 0, CARD.W, CARD.HEAD);
   // 금색 우상향 곡선 (머리 배경 장식) — 이벤트 카드는 조금 더 선명하게
   g.save(); g.beginPath(); g.rect(0, 0, CARD.W, CARD.HEAD); g.clip();
@@ -98,6 +114,7 @@ function cNew() {
   g.strokeStyle = CARD_C.gold2; g.lineWidth = 4; g.lineCap = "round"; g.lineJoin = "round";
   g.beginPath(); g.moveTo(CARD.W - 54, CARD.HEAD - 2); g.lineTo(CARD.W - 30, CARD.HEAD - 26); g.moveTo(CARD.W - 42, CARD.HEAD - 26); g.lineTo(CARD.W - 30, CARD.HEAD - 26); g.lineTo(CARD.W - 30, CARD.HEAD - 14); g.stroke();
   if (ev) { g.fillStyle = CARD_C.gold; g.fillRect(0, 0, CARD.W, 8); }   // 이벤트 카드: 맨 위 금색 띠
+  if (mkc) { g.fillStyle = mkc.c; g.fillRect(0, 0, CARD.W, 10); g.fillRect(0, 0, 12, CARD.H); }   // 시장 색 띠: 위 + 왼쪽 끝까지 (피드 썸네일에서도 보이게)
   return { cv: cv, g: g, y: CARD.HEAD + 32 };
 }
 function cLogo(g, x, y) {
@@ -139,9 +156,18 @@ function cHead(c, tag, title, sub, page, total) {
   var m = String(tag).match(/^(.*?)\s*·\s*([0-9]{1,2}\.[0-9]{1,2}\([일월화수목금토]\)[^·]*)$/);
   var tagTxt = m ? m[1] : tag, dateTxt = m ? m[2] : "";
   var lx = P + 40 + cW(g, "우상향연구소", 30, 800) + 22;
+  if (CARD_MKT) tagTxt = cFit(g, tagTxt, 250, 24, 700);
   cFont(g, 24, 700); var tw = g.measureText(tagTxt).width + 36;
   if (ev) { cRound(g, lx, 44, tw, 42, 21, CARD_C.gold); cText(g, tagTxt, lx + 18, 73, 24, 800, CARD_C.black); }
   else { cRound(g, lx, 44, tw, 42, 21, CARD_C.tagBg, "rgba(255,255,255,0.55)"); cText(g, tagTxt, lx + 18, 73, 24, 700, CARD_C.onNavy); }
+  if (CARD_MKT) {   // 시장 배지(색 채움) + 마감 날짜(크게) — 오른쪽 위
+    var mk = CARD_MKT, pg = page ? page + "/" + total : "", bx = CARD.W - P;
+    if (pg) { cText(g, pg, bx, 73, 24, 700, "rgba(255,255,255,0.7)", "right"); bx -= cW(g, pg, 24, 700) + 18; }
+    if (mk.date) { cText(g, mk.date, bx, 74, 28, 800, "#ffffff", "right"); bx -= cW(g, mk.date, 28, 800) + 14; }
+    var bw = cW(g, mk.name, 30, 900) + 34; cRound(g, bx - bw, 40, bw, 50, 12, mk.c); cText(g, mk.name, bx - bw / 2, 76, 30, 900, "#ffffff", "center");
+    if (CARD_SERIES) cText(g, CARD_SERIES, CARD.W - P, 116, 19, 600, "rgba(255,255,255,0.6)", "right");
+    c.y = CARD.HEAD + 32; if (!title) return; cTitle(g, title, 184); if (sub) cSummary(c, sub); return;
+  }
   var right = dateTxt + (page ? "  ·  " + page + "/" + total : "");
   if (right) cText(g, right, CARD.W - P, 73, 26, 700, ev ? CARD_C.gold2 : CARD_C.onNavy, "right");
   if (CARD_SERIES) cText(g, CARD_SERIES, CARD.W - P, 106, 19, 600, ev ? "rgba(230,197,122,0.75)" : CARD_C.onNavy2, "right");
@@ -732,6 +758,8 @@ function cardsOpen(kind) {
     CARD_STYLE = kind === "brief" ? "event" : "regular";   // 오늘의 브리핑(전일 정리)은 이벤트성 → 검정 머리, 채널 자료는 정기 → 남색 머리
     CARD_SERIES = kind === "brief" ? "DAILY · 전일 정리" : "CHANNEL · " + cDate(Date.now());
     CARD_UNIT = kind === "brief" && briefState.market === "coin" ? "코인" : "";
+    CARD_MKT = kind === "brief" ? cMktInfo(briefState.result) : null;
+    if (CARD_MKT) CARD_SERIES = "DAILY · " + CARD_MKT.name + " 전일 정리";
     var list = make0();
     try {
       var iss = kind === "brief" ? (typeof issuesCompute === "function" && briefState.recent ? issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }) : null)
@@ -756,7 +784,7 @@ function cardsOpen(kind) {
     if (btn) btn.textContent = old;
     var list;
     try { list = make(); } catch (e) { console.warn(e); list = []; }
-    CARD_STYLE = "regular"; CARD_SERIES = ""; CARD_UNIT = "";
+    CARD_STYLE = "regular"; CARD_SERIES = ""; CARD_UNIT = ""; CARD_MKT = null;
     if (!list.length) { alert("아직 데이터가 다 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요."); return; }
     var day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     var box = document.createElement("div");
