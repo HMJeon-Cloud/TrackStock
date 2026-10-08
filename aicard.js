@@ -235,78 +235,106 @@ function aiStudio(cfg) {
   st.mk = st.spec && st.spec.mk ? st.spec.mk : null;
   st.src = st.spec && st.spec.src ? st.spec.src : st.custom ? "" : "카드 묶음 데이터 기준 · 투자 권유 아님";
   st.extraOk = function (v) { if (!st.spec) return false; var n = aiNorm(v); return st.spec.facts.some(function (f) { return aiNorm(f.value) === n; }); };
+  st.baseLines = st.lines.slice(); st.refLines = [];
   var el = document.createElement("div"); el.id = "aiStudio"; el.className = "aiStu";
+  var GOALS = ["릴스 한 장으로 핵심 + 게시물 유입", "저장하고 싶은 정보 카드(체크리스트·표)", "질문으로 궁금증을 만드는 카드", "숫자 하나로 놀라게 하는 카드"];
   el.innerHTML = '<div class="aiIn">' +
-    '<div class="aiTop"><div class="aiTtl"><b>대표 카드 · ' + escapeHtml(st.title) + '</b><small>' + (st.custom ? "내 글·앱 데이터 → 릴스 한 장" : "카드 묶음 " + st.list.length + "장의 모든 내용 → 릴스 한 장") + '</small></div>' +
-    '<div class="aiSeg"><span>AI 사용 범위</span>' + Object.keys(AI_MODE_NM).map(function (k) { return '<button data-mode="' + k + '"><b>' + AI_MODE_NM[k][0] + '</b><small>' + AI_MODE_NM[k][1] + '</small></button>'; }).join("") + '</div>' +
-    '<button class="chip" data-x>닫기</button></div>' +
-    '<div class="aiBar"><input class="aiReq" placeholder="추가 요청 (예: 초보 관점으로, 제목은 질문형, 급락 쪽 강조, 순위 카드로)"><label class="chip aiAtt">📎 참고 이미지<input type="file" accept="image/*" multiple hidden></label><div class="aiThumbs"></div>' +
-    '<button class="primary" data-plan>기획하기</button><button class="chip" data-img>이미지 만들기</button><button class="chip" data-save>카드 저장(1080×1920)</button></div>' +
-    '<div class="aiBanner">원본 데이터를 확인하고 <b>기획하기</b>를 누르세요. ' + (AI_LAST_MODE === "app" ? "앱 카드는 AI 없이 무료로 만들어요." : "AI는 버튼을 누를 때만 호출돼요.") + '</div>' +
-    '<div class="aiCols"><div class="aiCol aiSrc"><div class="aiColH">원본 데이터 <small></small></div><div class="aiSrcBody"></div></div>' +
-    '<div class="aiCol aiMid"><div class="aiColH">카드</div><div class="aiPh">기획하기를 누르면<br>여기에 카드가 나와요</div><img alt="" hidden><div class="pills aiLay" hidden>' + Object.keys(OC_LAYER_NM).map(function (k) { return '<button data-ly="' + k + '">' + OC_LAYER_NM[k] + '</button>'; }).join("") + '</div></div>' +
-    '<div class="aiCol aiChk"><div class="aiColH">검증 · 고치기 <small>칸을 고치면 바로 다시 그려요</small></div><div class="aiChkBody"><div class="briefDim">기획 뒤 여기서 카드의 모든 글·숫자를 원본 줄과 맞춰 볼 수 있어요.</div></div></div></div></div>';
+    '<div class="aiTop"><div class="aiTtl"><span class="aiEy">릴스 대표 카드</span><b>' + escapeHtml(st.title) + '</b></div><button class="chip" data-x>닫기</button></div>' +
+    '<div class="aiSteps"><div data-step="1"><i>1</i>재료</div><div data-step="2"><i>2</i>요청</div><div data-step="3"><i>3</i>결과·검증</div></div>' +
+    '<div class="aiScroll"><div class="aiTwo">' +
+    '<div class="aiPanel" data-p="1"><h4><i>1</i>재료 <small>카드에 쓸 사실 — 숫자는 여기 있는 것만 씁니다</small></h4>' +
+    (st.custom ? '<label class="aiLbl">원본 데이터 <small>첫 줄 = 제목 · "- 항목: 설명" · 표는 | 로 칸 나누기 · 아래 버튼으로 앱 숫자 붙이기</small></label><textarea class="aiTxt" placeholder="예) 디딤돌대출 금리 정리&#10;- 부부합산 2천만원 이하: 2.85%~4.15%&#10;- 대출한도: 최대 2.5억원&#10;출처: 주택도시기금"></textarea>' +
+      '<div class="aiIns"><input class="aiSym" list="aiSymList" placeholder="종목·코인 이름"><datalist id="aiSymList"></datalist><button class="chip" data-ins="sym">종목 숫자</button><button class="chip" data-ins="brief">지금 브리핑</button><button class="chip" data-ins="cal">이번 주 일정</button><button class="chip" data-ins="mdd">고점 대비</button>' +
+      pubPolicyAll().map(function (p) { return '<button class="chip" data-ins="pol:' + p.id + '">' + escapeHtml(p.short || p.t) + '</button>'; }).join("") + '</div>'
+      : '<div class="aiSum"><div><span>원본 데이터</span><b>' + st.baseLines.length + '줄</b></div><small>카드 묶음 ' + st.list.length + '장에 적힌 모든 글자 · ③에서 전체 보기</small></div>') +
+    '<label class="aiLbl">참고 내용 <small>선택 · 원본 데이터 외에 넣을 사실·문장 (인스타 글, 정책 내용, 유튜브·책 메모 등)</small></label><textarea class="aiRefTxt" placeholder="예) 디딤돌대출 금리 연 2.85%~4.15% / 대출한도 최대 2.5억원 — 여기 적은 숫자도 카드에 쓸 수 있습니다"></textarea>' +
+    '<label class="aiLbl">참고 이미지 <small>선택 · 모양·구성·분위기만 참고(이미지 속 숫자·글은 안 씀)</small></label><div class="aiImgRow"><label class="aiImgAdd">+ 이미지 추가<input type="file" accept="image/*" multiple hidden></label><span class="briefDim">최대 3장 · 붙여넣기(Ctrl+V) 가능</span><div class="aiThumbs"></div></div></div>' +
+    '<div class="aiPanel" data-p="2"><h4><i>2</i>요청 <small>비워 두면 기본 구성으로 만듭니다</small></h4>' +
+    '<div class="aiGrid2"><label class="aiLbl">주제(말머리)<input class="aiKick" placeholder="비우면 자동"></label><label class="aiLbl">목적<select class="aiGoal">' + GOALS.map(function (g) { return '<option>' + g + '</option>'; }).join("") + '</select></label></div>' +
+    '<label class="aiLbl">원하는 카드 형태·의견<textarea class="aiReq" placeholder="예) 질문형 제목, 초보 관점, 급락 쪽 강조, 순위 대신 체크리스트 (Ctrl+Enter = 만들기)"></textarea></label>' +
+    '<label class="aiLbl">AI 사용 범위</label><div class="aiModes">' + Object.keys(AI_MODE_NM).map(function (k) { return '<button data-mode="' + k + '"><b>' + AI_MODE_NM[k][0] + '</b><small>' + AI_MODE_NM[k][1] + '</small></button>'; }).join("") + '</div>' +
+    '<button class="primary aiMake" data-plan>만들기</button><div class="aiCost"></div></div></div>' +
+    '<div class="aiPanel aiRes" data-p="3"><h4><i>3</i>결과 · 검증 <small>왼쪽 재료와 가운데 카드, 오른쪽 숫자 검사를 함께 보세요</small></h4>' +
+    '<div class="aiBanner">②에서 <b>만들기</b>를 누르면 여기에 결과가 나와요. AI는 버튼을 누를 때만 호출돼요.</div>' +
+    '<div class="aiCols"><div class="aiCol aiSrc"><div class="aiColH">재료 <small></small></div><div class="aiSrcBody"></div></div>' +
+    '<div class="aiCol aiMid"><div class="aiColH">카드</div><div class="aiPh">②에서 <b>만들기</b>를 누르면<br>여기에 카드가 나와요<br><small>의견을 비워 두면 기본 구성으로 만들어요</small></div><img alt="" hidden>' +
+    '<div class="pills aiLay" hidden>' + Object.keys(OC_LAYER_NM).map(function (k) { return '<button data-ly="' + k + '">' + OC_LAYER_NM[k] + '</button>'; }).join("") + '</div>' +
+    '<div class="aiActs"><button class="chip" data-img hidden>이미지만 다시</button><button class="primary" data-save disabled>카드 저장 (1080×1920)</button></div></div>' +
+    '<div class="aiCol aiChk"><div class="aiColH">검증 · 고치기 <small>칸을 고치면 카드가 바로 바뀝니다</small></div><div class="aiChkBody"><div class="briefDim">만든 뒤 항목마다 근거 원문과 숫자 일치를 보여 줍니다.</div></div></div></div></div>' +
+    '</div></div>';
   document.body.appendChild(el); document.addEventListener("keydown", aiStudioKey, true);
   var $a = function (q) { return el.querySelector(q); };
   $a("[data-x]").onclick = aiStudioClose;
-  // 모드
+  function step(n) { Array.prototype.forEach.call(el.querySelectorAll("[data-step]"), function (d) { var k = +d.getAttribute("data-step"); d.classList.toggle("on", k === n); d.classList.toggle("done", k < n); }); }
+  step(1);
+  $a('[data-p="1"]').addEventListener("focusin", function () { if (!st.plan) step(1); });
+  $a('[data-p="2"]').addEventListener("focusin", function () { if (!st.plan) step(2); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-step]"), function (d) { d.onclick = function () { var t = $a('[data-p="' + d.getAttribute("data-step") + '"]'); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); }; });
+  // AI 사용 범위
+  var COST = { app: "앱 카드: 의견·참고가 없으면 AI 없이 무료 · 있으면 AI 기획 1회(약 50원)", bg: "배경만 AI: 기획 1회 + 배경 이미지 1장 (약 80~140원) · 글·숫자는 앱이 그려 정확", full: "전부 AI: 기획 1회 + 이미지 1장 + 글자 읽기 1회 (약 100~170원) · 이미지 속 글자를 원본과 대조" };
   function setMode(m) {
     st.mode = m; AI_LAST_MODE = m; try { localStorage.setItem("sm.aiMode", m); } catch (e) {}
     Array.prototype.forEach.call(el.querySelectorAll("[data-mode]"), function (b) { b.classList.toggle("on", b.getAttribute("data-mode") === m); });
-    $a("[data-img]").disabled = m === "app"; $a("[data-img]").textContent = (m === "bg" ? (st.bgImg ? "배경 다시" : "배경 만들기") : m === "full" ? (st.fullImg ? "이미지 다시" : "이미지 만들기") : "이미지 만들기");
+    $a(".aiCost").textContent = COST[m];
+    var ib = $a("[data-img]"); ib.hidden = m === "app" || !st.plan; ib.textContent = m === "bg" ? "배경만 다시" : "이미지만 다시";
     if (st.plan) render();
   }
   Array.prototype.forEach.call(el.querySelectorAll("[data-mode]"), function (b) { b.onclick = function () { setMode(b.getAttribute("data-mode")); }; });
-  // 참고 이미지
-  $a(".aiAtt input").onchange = function () { var fs = Array.prototype.slice.call(this.files || []).slice(0, 3 - st.imgs.length); this.value = ""; Promise.all(fs.map(ocImgShrink)).then(function (us) { us.filter(Boolean).forEach(function (u) { st.imgs.push(u); }); thumbs(); }); };
+  // 참고 이미지 (+ 붙여넣기)
+  function addFiles(files) { files = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type); }).slice(0, 3 - st.imgs.length); return Promise.all(files.map(ocImgShrink)).then(function (us) { us.filter(Boolean).forEach(function (u) { st.imgs.push(u); }); thumbs(); }); }
+  $a(".aiImgAdd input").onchange = function () { var f = this.files; addFiles(f); this.value = ""; };
+  el.addEventListener("paste", function (e) { var fs = []; Array.prototype.forEach.call((e.clipboardData && e.clipboardData.items) || [], function (it) { if (it.kind === "file") { var f = it.getAsFile(); if (f) fs.push(f); } }); if (fs.length) { e.preventDefault(); addFiles(fs); } });
   function thumbs() { $a(".aiThumbs").innerHTML = st.imgs.map(function (u, i) { return '<span><img src="' + u + '"><button data-rm="' + i + '">✕</button></span>'; }).join(""); Array.prototype.forEach.call(el.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { st.imgs.splice(+b.getAttribute("data-rm"), 1); thumbs(); }; }); }
-  // 원본 데이터
+  // 재료: 원본 + 참고 내용(R줄)
+  function syncLines() {
+    if (st.custom) { var ta = $a(".aiTxt"); st.baseLines = ta.value.split(/\r?\n/).map(function (t) { return t.trim(); }).filter(Boolean).map(function (t, i) { return { id: "F" + (i + 1), card: "", text: t }; }); }
+    st.refLines = $a(".aiRefTxt").value.split(/\r?\n/).map(function (t) { return t.trim(); }).filter(Boolean).map(function (t, i) { return { id: "R" + (i + 1), card: "참고", text: t, ref: true }; });
+    st.lines = st.baseLines.concat(st.refLines);
+    srcRender();
+  }
+  $a(".aiRefTxt").oninput = syncLines;
+  if (st.custom) {
+    var rs = briefState.recent && briefState.recent.symbols; if (rs) $a("#aiSymList").innerHTML = Object.keys(rs).map(function (k) { return '<option value="' + escapeHtml(briefName({ sym: k })) + '">'; }).join("");
+    $a(".aiTxt").oninput = syncLines;
+    Array.prototype.forEach.call(el.querySelectorAll("[data-ins]"), function (b) { b.onclick = function () {
+      var ta = $a(".aiTxt"), sy = $a(".aiSym"); ta.id = "ocText"; sy.id = "ocSym";   // 기존 '데이터 넣기' 함수 재사용
+      try { ocInsert(b.getAttribute("data-ins")); } finally { ta.id = ""; sy.id = ""; }
+      syncLines(); }; });
+  }
   function used() { var u = {}; if (st.plan) { [st.plan.hero].concat(st.plan.items || []).forEach(function (x) { if (x && x.ref) u[x.ref] = 1; }); } return u; }
   function srcRender() {
-    var u = used(), body = $a(".aiSrcBody");
-    $a(".aiSrc .aiColH small").textContent = st.lines.length + "개 · 금색 = 카드에 쓰인 근거";
-    var list = '<div class="aiLines">' + st.lines.map(function (l) { return '<div class="aiL' + (u[l.id] ? " on" : "") + '" id="ai-' + l.id + '"><b>' + l.id + '</b><span>' + (l.card ? '<i>' + escapeHtml(l.card) + '</i> · ' : '') + escapeHtml(l.text) + '</span></div>'; }).join("") + '</div>';
-    if (st.custom) {
-      if (!body.querySelector(".aiCustom")) {
-        body.innerHTML = '<div class="aiCustom"><input class="aiHint" placeholder="주제 꼬리표 (예: 디딤돌대출, 책 메모)"><textarea class="aiTxt" placeholder="첫 줄 = 제목&#10;- 항목: 설명&#10;표는 | 로 칸 나누기&#10;출처: 기관·책 이름&#10;&#10;아래 버튼으로 앱 데이터를 붙여 넣을 수 있어요"></textarea>' +
-          '<div class="aiIns"><input class="aiSym" list="aiSymList" placeholder="종목·코인 이름"><datalist id="aiSymList"></datalist><button class="chip" data-ins="sym">종목 숫자</button><button class="chip" data-ins="brief">지금 브리핑</button><button class="chip" data-ins="cal">이번 주 일정</button><button class="chip" data-ins="mdd">고점 대비</button>' +
-          (pubPolicyAll().map(function (p) { return '<button class="chip" data-ins="pol:' + p.id + '">' + escapeHtml(p.short || p.t) + '</button>'; }).join("")) + '</div><div class="aiLinesWrap"></div></div>';
-        var rs = briefState.recent && briefState.recent.symbols; if (rs) body.querySelector("#aiSymList").innerHTML = Object.keys(rs).map(function (k) { return '<option value="' + escapeHtml(briefName({ sym: k })) + '">'; }).join("");
-        var ta = body.querySelector(".aiTxt");
-        var sync = function () { st.hint = body.querySelector(".aiHint").value; st.lines = ta.value.split(/\r?\n/).map(function (t) { return t.trim(); }).filter(Boolean).map(function (t, i) { return { id: "F" + (i + 1), card: "", text: t }; }); body.querySelector(".aiLinesWrap").innerHTML = '<div class="aiLines">' + st.lines.map(function (l) { return '<div class="aiL' + (used()[l.id] ? " on" : "") + '"><b>' + l.id + '</b><span>' + escapeHtml(l.text) + '</span></div>'; }).join("") + '</div>'; $a(".aiSrc .aiColH small").textContent = st.lines.length + "줄 · 금색 = 카드에 쓰인 근거"; };
-        ta.oninput = sync; body.querySelector(".aiHint").oninput = sync;
-        Array.prototype.forEach.call(body.querySelectorAll("[data-ins]"), function (b) { b.onclick = function () {
-          // 기존 '데이터 넣기' 함수를 그대로 쓰기 위해 임시로 #ocText·#ocSym 역할을 맡긴다
-          var keepT = ta.id, keepS = body.querySelector(".aiSym").id; ta.id = "ocText"; body.querySelector(".aiSym").id = "ocSym";
-          try { ocInsert(b.getAttribute("data-ins")); } finally { ta.id = keepT; body.querySelector(".aiSym").id = keepS; }
-          sync(); }; });
-        st.syncCustom = sync; sync();
-      } else st.syncCustom();
-      return;
-    }
-    body.innerHTML = list;
+    var u = used();
+    $a(".aiSrc .aiColH small").textContent = st.lines.length + "줄 · 금색 = 카드에 쓰임" + (st.refLines.length ? " · 파랑 = 참고 내용" : "");
+    $a(".aiSrcBody").innerHTML = st.lines.length ? '<div class="aiLines">' + st.lines.map(function (l) { return '<div class="aiL' + (l.ref ? " ref" : "") + (u[l.id] ? " on" : "") + '" id="ai-' + l.id + '"><b>' + l.id + '</b><span>' + (l.card ? '<i>' + escapeHtml(l.card) + '</i> · ' : '') + escapeHtml(l.text) + '</span></div>'; }).join("") + '</div>' : '<div class="briefDim">①에 재료를 넣어 주세요.</div>';
   }
   srcRender();
-  // 기획하기
+  // 만들기 (기획 → 필요하면 이미지까지 한 번에)
+  $a(".aiReq").addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $a("[data-plan]").click(); } });
   $a("[data-plan]").onclick = function () {
-    var b = this, req = $a(".aiReq").value.trim(), useAi = st.mode !== "app" || !!req || st.imgs.length;
-    if (!st.lines.length) { alert("원본 데이터가 비어 있어요."); return; }
-    b.disabled = true; b.textContent = useAi ? "AI 기획 중… (10~60초)" : "기획 중…";
-    var p = !useAi ? Promise.resolve({ plan: aiRulePlan(st), by: "규칙(앱 데이터 그대로 · AI 없음)" }) :
-      aiCall({ mode: "plan", title: st.title, deck: st.deckNames.join(", "), lines: st.lines.map(function (l) { return { id: l.id, text: (l.card ? "[" + l.card + "] " : "") + l.text }; }), request: req, images: st.imgs }).then(function (j) {
+    syncLines();
+    var b = this, req = $a(".aiReq").value.trim(), kick = $a(".aiKick").value.trim(), goal = $a(".aiGoal").value;
+    var useAi = st.mode !== "app" || !!req || st.imgs.length || st.refLines.length || $a(".aiGoal").selectedIndex > 0;
+    if (!st.lines.length) { alert("①에 재료(원본 데이터)를 넣어 주세요."); return; }
+    b.disabled = true; b.textContent = useAi ? "AI가 기획하는 중… (10~60초)" : "만드는 중…"; step(3);
+    $a(".aiRes").scrollIntoView({ behavior: "smooth", block: "start" });
+    var request = ["목적: " + goal, kick ? "말머리는 '" + kick + "'로" : "", req].filter(Boolean).join("\n");
+    var p = !useAi ? Promise.resolve({ plan: aiRulePlan(st), by: "기본 구성(앱 데이터 그대로 · AI 없음)" }) :
+      aiCall({ mode: "plan", title: st.title, deck: st.deckNames.join(", "), lines: st.lines.map(function (l) { return { id: l.id, text: (l.card ? "[" + l.card + "] " : "") + l.text }; }), request: request, images: st.imgs }).then(function (j) {
         if (j && j.ok && j.out) return { plan: aiCleanPlan(j.out), by: "AI 기획 · " + j.model + (j.tries && j.tries.length > 1 ? " (" + j.tries.join(" → ") + ")" : "") };
         throw new Error((OC_REASON[j && j.reason] || (j && j.reason) || "알 수 없음") + (j && j.detail ? " — " + j.detail : "") + (j && j.tries ? " [" + j.tries.join(" → ") + "]" : ""));
       });
     p.then(function (r) {
-      st.plan = r.plan; st.planBy = r.by; st.ocr = null; b.disabled = false; b.textContent = "새로 기획";
-      if (st.mode === "app") { render(); return; }
-      render(); return makeImage();
-    }).catch(function (e) { b.disabled = false; b.textContent = st.plan ? "새로 기획" : "기획하기"; banner("bad", "AI 기획 실패: " + e.message + " — '앱 카드'로 바꾸면 AI 없이 만들 수 있어요."); });
+      if (kick) r.plan.kicker = kick;
+      st.plan = r.plan; st.planBy = r.by; st.ocr = null; st.bgImg = null; st.fullImg = null; b.disabled = false; b.textContent = "다시 만들기";
+      $a("[data-save]").disabled = false; setMode(st.mode);
+      if (st.mode === "app") return;
+      return makeImage();
+    }).catch(function (e) { b.disabled = false; b.textContent = st.plan ? "다시 만들기" : "만들기"; banner("bad", "AI 기획 실패: " + e.message + " — '앱 카드'를 고르면 AI 없이 만들 수 있어요."); });
   };
   // 이미지
   function makeImage() {
-    if (!st.plan) { alert("먼저 기획하기를 눌러 주세요."); return Promise.resolve(); }
-    var b = $a("[data-img]"), scope = st.mode === "bg" ? "bg" : "full"; b.disabled = true; b.textContent = "이미지 만드는 중… (20~90초)";
+    if (!st.plan) { alert("먼저 ②에서 만들기를 눌러 주세요."); return Promise.resolve(); }
+    var b = $a("[data-img]"), scope = st.mode === "bg" ? "bg" : "full"; b.hidden = false; b.disabled = true; b.textContent = "이미지 만드는 중… (20~90초)";
     banner("info", scope === "bg" ? "AI가 배경을 그리는 중이에요. 글·숫자는 앱이 그 위에 정확히 그려요." : "AI가 카드 전체를 그리는 중이에요. 다 되면 이미지 속 글자를 다시 읽어 원본과 대조해요.");
     return aiCall({ mode: "image", scope: scope, plan: st.plan }).then(function (j) {
       if (!(j && j.ok && j.image)) throw new Error((j && (j.reason || "")) + (j && j.tries ? " [" + j.tries.join(" → ") + "]" : ""));
@@ -324,7 +352,7 @@ function aiStudio(cfg) {
   Array.prototype.forEach.call(el.querySelectorAll("[data-ly]"), function (b) { b.onclick = function () { st.ly = b.getAttribute("data-ly"); render(); }; });
   // 저장
   $a("[data-save]").onclick = function () {
-    if (!st.url) { alert("먼저 기획하기로 카드를 만들어 주세요."); return; }
+    if (!st.url) { alert("먼저 ②에서 만들기를 눌러 주세요."); return; }
     if (st.lock && !st.forceOk) { if (!confirm("검증에서 확인이 필요한 항목이 있어요. 그래도 저장할까요?")) return; st.forceOk = true; }
     var day = pubToday().replace(/-/g, ""), base = "uphill.lab_대표_" + st.title.replace(/[^\w가-힣]/g, "") + "_" + day;
     cardsDownload({ url: st.url, file: base + (st.mode === "full" ? "_AI" : st.ly === "bg" ? "_배경" : st.ly === "text" ? "_글" : "") + ".png" });
@@ -337,7 +365,7 @@ function aiStudio(cfg) {
     $a(".aiLay").hidden = st.mode === "full";
     Array.prototype.forEach.call(el.querySelectorAll("[data-ly]"), function (x) { x.classList.toggle("active", x.getAttribute("data-ly") === st.ly); });
     if (st.mode === "full") {
-      if (!st.fullImg) { $a(".aiPh").hidden = false; $a(".aiPh").innerHTML = "<b>이미지 만들기</b>를 누르면<br>AI가 카드 전체를 그려요"; img.hidden = true; st.url = null; }
+      if (!st.fullImg) { $a(".aiPh").hidden = false; $a(".aiPh").innerHTML = "AI가 카드 전체를 그리는 중이에요"; img.hidden = true; st.url = null; }
       else { url = aiFullCard(st).toDataURL("image/jpeg", 0.92); }
     } else {
       var draw = function () { return aiPlanCard(st); };
@@ -363,10 +391,10 @@ function aiStudio(cfg) {
       st.ocrExp = exp;
     }
     st.lock = !!(badF.length || badI || badD.length || (ocrMiss && ocrMiss.length) || st.draft || (st.mode === "full" && !st.ocr));
-    var msg = st.mode === "full" && !st.fullImg ? ["info", "기획 완료 · " + st.planBy + " — <b>이미지 만들기</b>를 누르면 AI가 카드 전체를 그려요."] :
+    var msg = st.mode === "full" && !st.fullImg ? ["info", "기획 완료 · " + st.planBy + " — AI 이미지를 기다리는 중이거나 실패했어요. <b>이미지만 다시</b>를 눌러 보세요."] :
       st.lock ? ["bad", "확인 필요: " + [badI ? "근거 줄에 없는 값 " + badI + "개" : "", badF.length ? "원본에 없는 숫자 " + badF.length + "개(" + badF.slice(0, 3).join(", ") + ")" : "", badD.length ? "카드에 그려진 숫자 중 원본에 없는 것 " + badD.join(", ") : "", ocrMiss && ocrMiss.length ? "이미지에서 못 찾은 값 " + ocrMiss.join(", ") : "", st.mode === "full" && !st.ocr ? "이미지 글자 읽는 중" : "", st.draft ? "검토용(구간 미확정)" : ""].filter(Boolean).join(" · ") + " — 오른쪽에서 고치세요"] :
       ["ok", (st.mode === "full" ? "이미지 속 글자에서 기대한 값 " + (st.ocrExp || []).length + "개를 모두 찾았어요" : "카드의 모든 숫자·값이 원본 데이터에 있어요") + " · " + st.planBy + (st.mode !== "app" && st.imgModel ? " · 이미지 " + st.imgModel : "") + " — 그래도 최종 확인은 직접 해 주세요"];
-    if (st.mode === "bg" && !st.bgImg) msg = ["info", "기획 완료 · " + st.planBy + " — <b>배경 만들기</b>를 누르면 AI 배경이 들어가요(지금은 앱 배경)."];
+    if (st.mode === "bg" && !st.bgImg) msg = ["info", "기획 완료 · " + st.planBy + " — AI 배경을 기다리는 중이에요(지금은 앱 배경). 실패하면 <b>배경만 다시</b>."];
     banner(msg[0], msg[1]);
     srcRender();
     chkRender(its, itChk);
@@ -409,7 +437,7 @@ function aiStudio(cfg) {
       (L ? '<div class="aiOrig">원본: ' + line + '</div>' : '') + (chk && chk.t ? '<em class="' + (chk.ok ? "ok" : "bad") + '">' + escapeHtml(chk.t) + '</em>' : '') + '</div>';
   }
   setMode(st.mode);
-  $a(".aiReq").focus();
+  (st.custom ? $a(".aiTxt") : $a(".aiReq")).focus();
 }
 function aiCaption(st) {
   var p = st.plan; if (!p) return "";

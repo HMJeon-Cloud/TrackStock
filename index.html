@@ -653,6 +653,34 @@
   .aiCustom { display: grid; gap: 8px; } .aiCustom textarea { min-height: 180px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font: inherit; background: var(--card, #fff); color: inherit; } .aiCustom input { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: inherit; background: var(--card, #fff); color: inherit; }
   .aiIns { display: flex; flex-wrap: wrap; gap: 6px; } .aiIns .aiSym { flex: 1; min-width: 140px; }
   .aiCap { min-height: 140px; background: var(--card) !important; color: inherit !important; border-color: var(--line) !important; }
+  /* v9.7.1 작업창 3단계 (재료 → 요청 → 결과·검증) */
+  .aiEy { display: block; font-size: 12px; font-weight: 800; color: #a17a24; } .aiTtl b { font-size: 20px; }
+  .aiSteps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 10px; }
+  .aiSteps > div { background: rgba(127,127,127,.08); border-radius: 12px; padding: 9px 12px; font-weight: 800; font-size: 14px; color: var(--sub); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .aiSteps i, .aiPanel h4 i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: #c9c4ba; color: #fff; flex: 0 0 auto; }
+  .aiSteps > div.on { background: #fff4dd; color: #1c2333; box-shadow: inset 0 0 0 1.5px #c9a24f; } .aiSteps > div.on i, .aiSteps > div.done i, .aiPanel h4 i { background: #141317; }
+  .aiSteps > div.done { color: var(--txt, #1c2333); }
+  .aiScroll { overflow: auto; flex: 1; min-height: 0; padding: 0 16px 16px; }
+  .aiTwo { display: grid; grid-template-columns: 1fr; gap: 12px; } @media (min-width: 900px) { .aiTwo { grid-template-columns: 1fr 1fr; } }
+  .aiPanel { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; background: var(--card, #fff); }
+  .aiPanel h4 { margin: 0 0 12px; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .aiPanel h4 small { font-size: 12px; font-weight: 500; color: var(--sub); }
+  .aiRes { margin-top: 12px; }
+  .aiSum { background: rgba(127,127,127,.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; } .aiSum div { display: flex; align-items: baseline; gap: 8px; } .aiSum span { font-weight: 700; font-size: 14px; } .aiSum b { font-size: 20px; } .aiSum small { color: var(--sub); font-size: 12px; }
+  .aiLbl { display: block; font-weight: 800; font-size: 14px; margin: 10px 0 6px; } .aiLbl small { font-weight: 500; font-size: 11.5px; color: var(--sub); }
+  .aiLbl input, .aiLbl select, .aiLbl textarea, .aiPanel > textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; font-weight: 400; font-size: 14px; background: var(--card, #fff); color: inherit; }
+  .aiPanel textarea { min-height: 76px; resize: vertical; } .aiPanel .aiTxt { min-height: 150px; }
+  .aiGrid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .aiGrid2 .aiLbl { margin-top: 0; }
+  .aiImgRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+  .aiImgAdd { border: 1.5px dashed #c9a24f; color: #8a6a1f; background: #fff8ea; border-radius: 10px; padding: 7px 14px; font-weight: 800; font-size: 13px; cursor: pointer; }
+  .aiModes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .aiModes button { text-align: left; border: 1.5px solid var(--line); background: var(--card, #fff); color: inherit; border-radius: 14px; padding: 10px 12px; cursor: pointer; line-height: 1.35; }
+  .aiModes button b { display: block; font-size: 15px; } .aiModes button small { font-size: 11.5px; color: var(--sub); }
+  .aiModes button.on { border-color: #141317; background: rgba(20,19,23,.05); box-shadow: inset 0 0 0 1px #141317; }
+  .aiMake { width: 100%; margin-top: 14px; padding: 14px; font-size: 17px; border-radius: 14px; }
+  .aiCost { font-size: 12px; color: var(--sub); margin-top: 8px; text-align: center; }
+  .aiRes .aiCols { padding: 10px 0 0; } @media (min-width: 1000px) { .aiRes .aiCols { height: 78vh; } } .aiRes .aiBanner { margin: 0; }
+  .aiActs { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .aiL.ref { background: rgba(59,130,246,.07); } .aiL.ref b { color: #2563eb; } .aiL.ref.on { background: rgba(59,130,246,.16); }
   .reelWrap { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
   .thrGrid { display: grid; grid-template-columns: 1fr; gap: 10px; } @media (min-width: 760px) { .thrGrid { grid-template-columns: 1fr 1fr; } }
   .thrLbl { font-size: 12.5px; font-weight: 700; color: #f1dca2; margin-top: 4px; } .thrLbl span { font-weight: 400; margin-left: 6px; color: #b9b3a8; }
@@ -4484,7 +4512,7 @@ window.addEventListener("load", function () {
 <script src="reels.js?v=9.7"></script>
 <script src="slides.js?v=9.7"></script>
 <script src="onecard.js?v=9.7"></script>
-<script src="aicard.js?v=9.7"></script>
+<script src="aicard.js?v=9.7.1"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>
