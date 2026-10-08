@@ -318,7 +318,7 @@ function reelTabHtml() {
   var td = reelToday(), h = '<div class="briefDim" style="margin-bottom:8px">리스트형 정보 릴스 — 표지 · 리스트 · 마무리(프로필 안내) 이미지 + 인스타 캡션 + 화면 자막 + 고정 댓글이 같이 나와요. 데이터 릴스는 만들 때마다 최신 종가로 다시 계산돼요.</div>';
   ["데이터", "상식"].forEach(function (gname) {
     h += '<h4 class="chSub">' + (gname === "데이터" ? "데이터 릴스 (실제 종가로 계산)" : "상식 릴스 (저장각 리스트)") + '</h4><div class="perCal">' + REEL_LIST.filter(function (x) { return x.g === gname; }).map(function (x) {
-      return '<div class="perRow' + (x.id === td ? ' now' : '') + '"><div class="perBody"><b>' + escapeHtml(x.t) + (x.id === td ? ' <span style="color:var(--gold,#c9a24f)">← 오늘</span>' : '') + '</b><small>' + escapeHtml(x.d) + '</small></div><button class="chip" data-reel="' + x.id + '">🎬 만들기</button></div>'; }).join("") + '</div>';
+      return '<div class="perRow' + (x.id === td ? ' now' : '') + '"><div class="perBody"><b>' + escapeHtml(x.t) + (x.id === td ? ' <span style="color:var(--gold,#c9a24f)">← 오늘</span>' : '') + '</b><small>' + escapeHtml(x.d) + '</small></div><div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-reel="' + x.id + '">🎬 만들기</button>' + (typeof aiBtn === "function" ? aiBtn("reel:" + x.id) : "") + '</div></div>'; }).join("") + '</div>';
   });
   return h + '<div class="briefDim" style="margin-top:8px">세율·제도 숫자가 들어간 상식 릴스는 올리기 전 기준(캡션 맨 아래)을 한 번 확인하세요. 데이터 릴스는 환율·배당·세금을 뺀 가격 기준이에요.</div>';
 }

@@ -16,7 +16,7 @@
     },
     "api/channel.js": {
       "includeFiles": "tickers.js",
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }

@@ -486,11 +486,10 @@ function ocDeckSpec(ctx, names, opt) {
 }
 /* 카드 묶음 창에 '대표 카드' 버튼 붙이기 (+ 대표 카드 페이지에서 왔으면 바로 실행) */
 function ocHook(ctx, names, box, opt) {
-  if (!box) return;
+  if (!box || box.querySelector(".ocHookRow")) return;
   var row = document.createElement("div"); row.className = "row ocHookRow"; row.style.cssText = "gap:8px;margin:0 0 10px;align-items:center";
-  row.innerHTML = '<button class="primary" data-oh>📌 대표 카드 만들기 (릴스 1장)</button><span class="briefDim">이 ' + names.length + '장을 한 장으로 요약 · 작업창에서 의견을 적고 만들기</span>';
+  row.innerHTML = '<button class="primary aiBtn" data-ai-open="' + ctx + '">✨ AI 대표 카드 (릴스 1장)</button><span class="briefDim">이 ' + names.length + '장의 모든 내용을 한 장으로 · 앱 카드/배경만 AI/전부 AI 중 선택</span>';
   box.insertBefore(row, box.firstChild);
-  row.querySelector("[data-oh]").onclick = function () { var sp = ocDeckSpec(ctx, names, opt); if (!sp) { alert("이 묶음의 대표 카드에 필요한 데이터가 아직 없어요."); return; } ocStudio({ mode: "deck", title: "대표 카드 · " + sp.title, spec: sp }); };
 }
 function ocDeckOpen(ctx, names, useAi, opt, btn) {
   var sp = ocDeckSpec(ctx, names, opt);
@@ -576,7 +575,7 @@ function ocRender() {
 
 /* ---------- ④ 데이터 넣기: 앱의 실제 숫자를 글 상자에 붙인다 ---------- */
 var OC_JUMP = false;
-function ocMine() { OC_JUMP = true; switchTab("onecard"); }
+function ocMine() { if (typeof aiOpen === "function") aiOpen("custom"); }
 function ocInsert(k) {
   var ta = $("ocText"); if (!ta) return; var L = [], R = briefState.result;
   if (k === "sym") {

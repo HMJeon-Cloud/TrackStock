@@ -292,8 +292,9 @@ function pubPolicyOpen(id) {
 var pubState = { tab: "plan", termOffset: 0, policy: null };
 function pubRender() {
   var box = $("pubBox"); if (!box) return;
-  var tabs = [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["notes", "연구노트"], ["topics", "주제 은행"], ["policy", "정책 카드"], ["reels", "릴스"], ["caption", "캡션"], ["cal", "이번 주 일정"], ["term", "용어 한 입"]];
-  var h = '<div class="pills" style="margin-bottom:10px">' + tabs.map(function (t) { return '<button data-pt="' + t[0] + '"' + (t[0] === pubState.tab ? ' class="active"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div>';
+  // v9.7 탭을 쓰는 순서대로 묶음: 오늘 할 일 → 만들 콘텐츠 → 글·참고
+  var groups = [["오늘", [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["cal", "이번 주 일정"]]], ["콘텐츠", [["notes", "연구노트"], ["reels", "릴스"], ["policy", "정책 카드"], ["term", "용어 한 입"]]], ["글·참고", [["caption", "캡션"], ["topics", "주제 은행"]]]];
+  var h = '<div class="pubTabs">' + groups.map(function (gp) { return '<div class="pubTabG"><span>' + gp[0] + '</span><div class="pills">' + gp[1].map(function (t) { return '<button data-pt="' + t[0] + '"' + (t[0] === pubState.tab ? ' class="active"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div></div>'; }).join("") + '</div>';
   if (pubState.tab === "plan") {
     var ck = pubChecklist(), pl = pubPlan(), today = typeof perToday === "function" ? perToday() : [];
     var nowDecks = typeof storyDecks === "function" ? storyDecks().filter(function (d) { return d.now && d.ready; }) : [];
@@ -301,13 +302,13 @@ function pubRender() {
     if (today.length) h += '<div class="perToday">' + today.map(function (k) { var S = PER_SETS[k]; return '<div class="pubPlanItem per"><div><b>' + S.t + ' 올리는 날</b><small>' + S.when + ' 정기 세트 · 카드 ' + (k === "weekReview" || k === "monthReview" ? 7 : 5) + '장 + 캡션</small></div><button class="primary" data-per="' + k + '">🃏 세트 만들기</button></div>'; }).join("") + '</div>';
     h += '<div class="pubCk">' + ck.map(function (c) { return '<div class="pubCkRow ' + (c.ok ? "ok" : c.w ? "bad" : "warn") + '"><span>' + (c.ok ? "✅" : c.w ? "⛔" : "⚠️") + '</span><span>' + escapeHtml(c.t) + '</span></div>'; }).join("") + '</div>';
     h += '<h4 class="chSub">' + pl.dow + '요일 추천 세트' + (pl.why.length ? ' <small>오늘 신호: ' + pl.why.join(" · ") + '</small>' : '') + '</h4>';
-    h += '<div class="pubPlan">' + pl.plan.map(function (p) { return '<div class="pubPlanItem"><div><b>' + p.t + '</b><small>' + p.d + '</small></div><button class="chip" data-make="' + p.kind + '" data-pick="' + (p.pick || "") + '">🃏 만들기</button></div>'; }).join("") + '</div>';
+    h += '<div class="pubPlan">' + pl.plan.map(function (p) { return '<div class="pubPlanItem"><div><b>' + p.t + '</b><small>' + p.d + '</small></div><div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-make="' + p.kind + '" data-pick="' + (p.pick || "") + '">🃏 만들기</button>' + (typeof aiBtn === "function" && ({ issues: 1, brief: 1, channel: 1, cal: 1, term: 1 })[p.kind] ? aiBtn(p.kind) : "") + '</div></div>'; }).join("") + '</div>';
     h += '<div class="briefDim" style="margin-top:8px">권장 리듬: 인스타 캐러셀 주 3~4회(핵심 이슈 5 + 그날 1~2장) · 스레드 매일 1개(캡션 탭의 500자 버전) · 용어 카드는 저장용으로 매일 또는 격일</div>';
   } else if (pubState.tab === "per") {
     var td = typeof perToday === "function" ? perToday() : [];
     h += '<div class="briefDim" style="margin-bottom:8px">매일은 "오늘 뭐 올리지" 탭(전일 이슈 정리). 구간은 달력 기준이에요 — 한 주 = 월~일, 한 달 = 1일~말일. <b>정리</b> 세트는 구간 안 마지막 거래일 종가가 들어와 있어야만 발행용으로 만들어지고(아니면 "검토용 · 발행 금지" 도장), <b>예상</b> 세트는 일정과 지금 위치만 담고 방향 예측은 하지 않아요.</div>';
     var perRows = [{ when: "매일 아침", t: "📰 전일 이슈 정리 (검정 머리 · 이벤트성)", cards: "핵심 이슈 5 · 시장 온도 · 자금 흐름 · 급등락 · 돈이 몰린 곳 · 숫자 · 심리 온도계 (8장)", make: "brief" }].concat(Object.keys(PER_SETS).map(function (k) { var S = PER_SETS[k]; return { k: k, when: S.when, t: S.t, now: td.indexOf(k) >= 0, cards: { weekReview: "핵심 이슈 5 · 자산 성적표(시작→끝 가격) · 테마 · 급등락 · 날짜별 흐름 표 · 숫자 · 돈이 몰린 곳 (7장)", weekPreview: "이번 주 일정 · 볼 것 3~4가지 · 지난주 흐름 이어질까 · 적립 체크 · 용어 (5장)", monthReview: "핵심 이슈 5 · 자산 성적표(시작→끝 가격) · 테마 · 급등락 · 주차별 흐름 표 · 숫자 · 돈이 몰린 곳 + 과거 같은 달 (7장)", monthPreview: "이달 일정 · 과거 같은 달 계절성 · 역사 속 이달 · 지난달 요약→이달 볼 것 · 적립 계획 (5장)" }[k] }; }));
-    h += '<div class="perCal">' + perRows.map(function (r) { return '<div class="perRow' + (r.now ? ' now' : '') + '"><div class="perWhen">' + r.when + (r.now ? ' <b>← 오늘</b>' : '') + '</div><div class="perBody"><b>' + r.t + '</b><small>' + r.cards + '</small></div>' + (r.k ? '<button class="chip" data-per="' + r.k + '">🃏 만들기</button>' : '<button class="chip" data-make="brief">🃏 만들기</button>') + '</div>'; }).join("") + '</div>';
+    h += '<div class="perCal">' + perRows.map(function (r) { return '<div class="perRow' + (r.now ? ' now' : '') + '"><div class="perWhen">' + r.when + (r.now ? ' <b>← 오늘</b>' : '') + '</div><div class="perBody"><b>' + r.t + '</b><small>' + r.cards + '</small></div>' + '<div class="row" style="gap:4px;flex:0 0 auto">' + (r.k ? '<button class="chip" data-per="' + r.k + '">🃏 만들기</button>' + (typeof aiBtn === "function" ? aiBtn("per:" + r.k) : "") : '<button class="chip" data-make="brief">🃏 만들기</button>' + (typeof aiBtn === "function" ? aiBtn("brief") : "")) + '</div>' + '</div>'; }).join("") + '</div>';
     h += '<div class="briefDim" style="margin-top:8px">월간 세트는 S&P500·코스피·금·비트코인 10년치를 처음 한 번 불러와서 몇 초 걸릴 수 있어요. 예상 세트는 "무엇을 볼지"만 담고 방향 예측은 하지 않아요(채널 원칙).</div>';
   } else if (pubState.tab === "topics") {
     h += '<div class="briefDim" style="margin-bottom:8px">카드로 바로 만들 수 있는 주제와, 손으로 보충하면 좋은 주제(수동)를 리듬별로 모았어요. 소재가 떠오르지 않는 날 펼쳐 보세요.</div>';
@@ -317,7 +318,7 @@ function pubRender() {
     decks.forEach(function (d) { (groups[d.group] = groups[d.group] || []).push(d); });
     h += '<div class="briefDim" style="margin-bottom:8px">한 가지 질문을 데이터로 끝까지 따라가는 캐러셀(7~11장). 위 검정 패널에 결론, 아래 밝은 패널에 근거. 지금 신호와 맞는 덱에 <b>← 지금</b>이 붙어요. 언제든 만들 수 있고, 숫자는 그날 데이터로 새로 계산돼요.</div>';
     Object.keys(groups).forEach(function (gname) {
-      h += '<h4 class="chSub">' + gname + '</h4><div class="perCal">' + groups[gname].map(function (d) { return '<div class="perRow' + (d.now ? ' now' : '') + '"><div class="perBody"><b>' + escapeHtml(d.t) + (d.now ? ' <span style="color:var(--gold,#c9a24f)">← 지금</span>' : '') + '</b><small>' + escapeHtml(d.d) + (d.ready ? '' : ' · <span style="color:#b26a00">데이터 준비 중</span>') + '</small></div><button class="chip" data-story="' + d.key + '">🃏 만들기</button></div>'; }).join("") + '</div>';
+      h += '<h4 class="chSub">' + gname + '</h4><div class="perCal">' + groups[gname].map(function (d) { return '<div class="perRow' + (d.now ? ' now' : '') + '"><div class="perBody"><b>' + escapeHtml(d.t) + (d.now ? ' <span style="color:var(--gold,#c9a24f)">← 지금</span>' : '') + '</b><small>' + escapeHtml(d.d) + (d.ready ? '' : ' · <span style="color:#b26a00">데이터 준비 중</span>') + '</small></div><div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-story="' + d.key + '">🃏 만들기</button>' + (typeof aiBtn === "function" ? aiBtn("story:" + d.key) : "") + '</div></div>'; }).join("") + '</div>';
     });
     h += '<div class="briefDim" style="margin-top:8px">국면 덱은 지금 신호가 없어도 "이런 상황이 오면"으로 만들어져요(미리 저장용). 뉴스 덱은 아침 뉴스 제목에서 자산을 2개 이상 찾았을 때만 만들어져요. 적립 덱은 처음 한 번 10년치를 불러와 몇 초 걸려요.</div>';
   } else if (pubState.tab === "policy") {
@@ -325,7 +326,7 @@ function pubRender() {
     h += '<div class="briefDim" style="margin-bottom:8px">정책·제도 변경은 "내 구간은 얼마?"가 핵심이라 표로 보여줘요. 숫자는 기관 공지를 그대로 옮기고 적용일·출처를 적어야 카드 바닥에 표기돼요.</div>';
     h += '<div class="pills" style="margin-bottom:8px">' + pls.map(function (p) { return '<button data-pol="' + p.id + '"' + (cur && p.id === cur.id ? ' class="active"' : '') + '>' + escapeHtml(p.t) + '</button>'; }).join("") + '</div>';
     if (cur) h += '<div class="chPlanItem"><div style="font-size:13.5px;line-height:1.7"><b>' + escapeHtml(cur.short || cur.t) + '</b> <span class="briefDim">' + escapeHtml(cur.eff || "") + ' · ' + escapeHtml(cur.src || "") + '</span><br>' + escapeHtml(cur.sub || "") + ' · 표 ' + cur.table.rows.length + '행' + (cur.table2 ? ' + 표 ' + cur.table2.rows.length + '행' : '') + (cur.bullets ? ' · 조건 ' + cur.bullets.items.length + '개' : '') + '<br><span class="briefDim">⚠️ ' + escapeHtml(cur.check || "") + '</span></div></div>' +
-      '<div class="row" style="gap:6px;margin:8px 0"><button class="primary" data-make="policy" data-id="' + cur.id + '">🃏 카드 만들기</button><button class="chip" data-act="poledit">✏️ 편집 / 새 항목</button></div>';
+      '<div class="row" style="gap:6px;margin:8px 0"><button class="primary" data-make="policy" data-id="' + cur.id + '">🃏 카드 만들기</button>' + (typeof aiBtn === "function" ? aiBtn("policy:" + cur.id, "✨ AI 대표 카드") : "") + '<button class="chip" data-act="poledit">✏️ 편집 / 새 항목</button></div>';
     h += '<details class="chFold" id="polEditor"><summary>편집창 (JSON · 이 기기에 저장)</summary><div class="briefDim" style="margin:6px 0">아래 형식 그대로 복사해 숫자만 바꾸면 돼요. id가 같으면 덮어쓰고, 새 id면 추가돼요. 표의 값에 [[ ]]를 두르면 금색 강조.</div><textarea id="polJson" style="width:100%;min-height:220px;font:12px/1.5 ui-monospace,monospace;border:1px solid var(--line);border-radius:10px;padding:8px"></textarea><div class="row" style="gap:6px;margin-top:6px"><button class="primary" data-act="polsave">저장</button><button class="chip" data-act="poldel">이 항목 삭제(내 기기 저장분만)</button><span id="polMsg" class="briefDim"></span></div></details>';
   } else if (pubState.tab === "reels") {
     h += typeof reelTabHtml === "function" ? reelTabHtml() : "";
@@ -336,12 +337,12 @@ function pubRender() {
       '<div class="briefDim" style="margin-top:8px">훅 문장과 질문은 날마다 자동으로 바뀌어요. 종목 이름을 직접 언급할 땐 "추천"처럼 읽히지 않게 사실(숫자)만 쓰세요. 해시태그는 5~10개가 적당해요.</div>';
   } else if (pubState.tab === "cal") {
     var up = pubUpcoming(14);
-    h += '<div class="row" style="gap:6px;margin-bottom:8px"><button class="primary" data-make="cal">🃏 이번 주 일정 카드</button><span class="briefDim">앞으로 2주 · 한국 시간</span></div>' +
+    h += '<div class="row" style="gap:6px;margin-bottom:8px"><button class="primary" data-make="cal">🃏 이번 주 일정 카드</button>' + (typeof aiBtn === "function" ? aiBtn("cal", "✨ AI 대표 카드") : "") + '<span class="briefDim">앞으로 2주 · 한국 시간</span></div>' +
       '<div class="pubCal">' + (up.length ? up.map(function (e) { return '<div class="pubCalRow ' + e.k + '"><b>' + e.d.slice(5).replace("-", "/") + '(' + pubDow(e.d) + ')</b><div><span>' + escapeHtml(e.t) + (e.sure === false ? ' <small class="briefDim">(예정)</small>' : '') + '</span>' + (e.n ? '<small>' + escapeHtml(e.n) + '</small>' : '') + '</div></div>'; }).join("") : '<div class="briefDim">2주 내 등록된 일정이 없어요.</div>') + '</div>' +
       '<div class="briefDim" style="margin-top:8px">일정은 publish.js 맨 위 PUB_CAL 목록에서 고쳐요. 출처: 연준(FOMC) · BLS(CPI·고용) · BEA(GDP·PCE) · 한국은행(금통위). 실적 발표일은 회사 공시로 확정되니 "(예정)" 표시는 발표 전 확인하세요.</div>';
   } else {
     var term = pubTerm(pubState.termOffset);
-    h += '<div class="row" style="gap:6px;margin-bottom:8px"><button class="chip" data-term="-1">‹</button><b>' + escapeHtml(term[0]) + '</b><button class="chip" data-term="1">›</button><button class="primary" data-make="term">🃏 카드</button><button class="chip" data-copy="term">📋 캡션 복사</button></div>' +
+    h += '<div class="row" style="gap:6px;margin-bottom:8px"><button class="chip" data-term="-1">‹</button><b>' + escapeHtml(term[0]) + '</b><button class="chip" data-term="1">›</button><button class="primary" data-make="term">🃏 카드</button>' + (typeof aiBtn === "function" ? aiBtn("term") : "") + '<button class="chip" data-copy="term">📋 캡션 복사</button></div>' +
       '<div class="chPlanItem"><div style="font-size:14px;line-height:1.7"><b>' + escapeHtml(term[1]) + '</b><br>' + escapeHtml(term[2]) + '<br><span class="briefDim">💡 ' + escapeHtml(term[3]) + '</span></div></div>' +
       '<div class="briefDim" style="margin-top:8px">용어 ' + PUB_TERMS.length + '개가 날짜 순으로 돌아가요(오늘 자동 선택). 댓글로 들어온 용어는 publish.js의 PUB_TERMS에 한 줄 추가하면 돼요.</div>';
   }
