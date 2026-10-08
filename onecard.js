@@ -150,6 +150,22 @@ function ocApplyAi(sp, out) {
 
 /* ---------- 그리기 ---------- */
 var OC_DRAWN = null;
+/* v9.5.3 저장할 이미지 고르기: 전체(글 포함) · 배경만 · 글만(투명 PNG — 영상 위에 얹기용) */
+var OC_LAYER = "all", OC_LAYER_NM = { all: "전체(글 포함)", bg: "배경만", text: "글만(투명 PNG)" };
+function ocLayerUrl(draw, ly, stamp) { var keep = OC_LAYER; OC_LAYER = ly; try { var cv = draw(); if (stamp && ly !== "bg") stamp(cv); return cv.toDataURL("image/png"); } finally { OC_LAYER = keep; } }
+function ocLayerBind(box, draw, fileBase, stamp) {
+  var st = { ly: "all", url: box.querySelector(".ocVR img").src }, img = box.querySelector(".ocVR img");
+  var bar = document.createElement("div"); bar.className = "pills ocLay"; bar.style.cssText = "margin-top:8px;justify-content:center";
+  bar.innerHTML = Object.keys(OC_LAYER_NM).map(function (k) { return '<button data-ly="' + k + '"' + (k === "all" ? ' class="active"' : '') + '>' + OC_LAYER_NM[k] + '</button>'; }).join("");
+  img.parentNode.insertBefore(bar, img.nextSibling);
+  var tip = document.createElement("div"); tip.className = "briefDim"; tip.style.cssText = "text-align:center;font-size:11.5px;margin-top:4px"; tip.textContent = "배경만: 영상·자막을 직접 얹을 때 · 글만: 투명 배경이라 영상 위에 겹쳐 쓰기";
+  bar.parentNode.insertBefore(tip, bar.nextSibling);
+  Array.prototype.forEach.call(bar.querySelectorAll("[data-ly]"), function (b) { b.onclick = function () {
+    st.ly = b.getAttribute("data-ly"); st.url = ocLayerUrl(draw, st.ly, stamp); img.src = st.url; img.classList.toggle("ocChecker", st.ly === "text");
+    Array.prototype.forEach.call(bar.children, function (x) { x.classList.toggle("active", x === b); });
+  }; });
+  return function () { cardsDownload({ url: st.url, file: fileBase + (st.ly === "bg" ? "_배경" : st.ly === "text" ? "_글" : "") + ".png" }); };
+}
 function ocWithLog(fn) {   // 카드에 실제로 그려진 글자를 모두 기록 → 숫자 대조
   var orig = window.cText; OC_DRAWN = [];
   window.cText = function (g, s) { OC_DRAWN.push(String(s)); return orig.apply(this, arguments); };
@@ -166,7 +182,8 @@ function ocBadge(g, mk, y) {
 }
 function ocItemCard(sp) {
   var c = rNew(), g = c.g, P = REEL.P, W = REEL.W - P * 2, mk = sp.mk;
-  if (mk) { g.fillStyle = mk.c; g.fillRect(0, 0, REEL.W, 14); g.fillRect(0, 0, 14, REEL.H); }
+  if (mk && OC_LAYER !== "text") { g.fillStyle = mk.c; g.fillRect(0, 0, REEL.W, 14); g.fillRect(0, 0, 14, REEL.H); }
+  if (OC_LAYER === "bg") return c.cv;   // 배경만
   rBrand(g, REEL.TOP + 30); ocBadge(g, mk, REEL.TOP);
   var y = REEL.TOP + 130;
   cText(g, sp.kicker, P, y, 36, 800, REEL_C.gold2); y += 40;
@@ -218,10 +235,13 @@ function ocItemCard(sp) {
 /* 내 글 카드 */
 function ocCustomCard(cs) {
   var c = rNew(), g = c.g, P = REEL.P, W = REEL.W - P * 2;
+  if (OC_LAYER === "bg") return c.cv;   // 배경만
   rBrand(g, REEL.TOP + 30);
   var y = REEL.TOP + 100;
   if (cs.kicker) { var kw = cW(g, cs.kicker, 32, 800) + 44; cRound(g, P, y, kw, 56, 28, "rgba(201,162,79,0.2)"); cText(g, cs.kicker, P + 22, y + 39, 32, 800, REEL_C.gold2); y += 90; }
-  var lines = String(cs.hook || "").split("\n").filter(Boolean).slice(0, 3), size = rFitSize(g, lines, W, 84);
+  var lines = String(cs.hook || "").split("\n").filter(Boolean).slice(0, 3);
+  if (lines.length === 1 && cW(g, cPlain(lines[0]), 64, 900) > W) { var l0 = lines[0], k0 = l0.search(/ · | — /); if (k0 > 0) lines = [l0.slice(0, k0), l0.slice(k0 + 3)]; else { var ws = l0.split(" "), hf = Math.ceil(ws.length / 2); lines = [ws.slice(0, hf).join(" "), ws.slice(hf).join(" ")]; } }
+  var size = rFitSize(g, lines, W, 84);
   lines.forEach(function (l, i) { rRich(g, l, P, y + size + i * size * 1.24, size, REEL_C.txt, REEL_C.gold2); });
   y += size + (lines.length - 1) * size * 1.24 + 44;
   g.fillStyle = REEL_C.gold; g.fillRect(P, y, 110, 7); y += 40;
@@ -265,7 +285,7 @@ function ocCheckNums(drawn, allowedText) {
 function ocParse(text, hint) {
   var L = String(text).split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
   if (!L.length) return null;
-  var title = L[0].replace(/^#+\s*/, ""), body = L.slice(1), tbl = body.filter(function (l) { return /\||\t/.test(l); });
+  var title = L[0].replace(/^#+\s*/, "").replace(/^\[데이터\]\s*/, ""), body = L.slice(1), tbl = body.filter(function (l) { return /\||\t/.test(l); });
   var cs = { kicker: hint || "", hook: title, layout: "list", points: [], table: { head: [], rows: [] }, takeaway: "", source: "" };
   if (tbl.length >= 2) {
     var rows = tbl.map(function (l) { return l.split(/\s*\|\s*|\t/).filter(function (x) { return x !== ""; }); }).filter(function (r) { return !r.every(function (x) { return /^[-:]+$/.test(x); }); });
@@ -332,16 +352,16 @@ function ocShowItem(sp) {
       OC_N = nx.n; infoModal.close && infoModal.close(); ocShowItem(nx);
     };
     box.querySelector('[data-act="cap"]').onclick = function () { chCopy(box.querySelector(".ocCap").value, this); };
-    box.querySelector('[data-act="save"]').onclick = function () { cardsDownload({ url: url, file: "uphill.lab_대표_" + (sp.mk ? sp.mk.name + "_" : "") + sp.k + "_" + day + ".png" }); };
+    box.querySelector('[data-act="save"]').onclick = ocLayerBind(box, function () { return ocItemCard(sp); }, "uphill.lab_대표_" + (sp.mk ? sp.mk.name + "_" : "") + (sp.ctx || sp.k).replace(/[^\w가-힣]/g, "_") + "_" + day, sp.draft && typeof perStamp === "function" ? function (cv) { perStamp(cv, "검토용 · 발행 금지"); } : null);
     infoModal.open("대표 카드 · " + sp.title + (sp.mk ? " · " + sp.mk.name : ""), box);
   });
 }
 function ocOpenCustom(useAi) {
-  var text = ($("ocText") || {}).value || "", hint = ($("ocHint") || {}).value || "", lay = ($("ocLayout") || {}).value || "auto";
+  var text = ($("ocText") || {}).value || "", hint = ($("ocHint") || {}).value || "", lay = ($("ocLayout") || {}).value || "auto", ask = ($("ocAsk") || {}).value || "";
   if (!text.trim()) { alert("카드로 만들 글을 넣어 주세요."); return; }
   var btn = $(useAi ? "ocGoAi" : "ocGo"), old = btn.textContent; btn.textContent = "만드는 중…";
   var base = ocParse(text, hint);
-  var p = useAi ? ocAi({ mode: "custom", text: text, hint: hint }).then(function (j) {
+  var p = useAi ? ocAi({ mode: "custom", text: text, hint: hint, ask: ask }).then(function (j) {
     if (j && j.ok && j.out) { var o = j.out; return { cs: { kicker: ocClean(o.kicker || hint), hook: String(o.hook || base.hook).replace(/\\n/g, "\n"), layout: o.layout, points: o.points || [], table: o.table || { head: [], rows: [] }, takeaway: o.takeaway || "", source: o.source || "" }, log: [{ ok: true, t: "AI 정리 (" + (j.model || "") + (j.tries && j.tries.length > 1 ? " · " + j.tries.join(" → ") : "") + ")" }] }; }
     return { cs: base, log: [{ ok: false, t: "AI 실패: " + (OC_REASON[j && j.reason] || (j && j.reason)) + " → 규칙 정리" }] };
   }).catch(function (e) { return { cs: base, log: [{ ok: false, t: "AI 호출 실패: " + e.message + " → 규칙 정리" }] }; }) : Promise.resolve({ cs: base, log: [{ ok: true, t: "규칙 정리(줄 단위)" }] });
@@ -360,7 +380,7 @@ function ocShowCustom(cs, text, log) {
     box.querySelector("img").src = url; box.querySelector(".ocJson").value = JSON.stringify(cs, null, 1);
     box.querySelector('[data-act="re"]').onclick = function () { var o; try { o = JSON.parse(box.querySelector(".ocJson").value); } catch (e) { alert("JSON 형식 오류: " + e.message); return; } infoModal.close && infoModal.close(); ocShowCustom(o, text, [{ ok: true, t: "직접 수정함" }]); };
     var ok = box.querySelector('[data-act="ok"]'); if (ok) ok.onclick = function () { box.querySelector('[data-act="save"]').disabled = false; ok.textContent = "확인함"; };
-    box.querySelector('[data-act="save"]').onclick = function () { cardsDownload({ url: url, file: "uphill.lab_한장카드_" + day + ".png" }); };
+    box.querySelector('[data-act="save"]').onclick = ocLayerBind(box, function () { return ocCustomCard(cs); }, "uphill.lab_한장카드_" + day);
     infoModal.open("한 장 카드 · 검증", box);
   });
 }
@@ -515,12 +535,19 @@ function ocRender() {
     row("이번 주 일정", "앞으로 7일 공개 일정", "cal", "cal") + row("용어 한 입 · " + ocClean(pubTerm(pubState.termOffset)[0]), "오늘의 단어", "term", "term") + '</div>';
   // ③ 섹션별(세부)
   h += '<details class="chFold"><summary>③ 섹션 하나만 한 장으로 (세부)</summary><div class="perCal" style="margin-top:8px">' + OC_ITEMS.map(function (x) { return '<div class="perRow"><div class="perBody"><b>' + escapeHtml(x.t) + '</b><small>' + escapeHtml(x.d) + '</small></div><div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-oc="' + x.k + '" data-ai="0">규칙</button><button class="primary" data-oc="' + x.k + '" data-ai="1">AI</button></div></div>'; }).join("") + '</div></details>';
-  // ④ 내 글
-  h += '<h3 class="chSub">④ 내 글로 한 장 카드 <small>인스타 글 · 정책 내용 · 유튜브/책 메모</small></h3>' +
-    '<div class="ocForm"><input id="ocHint" placeholder="주제 꼬리표 (예: 디딤돌대출, 책 메모) — 비워도 돼요">' +
-    '<textarea id="ocText" placeholder="첫 줄 = 제목&#10;- 항목: 설명&#10;- 항목: 설명&#10;표는 | 로 칸을 나눠요 (예: 소득 | 금리)&#10;핵심: 마지막 한 줄 요약&#10;출처: 기관·책 이름"></textarea>' +
+  // ④ 내 글 · 데이터로 만들기
+  var stocks = []; try { var rs = briefState.recent && briefState.recent.symbols; if (rs) stocks = Object.keys(rs).map(function (k) { return { sym: k, name: briefName({ sym: k }) }; }); } catch (e) {}
+  h += '<h3 class="chSub" id="ocMine">④ 내 글 · 데이터로 한 장 카드 <small>인스타 글 · 정책 · 유튜브/책 메모 · 앱 데이터</small></h3>' +
+    '<div class="ocForm">' +
+    '<div class="ocData"><b>데이터 넣기</b> <span class="briefDim">앱의 실제 숫자를 아래 글 상자에 붙여 넣어요 — 카드 숫자는 이 값과 대조돼요</span>' +
+    '<div class="row" style="gap:6px;margin-top:6px"><input id="ocSym" list="ocSymList" placeholder="종목·코인 이름 (예: 삼성전자, 비트코인, S&P500)" style="flex:1;min-width:180px"><datalist id="ocSymList">' + stocks.map(function (x) { return '<option value="' + escapeHtml(x.name) + '">'; }).join("") + '</datalist><button class="chip" data-ins="sym">종목 숫자 넣기</button></div>' +
+    '<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="chip" data-ins="brief">지금 브리핑 숫자 (' + escapeHtml(R && BRIEF_MKT[briefState.market] || "") + ')</button><button class="chip" data-ins="cal">이번 주 일정</button><button class="chip" data-ins="mdd">고점 대비 위치</button>' +
+    (typeof pubPolicyAll === "function" ? pubPolicyAll().map(function (p) { return '<button class="chip" data-ins="pol:' + p.id + '">정책 표: ' + escapeHtml(p.short || p.t) + '</button>'; }).join("") : "") + '</div></div>' +
+    '<input id="ocAsk" placeholder="AI에게 요청 (예: 삼성전자와 코스피 1년을 비교해서 초보가 궁금해할 카드로 만들어줘)">' +
+    '<input id="ocHint" placeholder="주제 꼬리표 (예: 디딤돌대출, 책 메모) — 비워도 돼요">' +
+    '<textarea id="ocText" placeholder="첫 줄 = 제목&#10;- 항목: 설명&#10;- 항목: 설명&#10;표는 | 로 칸을 나눠요 (예: 소득 | 금리)&#10;핵심: 마지막 한 줄 요약&#10;출처: 기관·책 이름&#10;&#10;위 [데이터 넣기]로 앱 숫자를 붙여 넣고 요청만 적어도 돼요"></textarea>' +
     '<div class="row" style="gap:6px"><select id="ocLayout"><option value="auto">모양 자동</option><option value="list">리스트</option><option value="table">표</option><option value="steps">순서(STEP)</option></select><button class="chip" id="ocGo">규칙으로 만들기</button><button class="primary" id="ocGoAi">AI로 정리해서 만들기</button></div>' +
-    '<div class="briefDim" style="margin-top:6px">AI가 쓴 숫자는 입력한 글의 숫자와 하나하나 대조해요. 안 맞는 숫자가 있으면 저장 버튼이 잠겨요.</div></div>';
+    '<div class="briefDim" style="margin-top:6px">AI가 쓴 숫자는 글 상자의 숫자(붙여 넣은 데이터 포함)와 하나하나 대조해요. 안 맞는 숫자가 있으면 저장 버튼이 잠겨요.</div></div>';
   box.innerHTML = h;
   Array.prototype.forEach.call(box.querySelectorAll("[data-g]"), function (b) { b.onclick = function () {
     var ctx = b.getAttribute("data-g"), ai = b.getAttribute("data-ai") === "1", r = b.getAttribute("data-run").split("|");
@@ -542,8 +569,56 @@ function ocRender() {
     var k = b.getAttribute("data-oc"), ai = b.getAttribute("data-ai") === "1";
     var go = function () { ocOpenItem(k, ai); };
     if (k === "news" && !(CARD_NEWS.items && CARD_NEWS.items.length) && typeof cardsNewsFetch === "function") { b.textContent = "기사 받는 중…"; cardsNewsFetch(briefState.result).then(function () { b.textContent = ai ? "AI" : "규칙"; go(); }, go); } else go(); }; });
+  Array.prototype.forEach.call(box.querySelectorAll("[data-ins]"), function (b) { b.onclick = function () { ocInsert(b.getAttribute("data-ins")); }; });
+  var nav = document.createElement("div"); nav.className = "row"; nav.style.cssText = "gap:6px;margin-bottom:10px;flex-wrap:wrap";
+  nav.innerHTML = '<button class="chip" data-jump="top">① 카드 묶음 대표 카드</button><button class="primary" data-jump="ocMine">✍️ 내 글 · 데이터로 만들기 ↓</button>';
+  box.insertBefore(nav, box.firstChild);
+  nav.querySelector('[data-jump="ocMine"]').onclick = function () { var el = $("ocMine"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  nav.querySelector('[data-jump="top"]').onclick = function () { box.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  if (OC_JUMP) { OC_JUMP = false; setTimeout(function () { var el = $("ocMine"); if (el) el.scrollIntoView({ block: "start" }); }, 100); }
   $("ocGo").onclick = function () { ocOpenCustom(false); };
   $("ocGoAi").onclick = function () { ocOpenCustom(true); };
   ocAiStatus().then(function (s) { var el = $("ocAiLine"); if (!el) return; el.innerHTML = s.ai ? "AI 연결됨 · " + escapeHtml(s.model) + (s.fallback ? " (안 되면 " + escapeHtml(s.fallback) + ")" : "") + " · 오늘 " + s.used + " / " + s.max + "회 사용" : "AI 미연결 — Vercel 환경변수 <b>OPENAI_API_KEY</b>를 넣으면 'AI' 버튼이 동작해요. 지금은 '규칙' 버튼만 쓰세요(무료)."; });
   if (!R) setTimeout(function () { if (currentTab === "onecard" && briefState.result) ocRender(); }, 4000);
+}
+
+/* ---------- ④ 데이터 넣기: 앱의 실제 숫자를 글 상자에 붙인다 ---------- */
+var OC_JUMP = false;
+function ocMine() { OC_JUMP = true; switchTab("onecard"); }
+function ocInsert(k) {
+  var ta = $("ocText"); if (!ta) return; var L = [], R = briefState.result;
+  if (k === "sym") {
+    var q = ($("ocSym").value || "").trim(), rs = briefState.recent && briefState.recent.symbols; if (!q || !rs) { alert("종목 이름을 입력해 주세요 (목록에서 고르면 정확해요)."); return; }
+    var sym = Object.keys(rs).filter(function (s2) { return briefName({ sym: s2 }) === q || s2.toLowerCase() === q.toLowerCase(); })[0] || Object.keys(rs).filter(function (s2) { return briefName({ sym: s2 }).indexOf(q) >= 0; })[0];
+    if (!sym) { alert("'" + q + "' 종목을 찾지 못했어요."); return; }
+    var st = briefStats(sym, rs[sym], "day"); if (!st) { alert("이 종목의 데이터가 부족해요."); return; }
+    var lt = rs[sym].t[rs[sym].t.length - 1] * 1000, coin = /-USD$/.test(sym);
+    L.push("[데이터] " + briefName({ sym: sym }) + " (" + sym + ") · " + (coin ? cDate(Math.floor(lt / 86400e3) * 86400e3 + 86400e3) + " 9시 마감" : cDate(lt) + " 종가") + " 기준");
+    L.push("- 종가: " + cPrice(sym, st.last));
+    if (st.ret1 != null) L.push("- 하루: " + ocPct(st.ret1));
+    if (st.m1 != null) L.push("- 1개월: " + ocPct(st.m1));
+    if (st.m3 != null) L.push("- 3개월: " + ocPct(st.m3));
+    if (st.y1 != null) L.push("- 1년: " + ocPct(st.y1));
+    if (st.vsHi != null) L.push("- 52주 고점 대비: " + ocPct(st.vsHi));
+    if (st.vsMa20 != null) L.push("- 20일 평균 대비: " + ocPct(st.vsMa20));
+  } else if (k === "brief") {
+    var sp = ocDeckSpec("brief", []); if (!sp) { alert("브리핑 데이터가 아직 없어요."); return; }
+    L.push("[데이터] " + (sp.mk ? sp.mk.name + " · " + sp.mk.date : "전체 시장") + " " + (R.mode === "week" ? "이번 주" : "그날") + " 브리핑");
+    sp.facts.forEach(function (x) { L.push("- " + x.label + ": " + x.value); });
+  } else if (k === "cal") {
+    var up = pubUpcoming(7).filter(function (e) { return e.k !== "hol"; }); if (!up.length) { alert("7일 안에 등록된 일정이 없어요."); return; }
+    L.push("[데이터] 이번 주 경제 일정 (한국 시간)");
+    up.forEach(function (e) { L.push("- " + e.d.slice(5).replace("-", "/") + "(" + pubDow(e.d) + "): " + ocClean(e.t) + (e.sure === false ? " (예정)" : "")); });
+  } else if (k === "mdd") {
+    var rows = (chState.mdd || []).filter(function (x) { return x && !x.err; }); if (!rows.length) { alert("채널 화면의 MDD 계산이 아직 끝나지 않았어요."); return; }
+    L.push("[데이터] 고점 대비 지금 위치 · " + cDate(Date.now()));
+    rows.forEach(function (x) { L.push("- " + x.name + ": 고점 대비 " + cPct(x.cur, 1) + (x.eps ? " (과거 -10% 하락 " + x.eps + "번 중 " + x.deeper + "번이 더 깊었음)" : "")); });
+  } else if (k.indexOf("pol:") === 0) {
+    var pl = pubPolicyAll().filter(function (p) { return p.id === k.slice(4); })[0]; if (!pl) return;
+    L.push("[데이터] " + (pl.short || pl.t) + " · " + (pl.eff || "") + " · 출처: " + (pl.src || ""));
+    L.push(pl.table.head.map(cPlain).join(" | ")); pl.table.rows.forEach(function (r) { L.push(r.map(cPlain).join(" | ")); });
+    if (pl.bullets) pl.bullets.items.forEach(function (b2) { L.push("- " + cPlain(Array.isArray(b2) ? b2.join(": ") : b2)); });
+  }
+  ta.value = (ta.value.trim() ? ta.value.trim() + "\n\n" : "") + L.join("\n");
+  ta.scrollTop = ta.scrollHeight;
 }

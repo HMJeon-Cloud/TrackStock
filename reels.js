@@ -182,6 +182,7 @@ function reelToday() { var seed = Math.floor((Date.now() + 9 * 3600e3) / 86400e3
 /* ---------- 이미지 (1080×1920) ---------- */
 function rNew() {
   var cv = document.createElement("canvas"); cv.width = REEL.W; cv.height = REEL.H; var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
+  if (typeof OC_LAYER !== "undefined" && OC_LAYER === "text") return { cv: cv, g: g };   // 글만(투명 배경) 레이어
   var bg = g.createLinearGradient(0, 0, 0, REEL.H); bg.addColorStop(0, REEL_C.bg2); bg.addColorStop(0.55, REEL_C.bg); bg.addColorStop(1, "#000"); g.fillStyle = bg; g.fillRect(0, 0, REEL.W, REEL.H);
   var gl = g.createRadialGradient(REEL.W * 0.85, REEL.H * 0.18, 20, REEL.W * 0.85, REEL.H * 0.18, 760); gl.addColorStop(0, "rgba(201,162,79,0.30)"); gl.addColorStop(1, "rgba(201,162,79,0)"); g.fillStyle = gl; g.fillRect(0, 0, REEL.W, REEL.H);
   // 우상향 곡선 (브랜드 시그니처)

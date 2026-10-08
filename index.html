@@ -563,6 +563,8 @@
   .ocV { display: grid; grid-template-columns: 1fr; gap: 14px; } @media (min-width: 900px) { .ocV { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
   .modalBox:has(.ocV) { max-width: min(1180px, 96vw) !important; width: 96vw; }
   .ocVR { position: sticky; top: 0; align-self: start; }
+  .ocVR img.ocChecker { background: repeating-conic-gradient(#d9d9d9 0% 25%, #f5f5f5 0% 50%) 50% / 24px 24px; }
+  .ocData { border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; } .ocData input { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font: inherit; background: var(--card, #fff); color: inherit; }
   .ocVR img { width: 100%; max-width: 420px; display: block; margin: 0 auto; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
   .ocChk div { font-size: 13px; padding: 7px 10px; border-radius: 10px; margin-bottom: 6px; line-height: 1.45; }
   .ocChk .ok { background: rgba(22,163,74,.10); color: #15803d; } .ocChk .bad { background: rgba(220,38,38,.10); color: #b91c1c; font-weight: 700; }
@@ -1672,7 +1674,7 @@
 <div class="card" id="briefCard">
   <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
     <h2 style="margin:0">오늘의 브리핑 <small id="briefAsOf">전 종목 시세와 뉴스 제목을 숫자 기준으로 정리해요</small></h2>
-    <div class="row" style="gap:6px;flex:0 0 auto"><button class="chip" id="briefCards">🃏 카드</button><button class="chip" onclick="switchTab('onecard')">📌 대표 카드</button><button class="chip" id="briefToChannel">📢 채널용 글 ›</button></div>
+    <div class="row" style="gap:6px;flex:0 0 auto"><button class="chip" id="briefCards">🃏 카드</button><button class="chip" onclick="switchTab('onecard')">📌 대표 카드</button><button class="chip" onclick="ocMine()">✍️ 내 글 카드</button><button class="chip" id="briefToChannel">📢 채널용 글 ›</button></div>
   </div>
   <div class="pills" id="briefModeTabs" style="margin-top:12px">
     <button data-bm="day" class="active">금일</button>
@@ -1774,7 +1776,7 @@
 
 <div id="tab-channel" class="hidden">
 <div class="card" id="channelCard">
-  <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><h2 style="margin:0">채널 발행 자료 <small>매일 아침 자동 집계된 데이터를 붙여 넣을 수 있는 글로 · 운영자용</small></h2><span class="row" style="gap:6px;flex:0 0 auto"><button class="chip" onclick="switchTab('onecard')">📌 대표 카드</button><button class="chip" id="ownerLock" title="이 기기에서 운영자 모드 끄기">🔒 운영자 모드 끄기</button></span></div>
+  <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><h2 style="margin:0">채널 발행 자료 <small>매일 아침 자동 집계된 데이터를 붙여 넣을 수 있는 글로 · 운영자용</small></h2><span class="row" style="gap:6px;flex:0 0 auto"><button class="chip" onclick="switchTab('onecard')">📌 대표 카드</button><button class="chip" onclick="ocMine()">✍️ 내 글 카드</button><button class="chip" id="ownerLock" title="이 기기에서 운영자 모드 끄기">🔒 운영자 모드 끄기</button></span></div>
   <details class="howto"><summary>이 화면 쓰는 법</summary><div class="body">
     <ul>
       <li><b>①</b>은 서버가 종가·뉴스 제목으로 자동으로 쓴 글이에요. 매일 아침 수집 뒤 새로 만들어져요.</li>
@@ -4404,9 +4406,9 @@ window.addEventListener("load", function () {
 <script src="periodic.js?v=9.5.2"></script>
 <script src="story.js?v=9.5.2"></script>
 <script src="threads.js?v=9.5"></script>
-<script src="reels.js?v=9.5"></script>
+<script src="reels.js?v=9.5.3"></script>
 <script src="slides.js?v=9.5"></script>
-<script src="onecard.js?v=9.5.2"></script>
+<script src="onecard.js?v=9.5.3"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>
