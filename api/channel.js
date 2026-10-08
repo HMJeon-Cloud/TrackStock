@@ -42,8 +42,9 @@ export default async function handler(req, res) {
    내 글 카드는 입력한 글에 있는 숫자만 쓰도록 지시하고, 화면이 다시 한 번 숫자를 대조한다.
    비용 보호: 하루 호출 수 상한(AI_DAILY_MAX, 기본 30) · 입력 길이 제한 · 출력 토큰 제한 */
 const AI_SCHEMA_ITEM = {
-  type: "object", additionalProperties: false, required: ["hook", "kicker", "hero", "rows", "teaser"],
+  type: "object", additionalProperties: false, required: ["style", "hook", "kicker", "hero", "rows", "teaser"],
   properties: {
+    style: { type: "string", enum: ["hero", "big", "list"], description: "hero=큰 숫자 하나+줄 3~4개(기본), big=큰 숫자 하나를 아주 크게+줄 1~2개, list=큰 숫자 없이 줄 목록 5~6개" },
     hook: { type: "string", description: "2줄 이하 훅. 숫자를 직접 쓰지 말고 {f1}처럼 자리표시만. 줄바꿈은 \\n" },
     kicker: { type: "string", description: "12자 이하 작은 머리말. 숫자 금지" },
     hero: { type: "string", description: "가장 크게 보여줄 사실의 id (예: f1)" },
@@ -76,28 +77,32 @@ async function aiHandler(req, res) {
   let b = req.body; if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = {}; } } b = b || {};
   if (rc) { try { const n = await redisCmd(rc, ["INCR", day]); if (n === 1) await redisCmd(rc, ["EXPIRE", day, "172800"]); if (n > max) return res.status(200).json({ ok: false, reason: "DAILY_LIMIT", max }); } catch (e) {} }
   let schema, user;
+  // 참고 이미지(선택): data:image/... 최대 3장, 장당 1.5MB 이하 (화면에서 1024px JPEG로 줄여서 보냄)
+  const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => typeof u === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(u) && u.length < 1600000).slice(0, 3);
   if (b.mode === "custom") {
     const text = String(b.text || "").slice(0, 6000);
     if (!text.trim()) return res.status(400).json({ ok: false, reason: "EMPTY" });
     schema = AI_SCHEMA_CUSTOM;
     user = "아래 글을 릴스용 한 장 카드로 정리해 줘. 숫자·날짜·금액·비율은 반드시 아래 글에 있는 표기 그대로만 쓰고, 계산하거나 새로 만들지 마. 글에 없는 내용은 넣지 마. " +
-      "비교·조건·구간이 많으면 layout=table, 순서가 있으면 steps, 아니면 list. 쓰지 않는 쪽(points 또는 table)은 빈 배열로.\n" + (b.hint ? "주제 꼬리표: " + String(b.hint).slice(0, 100) + "\n" : "") + (b.ask ? "운영자 요청(어떤 카드로 만들지): " + String(b.ask).slice(0, 500) + "\n" : "") + "---\n" + text;
+      "비교·조건·구간이 많으면 layout=table, 순서가 있으면 steps, 아니면 list. 쓰지 않는 쪽(points 또는 table)은 빈 배열로.\n" + (b.hint ? "주제 꼬리표: " + String(b.hint).slice(0, 100) + "\n" : "") + (b.ask || b.opinion ? "운영자 의견(어떤 카드로 만들지, 최우선 반영): " + String(b.ask || b.opinion).slice(0, 500) + "\n" : "") + (imgs.length ? "첨부한 참고 이미지의 구성·강조 방식·말투를 참고해. 이미지 속 숫자나 내용은 쓰지 마.\n" : "") + "---\n" + text;
   } else {
     const facts = (Array.isArray(b.facts) ? b.facts : []).slice(0, 40).map((f) => ({ id: String(f.id).slice(0, 6), label: String(f.label).slice(0, 60), value: String(f.value).slice(0, 40) }));
     if (!facts.length) return res.status(400).json({ ok: false, reason: "NO_FACTS" });
     schema = AI_SCHEMA_ITEM;
     user = "주제: " + String(b.title || "").slice(0, 60) + " / 상세 게시물 장수: {n}장\n사실 목록(이 값만 사용, 숫자는 직접 쓰지 말고 {id}로 부를 것):\n" +
       facts.map((f) => f.id + " | " + f.label + " | " + f.value).join("\n") +
-      "\n\n가장 궁금증을 만드는 사실 하나를 hero로, 흐름이 이어지게 rows 3~4개를 골라. hook은 초보가 이미 하는 질문이나 반전으로 시작. label은 그 값이 무엇인지 바로 알게.";
+      "\n\n가장 궁금증을 만드는 사실 하나를 hero로, 흐름이 이어지게 rows 3~4개를 골라(list면 5개). hook은 초보가 이미 하는 질문이나 반전으로 시작. label은 그 값이 무엇인지 바로 알게." +
+      (b.opinion ? "\n\n운영자 의견(최우선으로 반영, 단 숫자 규칙은 지킬 것): " + String(b.opinion).slice(0, 500) : "") +
+      (imgs.length ? "\n\n첨부한 참고 이미지의 구성·강조 방식·말투를 참고해서 style과 문구를 골라. 이미지 속 숫자나 내용은 쓰지 마." : "");
   }
   const name = b.mode === "custom" ? "custom_card" : "item_card", tries = [];
   // ① 기본 모델(gpt-6.1-sol): Responses API · 추론 low · JSON 스키마 강제 (temperature는 이 모델에서 받지 않음)
-  let r1 = await aiResponses(key, model, AI_RULES, user, name, schema, 35000);
+  let r1 = await aiResponses(key, model, AI_RULES, user, name, schema, 40000, imgs);
   tries.push(model + ": " + (r1.ok ? "성공" : r1.reason));
   if (r1.ok) return res.status(200).json({ ok: true, out: r1.out, model, usage: r1.usage, tries });
   // ② 계정에서 못 쓰거나 실패하면 gpt-4.1(Chat Completions)로 한 번 더
   if (fallback && fallback !== model && r1.reason !== "REFUSED") {
-    const r2 = await aiChat(key, fallback, AI_RULES, user, name, schema, 20000);
+    const r2 = await aiChat(key, fallback, AI_RULES, user, name, schema, 18000, imgs);
     tries.push(fallback + ": " + (r2.ok ? "성공" : r2.reason));
     if (r2.ok) return res.status(200).json({ ok: true, out: r2.out, model: fallback, usage: r2.usage, tries });
     return res.status(200).json({ ok: false, reason: r2.reason, detail: r2.detail, tries });
@@ -113,10 +118,10 @@ async function aiPost(url, key, body, ms) {
     return { status: r.status, j };
   } catch (e) { return { status: 0, j: {}, err: e.name === "AbortError" ? "TIMEOUT" : "FETCH_FAIL" }; } finally { clearTimeout(tm); }
 }
-async function aiResponses(key, model, sys, user, name, schema, ms) {
+async function aiResponses(key, model, sys, user, name, schema, ms, imgs) {
   const { status, j, err } = await aiPost("https://api.openai.com/v1/responses", key, {
     model, reasoning: { effort: "low" }, max_output_tokens: 6000,
-    input: [{ role: "system", content: sys }, { role: "user", content: user }],
+    input: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "input_text", text: user }].concat(imgs.map((u) => ({ type: "input_image", image_url: u }))) : user }],
     text: { format: { type: "json_schema", name, strict: true, schema } }
   }, ms);
   if (err) return { ok: false, reason: err };
@@ -127,9 +132,9 @@ async function aiResponses(key, model, sys, user, name, schema, ms) {
   if (!txt) return { ok: false, reason: j.status === "incomplete" ? "INCOMPLETE" : "EMPTY" };
   try { return { ok: true, out: JSON.parse(txt), usage: j.usage || null }; } catch (e) { return { ok: false, reason: "BAD_JSON" }; }
 }
-async function aiChat(key, model, sys, user, name, schema, ms) {
+async function aiChat(key, model, sys, user, name, schema, ms, imgs) {
   const { status, j, err } = await aiPost("https://api.openai.com/v1/chat/completions", key, {
-    model, temperature: 0.4, max_tokens: 1200, messages: [{ role: "system", content: sys }, { role: "user", content: user }],
+    model, temperature: 0.4, max_tokens: 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
     response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }
   }, ms);
   if (err) return { ok: false, reason: err };
