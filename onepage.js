@@ -67,6 +67,20 @@ function opScreens(R) {
 }
 
 /* ---------- 그리기 ---------- */
+/* 기사가 없을 때 8번 칸을 채우는 순위 — 비어 있지 않은 것부터 2개 (날짜로 순서를 바꿔 매일 같은 둘이 아니게) */
+function opRanks(R) {
+  var S = (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); });
+  function top(list, val, col) { return list.slice(0, 5).map(function (s) { return { name: briefName(s), val: val(s), col: col ? col(s) : OP_C.ink }; }); }
+  var all = [
+    { t: "1개월 수익률 TOP5", rows: top(S.filter(function (s) { return s.m1 != null; }).sort(function (a, b) { return b.m1 - a.m1; }), function (s) { return opPct(s.m1, 0); }, function (s) { return opCol(s.m1); }) },
+    { t: "고점 대비 할인 TOP5", rows: top(S.filter(function (s) { return s.vsHi != null && s.vsHi < 0; }).sort(function (a, b) { return a.vsHi - b.vsHi; }), function (s) { return opPct(s.vsHi, 0); }, function () { return OP_C.down; }) },
+    { t: "거래대금 평소 대비 TOP5", rows: top(S.filter(function (s) { return s.amtX > 1; }).sort(function (a, b) { return b.amtX - a.amtX; }), function (s) { return s.amtX.toFixed(1) + "배"; }) },
+    { t: "1주 수익률 TOP5", rows: top(S.filter(function (s) { return s.ret5 != null; }).sort(function (a, b) { return b.ret5 - a.ret5; }), function (s) { return opPct(s.ret5, 0); }, function (s) { return opCol(s.ret5); }) },
+    { t: "3개월 수익률 TOP5", rows: top(S.filter(function (s) { return s.m3 != null; }).sort(function (a, b) { return b.m3 - a.m3; }), function (s) { return opPct(s.m3, 0); }, function (s) { return opCol(s.m3); }) }
+  ].filter(function (x) { return x.rows.length >= 3; });
+  var k = all.length ? opSeed() % all.length : 0;
+  return all.slice(k).concat(all.slice(0, k));
+}
 function opBox(g, x, y, w, h, no, title, sub, col) {
   cRound(g, x, y, w, h, 14, OP_C.paper, OP_C.line);
   cRound(g, x, y, w, 46, 14, col || OP_C.navy); g.fillStyle = col || OP_C.navy; g.fillRect(x, y + 20, w, 26);
@@ -159,14 +173,22 @@ function onePageCard(R, iss, news) {
   g.fillStyle = OP_C.line; g.fillRect(L + 12, hy - 14, colW - 24, 1);
   cText(g, "💰 거래대금 평소 대비", L + 12, hy + 6, 14, 800, OP_C.sub);
   hv.forEach(function (s, k) { var rx = L + 12 + k * ((colW - 24) / 3); cText(g, cFit(g, briefName(s), (colW - 24) / 3 - 8, 16, 700), rx, hy + 30, 16, 700, OP_C.ink); cText(g, s.amtX.toFixed(1) + "배 · " + opPct(r1(s)), rx, hy + 48, 13, 600, opCol(r1(s))); });
-  var y8 = opBox(g, Rx, y, colW, h7, 8, "오늘의 기사", "네이버 뉴스 · 제목 원문", mkc);
   var lead = typeof cNewsLead === "function" ? cNewsLead(news || [], R) : null;
-  if (lead) {
+  var ranks = lead ? null : opRanks(R);   // v10.0: 기사가 없으면 순위를 더 보여준다
+  var y8 = opBox(g, Rx, y, colW, h7, 8, lead ? "오늘의 기사" : "순위 더 보기", lead ? "네이버 뉴스 · 제목 원문" : "기사 대신 · " + unit + " 순위 2가지", mkc);
+  if (!lead && ranks.length) {
+    var rw8 = (colW - 36) / 2;
+    ranks.slice(0, 2).forEach(function (rk, k) {
+      var rx = Rx + 12 + k * (rw8 + 12);
+      cText(g, cFit(g, rk.t, rw8, 14, 800), rx, y8 + 6, 14, 800, OP_C.sub);
+      rk.rows.forEach(function (r, j) { opRow(g, rx, y8 + 30 + j * 24, rw8, (j + 1) + " " + r.name, r.val, r.col, null, 15); });
+    });
+  } else if (lead) {
     var ly = cWrap(g, cNewsClean(lead.it.title), Rx + 12, y8 + 24, colW - 24, 19, 800, OP_C.ink, 25, 2);
     if (lead.it.desc) ly = cWrap(g, cNewsClean(lead.it.desc), Rx + 12, ly + 2, colW - 24, 14, 500, OP_C.ink2, 19, 2);
     var oth = (news || []).filter(function (x) { return x !== lead.it; }).slice(0, Math.max(0, Math.floor((y + h7 - 14 - ly - 12) / 20)));
     oth.forEach(function (o, k) { cText(g, cFit(g, "· " + cNewsClean(o.title), colW - 24, 14, 600), Rx + 12, ly + 18 + k * 20, 14, 600, OP_C.sub); });
-  } else cText(g, "기사를 아직 받지 못했어요", Rx + 12, y8 + 24, 16, 600, OP_C.sub);
+  } else cText(g, "기사와 순위 자료가 아직 없어요", Rx + 12, y8 + 24, 16, 600, OP_C.sub);
   y += h7 + gap;
   // ── 9 오늘의 한 줄 상식 (가로 전체)
   var tips = OP_TIPS.common.concat(OP_TIPS[R.market === "coin" ? "coin" : R.market === "us" ? "us" : "kr"] || []), tip = tips[opSeed() % tips.length];

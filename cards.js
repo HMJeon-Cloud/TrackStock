@@ -641,11 +641,66 @@ function cardsNewsFetch(R) {
   });
 }
 function cNewsClean(t) { return String(t).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim(); }
-function cardsNews(items, dateTxt) {
+/* v9.8 대표 기사 고르기: 기사 제목에 그날 데이터(급등락·업종·지수·거시)의 이름이 들어 있으면 점수 ↑, 시장 기사(main/world) 우대, 종목 기사·너무 짧은 제목은 ↓ */
+function cNewsLead(items, R) {
+  if (!items || items.length < 3) return null;
+  var names = [];
+  if (R) {
+    (R.movers ? R.movers.up.slice(0, 5).concat(R.movers.down.slice(0, 5)) : []).forEach(function (x) { names.push({ n: briefName(x), f: briefName(x) + " " + cPct(x.ret1 != null ? x.ret1 : x.ret), w: 3 }); });
+    (R.themes || []).forEach(function (t) { names.push({ n: t.name.split("·")[0], f: t.name + " " + cPct(t.ret), w: 2 }); });
+    (R.indexRow || []).forEach(function (i) { names.push({ n: i.name, f: i.name + " " + cPct(i.ret), w: 2 }); });
+    (R.hotVol || []).slice(0, 3).forEach(function (x) { names.push({ n: briefName(x), f: briefName(x) + " 거래대금 평소의 " + x.amtX.toFixed(1) + "배", w: 2 }); });
+    // 거시 키워드 → 그날 숫자 (기사에 '금리'가 나오면 미국 장기채 등락을 붙인다)
+    var rec = typeof briefState !== "undefined" && briefState.recent && briefState.recent.symbols;
+    function mac(sym, label) { var d = rec && rec[sym]; var st = d && typeof briefStats === "function" ? briefStats(sym, d, "day") : null; return st ? label + " " + (sym === "KRW=X" ? Math.round(st.last).toLocaleString() + "원 (" + cPct(st.ret1) + ")" : sym === "^VIX" ? st.last.toFixed(1) + " (" + cPct(st.ret1) + ")" : cPct(st.ret1)) : ""; }
+    [["금리", "TLT", "미국 장기채"], ["연준", "TLT", "미국 장기채"], ["FOMC", "TLT", "미국 장기채"], ["환율", "KRW=X", "원/달러"], ["달러", "KRW=X", "원/달러"], ["유가", "USO", "원유"], ["원유", "USO", "원유"], ["비트코인", "BTC-USD", "비트코인"], ["금값", "GLD", "금"], ["공포", "^VIX", "공포지수"], ["반도체", "", ""], ["관세", "", ""], ["실적", "", ""]].forEach(function (k) { names.push({ n: k[0], f: k[1] ? mac(k[1], k[2]) : "", w: 1.2 }); });
+  }
+  var best = null;
+  items.forEach(function (it, i) {
+    var t = cNewsClean(it.title), sc = (it.cat === "main" || it.cat === "world" ? 2 : it.cat === "stock" ? -1 : 1) - i * 0.15 + (it.desc ? 1 : 0) + (t.length >= 18 ? 0.5 : -1), facts = [];
+    names.forEach(function (nm) { var key = String(nm.n).replace(/\s*\(.*?\)\s*/g, "").replace(/\s+/g, "").slice(0, 6); if (key.length >= 2 && t.replace(/\s+/g, "").indexOf(key) >= 0) { sc += nm.w; if (nm.f && facts.indexOf(nm.f) < 0) facts.push(nm.f); } });
+    if (/\[속보\]|\[포토\]|\[영상\]|단독|\?$/.test(it.title)) sc -= 0.5;
+    if (!best || sc > best.sc) best = { it: it, sc: sc, facts: facts.slice(0, 3) };
+  });
+  return best;
+}
+/* 대표 기사 한 장: 큰 제목 + 요약 + 이 기사와 맞물린 그날 숫자 + 함께 볼 기사 */
+function cardsNewsLead(items, dateTxt, R, total) {
+  var lead = cNewsLead(items, R); if (!lead) return null;
+  var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2, it = lead.it, ttl = cNewsClean(it.title), desc = cNewsClean(it.desc || "");
+  cHead(c, "TODAY'S STORY · " + dateTxt, "오늘 가장 [[관심 가는 기사]]", null, 1, total);
+  var y = c.y - 10;
+  cRound(g, P, y, cW(g, it.press || "기사", 22, 800) + 32, 40, 20, CARD_C.goldDim); cText(g, it.press || "기사", P + 16, y + 28, 22, 800, CARD_C.warmTxt);
+  y += 64;
+  var ts = 48; while (ts > 36 && cWrapCount(g, ttl, W, ts, 800) > 3) ts -= 2;
+  y = cWrap(g, ttl, P, y + ts, W, ts, 800, CARD_C.txt, ts * 1.3, 3) + 10;
+  g.fillStyle = CARD_C.gold; g.fillRect(P, y, 96, 6); y += 34;
+  if (desc) y = cWrap(g, desc, P, y + 26, W, 27, 500, CARD_C.txt2, 40, 5) + 16;
+  if (lead.facts.length) {
+    cBox(g, P, y, W, 44 + lead.facts.length * 40, 16); cText(g, "이 기사와 맞물린 오늘 숫자", P + 24, y + 34, 22, 800, CARD_C.navy);
+    lead.facts.forEach(function (f, i) { cText(g, "· " + f, P + 24, y + 70 + i * 40, 26, 700, /-\d/.test(f) ? CARD_C.down : /\+\d/.test(f) ? CARD_C.up : CARD_C.txt); });
+    y += 44 + lead.facts.length * 40 + 20;
+  }
+  var room = CARD.H - 110 - y, others = items.filter(function (x) { return x !== it; }).slice(0, room > 420 ? 4 : 3);
+  if (others.length && room > 150) {
+    cText(g, "함께 보면 좋은 기사", P + 4, y + 26, 22, 800, CARD_C.sub); y += 44;
+    var lh = Math.min(96, Math.floor((room - 60) / others.length)), fs = lh >= 84 ? 27 : 24;
+    others.forEach(function (o, i) {
+      var yy = y + i * lh; cBox(g, P, yy, W, lh - 10, 14);
+      cText(g, String(i + 2), P + 22, yy + (lh - 10) / 2 + 10, 28, 800, CARD_C.gold);
+      cText(g, cFit(g, cNewsClean(o.title), W - 70 - (lh >= 84 ? 0 : cW(g, o.press || "", 19, 600) + 20), fs, 700), P + 56, yy + (lh >= 84 ? 38 : (lh - 10) / 2 + 9), fs, 700, CARD_C.txt);
+      if (o.press) cText(g, o.press, lh >= 84 ? P + 56 : P + W - 20, lh >= 84 ? yy + 66 : yy + (lh - 10) / 2 + 9, 19, 600, CARD_C.sub, lh >= 84 ? "left" : "right");
+    });
+  }
+  cFoot(c, "출처: " + (it.press || "네이버 뉴스") + " · 제목·요약은 기사 원문 그대로 · 숫자는 종가 기준 자동 집계 · 투자 권유 아님");
+  return { name: "N0_대표기사", cv: c.cv };
+}
+function cardsNews(items, dateTxt, R) {
   var out = [], pages = Math.ceil(items.length / 5); if (!items.length) return out;
+  var lead = cardsNewsLead(items, dateTxt, R || (typeof briefState !== "undefined" ? briefState.result : null), pages + 1); if (lead) out.push(lead);
   for (var pg = 0; pg < pages; pg++) {
     var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2, chunk = items.slice(pg * 5, pg * 5 + 5);
-    cHead(c, "NEWS BRIEFING · " + dateTxt, pg === 0 ? "아침 뉴스 브리핑 [[" + items.length + "]]" : "아침 뉴스 브리핑 [[" + (pg * 5 + 1) + "~" + Math.min(items.length, pg * 5 + 5) + "]]", null, pg + 1, pages);
+    cHead(c, "NEWS BRIEFING · " + dateTxt, pg === 0 ? "아침 뉴스 브리핑 [[" + items.length + "]]" : "아침 뉴스 브리핑 [[" + (pg * 5 + 1) + "~" + Math.min(items.length, pg * 5 + 5) + "]]", null, pg + 1 + (lead ? 1 : 0), pages + (lead ? 1 : 0));
     c.y -= 6;
     var avail = CARD.H - 100 - c.y, bh = Math.floor(avail / chunk.length) - 12;
     chunk.forEach(function (it, i) {
@@ -765,7 +820,7 @@ function cardsOpen(kind) {
       var iss = kind === "brief" ? (typeof issuesCompute === "function" && briefState.recent ? issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }) : null)
         : (chState && chState.issues);
       if (list.length && iss && iss.length) list.unshift({ name: "0_핵심이슈5", cv: issuesCard(iss) });
-      if (kind === "brief" && list.length && CARD_NEWS.items.length) list = list.concat(cardsNews(CARD_NEWS.items, cDate(Date.now()) + (new Date(Date.now() + 9 * 3600e3).getUTCHours() < 12 ? " 아침" : " 오후")));   // 맨 뒤에 뉴스 브리핑 1~2장
+      // v10.0: 뉴스 브리핑 카드는 오늘의 브리핑 덱에서 빠짐 (헤드라인·오늘 한 장에만 기사를 쓴다)
     } catch (e) { console.warn(e); }
     return list;
   };

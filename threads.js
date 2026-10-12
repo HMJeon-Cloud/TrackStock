@@ -74,12 +74,11 @@ function thrDaily(R, iss, names, opts) {
   if (has1y && (nh || nl)) S.push(endTag + "52주 신고가 " + nh + "개 · 신저가 " + nl + "개");
   else if (hot) S.push(briefName(hot) + " 거래대금 평소의 " + hot.amtX.toFixed(1) + "배");
   var INS = thrInsights(R, iss, unit);
-  var pSale = thrPage(names, /세일/), pMove = thrPage(names, /급등급락/), pTheme = thrPage(names, /테마|전체시세/), pHL = thrPage(names, /신고가/), pNews = thrPage(names, /^N/);
+  var pSale = thrPage(names, /세일/), pMove = thrPage(names, /급등급락/), pTheme = thrPage(names, /테마|전체시세/), pHL = thrPage(names, /신고가/);
   var tz = [];
   if (pSale && saleN) tz.push("고점보다 20% 넘게 싼 " + saleN + " " + unit + " 리스트는 카드 " + pSale + "장째에 있어요.");
   if (pHL && has1y) tz.push("신고가·신저가 " + unit + " 이름은 카드 " + pHL + "장째에 있어요.");
   if (pMove) tz.push("가장 많이 오르고 내린 " + unit + " 14개는 카드 " + pMove + "장째에 있어요.");
-  if (pNews) tz.push("같이 읽으면 좋은 기사 10개는 카드 " + pNews + "장째부터예요.");
   var cardsLine = tz.length ? tz[thrSeed() % tz.length] : "";
   var cardList = (names || []).map(function (n, i) { return (i + 1) + " " + String(n).replace(/^[0-9N]+_?/, "").replace(/\d+$/, "").replace(/([a-z])([A-Z])/g, "$1 $2"); }).slice(0, 12);
   var q = ["여러분 계좌는 " + when + " 어땠나요?", "이 중에 들고 계신 " + unit + " 있나요?", when + " 숫자 중 가장 눈에 띈 건 뭐였나요?", "저장해 두고 다음 정리와 비교해 보세요."][thrSeed() % 4];

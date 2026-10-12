@@ -6,7 +6,7 @@
      drawdown    낙폭 덱 — 지금 고점 대비 얼마나 빠졌나, 과거엔 몇 번·얼마나·얼마 만에 회복했나
      dca         적립 덱 — 1년 전 100만원 / 매달 10만원 / 가장 좋은 10일을 놓쳤다면
      news        뉴스 덱 — 오늘 아침 기사 제목 → 그 자산의 실제 숫자 (말과 숫자 비교)
-   원칙: 추천·예측 없음. 과거 사실 + 지금 위치 + 무엇을 보면 되는지까지만.
+   v10.0: deep.js의 조건부 통계 카드(승률·중앙값·최악, 닮은 날, 분할 vs 일시, 시작 시점 분포)가 각 덱 마무리 앞에 붙고, "데이터 기준 제안"을 명시한다.
    ============================================================ */
 var NB = { W: 1080, H: 1350, PAD: 60, SPLIT: 540 };   // 위 검정 0~540 / 아래 밝은 540~1350
 var NB_C = { black: "#111111", light: "#f7f5f0", navy: "#1f2a44", txt: "#1c2333", sub: "#6b7280", line: "#e4dfd3", gold: "#e6c57a", gold2: "#c9a24f", up: "#d9342b", down: "#2f6fd6", teal: "#5b9bb5", white: "#ffffff", grey: "#9aa3b2", box: "#eeeae1" };
@@ -181,11 +181,11 @@ function nbMissBest(rows, years, n) {
 function storyDecks() {
   var now = nbNow(), out = [];
   if (typeof CH_SCEN !== "undefined") CH_SCEN.forEach(function (sc) {
-    out.push({ key: "scene:" + sc.id, t: sc.icon + " " + sc.tag + "이(가) 오면", d: "과거 " + sc.eps.length + "번 — 그 뒤 1년 무엇이 강했나 · 체크리스트 · 조건별 구성", now: !!now.match[sc.id], ready: storyReady("scene"), group: "국면" });
+    out.push({ key: "scene:" + sc.id, t: sc.icon + " " + sc.tag + "이(가) 오면", d: "과거 " + sc.eps.length + "번 — 그 뒤 1년 무엇이 강했나 · 조건부 승률표 · 닮은 날 · 데이터 기준 제안", now: !!now.match[sc.id], ready: storyReady("scene"), group: "국면" });
   });
   out.unshift({ key: "today", t: "🔍 오늘의 관찰 — 오늘 가장 이례적인 것부터", d: "그날 데이터에서 평소와 다른 것 5~6가지를 골라 매일 다른 순서·다른 틀로 엮어요 (숫자만 바뀌는 덱이 아니라 구성 자체가 바뀜)", now: true, ready: !!nbRecent(), group: "매일" });
-  out.push({ key: "drawdown", t: "🕳️ 지금 고점 대비 얼마나 빠졌나", d: "대표 자산의 낙폭 · 전고점 못 넘은 기간 · 비슷한 깊이의 과거 회복 기간", now: !!now.match.panic, ready: storyReady("drawdown"), group: "낙폭" });
-  out.push({ key: "dca", t: "🗓️ 적금처럼 샀다면", d: "1년 전 100만원 · 매달 10만원 · 가장 좋은 10일을 놓쳤다면", now: false, ready: storyReady("dca"), group: "적립" });
+  out.push({ key: "drawdown", t: "🕳️ 지금 고점 대비 얼마나 빠졌나", d: "낙폭 · 회복 기간 · 지금 낙폭에서 샀다면 3·6·12개월 뒤 승률 · 한 번에 vs 나눠 사기 제안", now: !!now.match.panic, ready: storyReady("drawdown"), group: "낙폭" });
+  out.push({ key: "dca", t: "🗓️ 적금처럼 샀다면", d: "1년 전 100만원 · 매달 10만원 · 좋은 10일 · 시작 시점 " + "별 10년 결과 분포 · 200일선 아래 2배 적립 제안", now: false, ready: storyReady("dca"), group: "적립" });
   out.push({ key: "news", t: "📰 오늘 기사 vs 실제 숫자", d: "아침 뉴스 제목과 그 자산의 종가 변화를 나란히", now: typeof CARD_NEWS !== "undefined" && CARD_NEWS.items.length > 0, ready: storyReady("news"), group: "뉴스" });
   return out;
 }
@@ -203,6 +203,7 @@ function storyPrepare(key) {
   var kind = key.split(":")[0], ps = [];
   if (kind === "dca" && typeof cardsPrefetch === "function") ps.push(cardsPrefetch("all"));
   if (kind === "drawdown") ps.push(nbLoad(NB_DD_SYMS));
+  if ((kind === "scene" || kind === "drawdown" || kind === "dca") && typeof DP_SYMS !== "undefined") ps.push(nbLoad(DP_SYMS));   // v10.0 심화 통계용 25년치
   if (kind === "today") ps.push(nbLoad(["SPY", "^VIX", "^KS11", "BTC-USD", "GLD", "QQQ", "TLT"]), typeof cardsPrefetch === "function" ? cardsPrefetch("all") : null, typeof cardsNewsFetch === "function" ? cardsNewsFetch(typeof briefState !== "undefined" ? briefState.result : null).catch(function () { return []; }) : null);
   if (kind === "news" && typeof cardsNewsFetch === "function") ps.push(cardsNewsFetch(typeof briefState !== "undefined" ? briefState.result : null).catch(function () { return []; }));
   return Promise.all(ps);
@@ -225,7 +226,8 @@ function nbSceneDeck(id) {
   var isNow = !!now.match[main.id];
   var tlt = nbStat("TLT"), vix = nbStat("^VIX"), spy = nbStat("SPY"), uso = nbStat("USO"), krw = nbStat("KRW=X");
   var epsFwd = main.eps.filter(function (e) { return e.st.some(function (x) { return x.fwd != null; }); }).slice(0, 3);
-  var total = 2 + 1 + epsFwd.length + 1 + 1 + 1 + 1 + 1, pg = 0, n = 0, c;
+  var dp = typeof dpPlan === "function" ? dpPlan("scene", main.id) : [];
+  var total = 2 + 1 + epsFwd.length + 1 + 1 + 1 + 1 + 1 + dp.length, pg = 0, n = 0, c;
   var hookWord = isNow && now.why.length ? now.why[0].split("→").pop().trim() : main.tag;
   // 표지
   pg++; out.push({ name: "표지", cv: nbCover(isNow ? "지금 시장이 보내는 신호" : "이런 상황이 오면", [isNow ? "지금은 [[" + hookWord + "]]" : "[[" + main.tag + "]]이 오면", "과거엔 무엇이 강했을까?"], main.tag + " 국면 " + main.eps.length + "번의 과거를 자산별로 뜯어봤어요. 결론부터 말하면, 정해진 승자는 없었어요.") });
@@ -290,6 +292,8 @@ function nbSceneDeck(id) {
     nbRows(c, cmp.map(function (x) { return ["1년 " + cPct(x.res[2].ret, 0) + " (" + cPct(x.res[2].mdd, 0) + ")", x.label, cPct(x.res[3].ret, 0), cCol(x.res[3].ret)]; }), 330);
     nbFoot(c); out.push({ name: "구성성과", cv: c.cv });
   }
+  // 심화 (deep.js)
+  if (dp.length) { var st1 = dpDraw(out, dp, n, pg, total); n = st1.n; pg = st1.pg; }
   // 마무리
   pg++; out.push({ name: "마무리", cv: nbClose("지금은 어떤 구간이라고 보시나요?", ["저장해 두고, 신호가 바뀔 때", "다시 꺼내 보면 돼요."]) });
   return out;
@@ -315,7 +319,8 @@ function nbDd(sym) {
 function nbMonths(d) { return d == null ? "-" : d < 45 ? d + "일" : d < 700 ? Math.round(d / 30) + "개월" : (d / 365).toFixed(1) + "년"; }
 function nbDrawdownDeck() {
   var rows = NB_DD_SYMS.map(nbDd).filter(Boolean).sort(function (a, b) { return a.cur - b.cur; }); if (rows.length < 3) return [];
-  var out = [], deep = rows[0], spy = rows.filter(function (x) { return x.sym === "SPY"; })[0] || deep, total = 6, pg = 0, n = 0, c, seed = nbSeed();
+  var dp = typeof dpPlan === "function" ? dpPlan("drawdown") : [];
+  var out = [], deep = rows[0], spy = rows.filter(function (x) { return x.sym === "SPY"; })[0] || deep, total = 6 + dp.length, pg = 0, n = 0, c, seed = nbSeed();
   var hooks = [["빠질 때 가장 먼저 보는 숫자", ["지금 [[고점 대비 " + cPct(deep.cur, 0) + "]]", "과거엔 몇 번, 얼마나, 얼마 만에?"]], ["얼마나 빠졌나보다 중요한 것", ["[[" + deep.name + "]]은 전고점을", "못 넘은 지 [[" + nbMonths(deep.sincePeak) + "]]째"]], ["하락장 체감 온도계", ["대표 자산 " + rows.filter(function (x) { return x.ongoing; }).length + "개가 [[-10% 아래]]", "과거의 하락은 어떻게 끝났나"]]][seed % 3];
   pg++; out.push({ name: "표지", cv: nbCover(hooks[0], hooks[1], deep.name + "이(가) 대표 자산 중 가장 많이 빠져 있어요. 10년치 일봉으로 과거의 하락과 회복을 꺼내 봤어요.") });
   c = nbNew(); pg++; n++;
@@ -340,6 +345,7 @@ function nbDrawdownDeck() {
   nbBody(c, "지금 하락, 과거와 나란히", "지금 낙폭 · 최악 낙폭 · 이보다 깊었던 횟수 · 비슷한 깊이의 회복");
   nbTable(c, rows.slice(0, 5).map(function (x) { return [x.name, "지금 " + cPct(x.cur, 0) + (x.worst != null ? " · 최악 " + cPct(x.worst, 0) + "('" + String(x.worstY).slice(2) + ")" : "") + " · 더 깊었던 적 " + x.deeper + "번", x.medSim != null ? nbMonths(x.medSim) : "–", NB_C.navy]; }));
   nbFoot(c); out.push({ name: "비교", cv: c.cv });
+  if (dp.length) { var st2 = dpDraw(out, dp, n, pg, total); n = st2.n; pg = st2.pg; }
   pg++; out.push({ name: "마무리", cv: nbClose([["하락장에서 가장 어려운 건 '얼마나'가 아니라 '언제까지'예요.", "내가 견딜 수 있는 낙폭이 곧 내 주식 비중의 상한이에요."], ["전고점은 '언젠가'는 왔지만 '언제'는 아무도 몰랐어요.", "그래서 기간을 견딜 수 있는 돈으로만 투자해요."]][seed % 2][0], [[["내가 견딜 수 있는 낙폭이", "곧 내 주식 비중의 상한이에요."], ["기다릴 수 있는 돈과", "기다릴 수 없는 돈을 나누세요."]][seed % 2]][0]) });
   return out;
 }
@@ -350,7 +356,8 @@ function nbDcaDeck() {
   if (!storyReady("dca")) return [];
   var out = [], ya = cYearAgo("all"), dca = cDca("all"), miss = nbMissBest(CARD_HIST.SPY, 10, 10);
   if (!ya.length || !dca) return [];
-  var total = 5 + (miss ? 1 : 0), pg = 0, n = 0, c, w1 = ya[0], d1 = dca.rows[0];
+  var dp = typeof dpPlan === "function" ? dpPlan("dca") : [];
+  var total = 5 + (miss ? 1 : 0) + dp.length, pg = 0, n = 0, c, w1 = ya[0], d1 = dca.rows[0];
   pg++; out.push({ name: "표지", cv: nbCover("타이밍 대신 꾸준함", ["적금처럼 샀다면", "[[" + dca.years + "년 뒤 얼마]]가 됐을까?"], "매달 10만원, 1년 전 100만원, 그리고 가장 좋은 10일을 놓쳤을 때 — 실제 종가로 계산했어요.") });
   c = nbNew(); pg++; n++;
   nbTop(c, n, ["1년 전 100만원은", "[[" + w1.name + " " + cMan(w1.val) + "]]이 됐다.", "", "지금 유명한 종목만 고른 것 자체가 결과를 알고 고른 것(생존자 편향)."], pg, total);
@@ -375,6 +382,7 @@ function nbDcaDeck() {
   nbBody(c, "지금 위치 — 이번 달 적립하는 분들께", "52주 고점 대비 · 20일선 · 한 달 등락");
   nbRows(c, [["SPY", "S&P500 ETF"], ["QQQ", "나스닥100 ETF"], ["360750.KS", "TIGER 미국S&P500"], ["069500.KS", "KODEX 200"], ["GLD", "금 ETF"], ["BTC-USD", "비트코인"]].map(function (a) { var s = nbStat(a[0]); return s ? [(s.above20 ? "20일선 위" : "20일선 아래") + " · 한 달 " + cPct(s.m1, 0), a[1], s.vsHi != null ? "고점比 " + cPct(s.vsHi, 0) : "-", s.vsHi != null && s.vsHi <= -0.1 ? NB_C.down : NB_C.navy] : null; }).filter(Boolean), 300);
   nbFoot(c); out.push({ name: "지금위치", cv: c.cv });
+  if (dp.length) { var st3 = dpDraw(out, dp, n, pg, total); n = st3.n; pg = st3.pg; }
   pg++; out.push({ name: "마무리", cv: nbClose("여러분은 매달 어떤 걸 사고 계세요?", ["적립일을 정했다면 그대로.", "시장이 무서운 날일수록 규칙이 지켜 줘요."]) });
   return out;
 }

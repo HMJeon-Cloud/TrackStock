@@ -157,7 +157,7 @@ function pubCaption(opt) {
   var up = pubUpcoming(3).filter(function (e) { return e.k !== "hol"; }), calLine = up.length ? "\n\n🗓️ 다가오는 일정: " + up.slice(0, 2).map(function (e) { return e.d.slice(5).replace("-", "/") + "(" + pubDow(e.d) + ") " + e.t.replace(/^[^\s]+\s/, ""); }).join(" · ") : "";
   var disc = "\n\n※ 전일 종가 기준 자동 집계" + (krHol ? " · 오늘 한국 " + krHol + "로 국내는 전 거래일 값" : "") + " · 투자 권유가 아니며 판단과 책임은 각자에게 있어요. 데이터 출처: 야후 파이낸스 · 네이버 뉴스 제목";
   var tags = PUB_TAGS_BASE.concat(PUB_TAGS_POOL.daily.slice(0, 4), R.market && PUB_TAGS_POOL[R.market] ? PUB_TAGS_POOL[R.market].slice(0, 2) : []);
-  var newsLine = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items.length) ? "\n\n📰 아침 뉴스\n" + CARD_NEWS.items.slice(0, 3).map(function (it) { return "· " + cNewsClean(it.title); }).join("\n") : "";
+  var newsLine = "";   // v10.0: 캡션에서도 뉴스 브리핑 제외
   var ig = hookLine + "\n\n📌 오늘의 핵심 이슈 5 (" + date + ")\n" + body + "\n\n🌡️ 오른 종목 " + Math.round(t.upPct * 100) + "% — " + read + newsLine + "\n\n" + q + calLine + disc + "\n\n" + tags.map(function (x) { return "#" + x; }).join(" ");
   // 스레드: 500자 — 훅 + 상위 3 + 질문
   var th = hookLine + "\n\n" + iss.slice(0, 3).map(function (it, i) { return (i + 1) + ". " + it.emoji + " " + it.title; }).join("\n") + "\n\n" + read + "\n\n" + q + "\n\n(전일 종가 기준 · 투자 권유 아님)";
@@ -320,7 +320,7 @@ function pubRender() {
     Object.keys(groups).forEach(function (gname) {
       h += '<h4 class="chSub">' + gname + '</h4><div class="perCal">' + groups[gname].map(function (d) { return '<div class="perRow' + (d.now ? ' now' : '') + '"><div class="perBody"><b>' + escapeHtml(d.t) + (d.now ? ' <span style="color:var(--gold,#c9a24f)">← 지금</span>' : '') + '</b><small>' + escapeHtml(d.d) + (d.ready ? '' : ' · <span style="color:#b26a00">데이터 준비 중</span>') + '</small></div><div class="row" style="gap:4px;flex:0 0 auto"><button class="chip" data-story="' + d.key + '">🃏 만들기</button>' + (typeof aiBtn === "function" ? aiBtn("story:" + d.key) : "") + '</div></div>'; }).join("") + '</div>';
     });
-    h += '<div class="briefDim" style="margin-top:8px">국면 덱은 지금 신호가 없어도 "이런 상황이 오면"으로 만들어져요(미리 저장용). 뉴스 덱은 아침 뉴스 제목에서 자산을 2개 이상 찾았을 때만 만들어져요. 적립 덱은 처음 한 번 10년치를 불러와 몇 초 걸려요.</div>';
+    h += '<div class="briefDim" style="margin-top:8px">국면 덱은 지금 신호가 없어도 "이런 상황이 오면"으로 만들어져요(미리 저장용). 뉴스 덱은 아침 뉴스 제목에서 자산을 2개 이상 찾았을 때만 만들어져요. 국면·낙폭·적립 덱 뒤에는 25년치 일봉으로 계산한 심화 카드(조건부 승률·닮은 날·분할 vs 일시·시작 시점 분포·데이터 기준 제안)가 붙어요 — 처음 한 번 불러올 때 몇 초 걸려요.</div>';
   } else if (pubState.tab === "policy") {
     var pls = pubPolicyAll(), cur = pls.filter(function (p) { return p.id === pubState.policy; })[0] || pls[0];
     h += '<div class="briefDim" style="margin-bottom:8px">정책·제도 변경은 "내 구간은 얼마?"가 핵심이라 표로 보여줘요. 숫자는 기관 공지를 그대로 옮기고 적용일·출처를 적어야 카드 바닥에 표기돼요.</div>';

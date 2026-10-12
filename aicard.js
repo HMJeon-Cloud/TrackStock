@@ -52,6 +52,7 @@ function aiTitleOf(ctx) {
   if (kind === "cal") return "이번 주 일정";
   if (kind === "term") return "용어 한 입";
   if (kind === "issues") return "핵심 이슈 5";
+  if (kind === "onepage") { var mk1 = R && cMktInfo(R); return (mk1 ? mk1.name : "전체") + " 오늘 한 장"; }
   if (kind === "reel") { var x = REEL_LIST.filter(function (z) { return z.id === arg; })[0]; return "릴스 · " + (x ? x.t : arg); }
   return "대표 카드";
 }
@@ -67,7 +68,6 @@ function aiDeck(ctx) {
         CARD_STYLE = "event"; CARD_UNIT = briefState.market === "coin" ? "코인" : ""; CARD_MKT = cMktInfo(briefState.result); CARD_SERIES = CARD_MKT ? "DAILY · " + CARD_MKT.name + " 전일 정리" : "DAILY · 전일 정리";
         var l = cardsBrief(), iss = issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular, mode: briefState.result.mode });
         if (l.length && iss && iss.length) l.unshift({ name: "0_핵심이슈5", cv: issuesCard(iss) });
-        if (CARD_NEWS.items.length) l = l.concat(cardsNews(CARD_NEWS.items, cDate(Date.now())));
         return l;
       });
     });
@@ -83,6 +83,16 @@ function aiDeck(ctx) {
   if (kind === "cal") return Promise.resolve(cap(function () { return [{ name: "이번 주 일정", cv: pubCalCard() }]; }));
   if (kind === "term") return Promise.resolve(cap(function () { return [{ name: "용어 한 입", cv: pubTermCard(pubTerm(pubState.termOffset)) }]; }));
   if (kind === "issues") return Promise.resolve(cap(function () { var l = chState.issues && chState.issues.length ? chState.issues : issuesCompute(briefState.recent, { market: briefState.market }); return [{ name: "핵심 이슈 5", cv: issuesCard(l) }]; }));
+  if (kind === "onepage") {   // v10.0: 오늘 한 장 (9칸 한 페이지) — 기사 포함 전체 글자를 재료로
+    if (!briefState.result) return Promise.reject(new Error("오늘의 브리핑 데이터가 아직 없어요"));
+    return cardsNewsFetch(briefState.result).catch(function () { return []; }).then(function () {
+      return cap(function () {
+        var R1 = briefState.result; CARD_MKT = cMktInfo(R1);
+        var iss = []; try { iss = issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }); } catch (e) {}
+        return [{ name: "오늘한장", cv: onePageCard(R1, iss, CARD_NEWS.items || []) }];
+      });
+    });
+  }
   if (kind === "reel") {
     var needD = REEL_DATA[arg] && arg !== "loss";
     return (needD && typeof nbLoad === "function" ? nbLoad(REEL_HIST) : Promise.resolve()).then(function () {
