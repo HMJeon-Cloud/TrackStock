@@ -605,6 +605,7 @@ function renderBrief() {
     };
   });
   loadBriefNews(R);
+  if (typeof pkRender === "function") { try { pkRender(R); } catch (e) { console.warn("picks", e); } }   // v10.1 선별 종목
 }
 
 /* 급등락 종목 기사(종목당 1줄) + 시장 키워드 칩 (모두 서버 캐시 10분) */

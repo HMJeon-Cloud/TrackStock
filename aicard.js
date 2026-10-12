@@ -85,7 +85,7 @@ function aiDeck(ctx) {
   if (kind === "issues") return Promise.resolve(cap(function () { var l = chState.issues && chState.issues.length ? chState.issues : issuesCompute(briefState.recent, { market: briefState.market }); return [{ name: "핵심 이슈 5", cv: issuesCard(l) }]; }));
   if (kind === "onepage") {   // v10.0: 오늘 한 장 (9칸 한 페이지) — 기사 포함 전체 글자를 재료로
     if (!briefState.result) return Promise.reject(new Error("오늘의 브리핑 데이터가 아직 없어요"));
-    return cardsNewsFetch(briefState.result).catch(function () { return []; }).then(function () {
+    return Promise.all([cardsNewsFetch(briefState.result).catch(function () { return []; }), typeof pkEnsure === "function" ? pkEnsure(briefState.result).catch(function () { return null; }) : null]).then(function () {
       return cap(function () {
         var R1 = briefState.result; CARD_MKT = cMktInfo(R1);
         var iss = []; try { iss = issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }); } catch (e) {}

@@ -62,7 +62,11 @@ function opScreens(R) {
     { t: "고점 -10% 진입", d: "손절 기준 확인할 때", list: S.filter(function (s) { return has(s) && s.vsHi <= -0.1 && s.vsHi > -0.14 && s.ret1 < 0; }).sort(function (a, b) { return a.vsHi - b.vsHi; }), tag: function (s) { return "고점 " + opPct(s.vsHi, 0); } },
     { t: "52주 신저가", d: "1년 최저가 경신", list: S.filter(function (s) { return s.newLow; }).sort(function (a, b) { return a.ret1 - b.ret1; }), tag: function (s) { return "하루 " + opPct(s.ret1); } }
   ];
-  function pick(arr) { return arr.filter(function (x) { return x.list.length; }).slice(0, 2).map(function (x) { return { t: x.t, d: x.d, n: x.list.length, rows: x.list.slice(0, 3).map(function (s) { return { name: briefName(s), tag: x.tag(s), ret: s.ret1 }; }) }; }); }
+  function pick(arr, n) { return arr.filter(function (x) { return x.list.length; }).slice(0, n || 2).map(function (x) { return { t: x.t, d: x.d, n: x.list.length, rows: x.list.slice(0, 3).map(function (s) { return { name: briefName(s), tag: x.tag(s), ret: s.ret1 }; }) }; }); }
+  // v10.1: 복합 점수(추세·위치·RSI·대금 + 재무·수급·기사)로 고른 선별 종목이 준비돼 있으면 첫 줄은 그것, 둘째 줄은 하루 조건 스크린
+  var pk = typeof pkReady === "function" ? pkReady(R) : null;
+  function pkGroup(list, side) { return { t: side === "buy" ? "복합 점수 매수 후보" : "복합 점수 주의 " + unit, d: "추세·RSI·대금·재무·기사", n: list.length, rows: list.slice(0, 3).map(function (x) { return { name: briefName(x.s), tag: (side === "buy" ? "+" + x.bs + "/-" + x.ws : "-" + x.ws + "/+" + x.bs) + " · " + pkTopReason(x, side).split(" · ")[0], ret: x.s.ret1 }; }) }; }
+  if (pk && (pk.buy.length || pk.warn.length)) return { buy: (pk.buy.length ? [pkGroup(pk.buy, "buy")] : []).concat(pick(buy, 1)).slice(0, 2), warn: (pk.warn.length ? [pkGroup(pk.warn, "warn")] : []).concat(pick(warn, 1)).slice(0, 2) };
   return { buy: pick(buy), warn: pick(warn) };
 }
 
@@ -152,7 +156,7 @@ function onePageCard(R, iss, news) {
   // ── 5 매수 후보 스크린 (왼쪽) / 6 주의 스크린 (오른쪽)
   var sc = opScreens(R), h5 = 226;
   function drawScreen(x, no, title, groups, col, bg) {
-    var yb = opBox(g, x, y, colW, h5, no, title, "조건에 걸린 " + unit + " · 추천 아님", col);
+    var yb = opBox(g, x, y, colW, h5, no, title, "복합 점수 + 하루 조건 · 판단은 본인", col);
     if (!groups.length) { cText(g, "오늘은 조건에 걸린 " + unit + "이 없어요", x + 12, yb + 30, 17, 600, OP_C.sub); return; }
     var gh = (h5 - 70) / groups.length;
     groups.forEach(function (gp, k) {
@@ -199,7 +203,7 @@ function onePageCard(R, iss, news) {
     cWrap(g, tip[1], P + 14, y + 62, W - 28, 16, 500, OP_C.ink2, 21, 2);
   }
   // ── 바닥
-  cText(g, "종가 기준 자동 집계 · 스크린은 조건에 걸린 " + unit + "일 뿐 추천이 아니에요 · 세금·제도 숫자는 최신 공지 확인 · 투자 권유 아님", P, CARD.H - 24, 14, 500, OP_C.sub);
+  cText(g, "종가 기준 자동 집계 · 선별 " + unit + "은 여러 데이터로 고른 후보이며 판단·책임은 본인에게 · 세금·제도 숫자는 최신 공지 확인 · 투자 권유 아님", P, CARD.H - 24, 14, 500, OP_C.sub);
   cText(g, "@uphill.lab", CARD.W - P, CARD.H - 24, 18, 900, OP_C.ink, "right");
   return cv;
 }
@@ -209,7 +213,7 @@ function onePageOpen(btn) {
   var R = briefState.result; if (!R) { alert("오늘의 브리핑 데이터를 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요."); return; }
   var old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-  ready.then(function () { return typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : []; }).then(function () {
+  ready.then(function () { return Promise.all([typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : [], typeof pkEnsure === "function" ? pkEnsure(R).catch(function () { return null; }) : null]); }).then(function () {
     var iss = []; try { iss = issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }); } catch (e) {}
     var news = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items) || [];
     var keep = CARD_MKT; CARD_MKT = cMktInfo(R);
@@ -222,7 +226,7 @@ function onePageOpen(btn) {
       if (btn) btn.textContent = old;
       var url = cv.toDataURL("image/png"), day = pubToday().replace(/-/g, ""), mk = cMktInfo(R), box = document.createElement("div");
       var file = "uphill.lab_오늘한장_" + (mk ? mk.name : "전체") + "_" + day + ".png";
-      box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:10px"><button class="primary" data-act="save">⬇ 저장</button>' + (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유</button>' : '') + '<span class="briefDim">1080×1350 · 게시물·릴스 표지로 · 스크린은 조건에 걸린 종목이지 추천이 아니에요</span></div><img alt="" style="width:100%;max-width:520px;border-radius:12px;display:block;margin:0 auto;box-shadow:0 4px 18px rgba(0,0,0,.2)">';
+      box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:10px"><button class="primary" data-act="save">⬇ 저장</button>' + (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유</button>' : '') + '<span class="briefDim">1080×1350 · 게시물·릴스 표지로 · 선별 종목은 추세·RSI·대금·재무·기사를 겹쳐 고른 후보 · 판단과 책임은 본인에게</span></div><img alt="" style="width:100%;max-width:520px;border-radius:12px;display:block;margin:0 auto;box-shadow:0 4px 18px rgba(0,0,0,.2)">';
       box.querySelector("img").src = url;
       box.querySelector('[data-act="save"]').onclick = function () { cardsDownload({ url: url, file: file }); };
       var sh = box.querySelector('[data-act="share"]'); if (sh) sh.onclick = function () { cv.toBlob(function (b) { var f = new File([b], file, { type: "image/png" }); if (navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(function () {}); }); };
