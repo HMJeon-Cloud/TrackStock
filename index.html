@@ -1785,7 +1785,7 @@
       <div class="pills seg" id="briefModeTabs"><button data-bm="day" class="active">금일</button><button data-bm="week">금주</button></div>
       <div class="pills seg" id="briefMktTabs"><button data-bk="all" class="active">전체</button><button data-bk="kr">🇰🇷 국내</button><button data-bk="us">🇺🇸 미국</button><button data-bk="coin">₿ 코인</button></div>
     </div>
-    <div class="tbActions"><button class="primary" id="briefCards">🃏 카드 만들기</button><button class="chip aiBtn" data-ai-open="brief">✨ AI 대표 카드</button><button class="chip" data-ai-open="custom">✍️ 내 글 카드</button><button class="chip" id="briefToChannel">📢 채널 자료 ›</button></div>
+    <div class="tbActions"><button class="primary" id="briefCards">🃏 카드 만들기</button><button class="chip" id="briefOnePage" onclick="onePageOpen(this)">📄 오늘 한 장</button><button class="chip aiBtn" data-ai-open="brief">✨ AI 대표 카드</button><button class="chip" data-ai-open="custom">✍️ 내 글 카드</button><button class="chip" id="briefToChannel">📢 채널 자료 ›</button></div>
   </div>
   <div id="briefStatus" style="font-size:13px;color:var(--sub);margin-top:10px"></div>
   <details class="howto"><summary>이 화면은 어떻게 만들어지나</summary><div class="body">
@@ -2121,7 +2121,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v9.7<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v9.9<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4500,11 +4500,11 @@ window.addEventListener("load", function () {
 <script src="guide.js?v=9.5"></script>
 <script src="watch.js?v=9.5"></script>
 <script src="holdings.js?v=9.5"></script>
-<script src="brief.js?v=9.7"></script>
+<script src="brief.js?v=9.9"></script>
 <script src="channel.js?v=9.7"></script>
-<script src="cards.js?v=9.7"></script>
+<script src="cards.js?v=9.8"></script>
 <script src="mind.js?v=9.5"></script>
-<script src="issues.js?v=9.5.2"></script>
+<script src="issues.js?v=9.8"></script>
 <script src="publish.js?v=9.7"></script>
 <script src="periodic.js?v=9.5.2"></script>
 <script src="story.js?v=9.5.2"></script>
@@ -4513,6 +4513,7 @@ window.addEventListener("load", function () {
 <script src="slides.js?v=9.7"></script>
 <script src="onecard.js?v=9.7"></script>
 <script src="aicard.js?v=9.7.1"></script>
+<script src="onepage.js?v=9.9"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>

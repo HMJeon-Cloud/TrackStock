@@ -322,7 +322,7 @@ function briefCompute(recent, opts) {
       if (diff <= 14 && d.getFullYear() < now.getFullYear()) hist.push({ date: e.date, name: e.name, type: e.type, years: now.getFullYear() - d.getFullYear() });
     });
   }
-  return { quality: quality, mode: mode, market: market, mktName: market === "stock" ? "주식" : BRIEF_MKT[market], label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "" };
+  return { quality: quality, mode: mode, market: market, mktName: market === "stock" ? "주식" : BRIEF_MKT[market], label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "", stocks: stocks };
 }
 
 /* 뉴스 제목 묶음 → 키워드 순위 (NEWS_TAGS 재사용) */
