@@ -293,7 +293,7 @@ var pubState = { tab: "plan", termOffset: 0, policy: null };
 function pubRender() {
   var box = $("pubBox"); if (!box) return;
   // v9.7 탭을 쓰는 순서대로 묶음: 오늘 할 일 → 만들 콘텐츠 → 글·참고
-  var groups = [["오늘", [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["cal", "이번 주 일정"]]], ["콘텐츠", [["notes", "연구노트"], ["reels", "릴스"], ["policy", "정책 카드"], ["term", "용어 한 입"]]], ["글·참고", [["caption", "캡션"], ["topics", "주제 은행"]]]];
+  var groups = [["오늘", [["plan", "오늘 뭐 올리지"], ["per", "정기 발행"], ["cal", "이번 주 일정"]]], ["콘텐츠", [["tpl", "양식집"], ["notes", "연구노트"], ["reels", "릴스"], ["policy", "정책 카드"], ["term", "용어 한 입"]]], ["글·참고", [["caption", "캡션"], ["topics", "주제 은행"]]]];
   var h = '<div class="pubTabs">' + groups.map(function (gp) { return '<div class="pubTabG"><span>' + gp[0] + '</span><div class="pills">' + gp[1].map(function (t) { return '<button data-pt="' + t[0] + '"' + (t[0] === pubState.tab ? ' class="active"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div></div>'; }).join("") + '</div>';
   if (pubState.tab === "plan") {
     var ck = pubChecklist(), pl = pubPlan(), today = typeof perToday === "function" ? perToday() : [];
@@ -346,7 +346,9 @@ function pubRender() {
       '<div class="chPlanItem"><div style="font-size:14px;line-height:1.7"><b>' + escapeHtml(term[1]) + '</b><br>' + escapeHtml(term[2]) + '<br><span class="briefDim">💡 ' + escapeHtml(term[3]) + '</span></div></div>' +
       '<div class="briefDim" style="margin-top:8px">용어 ' + PUB_TERMS.length + '개가 날짜 순으로 돌아가요(오늘 자동 선택). 댓글로 들어온 용어는 publish.js의 PUB_TERMS에 한 줄 추가하면 돼요.</div>';
   }
+  if (pubState.tab === "tpl") h += '<h3 class="chSub">📐 uphill.lab 양식집 <small>카테고리별 고정 틀 · 내용만 바뀜</small></h3><div id="pubTpl"></div>';
   box.innerHTML = h;
+  if (pubState.tab === "tpl" && typeof tplPanel === "function") tplPanel($("pubTpl"));
   Array.prototype.forEach.call(box.querySelectorAll("[data-pt],[data-pt2]"), function (b) { b.onclick = function () { pubState.tab = b.getAttribute("data-pt") || b.getAttribute("data-pt2"); pubRender(); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-pol]"), function (b) { b.onclick = function () { pubState.policy = b.getAttribute("data-pol"); pubRender(); }; });
   if ($("polJson")) {

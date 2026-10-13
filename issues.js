@@ -125,6 +125,54 @@ function issCopy(text, btn) {
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); }); else done(false);
 }
 
+/* ---------- v9.8 표지 제목(헤드라인) 엔진 ----------
+   전처럼 1위 이슈 하나로 "○○ 약세 — 돈이 움직였다"를 찍어내지 않고,
+   이슈 5개 + 시장 폭(오른 비율) + 지수 + 업종 1등·꼴찌 + 급등락 + 거래대금 + 그날 기사 제목을 함께 읽어
+   '그날 가장 궁금한 한 줄'을 고른다. 사실(숫자)만 쓰고, 기사는 제목에 실제로 등장하는 이름만 붙인다. */
+function issNewsHit(name, news) {
+  if (!name || !news || !news.length) return null;
+  var key = String(name).replace(/\s*\(.*?\)\s*/g, "").replace(/\s+/g, "").slice(0, 6); if (key.length < 2) return null;
+  for (var i = 0; i < news.length; i++) { var t = cNewsClean(news[i].title); if (t.replace(/\s+/g, "").indexOf(key) >= 0) return t; }
+  return null;
+}
+function issShort(t, n) { t = String(t).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1).replace(/[\s,·]+$/, "") + "…" : t; }
+function issHeadline(list, R, news) {
+  var out = [], seed = Math.floor((Date.now() + 9 * 3600e3) / 86400e3);
+  if (!R) return null;
+  var t = R.temp, i0 = (R.indexRow || [])[0], th = R.themes || [], upP = Math.round(t.upPct * 100), dnP = 100 - upP;
+  var unit = R.market === "coin" ? "코인" : "종목", sec = R.market === "coin" ? "테마" : "업종";
+  var top = list[0] || {}, k = (top.sub || "").match(/평소[^0-9]*([0-9.]+)배/), times = k ? +k[1] : 0;
+  var mv = (R.movers && R.movers.up[0]) || null, md = (R.movers && R.movers.down[0]) || null, hv = (R.hotVol || [])[0];
+  function r1(x) { return x.ret1 != null && R.mode === "day" ? x.ret1 : x.ret; }
+  function add(score, hook, sub) { out.push({ score: score, hook: hook, sub: sub }); }
+  // ① 지수와 종목이 따로 논 날
+  if (i0 && i0.ret > 0.002 && t.upPct < 0.45) add(5 + (0.45 - t.upPct) * 10, i0.name + " [[" + issPct(i0.ret) + "]]인데 10개 중 " + Math.round((1 - t.upPct) * 10) + "개는 내렸다", "지수를 올린 건 몇몇 큰 " + unit + " — 내 " + unit + "이 빠진 이유");
+  if (i0 && i0.ret < -0.002 && t.upPct > 0.55) add(5 + (t.upPct - 0.55) * 10, i0.name + " [[" + issPct(i0.ret) + "]]인데 10개 중 " + Math.round(t.upPct * 10) + "개는 올랐다", "지수를 끌어내린 건 일부 대형 " + unit);
+  // ② 시장 전체가 한 방향
+  if (t.upPct >= 0.7) add(4 + (t.upPct - 0.7) * 10, "10개 중 [[" + Math.round(t.upPct * 10) + "개]]가 오른 날" + (th[0] ? " — " + th[0].name + " " + issPct(th[0].ret) : ""), "오른 " + unit + " " + upP + "% · 20일선 위 " + Math.round(t.abovePct * 100) + "%");
+  if (t.upPct <= 0.3) add(4 + (0.3 - t.upPct) * 10, "10개 중 [[" + Math.round((1 - t.upPct) * 10) + "개]]가 내린 날" + (md ? " — 최대 " + briefName(md) + " " + issPct(r1(md)) : ""), "내린 " + unit + " " + dnP + "% · 개별 악재보다 시장 전체 분위기");
+  // ③ 거시 충격 (환율·금리·공포·금·원유·비트코인) — 평소의 N배일 때만
+  if (/^(fx|rate|vix|gold|oil|btc)$/.test(top.cat) && times >= 2) {
+    var nm = String(top.title).replace(/\s*[—(].*$/, "").replace(/\s*→.*$/, "");
+    var hit = issNewsHit(nm.split(" ")[0] === "원/달러" ? "환율" : nm.split(" ")[0], news);
+    add(4.5 + Math.min(times, 6) * 0.3, "[[" + nm + "]] — 평소의 " + times + "배" + (top.cat === "rate" ? ", 금리가 움직였다" : top.cat === "vix" ? ", 시장이 긴장했다" : top.cat === "fx" ? ", 달러가 움직였다" : ""), hit ? "기사: " + issShort(hit, 44) : String(top.sub).split(" · ")[0]);
+  }
+  // ④ 업종 1등·꼴찌의 간극
+  if (th.length >= 4) { var gap = th[0].ret - th[th.length - 1].ret; if (gap >= 0.025) add(3 + gap * 40, th[0].name + " [[" + issPct(th[0].ret) + "]] vs " + th[th.length - 1].name + " [[" + issPct(th[th.length - 1].ret) + "]]", "같은 날 " + sec + " 차이 " + (gap * 100).toFixed(1) + "%p — 어디에 있었느냐가 갈랐다"); }
+  // ⑤ 급등락 종목 + 그 이름이 들어간 기사
+  [mv, md].forEach(function (x) { if (!x || Math.abs(r1(x)) < 0.04) return; var hit = issNewsHit(briefName(x), news); add((hit ? 5.5 : 3.2) + Math.abs(r1(x)) * 10, "[[" + briefName(x) + " " + issPct(r1(x)) + "]]" + (hit ? " — 기사는 이렇게 말했다" : ", 이유는?"), hit ? "“" + issShort(hit, 42) + "”" : (x.amtX >= 1.5 ? "거래대금 평소의 " + x.amtX.toFixed(1) + "배" : "관련 기사는 뒤 뉴스 브리핑에")); });
+  // ⑥ 돈이 몰린 곳
+  if (hv && hv.amtX >= 3) { var hh = issNewsHit(briefName(hv), news); add(3.5 + Math.min(hv.amtX, 8) * 0.3 + (hh ? 1 : 0), "[[" + briefName(hv) + "]]에 평소의 " + hv.amtX.toFixed(1) + "배 돈이 몰렸다", hh ? "기사: " + issShort(hh, 44) : "주가 " + issPct(r1(hv)) + " — 관심이 몰린 이유는?"); }
+  // ⑦ 테마가 움직였고 기사도 있는 경우
+  if (th[0] && Math.abs(th[0].ret) >= 0.02) { var th0 = issNewsHit(th[0].name.split("·")[0], news) || issNewsHit(briefName(th[0].best), news); if (th0) add(4.8, "[[" + th[0].name + " " + issPct(th[0].ret) + "]] — 기사가 먼저 말했다", "“" + issShort(th0, 42) + "”"); }
+  if (th.length && th[th.length - 1].ret <= -0.02) { var tb = th[th.length - 1], thb = issNewsHit(tb.name.split("·")[0], news) || issNewsHit(briefName(tb.worst), news); if (thb) add(4.8, "[[" + tb.name + " " + issPct(tb.ret) + "]] — 무슨 일이?", "“" + issShort(thb, 42) + "”"); }
+  // ⑧ 기본 (1위 이슈) — 위 후보가 없을 때만 의미 있게
+  if (top.title) add(2, "[[" + String(top.title).replace(/\s*—.*$/, "") + "]]" + (times ? " — 평소의 " + times + "배, 왜?" : " — 오늘 1위 이슈"), String(top.sub || "").split(" · ")[0]);
+  out.sort(function (a, b) { return b.score - a.score; });
+  // 1·2위 점수가 비슷하면 날짜로 번갈아 (매일 같은 틀로 보이지 않게)
+  var pick = out[0]; if (out[1] && out[0].score - out[1].score < 0.6 && seed % 2) pick = out[1];
+  return pick || null;
+}
 /* 카드 (블랙 & 골드) — 카드 묶음 맨 앞 표지로도 쓴다 */
 function issuesCard(list, page, total) {
   var c = cNew(), g = c.g, P = CARD.PAD, W = CARD.W - P * 2;
@@ -143,7 +191,15 @@ function issuesCard(list, page, total) {
     else hook = "[[" + tt + "]]" + (k ? " — 평소의 " + k[1] + "배, 왜?" : " — 오늘 1위 이슈");
     if (cW(g, cPlain(hook), 44, 800) > (CARD.W - P * 2) * 1.9) hook = "[[" + tt + "]]";
   }
-  cHead(c, tag + " · " + mk + cDate(list.asOf), hook, (top ? "오늘 가장 이례적인 움직임 5가지 — 넘겨서 확인 →" : "자료 전체에서 평소보다 이례적인 움직임 순"), page || 0, total || 0);
+  // v9.8 데이터 + 기사를 함께 읽은 헤드라인이 있으면 그걸 우선
+  var sub = top ? "오늘 가장 이례적인 움직임 5가지 — 넘겨서 확인 →" : "자료 전체에서 평소보다 이례적인 움직임 순";
+  try {
+    var Rh = list.R || (typeof briefState !== "undefined" && briefState.result && briefState.result.market === (list.market || "all") ? briefState.result : null);
+    var nw = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.mk === (list.market || "all") && CARD_NEWS.items) || [];
+    var hl = list.mode === "day" ? issHeadline(list, Rh, nw) : null;
+    if (hl && hl.hook) { hook = hl.hook; if (cW(g, cPlain(hook), 44, 800) > (CARD.W - P * 2) * 1.9) hook = "[[" + cPlain(hook).replace(/\[\[|\]\]/g, "").split(/ — | vs |, /)[0] + "]]"; if (hl.sub) sub = hl.sub; }
+  } catch (e) { console.warn(e); }
+  cHead(c, tag + " · " + mk + cDate(list.asOf), hook, sub, page || 0, total || 0);
   var per = Math.min(150, Math.floor((CARD.H - 110 - c.y) / list.length));
   list.forEach(function (it, i) {
     var y = c.y, bh = per - 12, mid = y + bh / 2;

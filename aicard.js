@@ -53,6 +53,7 @@ function aiTitleOf(ctx) {
   if (kind === "term") return "용어 한 입";
   if (kind === "issues") return "핵심 이슈 5";
   if (kind === "onepage") { var mk1 = R && cMktInfo(R); return (mk1 ? mk1.name : "전체") + " 오늘 한 장"; }
+  if (kind === "tpl") { var tc = TPL_CAT[arg.split(":")[0]]; return "양식 · " + (tc ? tc.name : arg); }
   if (kind === "reel") { var x = REEL_LIST.filter(function (z) { return z.id === arg; })[0]; return "릴스 · " + (x ? x.t : arg); }
   return "대표 카드";
 }
@@ -92,6 +93,12 @@ function aiDeck(ctx) {
         return [{ name: "오늘한장", cv: onePageCard(R1, iss, CARD_NEWS.items || []) }];
       });
     });
+  }
+  if (kind === "tpl") {   // v10.2 양식집: 정해진 틀의 앱 카드가 재료, 결과도 같은 틀
+    var tc = arg.split(":")[0], ts = arg.split(":")[1];
+    if (!briefState.result) return Promise.reject(new Error("오늘의 브리핑 데이터가 아직 없어요"));
+    var pre = tc === "quote" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : tc === "table" && typeof pkEnsure === "function" ? pkEnsure(briefState.result).catch(function () { return null; }) : Promise.resolve();
+    return pre.then(function () { var r = cap(function () { CARD_MKT = cMktInfo(briefState.result); var cv = tplBuild(tc, ts); return cv ? [{ name: TPL_CAT[tc].name, cv: cv }] : []; }); r.tpl = tc; return r; });
   }
   if (kind === "reel") {
     var needD = REEL_DATA[arg] && arg !== "loss";
@@ -232,7 +239,7 @@ function aiOpen(ctx, btn) {
     var names = (d.list || []).map(function (it) { return it.name; });
     var spec = null; try { spec = ctx.indexOf("reel:") === 0 ? null : ocDeckSpec(ctx, names, { draft: !!d.draft }); } catch (e) {}
     if (!d.lines.length) { alert("카드 묶음에서 읽을 내용이 없어요. 데이터가 준비된 뒤 다시 눌러 주세요."); return; }
-    aiStudio({ ctx: ctx, title: aiTitleOf(ctx), lines: d.lines, list: d.list, spec: spec, reel: d.reel, draft: !!d.draft });
+    aiStudio({ ctx: ctx, title: aiTitleOf(ctx), lines: d.lines, list: d.list, spec: spec, reel: d.reel, draft: !!d.draft, tpl: d.tpl || "" });
   }).catch(function (e) { if (btn) { btn.textContent = old; btn.disabled = false; } alert("준비하지 못했어요: " + e.message); });
 }
 function aiStudioClose() { var el = document.getElementById("aiStudio"); if (el) el.remove(); document.removeEventListener("keydown", aiStudioKey, true); }
@@ -240,7 +247,7 @@ function aiStudioKey(e) { if (e.key === "Escape" && document.getElementById("aiS
 function aiStudio(cfg) {
   aiStudioClose(); if (typeof ocStudioClose === "function") ocStudioClose();
   var st = { ctx: cfg.ctx, title: cfg.title, custom: !!cfg.custom, lines: cfg.lines || [], list: cfg.list || [], spec: cfg.spec, reel: cfg.reel, draft: cfg.draft,
-    mode: AI_LAST_MODE, imgs: [], plan: null, planBy: "", bgImg: null, fullImg: null, fullUrl: null, ocr: null, ly: "all", url: null, need: "", hint: "" };
+    mode: AI_LAST_MODE, imgs: [], plan: null, planBy: "", bgImg: null, fullImg: null, fullUrl: null, ocr: null, ly: "all", url: null, need: "", hint: "", tpl: cfg.tpl || "" };
   st.deckNames = st.list.map(function (it) { return ocDeckName(it.name); });
   st.mk = st.spec && st.spec.mk ? st.spec.mk : null;
   st.src = st.spec && st.spec.src ? st.spec.src : st.custom ? "" : "카드 묶음 데이터 기준 · 투자 권유 아님";
@@ -262,6 +269,7 @@ function aiStudio(cfg) {
     '<div class="aiPanel" data-p="2"><h4><i>2</i>요청 <small>비워 두면 기본 구성으로 만듭니다</small></h4>' +
     '<div class="aiGrid2"><label class="aiLbl">주제(말머리)<input class="aiKick" placeholder="비우면 자동"></label><label class="aiLbl">목적<select class="aiGoal">' + GOALS.map(function (g) { return '<option>' + g + '</option>'; }).join("") + '</select></label></div>' +
     '<label class="aiLbl">원하는 카드 형태·의견<textarea class="aiReq" placeholder="예) 질문형 제목, 초보 관점, 급락 쪽 강조, 순위 대신 체크리스트 (Ctrl+Enter = 만들기)"></textarea></label>' +
+    '<label class="aiLbl">카드 양식 <small>양식집 틀을 고르면 그 틀 안에 내용만 들어가요 (1080×1350)</small><select class="aiTpl"><option value="">릴스 기본 (9:16 · 자유 구성)</option>' + (typeof TPL_CAT !== "undefined" ? Object.keys(TPL_CAT).filter(function (k) { return k !== "calendar"; }).map(function (k) { return '<option value="' + k + '"' + (k === st.tpl ? ' selected' : '') + '>' + TPL_CAT[k].icon + ' ' + TPL_CAT[k].name + ' — ' + TPL_CAT[k].desc + '</option>'; }).join("") : "") + '</select></label>' +
     '<label class="aiLbl">AI 사용 범위</label><div class="aiModes">' + Object.keys(AI_MODE_NM).map(function (k) { return '<button data-mode="' + k + '"><b>' + AI_MODE_NM[k][0] + '</b><small>' + AI_MODE_NM[k][1] + '</small></button>'; }).join("") + '</div>' +
     '<button class="primary aiMake" data-plan>만들기</button><div class="aiCost"></div></div></div>' +
     '<div class="aiPanel aiRes" data-p="3"><h4><i>3</i>결과 · 검증 <small>왼쪽 재료와 가운데 카드, 오른쪽 숫자 검사를 함께 보세요</small></h4>' +
@@ -290,6 +298,8 @@ function aiStudio(cfg) {
     if (st.plan) render();
   }
   Array.prototype.forEach.call(el.querySelectorAll("[data-mode]"), function (b) { b.onclick = function () { setMode(b.getAttribute("data-mode")); }; });
+  $a(".aiTpl").onchange = function () { st.tpl = this.value; $a("[data-save]").textContent = st.tpl ? "카드 저장 (1080×1350)" : "카드 저장 (1080×1920)"; if (st.plan) render(); };
+  if (st.tpl) $a("[data-save]").textContent = "카드 저장 (1080×1350)";
   // 참고 이미지 (+ 붙여넣기)
   function addFiles(files) { files = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type); }).slice(0, 3 - st.imgs.length); return Promise.all(files.map(ocImgShrink)).then(function (us) { us.filter(Boolean).forEach(function (u) { st.imgs.push(u); }); thumbs(); }); }
   $a(".aiImgAdd input").onchange = function () { var f = this.files; addFiles(f); this.value = ""; };
@@ -327,7 +337,7 @@ function aiStudio(cfg) {
     if (!st.lines.length) { alert("①에 재료(원본 데이터)를 넣어 주세요."); return; }
     b.disabled = true; b.textContent = useAi ? "AI가 기획하는 중… (10~60초)" : "만드는 중…"; step(3);
     $a(".aiRes").scrollIntoView({ behavior: "smooth", block: "start" });
-    var request = ["목적: " + goal, kick ? "말머리는 '" + kick + "'로" : "", req].filter(Boolean).join("\n");
+    var request = ["목적: " + goal, kick ? "말머리는 '" + kick + "'로" : "", req, st.tpl && typeof TPL_HINT !== "undefined" ? "카드 양식(반드시 이 모양으로): " + TPL_HINT[st.tpl] : ""].filter(Boolean).join("\n");
     var p = !useAi ? Promise.resolve({ plan: aiRulePlan(st), by: "기본 구성(앱 데이터 그대로 · AI 없음)" }) :
       aiCall({ mode: "plan", title: st.title, deck: st.deckNames.join(", "), lines: st.lines.map(function (l) { return { id: l.id, text: (l.card ? "[" + l.card + "] " : "") + l.text }; }), request: request, images: st.imgs }).then(function (j) {
         if (j && j.ok && j.out) return { plan: aiCleanPlan(j.out), by: "AI 기획 · " + j.model + (j.tries && j.tries.length > 1 ? " (" + j.tries.join(" → ") + ")" : "") };
@@ -378,8 +388,9 @@ function aiStudio(cfg) {
       if (!st.fullImg) { $a(".aiPh").hidden = false; $a(".aiPh").innerHTML = "AI가 카드 전체를 그리는 중이에요"; img.hidden = true; st.url = null; }
       else { url = aiFullCard(st).toDataURL("image/jpeg", 0.92); }
     } else {
-      var draw = function () { return aiPlanCard(st); };
+      var draw = function () { return st.tpl && typeof tplFromPlan === "function" ? (tplFromPlan(st.tpl, st.plan, st) || aiPlanCard(st)) : aiPlanCard(st); };
       var cv = ocWithLog(draw); drawn = OC_DRAWN.slice();
+      if (st.tpl && st.mode === "bg") banner("", "양식 카드는 틀이 정해져 있어 배경 이미지를 쓰지 않아요 — 글·숫자만 AI가 골라 넣었어요.");
       if (st.draft && typeof perStamp === "function") perStamp(cv, "검토용 · 발행 금지");
       url = st.ly === "all" ? cv.toDataURL("image/png") : ocLayerUrl(draw, st.ly);
     }
