@@ -202,8 +202,8 @@ function rWrap(g, s, x, y, maxW, size, weight, color, lh, maxLines, align) {
   cFont(g, size, weight); var words = String(s).split(" "), lines = [], line = "";
   words.forEach(function (w) { var t = line ? line + " " + w : w; if (g.measureText(t).width <= maxW) { line = t; return; } if (line) lines.push(line); line = w; while (g.measureText(line).width > maxW && line.length > 1) { var k = line.length; while (k > 1 && g.measureText(line.slice(0, k)).width > maxW) k--; lines.push(line.slice(0, k)); line = line.slice(k); } });
   if (line) lines.push(line);
-  if (maxLines && lines.length > maxLines) { lines = lines.slice(0, maxLines); lines[maxLines - 1] = lines[maxLines - 1].replace(/.$/, "…"); }
-  lines.forEach(function (l, k) { cText(g, l, x, y + k * (lh || size * 1.45), size, weight, color, align); });
+  if (maxLines && lines.length > maxLines) { var rest = lines.slice(maxLines - 1).join(" "); lines = lines.slice(0, maxLines - 1); lines.push(rest); }   // v10.4: 자르지 않고 마지막 줄을 좁혀서 전부
+  lines.forEach(function (l, k) { cFont(g, size, weight); if (g.measureText(l).width > maxW) CARD_FIT = { s: l, w: maxW }; cText(g, l, x, y + k * (lh || size * 1.45), size, weight, color, align); });
   return y + lines.length * (lh || size * 1.45);
 }
 function rWrapN(g, s, maxW, size, weight) { cFont(g, size, weight); var n = 1, line = ""; String(s).split(" ").forEach(function (w) { var t = line ? line + " " + w : w; if (g.measureText(t).width <= maxW) line = t; else { n++; line = w; } }); return n; }

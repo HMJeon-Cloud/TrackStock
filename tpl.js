@@ -138,7 +138,9 @@ function tplTable(c, s) {
     r.forEach(function (v, i) {
       var hl = (s.hlCols || []).indexOf(i) >= 0, cx = (xs[i] + xs[i + 1]) / 2, mw = xs[i + 1] - xs[i] - 14, fs = i === 0 ? 27 : 30;
       if (hl) { var tw2 = cW(g, v, fs, 900) + 16; cRound(g, cx - tw2 / 2, yy + rh / 2 - fs * 0.62, tw2, fs * 1.25, 4, TPL_C.hl); }
-      cText(g, cFit(g, String(v), mw, fs, i === 0 ? 800 : 900), cx, yy + rh / 2 + fs * 0.36, fs, i === 0 ? 800 : 900, i === 0 ? TPL_C.ink : tplCol(v), "center");
+      var wt = i === 0 ? 800 : 900, col = i === 0 ? TPL_C.ink : tplCol(v);
+      if (cW(g, String(v), fs * 0.8, wt) > mw && rh >= 64) { var ws = Math.min(fs - 4, (rh - 14) / 2 / 1.2), nl = Math.min(2, cWrapCount(g, String(v), mw, ws, 700)); cWrap(g, String(v), cx, yy + rh / 2 - (nl - 1) * ws * 0.6 + ws * 0.36, mw, ws, 700, col, ws * 1.2, 2, "center"); }   // v10.4: 긴 칸은 두 줄
+      else cText(g, cFit(g, String(v), mw, fs, wt), cx, yy + rh / 2 + fs * 0.36, fs, wt, col, "center");
     });
     g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.beginPath(); g.moveTo(P + bx, yy + rh); g.lineTo(P + W, yy + rh); g.stroke();
   });
@@ -232,9 +234,9 @@ function tplLines(c, s) {
     if (r.icon) cText(g, r.icon, P + 70, mid + 16, 40, 400, TPL_C.ink, "center");
     cText(g, cFit(g, r.left, 330, 38, 900), P + 130, mid + 14, 38, 900, TPL_C.ink);
     cText(g, "➜", P + 500, mid + 14, 38, 900, TPL_C.red, "center");
-    var rs = 42; while (rs > 26 && cW(g, r.right, rs, 900) > W - 600) rs -= 2;
-    cText(g, r.right, P + 560, mid + 14, rs, 900, TPL_C.red);
-    if (r.sub) cText(g, cFit(g, r.sub, W - 600, 19, 600), P + 560, mid + 42, 19, 600, TPL_C.sub);
+    var rw = W - 580, rs = 40; while (rs > 32 && cW(g, r.right, rs, 900) > rw) rs -= 2;
+    if (cW(g, r.right, rs, 900) <= rw) { cText(g, r.right, P + 560, mid + (r.sub ? 6 : 14), rs, 900, TPL_C.red); if (r.sub) cText(g, cFit(g, r.sub, rw, 19, 600), P + 560, mid + 36, 19, 600, TPL_C.sub); }
+    else { var ws = Math.max(20, Math.min(30, (rh - 24) / 2 / 1.25)), nl = Math.min(2, cWrapCount(g, r.right, rw, ws, 800)); cWrap(g, r.right, P + 560, mid - (nl - 1) * ws * 0.62 + ws * 0.36, rw, ws, 800, TPL_C.red, ws * 1.25, 2); }   // v10.4: 길면 두 줄로
     if (i < rows.length - 1) { g.setLineDash([8, 8]); g.strokeStyle = TPL_C.shade; g.lineWidth = 2; g.beginPath(); g.moveTo(P + 30, yy + rh); g.lineTo(P + W - 30, yy + rh); g.stroke(); g.setLineDash([]); }
   });
   y += rows.length * rh + 40;
@@ -270,7 +272,7 @@ var TPL_HINT = {
   lines: "layout=list · items 7개 한 줄 상식: label=왼쪽(4자 이내), value=오른쪽(8자 이내), sub=부연(16자 이내), hero=펀치라인(label 왼쪽, value 오른쪽), cta=맺음말"
 };
 var TPL_DRAW = { market: tplMarket, rank: tplRank, table: tplTable, compare: tplCompare, quote: tplQuote, timeline: tplTimeline, grid: tplGrid, lines: tplLines, calendar: tplCalendar };
-function tplCard(cat, meta, spec) { meta = meta || {}; meta.cat = cat; var c = tplNew(meta); return TPL_DRAW[cat](c, spec || {}); }
+function tplCard(cat, meta, spec) { meta = meta || {}; meta.cat = cat; if (meta.sub) meta.sub = String(meta.sub).replace(/코인 코인/g, "코인").replace(/전체 종목/g, "전체"); var c = tplNew(meta); return TPL_DRAW[cat](c, spec || {}); }
 
 /* ============================================================
    앱 데이터 → 명세 (양식집 화면용) · 시장별로 내용만 바뀐다
@@ -291,8 +293,18 @@ var TPL_SOURCES = {
   lines: [{ id: "terms", t: "용어 한 입 7개" }, { id: "mind", t: "하락장 멘탈 체크 7줄" }],
   calendar: [{ id: "month", t: "이번 달 달력" }]
 };
-function tplSpec(cat, srcId) {
-  var R = typeof briefState !== "undefined" && briefState.result; if (!R) return null;
+/* v10.4 시장 선택: 전체·국내·미국·코인 — 브리핑 화면의 시장과 달라도 그 시장으로 다시 계산 (시장마다 1번만, 캐시) */
+var TPL_MKS = [["all", "전체"], ["kr", "🇰🇷 국내"], ["us", "🇺🇸 미국"], ["coin", "₿ 코인"]], TPL_RC = {};
+function tplR(mk) {
+  if (typeof briefState === "undefined" || !briefState.recent) return null;
+  mk = mk || briefState.market || "all";
+  if (briefState.result && briefState.market === mk && briefState.result.mode === "day") return briefState.result;
+  var key = mk + "|" + (briefState.recent.generated || "");
+  if (!TPL_RC[key]) { try { TPL_RC[key] = briefCompute(briefState.recent, { mode: "day", market: mk, popular: briefState.popular }); } catch (e) { console.warn(e); return null; } }
+  return TPL_RC[key];
+}
+function tplSpec(cat, srcId, mkSel) {
+  var R = tplR(mkSel); if (!R) return null;
   var mk = typeof cMktInfo === "function" ? cMktInfo(R) : null, mkName = mk ? mk.name : "전체", unit = R.market === "coin" ? "코인" : "종목", date = tplDateTxt(R), src = tplSrc(R);
   var S = (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); });
   function r1(s) { return s.ret1 != null ? s.ret1 : s.ret; }
@@ -302,7 +314,7 @@ function tplSpec(cat, srcId) {
     var ft = mv.slice(0, 3).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
     var pop = (R.popular || []).filter(function (s) { return mv.indexOf(s) < 0; }).slice(0, 8).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
     var hiN0 = S.filter(function (s) { return s.newHigh; }).length;
-    return { meta: { title: mkName === "미국" ? "새벽의 미장" : mkName === "코인" ? "오늘의 코인" : "오늘의 국장", sub: date + " · 전일 대비", source: src, catName: mkName + " 마감" }, spec: { indexes: ix, features: ft, chips: pop, foot: "오른 " + unit + " " + Math.round(R.temp.upPct * 100) + "%  ·  20일선 위 " + Math.round(R.temp.abovePct * 100) + "%  ·  52주 신고가 " + hiN0 + "개" } };
+    return { meta: { title: mkName === "미국" ? "새벽의 미장" : mkName === "코인" ? "오늘의 코인" : mkName === "국내" ? "오늘의 국장" : "오늘의 시장", sub: date + " · 전일 대비", source: src, catName: mkName + " 마감" }, spec: { indexes: ix, features: ft, chips: pop, foot: "오른 " + unit + " " + Math.round(R.temp.upPct * 100) + "%  ·  20일선 위 " + Math.round(R.temp.abovePct * 100) + "%  ·  52주 신고가 " + hiN0 + "개" } };
   }
   if (cat === "rank") {
     var list, title, val, tag;
@@ -330,7 +342,7 @@ function tplSpec(cat, srcId) {
     (lead.facts || []).slice(0, 4).forEach(function (f) { var m = String(f).match(/^(.*)\s(\S+)$/); facts.push(m ? [m[1], m[2]] : [String(f), ""]); });
     if (!facts.length) R.indexRow.slice(0, 4).forEach(function (i) { facts.push([i.name, tplPct(i.ret, 1)]); });
     var desc = cNewsClean(it.desc || ""), paras = desc ? desc.split(/(?<=다\.)\s+/).filter(Boolean).slice(0, 3) : ["기사 본문 요약이 없어요 — 제목과 숫자만 함께 보세요."];
-    return { meta: { title: "\"" + (t.length > 24 ? t.slice(0, 23) + "…" : t) + "\"", source: "네이버 뉴스 · " + (it.press || "") + " · " + date, source2: "숫자는 야후 파이낸스 종가", catName: "오늘의 기사" }, spec: { tag: "오늘의 기사", person: { name: it.press || "언론", role: ({ main: "국내 증시 기사", world: "해외 증시 기사", fx: "환율 기사", rate: "금리 기사", coin: "코인 기사", stock: "종목 기사" })[it.cat] || "오늘 가장 관심 가는 기사", facts: facts }, paras: paras } };
+    return { meta: { title: "\"" + t + "\"", source: "네이버 뉴스 · " + (it.press || "") + " · " + date, source2: "숫자는 야후 파이낸스 종가", catName: "오늘의 기사" }, spec: { tag: "오늘의 기사", person: { name: it.press || "언론", role: ({ main: "국내 증시 기사", world: "해외 증시 기사", fx: "환율 기사", rate: "금리 기사", coin: "코인 기사", stock: "종목 기사" })[it.cat] || "오늘 가장 관심 가는 기사", facts: facts }, paras: paras } };
   }
   if (cat === "timeline") {
     if (srcId === "policy" && typeof pubPolicyAll === "function") { var pl = pubPolicyAll()[0]; if (pl) { var blocks = []; if (pl.table) blocks.push({ date: (pl.eff || "").split(" ")[0].replace(/\.$/, "").replace(/\./, "\n"), title: pl.table.head.join(" · "), items: pl.table.rows.slice(0, 6).map(function (r) { return r[0] + " → [[" + r.slice(1).join(" · ") + "]]"; }) }); if (pl.bullets) blocks.push({ date: "추가\n할인", title: pl.bullets.title, items: pl.bullets.items.slice(0, 5).map(function (x) { return x.replace(/(\d[\d.]*%p?)/g, "[[$1]]"); }) }); return { meta: { title: cPlain(pl.title || pl.t), sub: pl.sub || "", source: pl.src || "", catName: "정책 카드" }, spec: { blocks: blocks } }; } }
@@ -347,7 +359,7 @@ function tplSpec(cat, srcId) {
   if (cat === "lines") {
     if (srcId === "mind") return { meta: { title: "하락장 멘탈 체크", sub: "떨어질 때 할 일 → 하지 말 일", source: "우상향연구소 원칙", catName: "투자 상식" }, spec: { rows: [{ icon: "📉", left: "빠지니", right: "낙폭 확인", sub: "고점 대비 몇 %인지 숫자부터" }, { icon: "📰", left: "무섭니", right: "뉴스 끄기", sub: "제목 크기 ≠ 숫자 크기" }, { icon: "🗓️", left: "적립일", right: "그대로", sub: "규칙이 감정을 이긴다" }, { icon: "🧮", left: "비중", right: "견딜 만큼만", sub: "못 견딜 낙폭 = 비중 과다" }, { icon: "⏳", left: "회복", right: "기간을 본다", sub: "얼마나보다 언제까지" }, { icon: "💰", left: "현금", right: "나눠 쓰기", sub: "한 번에 다 넣지 않기" }, { icon: "📓", left: "기록", right: "남기기", sub: "다음 하락장의 나를 위해" }], punch: { left: "결국", right: "계획이 멘탈이다" }, closing: "숫자를 먼저 보고, 규칙대로 움직이는 사람이 남아요" } };
     var terms = []; for (var i = 0; i < 7; i++) terms.push(pubTerm(i));
-    return { meta: { title: "주식 용어 7개\n한 줄로", sub: "뉴스에 매일 나오는 말 · 한 줄 정의", source: "우상향연구소 용어 한 입", catName: "용어" }, spec: { rows: terms.map(function (tm) { var nm = tm[0].split(" (")[0]; return { icon: "📌", left: nm, right: tm[1].length > 14 ? tm[1].slice(0, 13) + "…" : tm[1], sub: tm[1] }; }), punch: { left: "용어를 알면", right: "뉴스가 숫자로 보인다" } } };
+    return { meta: { title: "주식 용어 7개\n한 줄로", sub: "뉴스에 매일 나오는 말 · 한 줄 정의", source: "우상향연구소 용어 한 입", catName: "용어" }, spec: { rows: terms.map(function (tm) { var nm = tm[0].split(" (")[0]; return { icon: "📌", left: nm, right: tm[1] }; }), punch: { left: "용어를 알면", right: "뉴스가 숫자로 보인다" } } };
   }
   if (cat === "calendar") {
     var now = new Date(Date.now() + 9 * 3600e3), yy = now.getUTCFullYear(), mm = now.getUTCMonth() + 1, ev = {};
@@ -356,7 +368,8 @@ function tplSpec(cat, srcId) {
   }
   return null;
 }
-function tplBuild(cat, srcId) { var x = tplSpec(cat, srcId); if (!x) return null; return tplCard(cat, x.meta, x.spec); }
+function tplBuild(cat, srcId, mk) { var x = tplSpec(cat, srcId, mk); if (!x) return null; return tplCard(cat, x.meta, x.spec); }
+function tplPrep(cat, mk) { var R = tplR(mk); if (!R) return Promise.resolve(); return cat === "quote" && typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : cat === "table" && typeof pkEnsure === "function" ? pkEnsure(R).catch(function () { return null; }) : Promise.resolve(); }
 
 /* ============================================================
    AI 기획(plan) → 양식 (같은 틀에 AI가 고른 내용만) — plan: {kicker,title,subtitle,layout,hero,items[{label,value,sub}],cta}
@@ -381,27 +394,29 @@ function tplFromPlan(cat, plan, st) {
 /* ============================================================
    양식집 화면 (채널 자료 탭)
    ============================================================ */
-var TPL_UI = { cat: "market", src: null };
+var TPL_UI = { cat: "market", src: null, mk: null };
 function tplPanel(box) {
   var cats = Object.keys(TPL_CAT), cat = TPL_UI.cat, srcs = TPL_SOURCES[cat] || [], src = TPL_UI.src && srcs.some(function (s) { return s.id === TPL_UI.src; }) ? TPL_UI.src : (srcs[0] && srcs[0].id);
-  var h = '<div class="briefDim" style="margin-bottom:8px">카테고리마다 틀은 고정, 내용만 바뀌어요 (1080×1350). 아래에서 틀 → 내용 출처를 고르고 <b>미리보기</b> · <b>저장</b>. AI로 만들 때도 ✨ 버튼을 누르면 같은 틀에 AI가 고른 내용만 들어가요.</div>';
+  var mk = TPL_UI.mk || (typeof briefState !== "undefined" && briefState.market) || "all"; TPL_UI.mk = mk;
+  var h = '<div class="pills seg" style="margin-bottom:8px">' + TPL_MKS.map(function (m) { return '<button data-tmk="' + m[0] + '"' + (m[0] === mk ? ' class="active"' : '') + '>' + m[1] + '</button>'; }).join("") + '</div>';
+  h += '<div class="briefDim" style="margin-bottom:8px">카테고리마다 틀은 고정, 내용만 바뀌어요 (1080×1350). 아래에서 틀 → 내용 출처를 고르고 <b>미리보기</b> · <b>저장</b>. AI로 만들 때도 ✨ 버튼을 누르면 같은 틀에 AI가 고른 내용만 들어가요.</div>';
   h += '<div class="pills" style="margin-bottom:8px">' + cats.map(function (k) { return '<button data-tcat="' + k + '"' + (k === cat ? ' class="active"' : '') + '>' + TPL_CAT[k].icon + ' ' + TPL_CAT[k].name + '</button>'; }).join("") + '</div>';
   h += '<div class="briefDim" style="margin-bottom:8px"><b>' + TPL_CAT[cat].name + '</b> — ' + TPL_CAT[cat].desc + ' · 쓰임: ' + TPL_CAT[cat].use + '</div>';
   h += '<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><select class="tplSrc">' + srcs.map(function (s) { return '<option value="' + s.id + '"' + (s.id === src ? ' selected' : '') + '>' + s.t + '</option>'; }).join("") + '</select>' +
-    '<button class="primary" data-tpl-make>🖼️ 미리보기</button><button class="chip" data-tpl-save disabled>⬇ 저장</button>' + (typeof aiBtn === "function" ? aiBtn("tpl:" + cat + ":" + src, "✨ AI로 같은 틀") : "") + '</div>';
+    '<button class="primary" data-tpl-make>🖼️ 미리보기</button><button class="chip" data-tpl-save disabled>⬇ 저장</button>' + (typeof aiBtn === "function" ? aiBtn("tpl:" + cat + ":" + src + ":" + mk, "✨ AI로 같은 틀") : "") + '</div>';
   h += '<div class="tplPrev"><img alt="" style="width:100%;max-width:540px;border-radius:12px;display:none;box-shadow:0 4px 18px rgba(0,0,0,.2)"><div class="briefDim tplPh">미리보기를 누르면 여기에 카드가 나와요</div></div>';
   box.innerHTML = h;
+  Array.prototype.forEach.call(box.querySelectorAll("[data-tmk]"), function (b) { b.onclick = function () { TPL_UI.mk = b.getAttribute("data-tmk"); tplPanel(box); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-tcat]"), function (b) { b.onclick = function () { TPL_UI.cat = b.getAttribute("data-tcat"); TPL_UI.src = null; tplPanel(box); }; });
   box.querySelector(".tplSrc").onchange = function () { TPL_UI.src = this.value; tplPanel(box); };
   var img = box.querySelector(".tplPrev img"), ph = box.querySelector(".tplPh"), url = null;
   box.querySelector("[data-tpl-make]").onclick = function () {
     var btn = this; btn.textContent = "만드는 중…";
-    var pre = cat === "quote" && typeof cardsNewsFetch === "function" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : cat === "table" && typeof pkEnsure === "function" && briefState.result ? pkEnsure(briefState.result).catch(function () { return null; }) : Promise.resolve();
-    Promise.resolve(pre).then(function () { return document.fonts && document.fonts.ready ? document.fonts.ready : null; }).then(function () {
-      var cv; try { cv = tplBuild(cat, src); } catch (e) { console.warn(e); alert("만들지 못했어요: " + e.message); }
+    Promise.resolve(tplPrep(cat, mk)).then(function () { return document.fonts && document.fonts.ready ? document.fonts.ready : null; }).then(function () {
+      var cv; try { cv = tplBuild(cat, src, mk); } catch (e) { console.warn(e); alert("만들지 못했어요: " + e.message); }
       btn.textContent = "🖼️ 미리보기"; if (!cv) { ph.textContent = "오늘의 브리핑 데이터가 아직 없어요 — 브리핑 화면을 먼저 열어 주세요"; return; }
       url = cv.toDataURL("image/png"); img.src = url; img.style.display = "block"; ph.style.display = "none"; box.querySelector("[data-tpl-save]").disabled = false;
     });
   };
-  box.querySelector("[data-tpl-save]").onclick = function () { if (!url) return; cardsDownload({ url: url, file: "uphill.lab_" + TPL_CAT[cat].name + "_" + pubToday().replace(/-/g, "") + ".png" }); };
+  box.querySelector("[data-tpl-save]").onclick = function () { if (!url) return; cardsDownload({ url: url, file: "uphill.lab_" + TPL_CAT[cat].name + "_" + ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[mk] + "_" + pubToday().replace(/-/g, "") + ".png" }); };
 }

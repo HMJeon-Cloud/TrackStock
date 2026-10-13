@@ -135,7 +135,7 @@ function issNewsHit(name, news) {
   for (var i = 0; i < news.length; i++) { var t = cNewsClean(news[i].title); if (t.replace(/\s+/g, "").indexOf(key) >= 0) return t; }
   return null;
 }
-function issShort(t, n) { t = String(t).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1).replace(/[\s,·]+$/, "") + "…" : t; }
+function issShort(t, n) { t = String(t).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim(); if (t.length <= n) return t; var cut = t.slice(0, n + 6), sp = Math.max(cut.lastIndexOf(" "), cut.lastIndexOf("…"), cut.lastIndexOf(",")); return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,·…]+$/, ""); }   // v10.4: 말줄임 대신 단어 끝에서 끊기
 function issHeadline(list, R, news) {
   var out = [], seed = Math.floor((Date.now() + 9 * 3600e3) / 86400e3);
   if (!R) return null;

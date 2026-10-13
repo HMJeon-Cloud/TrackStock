@@ -53,7 +53,7 @@ function aiTitleOf(ctx) {
   if (kind === "term") return "용어 한 입";
   if (kind === "issues") return "핵심 이슈 5";
   if (kind === "onepage") { var mk1 = R && cMktInfo(R); return (mk1 ? mk1.name : "전체") + " 오늘 한 장"; }
-  if (kind === "tpl") { var tc = TPL_CAT[arg.split(":")[0]]; return "양식 · " + (tc ? tc.name : arg); }
+  if (kind === "tpl") { var tc = TPL_CAT[arg.split(":")[0]], tmk = ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[arg.split(":")[2]] || ""; return "양식 · " + (tc ? tc.name : arg) + (tmk ? " · " + tmk : ""); }
   if (kind === "reel") { var x = REEL_LIST.filter(function (z) { return z.id === arg; })[0]; return "릴스 · " + (x ? x.t : arg); }
   return "대표 카드";
 }
@@ -95,10 +95,9 @@ function aiDeck(ctx) {
     });
   }
   if (kind === "tpl") {   // v10.2 양식집: 정해진 틀의 앱 카드가 재료, 결과도 같은 틀
-    var tc = arg.split(":")[0], ts = arg.split(":")[1];
-    if (!briefState.result) return Promise.reject(new Error("오늘의 브리핑 데이터가 아직 없어요"));
-    var pre = tc === "quote" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : tc === "table" && typeof pkEnsure === "function" ? pkEnsure(briefState.result).catch(function () { return null; }) : Promise.resolve();
-    return pre.then(function () { var r = cap(function () { CARD_MKT = cMktInfo(briefState.result); var cv = tplBuild(tc, ts); return cv ? [{ name: TPL_CAT[tc].name, cv: cv }] : []; }); r.tpl = tc; return r; });
+    var tc = arg.split(":")[0], ts = arg.split(":")[1], tm = arg.split(":")[2] || null;
+    if (!briefState.recent) return Promise.reject(new Error("오늘의 브리핑 데이터가 아직 없어요"));
+    return tplPrep(tc, tm).then(function () { var r = cap(function () { CARD_MKT = cMktInfo(tplR(tm)); var cv = tplBuild(tc, ts, tm); return cv ? [{ name: TPL_CAT[tc].name, cv: cv }] : []; }); r.tpl = tc; return r; });
   }
   if (kind === "reel") {
     var needD = REEL_DATA[arg] && arg !== "loss";
@@ -131,6 +130,8 @@ function aiItemCheck(st, it) {
 }
 
 /* ---------- ② 기획 (규칙 · AI) ---------- */
+/* v10.4 숫자·단어 중간에서 자르지 않기: 길면 n자 근처의 띄어쓰기·구분점에서 끊는다 */
+function aiCut(t, n) { t = String(t || ""); if (t.length <= n) return t; var c = t.slice(0, n + 10), k = Math.max(c.lastIndexOf(" "), c.lastIndexOf("·"), c.lastIndexOf(",")); return (k >= n * 0.5 ? c.slice(0, k) : t).replace(/[\s·,]+$/, ""); }
 function aiRulePlan(st) {
   var sp = st.spec, L = st.lines;
   if (sp) {
@@ -142,15 +143,15 @@ function aiRulePlan(st) {
   if (st.reel) {
     var r = st.reel;
     return { kicker: r.t || "", title: cPlain(r.hook.join("\n")), subtitle: "", layout: "list", hero: { label: "", value: "", ref: "" },
-      items: r.items.slice(0, 5).map(function (x) { return { label: x[0], value: x[1].length <= 24 ? x[1] : "", sub: x[1].length > 24 ? x[1].slice(0, 30) : "", ref: aiRefFind(L, x[1].length <= 24 ? x[1] : x[0], x[0]) }; }), cta: n2cta(st), visual: "" };
+      items: r.items.slice(0, 5).map(function (x) { return { label: x[0], value: x[1].length <= 24 ? x[1] : "", sub: x[1].length > 24 ? aiCut(x[1], 30) : "", ref: aiRefFind(L, x[1].length <= 24 ? x[1] : x[0], x[0]) }; }), cta: n2cta(st), visual: "" };
   }
   // 내 글 등: 첫 줄 제목, 숫자가 있는 줄을 항목으로
   var first = L[0] ? L[0].text : st.title, items = [];
   L.slice(1).forEach(function (l) {
     if (items.length >= 5) return;
     var m = l.text.replace(/^[-·•*]\s*/, "").match(/^(.{1,20}?)\s*[:：]\s*(.+)$/);
-    if (m) items.push({ label: m[1], value: m[2].slice(0, 24), sub: "", ref: l.id });
-    else if (/\d/.test(l.text)) items.push({ label: l.text.slice(0, 20), value: "", sub: "", ref: l.id });
+    if (m) items.push({ label: m[1], value: aiCut(m[2], 24), sub: "", ref: l.id });
+    else if (/\d/.test(l.text)) items.push({ label: aiCut(l.text, 22), value: "", sub: "", ref: l.id });
   });
   return { kicker: st.hint || "", title: first.replace(/^\[데이터\]\s*/, ""), subtitle: "", layout: "list", hero: { label: "", value: "", ref: "" }, items: items, cta: "자세한 내용은 게시물에서", visual: "" };
 }

@@ -16,42 +16,48 @@ var NB_WORD = { label: "연구노트", obs: "관찰", next: "다음 장 →", sa
 function nbJosa(w, pair) { var ch = String(w).slice(-1), code = ch.charCodeAt(0), bat = code >= 0xAC00 && code <= 0xD7A3 ? (code - 0xAC00) % 28 !== 0 : /[0-9]$/.test(ch) ? /[013678]$/.test(ch) : /[^aeiouAEIOU\s]$/.test(ch) && /[A-Za-z]$/.test(ch) ? /[lmnrLMNR]$/.test(ch) : false; var p = pair.split("/"); return w + (bat ? p[0] : p[1]); }
 function nbName(sym) { return NB_ASSETS[sym] || (typeof chName === "function" ? chName(sym) : sym); }
 
-/* ---------- 틀 ---------- */
+/* ---------- 틀 (v10.4 uphill.lab 공통 얼굴: 위 검정 띠 · 아이보리 종이 · 우상향 선 · 아래 검정 띠) ---------- */
+var NB_PAPER = "#fbf8f1", NB_INK = "#14161c", NB_HI = "#b8913f";
+function nbBand(g) {
+  g.fillStyle = NB_PAPER; g.fillRect(0, 0, NB.W, NB.H);
+  g.fillStyle = NB_INK; g.fillRect(0, 0, NB.W, 72); g.fillStyle = NB_C.gold; g.fillRect(0, 72, NB.W, 3);
+  if (typeof cLogo === "function") cLogo(g, NB.PAD, 0);
+  var tag = "📓 " + NB_WORD.label, tw = cW(g, tag, 20, 800) + 32;
+  cRound(g, NB.W - NB.PAD - tw, 17, tw, 38, 19, null); g.strokeStyle = NB_C.gold; g.lineWidth = 2; g.stroke();
+  cText(g, tag, NB.W - NB.PAD - tw / 2, 43, 20, 800, NB_C.gold, "center");
+}
 function nbNew() {
   var cv = document.createElement("canvas"); cv.width = NB.W; cv.height = NB.H;
   var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
-  g.fillStyle = NB_C.black; g.fillRect(0, 0, NB.W, NB.SPLIT);
-  g.fillStyle = NB_C.light; g.fillRect(0, NB.SPLIT, NB.W, NB.H - NB.SPLIT);
-  var gl = g.createLinearGradient(0, 0, NB.W, 0); gl.addColorStop(0, NB_C.gold2); gl.addColorStop(0.6, NB_C.gold); gl.addColorStop(1, "rgba(230,197,122,0.25)");
-  g.fillStyle = gl; g.fillRect(0, NB.SPLIT - 4, NB.W, 4);
+  nbBand(g);
+  if (typeof cUphill === "function") cUphill(g, NB.PAD, NB.SPLIT - 16, NB.W - NB.PAD * 2);
   return { cv: cv, g: g, y: NB.SPLIT + 60 };
 }
-/* 위 검정: "연구노트 · 관찰 01" (금색 작은 글씨) + 오른쪽 쪽번호 + 큰 결론 문장들 */
+/* 결론 먼저: "관찰 01" (금색 작은 글씨) + 쪽번호 + 큰 결론 문장들 (검정 글씨 · 강조 금색) */
 function nbTop(c, n, lines, page, total) {
   var g = c.g, P = NB.PAD;
-  cText(g, "↗ " + NB_WORD.label + " · " + NB_WORD.obs + " " + (n < 10 ? "0" + n : n), P, 92, 24, 700, NB_C.gold);
-  if (page) cText(g, page + " / " + total, NB.W - P, 92, 24, 700, NB_C.grey, "right");
+  cText(g, NB_WORD.obs + " " + (n < 10 ? "0" + n : n), P, 122, 24, 900, NB_HI);
+  if (page) cText(g, page + " / " + total, NB.W - P, 122, 22, 700, NB_C.sub, "right");
   var size = 50, lh = 66, flat;
   function build() { flat = []; lines.forEach(function (l) { flat = flat.concat(nbSplit(g, l, NB.W - P * 2, size)); }); }
-  build(); while (flat.length * lh > 330 && size > 36) { size -= 2; lh = size * 1.32; build(); }
-  var y0 = NB.SPLIT - 70 - (flat.length - 1) * lh;   // 아래 맞춤 (금색 줄 바로 위에서 끝나게)
-  flat.forEach(function (l, i) { cRich(g, l, P, y0 + i * lh, size, 800, NB_C.white, NB_C.gold); });
+  build(); while (flat.length * lh > 320 && size > 34) { size -= 2; lh = size * 1.32; build(); }
+  var y0 = NB.SPLIT - 70 - (flat.length - 1) * lh;
+  flat.forEach(function (l, i) { cRich(g, l, P, y0 + i * lh, size, 800, NB_INK, NB_HI); });
 }
-/* 아래 밝은 패널 머리: 근거 제목(남색) + 부제(회색) */
+/* 근거 제목 + 부제 */
 function nbBody(c, title, sub) {
   var g = c.g, P = NB.PAD;
-  cText(g, title, P, NB.SPLIT + 70, 30, 800, NB_C.navy);
-  if (sub) cText(g, cFit(g, sub, NB.W - P * 2, 21, 500), P, NB.SPLIT + 106, 21, 500, NB_C.sub);
-  c.y = NB.SPLIT + 140;
+  cText(g, cFit(g, title, NB.W - P * 2, 30, 900), P, NB.SPLIT + 52, 30, 900, NB_INK);
+  if (sub) cWrap(g, sub, P, NB.SPLIT + 86, NB.W - P * 2, 20, 600, NB_C.sub, 26, 2);
+  c.y = NB.SPLIT + (sub && cWrapCount(g, sub, NB.W - P * 2, 20, 600) > 1 ? 140 : 120);
 }
 function nbFoot(c, src, cta) {
-  var g = c.g, P = NB.PAD;
-  cText(g, cFit(g, src || "StockMind 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", NB.W - P * 2 - 220, 19, 500), P, NB.H - 78, 19, 500, NB_C.sub);
-  cText(g, cta || NB_WORD.next, P, NB.H - 38, 20, 700, NB_C.gold2);
-  var w = cW(g, "uphill.lab", 26, 800), x = NB.W - P - w;
-  cText(g, "uphill.lab", NB.W - P, NB.H - 38, 26, 800, NB_C.txt, "right");
-  g.strokeStyle = NB_C.gold2; g.lineWidth = 4; g.lineCap = "round"; g.lineJoin = "round";
-  g.beginPath(); g.moveTo(x - 38, NB.H - 40); g.lineTo(x - 18, NB.H - 60); g.moveTo(x - 28, NB.H - 60); g.lineTo(x - 18, NB.H - 60); g.lineTo(x - 18, NB.H - 50); g.stroke();
+  var g = c.g, P = NB.PAD, F = 64, y0 = NB.H - F;
+  g.fillStyle = NB_INK; g.fillRect(0, y0, NB.W, F); g.fillStyle = NB_C.gold; g.fillRect(0, y0, NB.W, 3);
+  var bw = cW(g, "@uphill.lab", 22, 900);
+  cText(g, cFit(g, src || "StockMind 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", NB.W - P * 2 - bw - 70, 16, 600), P, y0 + 27, 16, 600, "#a9a291");
+  cText(g, cta || NB_WORD.next, P, y0 + 52, 17, 800, NB_C.gold);
+  if (typeof cMark === "function") cMark(g, NB.W - P, y0 + F / 2 + 9);
 }
 function nbSplit(g, s, maxW, size) {
   if (s === "") return [""];
@@ -60,27 +66,25 @@ function nbSplit(g, s, maxW, size) {
   if (line) lines.push(line);
   var open = false; return lines.map(function (l) { var o = open, n = (l.match(/\[\[/g) || []).length - (l.match(/\]\]/g) || []).length; if (o) l = "[[" + l; if (n > 0) { l += "]]"; open = true; } else if (n < 0) open = false; return l; });
 }
-/* 표지 / 마무리 (전체 검정) */
+/* 표지 / 마무리 (종이 위 큰 제목 · v10.4) */
 function nbCover(small, lines, sub, meta) {
-  var c = nbNew(), g = c.g, P = NB.PAD; g.fillStyle = NB_C.black; g.fillRect(0, 0, NB.W, NB.H); g.fillStyle = NB_C.gold; g.fillRect(0, 0, NB.W, 8);
-  cText(g, "↗ 우상향연구소 " + NB_WORD.label, P, 110, 26, 700, NB_C.gold);
-  cText(g, small, P, 540, 32, 600, "#cfd3dc");
-  var flat = []; lines.forEach(function (l) { flat = flat.concat(nbSplit(g, l, NB.W - P * 2, 74)); });
-  flat.forEach(function (l, i) { cRich(g, l, P, 660 + i * 94, 74, 800, NB_C.white, NB_C.gold); });
-  cWrap(g, sub, P, 660 + flat.length * 94 + 40, NB.W - P * 2, 27, 500, "#cfd3dc", 40, 3);
-  cText(g, meta || cDate(Date.now()) + " 기준 · 과거 데이터 비교 자료 · 투자 권유 아님", P, NB.H - 78, 19, 500, NB_C.grey);
-  cText(g, NB_WORD.next, P, NB.H - 38, 20, 700, NB_C.gold); cText(g, "uphill.lab", NB.W - P, NB.H - 38, 26, 800, NB_C.white, "right");
+  var c = nbNew(), g = c.g, P = NB.PAD; g.fillStyle = NB_PAPER; g.fillRect(0, 75, NB.W, NB.H - 75);
+  cText(g, small, P, 470, 32, 700, NB_HI);
+  var flat = []; lines.forEach(function (l) { flat = flat.concat(nbSplit(g, l, NB.W - P * 2, 76)); });
+  flat.forEach(function (l, i) { cRich(g, l, P, 580 + i * 96, 76, 900, NB_INK, NB_HI); });
+  var y = 580 + (flat.length - 1) * 96 + 50; if (typeof cUphill === "function") cUphill(g, P, y, NB.W - P * 2);
+  cWrap(g, sub, P, y + 64, NB.W - P * 2, 27, 600, NB_C.txt, 40, 4);
+  nbFoot(c, meta || cDate(Date.now()) + " 기준 · 과거 데이터 비교 자료 · 투자 권유 아님");
   return c.cv;
 }
 function nbClose(q, lines, foot) {
-  var c = nbNew(), g = c.g, P = NB.PAD; g.fillStyle = NB_C.black; g.fillRect(0, 0, NB.W, NB.H); g.fillStyle = NB_C.gold; g.fillRect(0, 0, NB.W, 8);
-  cText(g, "↗ 우상향연구소 " + NB_WORD.label, P, 110, 26, 700, NB_C.gold);
-  cWrap(g, q, P, 520, NB.W - P * 2, 54, 800, NB_C.white, 70, 3);
-  cText(g, NB_WORD.cta, P, 720, 50, 800, NB_C.gold);
-  lines.forEach(function (l, i) { cText(g, l, P, 840 + i * 56, 34, 600, "#cfd3dc"); });
-  cText(g, foot || "매일 아침 전일 정리 · 일요일 한 주 정리 · 월요일 한 주 예상", P, 1060, 24, 600, "#8e95a3");
-  cText(g, "StockMind 자동 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", P, NB.H - 78, 19, 500, NB_C.grey);
-  cText(g, NB_WORD.save, P, NB.H - 38, 20, 700, NB_C.gold); cText(g, "uphill.lab", NB.W - P, NB.H - 38, 26, 800, NB_C.white, "right");
+  var c = nbNew(), g = c.g, P = NB.PAD; g.fillStyle = NB_PAPER; g.fillRect(0, 75, NB.W, NB.H - 75);
+  var y = cWrap(g, q, P, 420, NB.W - P * 2, 54, 900, NB_INK, 70, 3);
+  if (typeof cUphill === "function") cUphill(g, P, y, NB.W - P * 2);
+  cText(g, NB_WORD.cta, P, y + 100, 46, 900, NB_HI);
+  lines.forEach(function (l, i) { cText(g, l, P, y + 200 + i * 54, 32, 700, NB_C.txt); });
+  cText(g, foot || "매일 아침 전일 정리 · 일요일 한 주 정리 · 월요일 한 주 예상", P, y + 220 + lines.length * 54 + 40, 23, 600, NB_C.sub);
+  nbFoot(c, "StockMind 자동 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", NB_WORD.save);
   return c.cv;
 }
 
@@ -241,7 +245,7 @@ function nbSceneDeck(id) {
   // 관찰 02 닮은 과거
   c = nbNew(); pg++; n++;
   var les = (main.lesson.match(/[^.。]+[.。]/) || [main.lesson])[0].trim();
-  nbTop(c, n, ["같은 [[" + main.tag + "]]이어도", "원인과 깊이는 매번 달랐다.", "", les.length > 56 ? les.slice(0, 54) + "…" : les], pg, total);
+  nbTop(c, n, ["같은 [[" + main.tag + "]]이어도", "원인과 깊이는 매번 달랐다.", "", les], pg, total);
   nbBody(c, main.tag + " 국면 — 과거 " + main.eps.length + "번", "구간 중 S&P500 등락 · 기간");
   nbCards3(c, main.eps.slice(0, 3).map(function (e) { var s = e.st.filter(function (x) { return x.sym === "SPY"; })[0]; return { year: e.s.slice(0, 4), name: e.name.replace(/^\d{4}\s*/, ""), sub: e.s.slice(5).replace("-", ".") + " ~ " + e.e.slice(5).replace("-", "."), v: s ? cPct(s.ret, 1) : "", vl: "S&P500 구간 등락", vc: s ? cCol(s.ret) : null, color: NB_C.up }; }));
   nbFoot(c); out.push({ name: "닮은과거", cv: c.cv });
@@ -400,7 +404,7 @@ function nbNewsDeck() {
   for (var i = 0; i < items.length; i += 4) {
     c = nbNew(); pg++; n++; var chunk = items.slice(i, i + 4);
     var lead = chunk[0];
-    nbTop(c, n, ["\"" + (lead.title.length > 26 ? lead.title.slice(0, 25) + "…" : lead.title) + "\"", "", "실제로는 [[" + nbName(lead.sym) + " " + cPct(lead.s.ret1) + "]] — 평소 하루 변동의 " + (lead.s.sd > 0 ? (Math.abs(lead.s.ret1) / lead.s.sd).toFixed(1) : "-") + "배."], pg, total);
+    nbTop(c, n, ["\"" + lead.title + "\"", "", "실제로는 [[" + nbName(lead.sym) + " " + cPct(lead.s.ret1) + "]] — 평소 하루 변동의 " + (lead.s.sd > 0 ? (Math.abs(lead.s.ret1) / lead.s.sd).toFixed(1) : "-") + "배."], pg, total);
     nbBody(c, "기사 제목 ↔ 그 자산의 전일 등락", "오른쪽 숫자는 전일 종가 등락 · 아래 회색은 고점 대비·20일선");
     nbNewsRows(c, chunk.map(function (x) { return { title: x.title, left: nbName(x.sym) + " · " + (x.press || "") + " · 고점比 " + cPct(x.s.vsHi, 0) + " · " + (x.s.above20 ? "20일선 위" : "20일선 아래"), right: cPct(x.s.ret1), color: cCol(x.s.ret1) }; }));
     nbFoot(c, "출처: 네이버 뉴스 검색(각 언론사) · 숫자는 야후 파이낸스 종가 · 투자 권유 아님"); out.push({ name: "기사vs숫자" + (n), cv: c.cv });
