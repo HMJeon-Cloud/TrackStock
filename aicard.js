@@ -97,7 +97,7 @@ function aiDeck(ctx) {
   if (kind === "tpl") {   // v10.2 양식집: 정해진 틀의 앱 카드가 재료, 결과도 같은 틀
     var tc = arg.split(":")[0], ts = arg.split(":")[1], tm = arg.split(":")[2] || null;
     if (!briefState.recent) return Promise.reject(new Error("오늘의 브리핑 데이터가 아직 없어요"));
-    return tplPrep(tc, tm).then(function () { var r = cap(function () { CARD_MKT = cMktInfo(tplR(tm)); var cv = tplBuild(tc, ts, tm); return cv ? [{ name: TPL_CAT[tc].name, cv: cv }] : []; }); r.tpl = tc; return r; });
+    return tplPrep(tc, tm, ts).then(function () { var r = cap(function () { CARD_MKT = cMktInfo(tplR(tm)); var cv = tplBuild(tc, ts, tm); return cv ? [{ name: TPL_CAT[tc].name, cv: cv }] : []; }); r.tpl = tc; return r; });
   }
   if (kind === "reel") {
     var needD = REEL_DATA[arg] && arg !== "loss";
@@ -232,6 +232,12 @@ function aiFullCard(st) {   // 전부 AI: 받은 2:3 이미지를 9:16 안에 (�
 function aiTok2() { return typeof ocTok === "function" ? ocTok() : ""; }
 function aiCall(body) { return fetch("/api/channel?op=ai", { method: "POST", headers: { "x-owner": aiTok2(), "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return { ok: false, reason: "HTTP_" + r.status }; }); }); }
 function aiLoadImg(u) { return new Promise(function (ok, no) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { no(new Error("이미지를 열지 못했어요")); }; im.src = u; }); }
+/* v10.5 카드 만들기 화면에서: 직접 쓴 내용 + 고른 양식으로 AI 작업창 열기 */
+function aiOpenCustom(text, tpl, title) {
+  aiStudio({ ctx: "custom", title: title || "내 글 · 데이터 한 장 카드", custom: true, lines: [], list: [], tpl: tpl || "" });
+  var el = document.getElementById("aiStudio"), ta = el && el.querySelector(".aiTxt");
+  if (ta) { ta.value = text || ""; ta.dispatchEvent(new Event("input")); }
+}
 function aiOpen(ctx, btn) {
   if (ctx === "custom") return aiStudio({ ctx: "custom", title: "내 글 · 데이터 한 장 카드", custom: true, lines: [], list: [] });
   var old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "카드 읽는 중…"; btn.disabled = true; }

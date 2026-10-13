@@ -412,7 +412,7 @@ function tplPanel(box) {
   var img = box.querySelector(".tplPrev img"), ph = box.querySelector(".tplPh"), url = null;
   box.querySelector("[data-tpl-make]").onclick = function () {
     var btn = this; btn.textContent = "만드는 중…";
-    Promise.resolve(tplPrep(cat, mk)).then(function () { return document.fonts && document.fonts.ready ? document.fonts.ready : null; }).then(function () {
+    Promise.resolve(tplPrep(cat, mk, src)).then(function () { return document.fonts && document.fonts.ready ? document.fonts.ready : null; }).then(function () {
       var cv; try { cv = tplBuild(cat, src, mk); } catch (e) { console.warn(e); alert("만들지 못했어요: " + e.message); }
       btn.textContent = "🖼️ 미리보기"; if (!cv) { ph.textContent = "오늘의 브리핑 데이터가 아직 없어요 — 브리핑 화면을 먼저 열어 주세요"; return; }
       url = cv.toDataURL("image/png"); img.src = url; img.style.display = "block"; ph.style.display = "none"; box.querySelector("[data-tpl-save]").disabled = false;
