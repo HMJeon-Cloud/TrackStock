@@ -4,7 +4,10 @@
       '고쳐 쓰기'를 누르면 앱 데이터가 입력칸 글로 바뀌어 그대로 고칠 수 있다 (글 ↔ 양식 명세 변환기 MK_FMT)
    ② 카드 묶음(여러 장): 오늘의 브리핑·오늘 한 장·채널·정기 발행·연구노트·정책·일정·용어·릴스를 버튼 하나로
    ============================================================ */
-var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null };
+var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "today" };
+var MK_TABS = [["today", "📌 오늘 할 일"], ["one", "🧩 한 장 양식"], ["decks", "🗂️ 묶음 카드"], ["reels", "🎬 릴스"]];
+/* 다른 화면에서 '카드 만들기 ›'로 들어올 때: 탭·시장을 정해서 연다 */
+function makerGo(tab, mk) { if (tab) MK.tab = tab; if (mk) MK.mk = mk; if (typeof navTo === "function") navTo("onecard"); else switchTab("onecard"); }
 function mkLoad() { try { var j = JSON.parse(localStorage.getItem("sm.maker") || "null"); if (j) { MK.text = j.text || {}; MK.meta = j.meta || {}; MK.cat = j.cat || MK.cat; MK.mode = j.mode || MK.mode; } } catch (e) {} }
 function mkSave() { try { localStorage.setItem("sm.maker", JSON.stringify({ text: MK.text, meta: MK.meta, cat: MK.cat, mode: MK.mode })); } catch (e) {} }
 function mkSplit(l) { return String(l).split("|").map(function (x) { return x.trim(); }); }
@@ -51,17 +54,34 @@ function mkChannelReady() { if (typeof chState === "undefined" || !chState.recen
 
 /* ---------- 화면 ---------- */
 function makerRender() {
-  var box = document.getElementById("mkBody"); if (!box) return;
+  var root = document.getElementById("mkBody"); if (!root) return;
   if (!MK.inited) { mkLoad(); MK.inited = true; }
-  if (!mkReady()) { box.innerHTML = '<div class="briefDim">전 종목 데이터를 불러오는 중이에요… (한 번만)</div>'; return; }
+  if (!mkReady()) { root.innerHTML = '<div class="briefDim">전 종목 데이터를 불러오는 중이에요… (한 번만)</div>'; return; }
   mkChannelReady();
   MK.mk = MK.mk || briefState.market || "all";
+  var top = '<div class="mkTop"><div class="pills seg mkMkt" title="모든 탭에 적용">' + TPL_MKS.map(function (m) { return '<button data-mmk="' + m[0] + '"' + (m[0] === MK.mk ? ' class="active"' : '') + '>' + m[1] + '</button>'; }).join("") + '</div>' +
+    '<button class="chip aiBtn" data-ai-open="custom" title="내가 쓴 글·데이터로 AI가 한 장 카드를">✍️ 내 글로 AI 카드</button></div>' +
+    '<div class="mkTabs">' + MK_TABS.map(function (t) { return '<button data-mtab="' + t[0] + '"' + (t[0] === MK.tab ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div><div class="mkPane"></div>';
+  root.innerHTML = top;
+  Array.prototype.forEach.call(root.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); if (typeof switchBriefMarket === "function" && briefState.market !== MK.mk) switchBriefMarket(MK.mk); makerRender(); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-mtab]"), function (b) { b.onclick = function () { MK.tab = b.getAttribute("data-mtab"); makerRender(); }; });
+  var pane = root.querySelector(".mkPane");
+  if (MK.tab === "today") {
+    pane.innerHTML = '<div class="briefDim" style="margin-bottom:8px">발행 전 점검 → 오늘 요일·신호에 맞는 추천 세트. 각 줄의 🃏는 카드 묶음, ✨는 그 묶음을 AI 한 장으로.</div><div class="mkToday"></div>';
+    if (typeof pubRender === "function") try { pubRender(pane.querySelector(".mkToday"), "plan"); } catch (e) { console.warn(e); }
+  } else if (MK.tab === "decks") {
+    pane.innerHTML = mkDecks(); mkDeckBind(pane);
+  } else if (MK.tab === "reels") {
+    pane.innerHTML = typeof reelTabHtml === "function" ? reelTabHtml() : "";
+    Array.prototype.forEach.call(pane.querySelectorAll("[data-reel]"), function (b) { b.onclick = function () { reelOpen(b.getAttribute("data-reel")); }; });
+  } else mkOneRender(pane);
+}
+function mkOneRender(box) {
   var cat = MK.cat, srcs = TPL_SOURCES[cat] || [], src = MK.src && srcs.some(function (s) { return s.id === MK.src; }) ? MK.src : srcs[0].id; MK.src = src;
   var F = MK_FMT[cat], txt = MK.text[cat] != null ? MK.text[cat] : F.ex, meta = MK.meta[cat] || {};
   var h = '<div class="mkCols"><div class="mkLeft">';
-  h += '<div class="mkStep"><b>1</b> 시장</div><div class="pills seg">' + TPL_MKS.map(function (m) { return '<button data-mmk="' + m[0] + '"' + (m[0] === MK.mk ? ' class="active"' : '') + '>' + m[1] + '</button>'; }).join("") + '</div>';
-  h += '<div class="mkStep"><b>2</b> 양식</div><div class="mkCats">' + Object.keys(TPL_CAT).map(function (k) { return '<button data-mcat="' + k + '"' + (k === cat ? ' class="on"' : '') + '><i>' + TPL_CAT[k].icon + '</i><span>' + TPL_CAT[k].name + '</span></button>'; }).join("") + '</div><div class="briefDim" style="margin:4px 0 8px">' + TPL_CAT[cat].desc + ' · 쓰임: ' + TPL_CAT[cat].use + '</div>';
-  h += '<div class="mkStep"><b>3</b> 내용</div><div class="pills seg"><button data-mmode="app"' + (MK.mode === "app" ? ' class="active"' : '') + '>📊 앱 데이터</button><button data-mmode="text"' + (MK.mode === "text" ? ' class="active"' : '') + '>✏️ 직접 입력</button></div>';
+  h += '<div class="mkStep"><b>1</b> 양식</div><div class="mkCats">' + Object.keys(TPL_CAT).map(function (k) { return '<button data-mcat="' + k + '"' + (k === cat ? ' class="on"' : '') + '><i>' + TPL_CAT[k].icon + '</i><span>' + TPL_CAT[k].name + '</span></button>'; }).join("") + '</div><div class="briefDim" style="margin:4px 0 8px">' + TPL_CAT[cat].desc + ' · 쓰임: ' + TPL_CAT[cat].use + '</div>';
+  h += '<div class="mkStep"><b>2</b> 내용 <small class="briefDim">· 시장: ' + ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[MK.mk] + ' (위에서 바꿈)</small></div><div class="pills seg"><button data-mmode="app"' + (MK.mode === "app" ? ' class="active"' : '') + '>📊 앱 데이터</button><button data-mmode="text"' + (MK.mode === "text" ? ' class="active"' : '') + '>✏️ 직접 입력</button></div>';
   if (MK.mode === "app") {
     h += '<div class="mkSrcs">' + srcs.map(function (s) { return '<button data-msrc="' + s.id + '"' + (s.id === src ? ' class="on"' : '') + '>' + s.t + '</button>'; }).join("") + '</div>';
     h += '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"><button class="chip" data-medit>✏️ 이 내용 고쳐 쓰기</button>' + aiBtn("tpl:" + cat + ":" + src + ":" + MK.mk, "✨ AI로 다듬기") + '</div>';
@@ -74,11 +94,8 @@ function makerRender() {
   }
   h += '<div class="row" style="gap:6px;margin-top:12px"><button class="primary" data-msave disabled>⬇ 저장 (1080×1350)</button><span class="briefDim mkMsg"></span></div>';
   h += '</div><div class="mkRight"><div class="mkPrev"><img alt="" hidden><div class="briefDim mkPh">미리보기를 만드는 중…</div></div></div></div>';
-  // ② 카드 묶음
-  h += '<h3 class="chSub" style="margin-top:22px">🗂️ 카드 묶음 (여러 장) <small>버튼 하나로 · 옆의 ✨는 그 묶음 전체를 AI 한 장으로</small></h3>' + mkDecks();
   box.innerHTML = h;
   var $m = function (q) { return box.querySelector(q); };
-  Array.prototype.forEach.call(box.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); makerRender(); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-mcat]"), function (b) { b.onclick = function () { MK.cat = b.getAttribute("data-mcat"); MK.src = null; mkSave(); makerRender(); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-mmode]"), function (b) { b.onclick = function () { MK.mode = b.getAttribute("data-mmode"); mkSave(); makerRender(); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-msrc]"), function (b) { b.onclick = function () { MK.src = b.getAttribute("data-msrc"); makerRender(); }; });
@@ -93,7 +110,6 @@ function makerRender() {
     $m("[data-mai]").onclick = function () { var t = ($m(".mkTitle").value || TPL_CAT[cat].name).replace(/\n/g, " ") + "\n" + $m(".mkTxt").value.split(/\r?\n/).map(function (l) { return l.replace(/^[#*!>@]\s*/, "- ").replace(/\s*\|\s*/g, ": "); }).join("\n") + ($m(".mkSrcTxt").value ? "\n출처: " + $m(".mkSrcTxt").value : ""); if (typeof aiOpenCustom === "function") aiOpenCustom(t, cat === "calendar" ? "" : cat, "내 글 · " + TPL_CAT[cat].name); };
   }
   $m("[data-msave]").onclick = function () { if (!MK.url) return; cardsDownload({ url: MK.url, file: "uphill.lab_" + TPL_CAT[cat].name + "_" + ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[MK.mk] + "_" + pubToday().replace(/-/g, "") + ".png" }); };
-  mkDeckBind(box);
   mkPreview();
 }
 function mkPreview() {
@@ -119,8 +135,7 @@ function mkDecks() {
   if (typeof PER_SETS !== "undefined") g.push(["정기 발행", Object.keys(PER_SETS).map(function (k) { return b(PER_SETS[k].t, "per:" + k, "per:" + k); })]);
   if (typeof storyDecks === "function") { var d = []; try { d = storyDecks(); } catch (e) {} g.push(["연구노트", d.map(function (x) { return b(x.t + (x.now ? " ←지금" : ""), "story:" + x.key, "story:" + x.key); })]); }
   if (typeof pubPolicyAll === "function") g.push(["정책 · 일정 · 용어", pubPolicyAll().map(function (p) { return b("🏛️ " + (p.short || p.t), "pol:" + p.id, "policy:" + p.id); }).concat([b("🗓️ 이번 주 일정", "cal", "cal"), b("📖 용어 한 입", "term", "term")])]);
-  if (typeof REEL_LIST !== "undefined") g.push(["릴스 (9:16)", REEL_LIST.map(function (r) { return b("🎬 " + r.t, "reel:" + r.id, "reel:" + r.id); })]);
-  return '<div class="mkDecks">' + g.map(function (x) { return '<div class="mkDeckG"><span>' + x[0] + '</span><div>' + x[1].join("") + '</div></div>'; }).join("") + '</div>';
+  return '<div class="briefDim" style="margin-bottom:6px">여러 장짜리 캐러셀. 위에서 고른 시장이 브리핑 카드·오늘 한 장에 적용돼요. 옆의 ✨는 그 묶음 전체를 AI 한 장으로.</div><div class="mkDecks">' + g.map(function (x) { return '<div class="mkDeckG"><span>' + x[0] + '</span><div>' + x[1].join("") + '</div></div>'; }).join("") + '</div>';
 }
 function mkDeckBind(box) {
   Array.prototype.forEach.call(box.querySelectorAll("[data-mdeck]"), function (btn) {

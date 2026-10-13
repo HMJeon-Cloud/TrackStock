@@ -772,6 +772,10 @@
   .pkNums span { display: inline-flex; flex-direction: column; } .pkNums small { color: var(--sub); font-size: 10.5px; } .pkNums b { font-size: 13px; }
   .pkNews { margin-top: 8px; font-size: 12.5px; line-height: 1.6; }
   /* v10.5 카드 만들기 */
+  .mkTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .mkTabs { display: flex; gap: 2px; border-bottom: 2px solid var(--line); margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .mkTabs button { border: 0; background: none; padding: 10px 14px; font-size: 14px; font-weight: 700; color: var(--sub); border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; white-space: nowrap; }
+  .mkTabs button.on { color: var(--txt); border-bottom-color: #b8913f; }
   .mkCols { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; align-items: start; }
   @media (max-width: 860px) { .mkCols { grid-template-columns: 1fr; } .mkRight { position: static !important; } }
   .mkRight { position: sticky; top: 80px; }
@@ -1836,7 +1840,7 @@
       <div class="pills seg" id="briefModeTabs"><button data-bm="day" class="active">금일</button><button data-bm="week">금주</button></div>
       <div class="pills seg" id="briefMktTabs"><button data-bk="all" class="active">전체</button><button data-bk="kr">🇰🇷 국내</button><button data-bk="us">🇺🇸 미국</button><button data-bk="coin">₿ 코인</button></div>
     </div>
-    <div class="tbActions"><button class="primary" id="briefCards">🃏 카드 만들기</button><button class="chip" id="briefOnePage" onclick="onePageOpen(this)">📄 오늘 한 장</button><button class="chip aiBtn" data-ai-open="onepage" title="오늘 한 장을 AI로 — 범위는 작업창에서 선택">✨ AI</button><button class="chip aiBtn" data-ai-open="brief">✨ AI 대표 카드</button><button class="chip" data-ai-open="custom">✍️ 내 글 카드</button><button class="chip" id="briefToChannel">📢 채널 자료 ›</button></div>
+    <div class="tbActions"><button class="primary" onclick="makerGo('one', briefState.market)" title="지금 고른 시장으로 카드 만들기 화면 열기">🃏 카드 만들기 ›</button><button class="chip" id="briefToChannel">📢 채널 ›</button></div>
   </div>
   <div id="briefStatus" style="font-size:13px;color:var(--sub);margin-top:10px"></div>
   <details class="howto"><summary>이 화면은 어떻게 만들어지나</summary><div class="body">
@@ -1902,11 +1906,7 @@
       <div id="briefToNote" class="briefDim" style="margin-top:8px"></div>
     </section>
 
-    <section class="briefSec snapTarget" data-snap-title="참고 종목">
-      <h3>참고 종목 <small>숫자 기준으로 걸러낸 후보 · 추천 아님</small></h3>
-      <div class="pills" id="briefPickTabs" style="margin-bottom:10px"></div>
-      <div id="briefPicks"></div>
-    </section>
+    <div hidden><div id="briefPickTabs"></div><div id="briefPicks"></div></div>   <!-- v10.6 참고 종목 → 위 선별 종목으로 통합 -->
 
     <section class="briefSec snapTarget" data-snap-title="오늘의 숫자">
       <h3>오늘의 숫자 <small>시장 전체를 네 숫자로 · 역사 속 이맘때</small></h3>
@@ -1920,7 +1920,7 @@
 
 <div id="tab-onecard" class="hidden">
 <div class="card" id="makerCard">
-  <div class="pgHead"><h2>카드 만들기 <small>시장 → 양식 → 내용(앱 데이터 · 직접 입력 · AI) → 미리보기 · 모든 카드 묶음도 여기서</small></h2></div>
+  <div class="pgHead"><h2>카드 만들기 <small>모든 카드는 여기서 — 오늘 할 일 · 한 장 양식 · 묶음 카드 · 릴스</small></h2></div>
   <div id="mkBody" style="margin-top:10px"></div>
 </div>
 </div><!-- /tab-onecard -->
@@ -1934,13 +1934,13 @@
 
 <div id="tab-channel" class="hidden">
 <div class="card" id="channelCard">
-  <div class="pgHead"><h2>채널 발행 자료 <small>오늘 올릴 것 → 발행 도우미 → 근거 자료 순서 · 운영자용</small></h2><button class="chip" id="ownerLock" title="이 기기에서 운영자 모드 끄기">🔒 운영자 모드 끄기</button></div>
-  <div class="toolbar"><div class="tbActions" style="margin-left:0"><button class="primary" id="chCards">🃏 카드 만들기</button><button class="chip aiBtn" data-ai-open="channel">✨ AI 대표 카드</button><button class="chip" data-ai-open="custom">✍️ 내 글 카드</button><button class="chip" id="chFullCopy">📋 전체 글 복사</button><button class="chip" id="chShortCopy">스레드용(500자) 복사</button><span id="chCount" class="briefDim"></span></div></div>
+  <div class="pgHead"><h2>채널 브리핑 <small>오늘 쓸 글 · 근거 자료 (데일리 글 · MDD · 자산배분 · 과거 사례) · 운영자용</small></h2><button class="chip" id="ownerLock" title="이 기기에서 운영자 모드 끄기">🔒 운영자 모드 끄기</button></div>
+  <div class="toolbar"><div class="tbActions" style="margin-left:0"><button class="primary" onclick="makerGo('today')">🃏 카드 만들기 ›</button><button class="chip" id="chFullCopy">📋 전체 글 복사</button><button class="chip" id="chShortCopy">스레드용(500자) 복사</button><span id="chCount" class="briefDim"></span></div></div>
 
   <section class="briefSec slHero" id="chHero"></section>
   <div class="chCols"><div class="chColL">
   <section class="briefSec" id="pubSec" style="margin-top:12px">
-    <h3>📣 발행 도우미 <small>발행 전 점검 · 오늘 올릴 세트 · 캡션 · 일정 · 용어 카드</small></h3>
+    <h3>✍️ 글 · 참고 <small>인스타·스레드 캡션 · 주제 은행 · 일정 목록 · 정책 데이터 편집 — 카드는 🃏 카드 만들기에서</small></h3>
     <div id="pubBox"></div>
   </section>
   </div><div class="chColR">
@@ -2176,7 +2176,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v10.5<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v10.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4554,25 +4554,25 @@ window.addEventListener("load", function () {
 <script src="guide.js?v=9.5"></script>
 <script src="watch.js?v=9.5"></script>
 <script src="holdings.js?v=9.5"></script>
-<script src="brief.js?v=10.1"></script>
+<script src="brief.js?v=10.6"></script>
 <script src="channel.js?v=9.7"></script>
 <script src="cards.js?v=10.4"></script>
 <script src="mind.js?v=10.4"></script>
 <script src="issues.js?v=10.4"></script>
-<script src="publish.js?v=10.2"></script>
+<script src="publish.js?v=10.6"></script>
 <script src="periodic.js?v=9.5.2"></script>
 <script src="story.js?v=10.4"></script>
 <script src="deep.js?v=10.0"></script>
 <script src="threads.js?v=10.0"></script>
 <script src="reels.js?v=10.4"></script>
-<script src="slides.js?v=9.7"></script>
+<script src="slides.js?v=10.6"></script>
 <script src="onecard.js?v=9.7"></script>
 <script src="aicard.js?v=10.5"></script>
 <script src="onepage.js?v=10.1"></script>
 <script src="picks.js?v=10.1"></script>
 <script src="tpl.js?v=10.5"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=10.5"></script>
+<script src="maker.js?v=10.6"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>

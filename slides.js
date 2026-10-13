@@ -67,7 +67,6 @@ function slBrief() {
   slSection(slSec("테마 흐름"), th.length >= 2 ? "1등 " + th[0].name + " " + briefPct(th[0].ret) + "  ·  꼴찌 " + th[th.length - 1].name + " " + briefPct(th[th.length - 1].ret) : "", true);
   slSection(slSec("급등·급락"), mUp && mDn ? "▲ " + briefName(mUp) + " " + briefPct(mUp.ret1 != null ? mUp.ret1 : mUp.ret) + "  ·  ▼ " + briefName(mDn) + " " + briefPct(mDn.ret1 != null ? mDn.ret1 : mDn.ret) : "", true);
   slSection(slSec("돈이 몰린 곳"), hv ? briefName(hv) + " 거래대금이 평소의 " + hv.amtX.toFixed(1) + "배" : "", true);
-  slSection(slSec("참고 종목"), "숫자 기준으로 걸러낸 후보 — 추천이 아니라 공부할 목록", true);
   slSection(slSec("오늘의 숫자"), nums.slice(0, 2).map(function (n) { return String(n.l).split(" — ")[0] + " " + n.v; }).join("  ·  "), true);
 }
 
@@ -76,11 +75,9 @@ function slChannel() {
   var el = document.getElementById("chHero"); if (!el || typeof chState === "undefined") return;
   var R = chState.brief, now = chState.now || { why: [], match: {} };
   var today = typeof perToday === "function" ? perToday() : [], next = typeof pubUpcoming === "function" ? pubUpcoming(7).filter(function (e) { return e.k !== "hol"; })[0] : null;
-  var acts = [["전일 정리 카드", function () { cardsOpen("channel"); }]];
-  today.forEach(function (k) { acts.push([PER_SETS[k].t + " 세트", function () { perOpen(k); }]); });
-  if (typeof reelOpen === "function") { var rid = reelToday(), rt = (REEL_LIST.filter(function (x) { return x.id === rid; })[0] || {}).t; acts.push(["오늘의 릴스: " + rt, function () { reelOpen(rid); }]); }
-  if (now.why.length && typeof storyOpen === "function") acts.push(["지금 신호 연구노트", function () { storyOpen(); }]);
-  var head = "오늘 올릴 것 <em>" + acts.length + "개</em>";
+  var nToday = 1 + today.length + (typeof reelOpen === "function" ? 1 : 0) + (now.why.length ? 1 : 0);   // v10.6 카드는 '카드 만들기' 한 곳에서
+  var acts = [["🃏 오늘 올릴 카드 " + nToday + "개 → 카드 만들기", function () { makerGo("today"); }]];
+  var head = "오늘 올릴 것 <em>" + nToday + "개</em>";
   var kpis = [];
   if (R) {
     var i0 = (R.indexRow || [])[0], t = R.temp;
