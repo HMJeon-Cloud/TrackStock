@@ -5,7 +5,7 @@
    ② 카드 묶음(여러 장): 오늘의 브리핑·오늘 한 장·채널·정기 발행·연구노트·정책·일정·용어·릴스를 버튼 하나로
    ============================================================ */
 var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "today" };
-var MK_TABS = [["today", "📌 오늘 할 일"], ["one", "🧩 한 장 양식"], ["decks", "🗂️ 묶음 카드"], ["reels", "🎬 릴스"], ["lib", "📚 보관함"]];
+var MK_TABS = [["today", "오늘 할 일"], ["one", "한 장 양식"], ["decks", "묶음 카드"], ["reels", "릴스"], ["lib", "보관함"]];
 /* 다른 화면에서 '카드 만들기 ›'로 들어올 때: 탭·시장을 정해서 연다 */
 function makerGo(tab, mk) { if (tab) MK.tab = tab; if (mk) MK.mk = mk; if (typeof navTo === "function") navTo("onecard"); else switchTab("onecard"); }
 function mkLoad() { try { var j = JSON.parse(localStorage.getItem("sm.maker") || "null"); if (j) { MK.text = j.text || {}; MK.meta = j.meta || {}; MK.cat = j.cat || MK.cat; MK.mode = j.mode || MK.mode; } } catch (e) {} }
@@ -60,7 +60,7 @@ function makerRender() {
   mkChannelReady();
   MK.mk = MK.mk || briefState.market || "all";
   var top = '<div class="mkTop"><div class="pills seg mkMkt" title="모든 탭에 적용">' + TPL_MKS.map(function (m) { return '<button data-mmk="' + m[0] + '"' + (m[0] === MK.mk ? ' class="active"' : '') + '>' + m[1] + '</button>'; }).join("") + '</div>' +
-    '<button class="chip aiBtn" data-ai-open="custom" title="내가 쓴 글·데이터로 AI가 한 장 카드를">✍️ 내 글로 AI 카드</button></div>' +
+    '<button class="chip aiBtn" data-ai-open="custom" title="내가 쓴 글·데이터로 AI가 한 장 카드를">내 글로 AI 카드</button></div>' +
     '<div class="mkTabs">' + MK_TABS.map(function (t) { return '<button data-mtab="' + t[0] + '"' + (t[0] === MK.tab ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div><div class="mkPane"></div>';
   root.innerHTML = top;
   Array.prototype.forEach.call(root.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); if (typeof switchBriefMarket === "function" && briefState.market !== MK.mk) switchBriefMarket(MK.mk); makerRender(); }; });
@@ -131,13 +131,13 @@ function mkPreview() {
 }
 /* ---------- 카드 묶음 ---------- */
 function mkDecks() {
-  function b(label, act, ai) { return '<span class="mkDeck"><button class="chip" data-mdeck="' + act + '">' + label + '</button>' + (ai ? aiBtn(ai, "✨") : "") + '</span>'; }
+  function row(t, d, act, ai, now) { return '<div class="pubPlanItem' + (now ? ' per' : '') + '"><div><b>' + escapeHtml(t) + '</b><small>' + escapeHtml(d || "") + '</small></div><div class="rlActs"><button class="chip" data-mdeck="' + act + '">만들기</button>' + (ai ? aiBtn(ai, "AI") : "") + '</div></div>'; }
   var g = [];
-  g.push(["오늘", [b("🃏 오늘의 브리핑 카드", "brief", "brief"), b("📄 오늘 한 장", "onepage", "onepage"), b("📢 채널 전일 정리", "channel", "channel"), b("🔥 핵심 이슈 5", "issues", "issues")]]);
-  if (typeof PER_SETS !== "undefined") g.push(["정기 발행", Object.keys(PER_SETS).map(function (k) { return b(PER_SETS[k].t, "per:" + k, "per:" + k); })]);
-  if (typeof storyDecks === "function") { var d = []; try { d = storyDecks(); } catch (e) {} g.push(["연구노트", d.map(function (x) { return b(x.t + (x.now ? " ←지금" : ""), "story:" + x.key, "story:" + x.key); })]); }
-  if (typeof pubPolicyAll === "function") g.push(["정책 · 일정 · 용어", pubPolicyAll().map(function (p) { return b("🏛️ " + (p.short || p.t), "pol:" + p.id, "policy:" + p.id); }).concat([b("🗓️ 이번 주 일정", "cal", "cal"), b("📖 용어 한 입", "term", "term")])]);
-  return '<div class="briefDim" style="margin-bottom:6px">여러 장짜리 캐러셀. 위에서 고른 시장이 브리핑 카드·오늘 한 장에 적용돼요. 옆의 ✨는 그 묶음 전체를 AI 한 장으로.</div><div class="mkDecks">' + g.map(function (x) { return '<div class="mkDeckG"><span>' + x[0] + '</span><div>' + x[1].join("") + '</div></div>'; }).join("") + '</div>';
+  g.push(["오늘", [row("오늘의 브리핑 카드", "시장 온도·업종·급등락·돈 몰린 곳 · 약 10장", "brief", "brief"), row("오늘 한 장", "9칸 한 페이지 요약", "onepage", "onepage"), row("채널 전일 정리", "주식 전일 정리 · 약 6장", "channel", "channel"), row("핵심 이슈 5", "오늘의 이슈 다섯 줄 한 장", "issues", "issues")]]);
+  if (typeof PER_SETS !== "undefined") { var td = typeof perToday === "function" ? perToday() : []; g.push(["정기 발행", Object.keys(PER_SETS).map(function (k) { return row(String(PER_SETS[k].t).replace(/^\S+\s/, ""), PER_SETS[k].when + " 발행" + (td.indexOf(k) >= 0 ? " · 오늘" : ""), "per:" + k, "per:" + k, td.indexOf(k) >= 0); })]); }
+  if (typeof storyDecks === "function") { var d = []; try { d = storyDecks(); } catch (e) {} g.push(["연구노트", d.map(function (x) { return row(String(x.t).replace(/^\S+\s/, ""), (x.now ? "지금 신호 · " : "") + x.d, "story:" + x.key, "story:" + x.key, x.now); })]); }
+  if (typeof pubPolicyAll === "function") g.push(["정책 · 일정 · 용어", pubPolicyAll().map(function (p) { return row(p.short || p.t, (p.eff || "") + (p.src ? " · " + p.src : ""), "pol:" + p.id, "policy:" + p.id); }).concat([row("이번 주 일정", "앞으로 7일 발표·실적·휴장", "cal", "cal"), row("용어 한 입", "오늘의 용어 한 장", "term", "term")])]);
+  return g.map(function (x) { return '<h4 class="mkH">' + x[0] + ' <small>' + x[1].length + '</small></h4><div class="pubPlan">' + x[1].join("") + '</div>'; }).join("");
 }
 function mkDeckBind(box) {
   Array.prototype.forEach.call(box.querySelectorAll("[data-mdeck]"), function (btn) {

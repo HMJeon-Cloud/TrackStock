@@ -109,7 +109,7 @@ function issuesRender(boxId, list) {
   var box = $(boxId); if (!box) return;
   if (!list || !list.length) { box.innerHTML = ""; return; }
   box.innerHTML = '<div class="issHead"><b>📌 ' + (ISS_LBL[list.mode] || "오늘") + '의 핵심 이슈 5</b><small>' + (list.market && list.market !== "all" ? list.mktName + " · " : "") + '자료 전체에서 평소보다 이례적인 순</small>' +
-    '<span class="issBtns"><button class="chip" data-act="copy">📋 복사</button><button class="chip" data-act="card">🃏 카드</button></span></div>' +
+    '<span class="issBtns"><button class="chip" data-act="copy">복사</button></span></div>' +
     '<ol class="issList">' + list.map(function (it, i) {
       return '<li><span class="issNo">' + (i + 1) + '</span><span class="issEmo">' + it.emoji + '</span><div><b>' + escapeHtml(it.title) + '</b><small>' + escapeHtml(it.sub) + '</small></div>' +
         (it.sym ? '<button class="linkBtn issGo" data-sym="' + it.sym + '" title="종목 탭에서 보기">›</button>' : '') + '</li>';

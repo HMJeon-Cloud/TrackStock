@@ -283,7 +283,7 @@ function aiStudio(cfg) {
     '<div class="aiPanel aiRes" data-p="3"><h4><i>3</i>결과 · 검증 <small>왼쪽 재료와 가운데 카드, 오른쪽 숫자 검사를 함께 보세요</small></h4>' +
     '<div class="aiBanner">②에서 <b>만들기</b>를 누르면 여기에 결과가 나와요. AI는 버튼을 누를 때만 호출돼요.</div>' +
     '<div class="aiCols"><div class="aiCol aiSrc"><div class="aiColH">재료 <small></small></div><div class="aiSrcBody"></div></div>' +
-    '<div class="aiCol aiMid"><div class="aiColH">카드</div><div class="aiPh">②에서 <b>만들기</b>를 누르면<br>여기에 카드가 나와요<br><small>의견을 비워 두면 기본 구성으로 만들어요</small></div><img alt="" hidden>' +
+    '<div class="aiCol aiMid"><div class="aiColH">카드</div><div class="aiPh"><div><b>②에서 만들기</b>를 누르면<br>여기에 카드가 나와요<br><small>의견을 비워 두면 기본 구성으로 만들어요</small></div></div><img alt="" hidden>' +
     '<div class="pills aiLay" hidden>' + Object.keys(OC_LAYER_NM).map(function (k) { return '<button data-ly="' + k + '">' + OC_LAYER_NM[k] + '</button>'; }).join("") + '</div>' +
     '<div class="aiActs"><button class="chip" data-img hidden>이미지만 다시</button><button class="chip" data-libsave hidden title="배경·스타일·구성을 서버 보관함에 저장해 다음에 다시 쓰기">💾 보관</button><button class="primary" data-save disabled>카드 저장 (1080×1920)</button></div></div>' +
     '<div class="aiCol aiChk"><div class="aiColH">검증 · 고치기 <small>칸을 고치면 카드가 바로 바뀝니다</small></div><div class="aiChkBody"><div class="briefDim">만든 뒤 항목마다 근거 원문과 숫자 일치를 보여 줍니다.</div></div></div></div></div>' +
