@@ -772,6 +772,28 @@
   .pkNums span { display: inline-flex; flex-direction: column; } .pkNums small { color: var(--sub); font-size: 10.5px; } .pkNums b { font-size: 13px; }
   .pkNews { margin-top: 8px; font-size: 12.5px; line-height: 1.6; }
   /* v10.5 카드 만들기 */
+  /* v10.7 보관함 */
+  .libRow { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .libChip { flex: 0 0 auto; display: flex; gap: 8px; align-items: center; max-width: 230px; padding: 5px 10px 5px 5px; border: 1px solid var(--line); border-radius: 10px; background: var(--card, #fff); color: var(--txt); cursor: pointer; text-align: left; }
+  .libChip:hover { border-color: #b8913f; }
+  .libChip img, .libChip i { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: 0 0 44px; display: grid; place-items: center; font-style: normal; font-size: 20px; background: #f3eee2; }
+  .libChip span { display: flex; flex-direction: column; min-width: 0; }
+  .libChip b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .libChip small { font-size: 11px; color: var(--sub); }
+  .libUsed { font-size: 12px; margin-top: 4px; color: #8a6a1f; }
+  .libSave { margin-top: 8px; padding: 10px; border: 1px solid #e6c57a; border-radius: 10px; background: #fffaf0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #14161c; }
+  .libSave small { color: #7a7468; }
+  .libSave .libName { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  .libIconMake { padding: 10px 12px; border: 1px dashed #c9a24f; border-radius: 10px; margin-bottom: 12px; }
+  .libIconMake input, .libIconMake select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; background: var(--card, #fff); color: var(--txt); }
+  .libIconMake input { flex: 1 1 220px; }
+  .libGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .libCard { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card, #fff); display: flex; flex-direction: column; }
+  .libCard.def { border-color: #b8913f; box-shadow: 0 0 0 2px rgba(184,145,63,.25); }
+  .libCard img, .libNoImg { width: 100%; height: 150px; object-fit: cover; background: #f3eee2; display: grid; place-items: center; font-size: 34px; }
+  .libMeta { padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+  .libMeta small { color: var(--sub); font-size: 11.5px; }
+  .libBtns { display: flex; gap: 4px; padding: 0 10px 10px; flex-wrap: wrap; }
   .mkTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
   .mkTabs { display: flex; gap: 2px; border-bottom: 2px solid var(--line); margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .mkTabs button { border: 0; background: none; padding: 10px 14px; font-size: 14px; font-weight: 700; color: var(--sub); border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; white-space: nowrap; }
@@ -2176,7 +2198,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v10.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v10.7<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4567,12 +4589,13 @@ window.addEventListener("load", function () {
 <script src="reels.js?v=10.4"></script>
 <script src="slides.js?v=10.6"></script>
 <script src="onecard.js?v=9.7"></script>
-<script src="aicard.js?v=10.5"></script>
+<script src="aicard.js?v=10.7"></script>
 <script src="onepage.js?v=10.1"></script>
 <script src="picks.js?v=10.1"></script>
-<script src="tpl.js?v=10.5"></script>
+<script src="tpl.js?v=10.7"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=10.6"></script>
+<script src="maker.js?v=10.7"></script>
+<script src="lib.js?v=10.7"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>

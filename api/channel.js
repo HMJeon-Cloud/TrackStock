@@ -1,6 +1,6 @@
 // /api/channel — 채널 발행용 '미국 증시 데일리 브리핑' 글 (JSON {text, asOf, ...})
 //   아침 수집 데이터(Redis) + 네이버 뉴스 제목으로 만든다. CDN 30분 캐시. 운영자 페이지(채널 탭)가 보여준다.
-import { redisConf, getJsonGzText, redisCmd, KEY } from "./_redis.js";
+import { redisConf, getJsonGzText, setJsonGz, redisCmd, KEY } from "./_redis.js";
 import { composeDaily } from "./_compose.js";
 import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
@@ -29,7 +29,8 @@ export async function buildDaily(origin) {
 export default async function handler(req, res) {
   // 운영자 전용: 토큰이 없으면 내용 없이 거절 (CDN에도 남기지 않음)
   if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
-  if (req.query.op === "ai") return aiHandler(req, res);   // v9.5 대표 카드 문구 (OpenAI) — 새 함수 파일을 만들 수 없어(무료 12개 한도) 여기에 붙임
+  if (req.query.op === "ai") return aiHandler(req, res);
+  if (req.query.op === "lib") return libHandler(req, res);   // v10.7 AI 보관함 (배경·스타일·구성·아이콘) — 서버(Redis) 저장   // v9.5 대표 카드 문구 (OpenAI) — 새 함수 파일을 만들 수 없어(무료 12개 한도) 여기에 붙임
   const proto = req.headers["x-forwarded-proto"] || "https";
   const origin = proto + "://" + req.headers.host;
   const d = await buildDaily(origin);
@@ -184,9 +185,11 @@ async function aiPlan(res, key, model, fallback, b) {
 /* ---------- v9.7 이미지: 배경만(글자 없이) 또는 전부(정해진 글자만 그대로) ---------- */
 async function aiImage(res, key, imgModel, b) {
   const p = b.plan || {}, visual = String(p.visual || "").slice(0, 600);
+  const isIcon = b.scope === "icon", size = isIcon ? "1024x1024" : "1024x1536";
   const base = "Vertical 2:3 poster for an Instagram Reel by a Korean investing education channel 'uphill.lab'. Premium, modern, high contrast. Brand palette: deep black/navy with warm gold accents. " + (visual ? "Scene/mood: " + visual + ". " : "");
   let prompt;
-  if (b.scope === "bg") prompt = base + "This is ONLY a background: keep the center and lower 70% calm and darker so white text can be overlaid later. ABSOLUTELY NO text, letters, numbers, signs, logos, UI, charts with labels or watermarks anywhere.";
+  if (isIcon) prompt = "One single flat minimal icon of: " + String(b.subject || p.title || "chart going up").slice(0, 120) + ". Brand 'uphill.lab': use ONLY deep black (#14161c) and warm gold (#e6c57a), on a plain solid ivory (#fbf8f1) background. Centered, bold rounded geometric shapes, consistent 2px-style outline weight, generous padding. ABSOLUTELY NO text, letters, numbers, shadows, gradients, frames or watermarks.";
+  else if (b.scope === "bg") prompt = base + "This is ONLY a background: keep the center and lower 70% calm and darker so white text can be overlaid later. ABSOLUTELY NO text, letters, numbers, signs, logos, UI, charts with labels or watermarks anywhere.";
   else {
     const L = [];
     if (p.kicker) L.push("Small pill label at top: \"" + p.kicker + "\"");
@@ -200,7 +203,7 @@ async function aiImage(res, key, imgModel, b) {
   }
   const models = [imgModel, "gpt-image-2", "gpt-image-1"].filter((m, i, a) => m && a.indexOf(m) === i), tries = [];
   for (const m of models) {
-    for (const body of [{ model: m, prompt, size: "1024x1536", n: 1, quality: process.env.OPENAI_IMAGE_QUALITY || "medium", output_format: "jpeg", output_compression: 88 }, { model: m, prompt, size: "1024x1536", n: 1 }]) {
+    for (const body of [{ model: m, prompt, size, n: 1, quality: process.env.OPENAI_IMAGE_QUALITY || "medium", output_format: "jpeg", output_compression: 88 }, { model: m, prompt, size, n: 1 }]) {
       const { status, j, err } = await aiPost("https://api.openai.com/v1/images/generations", key, body, 240000);
       if (err) { tries.push(m + ": " + err); break; }
       const d = j.data && j.data[0];
@@ -227,4 +230,64 @@ async function aiRead(res, key, model, fallback, b) {
   if (!r.ok && fallback && fallback !== model) r = await aiChat(key, fallback, "너는 정확한 OCR 도구다.", user, "read_text", AI_SCHEMA_READ, 40000, [u]);
   if (!r.ok) return res.status(200).json({ ok: false, reason: r.reason });
   return res.status(200).json({ ok: true, lines: r.out.lines || [] });
+}
+
+
+/* ---------- v10.7 AI 보관함: 배경 · 스타일 · 구성 프리셋 · 아이콘 ----------
+   sm:lib:idx      목록(gzip JSON) [{id, kind, name, tags:{ctx,k,tpl,mk,words}, at, size, fav, uses, def}]
+   sm:lib:img:<id> 이미지 data URL (JPEG/PNG, 클라이언트가 줄여서 보냄 · 최대 900KB)
+   sm:lib:dat:<id> 구성·설명 JSON (최대 20KB)
+   한도: 즐겨찾기 아닌 항목 LIB_MAX(기본 300)개 · 이미지 합계 LIB_MB(기본 120MB) — 넘으면 오래되고 덜 쓴 것부터 지운다 */
+const LIB = { idx: "sm:lib:idx", img: "sm:lib:img:", dat: "sm:lib:dat:" };
+async function libIdx(rc) { const t = await getJsonGzText(rc, LIB.idx); try { return t ? JSON.parse(t) : []; } catch (e) { return []; } }
+async function libPut(rc, arr) { await setJsonGz(rc, LIB.idx, arr); }
+async function libHandler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  const rc = redisConf(); if (!rc) return res.status(200).json({ ok: false, reason: "NO_REDIS" });
+  try {
+    if (req.method !== "POST") {
+      if (req.query.id) {
+        const id = String(req.query.id).replace(/[^\w-]/g, "").slice(0, 40);
+        const [img, dat] = await Promise.all([redisCmd(rc, ["GET", LIB.img + id]), redisCmd(rc, ["GET", LIB.dat + id])]);
+        let data = null; try { data = dat ? JSON.parse(dat) : null; } catch (e) {}
+        return res.status(200).json({ ok: true, id, img: img || null, data });
+      }
+      const idx = await libIdx(rc);
+      return res.status(200).json({ ok: true, items: idx, total: idx.length, bytes: idx.reduce((a, x) => a + (x.size || 0), 0) });
+    }
+    let b = req.body; if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = {}; } } b = b || {};
+    let idx = await libIdx(rc);
+    if (b.act === "save") {
+      const kind = ["bg", "style", "preset", "icon", "card"].indexOf(b.kind) >= 0 ? b.kind : null; if (!kind) return res.status(400).json({ ok: false, reason: "BAD_KIND" });
+      const img = typeof b.img === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(b.img) ? b.img : null;
+      if (img && img.length > 1200000) return res.status(400).json({ ok: false, reason: "TOO_BIG" });
+      const data = b.data ? JSON.stringify(b.data).slice(0, 20000) : null;
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      const t = b.tags || {}, tags = { ctx: String(t.ctx || "").slice(0, 60), k: String(t.k || "").slice(0, 20), tpl: String(t.tpl || "").slice(0, 20), mk: String(t.mk || "").slice(0, 10), words: (Array.isArray(t.words) ? t.words : []).slice(0, 12).map((w) => String(w).slice(0, 20)) };
+      const e = { id, kind, name: String(b.name || "").slice(0, 60) || kind, tags, at: Date.now(), size: (img ? img.length : 0) + (data ? data.length : 0), fav: false, uses: 0, thumb: typeof b.thumb === "string" && b.thumb.length < 40000 && /^data:image\//.test(b.thumb) ? b.thumb : null };
+      if (img) await redisCmd(rc, ["SET", LIB.img + id, img]);
+      if (data) await redisCmd(rc, ["SET", LIB.dat + id, data]);
+      idx.unshift(e);
+      // 정리: 즐겨찾기·기본 아이콘은 지키고, 오래되고 덜 쓴 것부터
+      const max = +(process.env.LIB_MAX || 300), maxB = (+(process.env.LIB_MB || 120)) * 1e6;
+      const keep = (x) => x.fav || x.def;
+      let total = idx.reduce((a, x) => a + (x.size || 0), 0), removed = [];
+      const cand = idx.filter((x) => !keep(x) && x.id !== id).sort((a, b2) => (a.uses - b2.uses) || (a.at - b2.at));
+      while ((idx.filter((x) => !keep(x)).length > max || total > maxB) && cand.length) { const r = cand.shift(); idx = idx.filter((x) => x.id !== r.id); total -= r.size || 0; removed.push(r.id); }
+      for (const r of removed) { await redisCmd(rc, ["DEL", LIB.img + r, LIB.dat + r]); }
+      await libPut(rc, idx);
+      return res.status(200).json({ ok: true, item: e, removed: removed.length });
+    }
+    const id = String(b.id || "").replace(/[^\w-]/g, "").slice(0, 40), e = idx.find((x) => x.id === id);
+    if (!e) return res.status(404).json({ ok: false, reason: "NOT_FOUND" });
+    if (b.act === "del") { idx = idx.filter((x) => x.id !== id); await redisCmd(rc, ["DEL", LIB.img + id, LIB.dat + id]); await libPut(rc, idx); return res.status(200).json({ ok: true }); }
+    if (b.act === "upd") {
+      if (typeof b.name === "string") e.name = b.name.slice(0, 60);
+      if (typeof b.fav === "boolean") e.fav = b.fav;
+      if (typeof b.def === "boolean") { if (b.def) idx.forEach((x) => { if (x.kind === e.kind && x.tags.tpl === e.tags.tpl) x.def = false; }); e.def = b.def; }   // 양식별 기본(아이콘)은 하나만
+      await libPut(rc, idx); return res.status(200).json({ ok: true, item: e });
+    }
+    if (b.act === "use") { e.uses = (e.uses || 0) + 1; e.last = Date.now(); await libPut(rc, idx); return res.status(200).json({ ok: true }); }
+    return res.status(400).json({ ok: false, reason: "BAD_ACT" });
+  } catch (err) { return res.status(200).json({ ok: false, reason: "ERROR", detail: String(err.message || err).slice(0, 200) }); }
 }

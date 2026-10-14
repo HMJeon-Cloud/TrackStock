@@ -49,11 +49,13 @@ function tplNew(meta) {
   if (meta.source) { cText(g, cFit(g, "출처  " + meta.source, W, 18, 600), P, sy, 18, 600, TPL_C.sub); sy += 24; }
   if (meta.source2) { cText(g, cFit(g, "· " + meta.source2, W, 18, 600), P, sy, 18, 600, TPL_C.sub); sy += 24; }
   // 제목 (아주 굵게) + 우상향 선
+  var ic = typeof TPL_ICON !== "undefined" && TPL_ICON[meta.cat], TW = ic ? W - 118 : W;   // v10.7 보관함의 양식 기본 아이콘 (제목 오른쪽)
   var lines = String(meta.title || "").split("\n").filter(Boolean).slice(0, 2);
-  if (lines.length === 1 && cW(g, cPlain(lines[0]), 64, 900) > W) { var t0 = lines[0], sp = t0.indexOf(" ", Math.floor(t0.length / 2) - 2), cut = sp > 0 && sp < t0.length - 3 ? sp : Math.ceil(t0.length / 2); lines = [t0.slice(0, cut).trim(), t0.slice(cut).trim()]; }
+  if (lines.length === 1 && cW(g, cPlain(lines[0]), 64, 900) > TW) { var t0 = lines[0], sp = t0.indexOf(" ", Math.floor(t0.length / 2) - 2), cut = sp > 0 && sp < t0.length - 3 ? sp : Math.ceil(t0.length / 2); lines = [t0.slice(0, cut).trim(), t0.slice(cut).trim()]; }
   var size = lines.length > 1 ? 80 : 96;
-  lines.forEach(function (l) { while (size > 54 && cW(g, cPlain(l), size, 900) > W) size -= 4; });
+  lines.forEach(function (l) { while (size > 54 && cW(g, cPlain(l), size, 900) > TW) size -= 4; });
   var ty = sy + 8 + size * 0.86;
+  if (ic) { var isz = 100, ix = TPL.W - P - isz, iy = sy + 2; g.save(); cRound(g, ix, iy, isz, isz, 22, null); g.clip(); g.drawImage(ic, ix, iy, isz, isz); g.restore(); cRound(g, ix, iy, isz, isz, 22, null); g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.stroke(); }
   lines.forEach(function (l, i) { cRich(g, l, P, ty + i * size * 1.1, size, 900, TPL_C.ink, TPL_C.gold2); });
   var y = ty + (lines.length - 1) * size * 1.1 + 30;
   if (cW(g, cPlain(lines[lines.length - 1] || ""), size, 900) > W - 170) y += 30;   // 제목 끝이 화살표와 겹치지 않게

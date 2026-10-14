@@ -276,6 +276,7 @@ function aiStudio(cfg) {
     '<div class="aiPanel" data-p="2"><h4><i>2</i>요청 <small>비워 두면 기본 구성으로 만듭니다</small></h4>' +
     '<div class="aiGrid2"><label class="aiLbl">주제(말머리)<input class="aiKick" placeholder="비우면 자동"></label><label class="aiLbl">목적<select class="aiGoal">' + GOALS.map(function (g) { return '<option>' + g + '</option>'; }).join("") + '</select></label></div>' +
     '<label class="aiLbl">원하는 카드 형태·의견<textarea class="aiReq" placeholder="예) 질문형 제목, 초보 관점, 급락 쪽 강조, 순위 대신 체크리스트 (Ctrl+Enter = 만들기)"></textarea></label>' +
+    '<div class="aiLib"></div>' +
     '<label class="aiLbl">카드 양식 <small>양식집 틀을 고르면 그 틀 안에 내용만 들어가요 (1080×1350)</small><select class="aiTpl"><option value="">릴스 기본 (9:16 · 자유 구성)</option>' + (typeof TPL_CAT !== "undefined" ? Object.keys(TPL_CAT).filter(function (k) { return k !== "calendar"; }).map(function (k) { return '<option value="' + k + '"' + (k === st.tpl ? ' selected' : '') + '>' + TPL_CAT[k].icon + ' ' + TPL_CAT[k].name + ' — ' + TPL_CAT[k].desc + '</option>'; }).join("") : "") + '</select></label>' +
     '<label class="aiLbl">AI 사용 범위</label><div class="aiModes">' + Object.keys(AI_MODE_NM).map(function (k) { return '<button data-mode="' + k + '"><b>' + AI_MODE_NM[k][0] + '</b><small>' + AI_MODE_NM[k][1] + '</small></button>'; }).join("") + '</div>' +
     '<button class="primary aiMake" data-plan>만들기</button><div class="aiCost"></div></div></div>' +
@@ -284,7 +285,7 @@ function aiStudio(cfg) {
     '<div class="aiCols"><div class="aiCol aiSrc"><div class="aiColH">재료 <small></small></div><div class="aiSrcBody"></div></div>' +
     '<div class="aiCol aiMid"><div class="aiColH">카드</div><div class="aiPh">②에서 <b>만들기</b>를 누르면<br>여기에 카드가 나와요<br><small>의견을 비워 두면 기본 구성으로 만들어요</small></div><img alt="" hidden>' +
     '<div class="pills aiLay" hidden>' + Object.keys(OC_LAYER_NM).map(function (k) { return '<button data-ly="' + k + '">' + OC_LAYER_NM[k] + '</button>'; }).join("") + '</div>' +
-    '<div class="aiActs"><button class="chip" data-img hidden>이미지만 다시</button><button class="primary" data-save disabled>카드 저장 (1080×1920)</button></div></div>' +
+    '<div class="aiActs"><button class="chip" data-img hidden>이미지만 다시</button><button class="chip" data-libsave hidden title="배경·스타일·구성을 서버 보관함에 저장해 다음에 다시 쓰기">💾 보관</button><button class="primary" data-save disabled>카드 저장 (1080×1920)</button></div></div>' +
     '<div class="aiCol aiChk"><div class="aiColH">검증 · 고치기 <small>칸을 고치면 카드가 바로 바뀝니다</small></div><div class="aiChkBody"><div class="briefDim">만든 뒤 항목마다 근거 원문과 숫자 일치를 보여 줍니다.</div></div></div></div></div>' +
     '</div></div>';
   document.body.appendChild(el); document.addEventListener("keydown", aiStudioKey, true);
@@ -340,11 +341,11 @@ function aiStudio(cfg) {
   $a("[data-plan]").onclick = function () {
     syncLines();
     var b = this, req = $a(".aiReq").value.trim(), kick = $a(".aiKick").value.trim(), goal = $a(".aiGoal").value;
-    var useAi = st.mode !== "app" || !!req || st.imgs.length || st.refLines.length || $a(".aiGoal").selectedIndex > 0;
+    var useAi = st.mode === "full" || (st.mode === "bg" && !st.bgFixed) || !!req || st.imgs.length || st.refLines.length || $a(".aiGoal").selectedIndex > 0 || !!st.presetData;   // v10.7 보관 배경을 다시 쓰면 AI 호출 없이
     if (!st.lines.length) { alert("①에 재료(원본 데이터)를 넣어 주세요."); return; }
     b.disabled = true; b.textContent = useAi ? "AI가 기획하는 중… (10~60초)" : "만드는 중…"; step(3);
     $a(".aiRes").scrollIntoView({ behavior: "smooth", block: "start" });
-    var request = ["목적: " + goal, kick ? "말머리는 '" + kick + "'로" : "", req, st.tpl && typeof TPL_HINT !== "undefined" ? "카드 양식(반드시 이 모양으로): " + TPL_HINT[st.tpl] : ""].filter(Boolean).join("\n");
+    var request = ["목적: " + goal, kick ? "말머리는 '" + kick + "'로" : "", req, st.tpl && typeof TPL_HINT !== "undefined" ? "카드 양식(반드시 이 모양으로): " + TPL_HINT[st.tpl] : "", st.presetData && typeof libPresetText === "function" ? libPresetText(st.presetData) : "", st.styleVisual ? "이미지 분위기(visual)는 다음과 같게: " + st.styleVisual : ""].filter(Boolean).join("\n");
     var p = !useAi ? Promise.resolve({ plan: aiRulePlan(st), by: "기본 구성(앱 데이터 그대로 · AI 없음)" }) :
       aiCall({ mode: "plan", title: st.title, deck: st.deckNames.join(", "), lines: st.lines.map(function (l) { return { id: l.id, text: (l.card ? "[" + l.card + "] " : "") + l.text }; }), request: request, images: st.imgs }).then(function (j) {
         if (j && j.ok && j.out) return { plan: aiCleanPlan(j.out), by: "AI 기획 · " + j.model + (j.tries && j.tries.length > 1 ? " (" + j.tries.join(" → ") + ")" : "") };
@@ -352,15 +353,18 @@ function aiStudio(cfg) {
       });
     p.then(function (r) {
       if (kick) r.plan.kicker = kick;
-      st.plan = r.plan; st.planBy = r.by; st.ocr = null; st.bgImg = null; st.fullImg = null; b.disabled = false; b.textContent = "다시 만들기";
+      if (st.styleVisual) r.plan.visual = st.styleVisual + (r.plan.visual ? ". " + r.plan.visual : "");
+      st.plan = r.plan; st.planBy = r.by; st.ocr = null; if (!st.bgFixed) st.bgImg = null; st.fullImg = null; $a("[data-libsave]").hidden = false; b.disabled = false; b.textContent = "다시 만들기";
       $a("[data-save]").disabled = false; setMode(st.mode);
       if (st.mode === "app") return;
+      if (st.mode === "bg" && st.bgFixed && st.bgImg) { render(); banner("ok", "보관한 배경 위에 그렸어요 — 이미지 생성 없이 0원"); return; }
       return makeImage();
     }).catch(function (e) { b.disabled = false; b.textContent = st.plan ? "다시 만들기" : "만들기"; banner("bad", "AI 기획 실패: " + e.message + " — '앱 카드'를 고르면 AI 없이 만들 수 있어요."); });
   };
   // 이미지
   function makeImage() {
     if (!st.plan) { alert("먼저 ②에서 만들기를 눌러 주세요."); return Promise.resolve(); }
+    st.bgFixed = false;   // '다시'를 누르면 새로 생성
     var b = $a("[data-img]"), scope = st.mode === "bg" ? "bg" : "full"; b.hidden = false; b.disabled = true; b.textContent = "이미지 만드는 중… (20~90초)";
     banner("info", scope === "bg" ? "AI가 배경을 그리는 중이에요. 글·숫자는 앱이 그 위에 정확히 그려요." : "AI가 카드 전체를 그리는 중이에요. 다 되면 이미지 속 글자를 다시 읽어 원본과 대조해요.");
     return aiCall({ mode: "image", scope: scope, plan: st.plan }).then(function (j) {
@@ -465,6 +469,10 @@ function aiStudio(cfg) {
       (L ? '<div class="aiOrig">원본: ' + line + '</div>' : '') + (chk && chk.t ? '<em class="' + (chk.ok ? "ok" : "bad") + '">' + escapeHtml(chk.t) + '</em>' : '') + '</div>';
   }
   setMode(st.mode);
+  // v10.7 보관함: ② 추천 · ③ 💾 보관
+  var libApiObj = { render: render, banner: banner, setMode: setMode, thumbs: thumbs };
+  if (typeof libStudioSuggest === "function") libStudioSuggest(st, el, libApiObj);
+  $a("[data-libsave]").onclick = function () { if (typeof libSaveMenu === "function") libSaveMenu(st, el, libApiObj); };
   (st.custom ? $a(".aiTxt") : $a(".aiReq")).focus();
 }
 function aiCaption(st) {

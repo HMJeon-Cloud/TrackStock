@@ -5,7 +5,7 @@
    ② 카드 묶음(여러 장): 오늘의 브리핑·오늘 한 장·채널·정기 발행·연구노트·정책·일정·용어·릴스를 버튼 하나로
    ============================================================ */
 var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "today" };
-var MK_TABS = [["today", "📌 오늘 할 일"], ["one", "🧩 한 장 양식"], ["decks", "🗂️ 묶음 카드"], ["reels", "🎬 릴스"]];
+var MK_TABS = [["today", "📌 오늘 할 일"], ["one", "🧩 한 장 양식"], ["decks", "🗂️ 묶음 카드"], ["reels", "🎬 릴스"], ["lib", "📚 보관함"]];
 /* 다른 화면에서 '카드 만들기 ›'로 들어올 때: 탭·시장을 정해서 연다 */
 function makerGo(tab, mk) { if (tab) MK.tab = tab; if (mk) MK.mk = mk; if (typeof navTo === "function") navTo("onecard"); else switchTab("onecard"); }
 function mkLoad() { try { var j = JSON.parse(localStorage.getItem("sm.maker") || "null"); if (j) { MK.text = j.text || {}; MK.meta = j.meta || {}; MK.cat = j.cat || MK.cat; MK.mode = j.mode || MK.mode; } } catch (e) {} }
@@ -74,7 +74,9 @@ function makerRender() {
   } else if (MK.tab === "reels") {
     pane.innerHTML = typeof reelTabHtml === "function" ? reelTabHtml() : "";
     Array.prototype.forEach.call(pane.querySelectorAll("[data-reel]"), function (b) { b.onclick = function () { reelOpen(b.getAttribute("data-reel")); }; });
-  } else mkOneRender(pane);
+  } else if (MK.tab === "lib") { if (typeof libTabRender === "function") libTabRender(pane); }
+  else mkOneRender(pane);
+  if (!MK.iconsLoaded && typeof libLoadIcons === "function") { MK.iconsLoaded = true; libLoadIcons().then(function () { if (Object.keys(TPL_ICON).length && MK.tab === "one") mkPreview(); }).catch(function () {}); }
 }
 function mkOneRender(box) {
   var cat = MK.cat, srcs = TPL_SOURCES[cat] || [], src = MK.src && srcs.some(function (s) { return s.id === MK.src; }) ? MK.src : srcs[0].id; MK.src = src;
