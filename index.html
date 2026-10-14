@@ -683,8 +683,11 @@
   .aiL.ref { background: rgba(59,130,246,.07); } .aiL.ref b { color: #2563eb; } .aiL.ref.on { background: rgba(59,130,246,.16); }
   .reelWrap { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
   .thrGrid { display: grid; grid-template-columns: 1fr; gap: 10px; } @media (min-width: 760px) { .thrGrid { grid-template-columns: 1fr 1fr; } }
-  .thrLbl { font-size: 12.5px; font-weight: 700; color: #f1dca2; margin-top: 4px; } .thrLbl span { font-weight: 400; margin-left: 6px; color: #b9b3a8; }
-  .thrGrid .primary { width: 100%; }
+  .thrLbl { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #f1dca2; margin-top: 4px; min-width: 0; } .thrLbl b { white-space: nowrap; color: #f1dca2 !important; font-weight: 700; } .thrLbl em { font-style: normal; color: #8f897e; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .thrLbl .thrCnt { margin-left: auto; color: #b9b3a8; font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .thrLbl .thrCopy { background: #c9a24f !important; color: #141317 !important; padding: 4px 12px; font-size: 12px; font-weight: 700; flex: none; }
+  .thrCol { display: flex; flex-direction: column; gap: 4px; min-width: 0; } .thrCol .thrPart:first-child .thrText:not(.sm) { min-height: 230px; }
+  .thrText.sm { min-height: 150px; } .thrGrid .thrCol:first-child .thrText { min-height: 600px; } @media (max-width: 759px) { .thrGrid .thrCol:first-child .thrText { min-height: 230px; } }
   .thrText { width: 100%; min-height: 230px; margin: 8px 0; background: #1f1d22; color: #f4f1ea; border: 1px solid #3a352c; border-radius: 12px; padding: 10px 12px; font: 13.5px/1.6 inherit; font-family: inherit; resize: vertical; box-sizing: border-box; }
   /* v9.1 — 브리핑 화면 정돈: 섹션을 카드로, 번호 배지, 한눈에 KPI 띠 */
   #briefBody .briefSec { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 18px; padding: 16px 16px 14px; margin-top: 12px; box-shadow: 0 1px 2px rgba(20,30,50,.04); }
@@ -2277,7 +2280,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v10.9<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.0<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4669,7 +4672,7 @@ window.addEventListener("load", function () {
 <script src="periodic.js?v=9.5.2"></script>
 <script src="story.js?v=10.4"></script>
 <script src="deep.js?v=10.0"></script>
-<script src="threads.js?v=10.0"></script>
+<script src="threads.js?v=11.0"></script>
 <script src="reels.js?v=10.4"></script>
 <script src="slides.js?v=10.6"></script>
 <script src="onecard.js?v=9.7"></script>
