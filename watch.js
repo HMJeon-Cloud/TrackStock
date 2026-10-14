@@ -437,16 +437,18 @@ Array.prototype.forEach.call(document.querySelectorAll("#mapFilters [data-mf]"),
 /* 관심 탭 하위 화면: 관심 종목 / 전체 종목 / 뉴스 */
 var watchPane = "list";
 function switchWatchPane(p, fromHistory) {
-  if (["list", "map", "news"].indexOf(p) < 0) p = "list";
+  if (["list", "map", "news", "disc", "guru"].indexOf(p) < 0) p = "list";
   if (!fromHistory && p !== watchPane && typeof pushPaneState === "function") pushPaneState({ wp: p });
   watchPane = p;
-  ["list", "map", "news"].forEach(function (k) { $("wp-" + k).classList.toggle("hidden", k !== p); });
+  ["list", "map", "news", "disc", "guru"].forEach(function (k) { var el = $("wp-" + k); if (el) el.classList.toggle("hidden", k !== p); });
   Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-wp") === p);
   });
   // 보이는 화면의 데이터만 불러온다 (뉴스·전체 종목은 처음 열 때 한 번)
   if (p === "map") loadMarketMap();
   if (p === "news") { renderNewsFilters(); loadWatchNews(); loadMarketNews(); }
+  if (p === "disc" && typeof renderDisc === "function") renderDisc();   // v11.2 공시
+  if (p === "guru" && typeof renderGuru === "function") renderGuru();   // v11.2 구루 13F
 }
 Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {
   b.onclick = function () { switchWatchPane(b.getAttribute("data-wp")); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -461,6 +463,8 @@ function renderWatchTab(force) {
   if (force) mapState.rows = null;
   if (watchPane === "map") loadMarketMap();
   if (watchPane === "news") { loadWatchNews(); loadMarketNews(); }
+  if (watchPane === "disc" && typeof renderDisc === "function") renderDisc();
+  if (watchPane === "guru" && typeof renderGuru === "function") renderGuru();
 }
 
 /* ---------- 이벤트 ---------- */

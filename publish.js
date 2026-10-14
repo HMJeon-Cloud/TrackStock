@@ -135,6 +135,14 @@ function pubPlan() {
   if (dow >= 2 && dow <= 4) plan.push({ id: "movers", t: "🚀 급등·급락 + 돈이 몰린 곳", d: "화~목 — 종목 얘기가 가장 잘 읽히는 요일", kind: "brief", pick: "3_급등급락" });
   if (dow === 5) plan.push({ id: "dca", t: "🗓️ 매달 10만원 / 1년 전 100만원", d: "금요일 — 주말에 천천히 보는 '적금처럼' 시리즈 (반응 최고 포맷)", kind: "brief", pick: "8_매달10만원" });
   if (dow === 0 || dow === 6) { plan.push({ id: "mind", t: "💛 투자 유형 테스트 소개", d: "주말 — 참여형 콘텐츠, 댓글로 4글자 받기", kind: "mind" }); plan.push({ id: "alloc", t: "⚖️ 자산배분 비교", d: "주말 — 시간 들여 읽는 긴 호흡 콘텐츠", kind: "channel", pick: "4_구성비교" }); }
+  // v11.1 배당 카드: 월초(1~3일) · 분기 배당이 몰리는 달(3·6·9·12월) 20일 이후
+  var dd = +pubToday().slice(8, 10), mo = +pubToday().slice(5, 7);
+  if (typeof dvDeckOpen === "function" && (dd <= 3 || (mo % 3 === 0 && dd >= 20))) plan.push({ id: "div", t: "💰 배당 카드 4장", d: dd <= 3 ? "월초 — '월 100만원 받으려면' · 이달 배당락 달력" : "분기 배당 시즌 — 배당락 전에 저장되는 카드", kind: "div" });
+  // v11.2 공시·구루: 데이터가 있으면 조건에 맞을 때 자동으로 / 없으면 받아 온 뒤 다시 그린다
+  if (typeof dsPlanHints === "function") {
+    if (typeof DS !== "undefined" && DS.disc && DS.guru) dsPlanHints().forEach(function (x) { plan.push(x); });
+    else if (typeof dsEnsure === "function" && typeof isOwner === "function" && isOwner()) dsEnsure().then(function () { if (typeof currentTab !== "undefined" && currentTab === "onecard" && typeof MK !== "undefined" && MK.tab === "today" && typeof makerRender === "function") makerRender(); });
+  }
   plan.push({ id: "term", t: "📖 용어 한 입 — " + pubTerm()[0], d: "매일 1장 — 검색·저장으로 새 사람이 들어오는 상시 콘텐츠", kind: "term" });
   return { plan: plan, why: why, dow: "일월화수목금토"[dow] };
 }
@@ -383,6 +391,8 @@ function pubRender(target, onlyTab) {
       else if (k === "mind") navTo("mind");   // 유형 테스트 페이지에서 결과 카드 생성
       else if (k === "cal") pubSingleCard(pubCalCard, "uphill.lab_이번주일정_" + pubToday().replace(/-/g, "") + ".png", "🗓️ 이번 주 일정", "cal");
       else if (k === "policy") pubPolicyOpen(b.getAttribute("data-id"));
+      else if (k === "div" && typeof dvDeckOpen === "function") dvDeckOpen();
+      else if ((k === "disc" || k === "guru") && typeof dsDeckOpen === "function") dsDeckOpen(k);
       else if (k === "term") pubSingleCard(function () { return pubTermCard(pubTerm(pubState.termOffset)); }, "uphill.lab_용어_" + pubTerm(pubState.termOffset)[0].replace(/[^\w가-힣]/g, "") + ".png", "📖 용어 한 입", "term");
     };
   });

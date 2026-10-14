@@ -1172,6 +1172,68 @@
   .pkCols > div { min-width: 0; } .pkItem { min-width: 0; }
   @media (max-width: 700px) { .pkCols { grid-template-columns: minmax(0, 1fr) !important; } }
   .cartBtn { font-size: 14px !important; font-weight: 700; padding: 8px 14px !important; }
+
+  /* v11.1 배당 · 세금 — 카드 탭과 같은 틀 */
+  .dvTabs.mkTabs { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .dvEmpty { padding: 28px 12px; text-align: center; color: var(--sub); font-size: 13px; line-height: 1.7; } .dvEmpty.sm { padding: 14px 12px; background: var(--soft, #f6f3ec); border-radius: 12px; text-align: left; margin-bottom: 12px; }
+  .dvForm { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; margin-bottom: 12px; align-items: end; }
+  .dvF { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; color: var(--sub); } .dvF.wide { grid-column: span 2; }
+  .dvF select, .dvF input { width: 100%; min-width: 0; box-sizing: border-box; height: 40px; }
+  .dvIn { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--card2); height: 40px; overflow: hidden; min-width: 0; }
+  .dvIn input { border: 0 !important; background: none; height: 38px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 0; flex: 1; padding: 0 6px 0 10px; }
+  .dvIn em { font-style: normal; color: var(--sub); font-size: 12px; padding-right: 10px; white-space: nowrap; } .dvIn.sm { height: 32px; width: 84px; margin-left: auto; } .dvIn.sm input { height: 30px; }
+  .dvChips > div { display: flex; gap: 4px; } .dvChips .chip { flex: 1; height: 40px; padding: 0 4px; } .dvChips .chip.on { background: #14161c; color: #e6c57a; border-color: #14161c; }
+  .dvCk { grid-column: span 2; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--txt); min-height: 32px; } .dvCk input { width: 18px; height: 18px; margin: 0; }
+  .dvBar2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; } .dvBar2 .pills { margin: 0; } .dvBar2 select { height: 36px; padding: 0 10px; font-size: 13px; }
+  .dvTable td, .dvTable th { font-variant-numeric: tabular-nums; vertical-align: middle; } .dvTable .l { text-align: left; white-space: normal; min-width: 150px; }
+  .dvTable td.l small { display: block; color: var(--sub); font-size: 11px; margin-top: 1px; } .dvTable td small.dvWarn { display: block; }
+  .dvTable tr.on td { background: #fbf6e8; } .dvTable input[type=checkbox] { width: 18px; height: 18px; margin: 0; }
+  .dvTable .linkBtn { padding: 0; border: 0; background: none; font-weight: 700; color: var(--txt); text-align: left; font-size: 13.5px; cursor: pointer; word-break: keep-all; }
+  .dvWarn { color: #c2410c; font-size: 11px; font-weight: 700; }
+  .dvMore { width: 100%; margin: 8px 0 4px; height: 38px; }
+  .dvCap { font-size: 12px; color: var(--sub); margin: 4px 0 6px; font-weight: 700; }
+  .dvBars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; height: 150px; align-items: end; margin-bottom: 8px; }
+  .dvBar { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
+  .dvBar i { display: block; width: 72%; background: #d9c48f; border-radius: 4px 4px 0 0; min-height: 0; } .dvBar.on i { background: #b8913f; }
+  .dvBarV { font-size: 10px; color: var(--sub); white-space: nowrap; margin-bottom: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; } .dvBarL { font-size: 11px; color: var(--sub); margin-top: 4px; }
+  .dvAccs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .dvAcc { border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-width: 0; background: var(--card); } .dvAcc.best { border: 2px solid #b8913f; background: #fffbf1; }
+  .dvAccH { display: flex; justify-content: space-between; align-items: center; } .dvAccH b { font-size: 15px; } .dvAccH em { font-style: normal; font-size: 11px; font-weight: 800; color: #14161c; background: #e6c57a; border-radius: 999px; padding: 2px 8px; }
+  .dvAccV { font-size: 24px; font-weight: 900; letter-spacing: -.02em; margin-top: 6px; font-variant-numeric: tabular-nums; word-break: keep-all; } .dvAccS { font-size: 12px; color: var(--sub); }
+  .dvAccRows { margin-top: 10px; border-top: 1px solid var(--line); } .dvAccRows div { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--line); } .dvAccRows span { color: var(--sub); } .dvAccRows b { font-variant-numeric: tabular-nums; white-space: nowrap; } .dvAccRows .sum b { color: #8a6a24; }
+  .dvNotes { margin: 8px 0 0; padding-left: 16px; font-size: 12px; color: var(--sub); line-height: 1.6; word-break: keep-all; }
+  .dvCal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .dvMon { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; min-width: 0; } .dvMon.now { border: 2px solid #b8913f; }
+  .dvMonH { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 6px; } .dvMonH b { font-size: 16px; } .dvMonH span { font-size: 12px; color: var(--sub); font-variant-numeric: tabular-nums; }
+  .dvMon ul { list-style: none; margin: 0; padding: 0; } .dvMon li { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto auto; gap: 6px; align-items: center; font-size: 12.5px; padding: 3px 0; }
+  .dvMon li .linkBtn { padding: 0; border: 0; background: none; text-align: left; font-weight: 700; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; min-width: 0; }
+  .dvDay { color: var(--sub); font-variant-numeric: tabular-nums; } .dvAmt { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .dvTag { font-size: 10.5px; border-radius: 999px; padding: 1px 6px; background: #eef0f3; color: var(--sub); white-space: nowrap; } li.conf .dvTag { background: #14161c; color: #e6c57a; } li.past { opacity: .55; } li.more { display: block; color: var(--sub); font-size: 12px; }
+  .dvNone { font-size: 12px; color: var(--sub); padding: 6px 0; }
+  @media (max-width: 759px) { .dvForm { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dvChips { grid-column: span 2; } .dvAccs { grid-template-columns: 1fr; } .dvCal { grid-template-columns: 1fr; } .dvBars { height: 130px; gap: 2px; } .dvBarV { font-size: 9px; } }
+  @media (min-width: 760px) and (max-width: 1023px) { .dvCal { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* v11.2 공시 · 구루 */
+  .dsCols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
+  .dsCol { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; min-width: 0; } .dsColH { font-weight: 800; font-size: 13px; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 4px; }
+  .dsAgg { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; } .dsAgg:last-child { border-bottom: 0; }
+  .dsAgg .linkBtn, .dsTopR .linkBtn { padding: 0; border: 0; background: none; font-weight: 700; color: var(--txt); text-align: left; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .dsAgg b, .dsTopR b { font-variant-numeric: tabular-nums; white-space: nowrap; } .dsAgg .dsNm { min-width: 0; grid-column: span 2; } .dsNm small { display: block; color: var(--sub); font-size: 11px; }
+  .dsTable td.l small { display: block; color: var(--sub); font-size: 11px; } .dsTable td small { display: block; color: var(--sub); font-size: 11px; } .dsD { color: var(--sub); font-variant-numeric: tabular-nums; margin-right: 4px; }
+  .dsTag { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; white-space: nowrap; background: #eef0f3; color: var(--sub); } .dsTag.buy { background: #fde8ea; color: var(--up); } .dsTag.sell { background: #e3eefe; color: var(--down); } .dsTag.cancel { background: #14161c; color: #e6c57a; }
+  .dsGuruPills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; } .dsGuruPills button { flex: 0 0 auto; }
+  .dsGHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; } .dsGHead b { font-size: 18px; }
+  .dsTop { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px; margin-bottom: 8px; }
+  .dsTopR { display: grid; grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1fr) 54px 52px; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; } .dsTopR:last-child { border-bottom: 0; }
+  .dsRank { color: var(--sub); font-variant-numeric: tabular-nums; } .dsNm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+  .dsW { height: 8px; background: #f0ece2; border-radius: 4px; overflow: hidden; } .dsW i { display: block; height: 100%; background: #b8913f; border-radius: 4px; }
+  .dsTopR b { text-align: right; } .dsChg { text-align: right; font-size: 12px; white-space: nowrap; }
+  #discBody .dvPills { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; } #discBody .dvPills button { padding-left: 4px; padding-right: 4px; white-space: nowrap; }
+  .dsList { border-top: 1px solid var(--line); margin-bottom: 8px; } .dsRow { padding: 9px 2px; border-bottom: 1px solid var(--line); }
+  .dsR1 { display: grid; grid-template-columns: auto minmax(0, auto) auto 1fr; gap: 8px; align-items: center; } .dsR1 .linkBtn { padding: 0; border: 0; background: none; font-weight: 800; font-size: 14px; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; text-align: left; }
+  .dsV { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 14px; } .dsRow .dsTag:last-child { justify-self: start; }
+  .dsR2 { display: flex; justify-content: space-between; gap: 10px; margin-top: 3px; font-size: 12px; color: var(--sub); line-height: 1.5; } .dsR2 span { min-width: 0; word-break: keep-all; } .dsR2 a { white-space: nowrap; color: var(--sub); text-decoration: none; font-weight: 700; }
+  @media (max-width: 759px) { .dsCols { grid-template-columns: 1fr; } .dsTopR { grid-template-columns: 20px minmax(0, 1fr) 46px 46px; } .dsW { display: none; } }
 </style>
 </head>
 <body>
@@ -1191,6 +1253,7 @@
     <button data-tab="single"><i>📊</i><span>종목</span></button>
     <button data-tab="compare"><i>⚖️</i><span>비교</span></button>
     <button data-tab="sim"><i>💼</i><span>내 자산</span></button>
+    <button data-tab="div"><i>💰</i><span>배당</span></button>
     <button data-tab="watch"><i>⭐</i><span>관심</span></button>
   </nav>
 </header>
@@ -2029,6 +2092,13 @@
 </div>
 </div><!-- /tab-onecard -->
 
+<div id="tab-div" class="hidden">
+<div class="card" id="divCard">
+  <div class="pgHead"><h2>배당 · 세금 <small>월 얼마 받으려면 얼마가 필요한지 · 계좌별 세후 · 배당락 달력</small></h2></div>
+  <div id="dvBody" style="margin-top:10px"></div>
+</div>
+</div><!-- /tab-div -->
+
 <div id="tab-mind" class="hidden">
 <div class="card" id="mindCard">
   <h2 style="margin:0">투자 유형 테스트 <small>나는 왜 사고, 어떻게 고를까 · 16가지 유형 · 질문 12개 · 2분</small></h2>
@@ -2168,6 +2238,8 @@
   <button data-wp="list" class="active">관심 종목</button>
   <button data-wp="map">전체 종목</button>
   <button data-wp="news">뉴스</button>
+  <button data-wp="disc">공시</button>
+  <button data-wp="guru">구루</button>
 </div>
 <div id="wp-list" class="subPane"><div class="card" id="watchCard">
   <h2>관심 종목 <small>내 종목들의 현재 위치를 한눈에</small></h2>
@@ -2211,6 +2283,14 @@
       <li>데이터는 매일 아침 갱신되는 사전 수집분(최근 90일 + 52주 범위)입니다. 3개월 수익률은 90일 데이터의 최대 범위입니다.</li>
     </ul>
   </div></details>
+</div></div>
+<div id="wp-disc" class="subPane hidden"><div class="card" id="discCard">
+  <div class="pgHead"><h2>공시 · 지분 변동 <small>등록된 국내 종목의 임원·대주주 매수·매도와 자사주 공시 · 매일 아침 DART에서</small></h2></div>
+  <div id="discBody" style="margin-top:10px"></div>
+</div></div>
+<div id="wp-guru" class="subPane hidden"><div class="card" id="guruCard">
+  <div class="pgHead"><h2>구루 13F <small>버핏 등 주요 투자자가 분기마다 산 종목 · 판 종목 · SEC 보고서 기준</small></h2></div>
+  <div id="guruBody" style="margin-top:10px"></div>
 </div></div>
 <div id="wp-news" class="subPane hidden"><div class="card" id="newsCard">
   <h2>뉴스 <small>관심 종목 기사와 시장 전체를 흔드는 기사</small></h2>
@@ -2280,7 +2360,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.0<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.2<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -3862,7 +3942,7 @@ function renderRecent() {
 renderRecent();
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard"];
+var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "div"];
 var currentTab = "home";
 
 var SUBS = ["chart", "history", "insight", "tech", "company"];
@@ -3917,6 +3997,7 @@ function switchTab(target, sub, noScroll) {
   if (target === "channel" && typeof renderChannel === "function") renderChannel();
   if (target === "mind" && typeof renderMind === "function") renderMind();
   if (target === "onecard" && typeof makerRender === "function") makerRender();   // v10.5 카드 만들기 화면
+  if (target === "div" && typeof renderDiv === "function") renderDiv();   // v11.1 배당 · 세금
   document.querySelectorAll(".tabItem.open").forEach(function (el) { el.classList.remove("open"); });
   resizeVisibleCharts();
   if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -4661,14 +4742,14 @@ window.addEventListener("load", function () {
 <script src="sim.js?v=10.9"></script>
 <script src="insight.js?v=9.5"></script>
 <script src="guide.js?v=10.9"></script>
-<script src="watch.js?v=10.9"></script>
+<script src="watch.js?v=11.2"></script>
 <script src="holdings.js?v=9.5"></script>
 <script src="brief.js?v=10.6"></script>
 <script src="channel.js?v=9.7"></script>
 <script src="cards.js?v=10.4"></script>
 <script src="mind.js?v=10.4"></script>
 <script src="issues.js?v=10.8"></script>
-<script src="publish.js?v=10.6"></script>
+<script src="publish.js?v=11.2"></script>
 <script src="periodic.js?v=9.5.2"></script>
 <script src="story.js?v=10.4"></script>
 <script src="deep.js?v=10.0"></script>
@@ -4681,9 +4762,11 @@ window.addEventListener("load", function () {
 <script src="picks.js?v=10.8"></script>
 <script src="tpl.js?v=10.7"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=10.8"></script>
+<script src="maker.js?v=11.2"></script>
 <script src="lib.js?v=10.7"></script>
-<script src="ui.js?v=10.9"></script>
+<script src="dividend.js?v=11.1"></script>
+<script src="disc.js?v=11.2"></script>
+<script src="ui.js?v=11.2"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>

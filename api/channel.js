@@ -4,6 +4,7 @@ import { redisConf, getJsonGzText, setJsonGz, redisCmd, KEY } from "./_redis.js"
 import { composeDaily } from "./_compose.js";
 import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
+import { collectAll } from "./_disc.js";
 
 export async function loadNames(origin) {
   const { pairs } = await loadTickerPairs(origin);
@@ -30,6 +31,7 @@ export default async function handler(req, res) {
   // 운영자 전용: 토큰이 없으면 내용 없이 거절 (CDN에도 남기지 않음)
   if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
   if (req.query.op === "ai") return aiHandler(req, res);
+  if (req.query.op === "disc") return discHandler(req, res);   // v11.2 공시·구루 수동 수집 (운영자) — 크론과 같은 수집기를 시간 넉넉히
   if (req.query.op === "lib") return libHandler(req, res);   // v10.7 AI 보관함 (배경·스타일·구성·아이콘) — 서버(Redis) 저장   // v9.5 대표 카드 문구 (OpenAI) — 새 함수 파일을 만들 수 없어(무료 12개 한도) 여기에 붙임
   const proto = req.headers["x-forwarded-proto"] || "https";
   const origin = proto + "://" + req.headers.host;
@@ -290,4 +292,17 @@ async function libHandler(req, res) {
     if (b.act === "use") { e.uses = (e.uses || 0) + 1; e.last = Date.now(); await libPut(rc, idx); return res.status(200).json({ ok: true }); }
     return res.status(400).json({ ok: false, reason: "BAD_ACT" });
   } catch (err) { return res.status(200).json({ ok: false, reason: "ERROR", detail: String(err.message || err).slice(0, 200) }); }
+}
+
+/* v11.2 공시·구루 수동 수집: /api/channel?op=disc&run=1[&days=30]
+   처음 한 번(지난 30일·투자자 전원) 또는 크론이 시간이 모자랐던 날 쓴다. 결과는 /api/snap?disc=1 · ?guru=1 로 공개 */
+async function discHandler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.query.run !== "1") return res.status(400).json({ ok: false, reason: "run=1 필요" });
+  const redis = redisConf(); if (!redis) return res.status(500).json({ ok: false, reason: "NO_REDIS" });
+  const proto = req.headers["x-forwarded-proto"] || "https", origin = proto + "://" + req.headers.host;
+  let pairs = []; try { pairs = (await loadTickerPairs(origin)).pairs; } catch (e) {}
+  const days = Math.max(1, Math.min(90, parseInt(req.query.days, 10) || 30));
+  const out = await collectAll(redis, { pairs, dartMs: 90000, secMs: 150000, maxUpdates: 20, backfillDays: days });
+  return res.status(200).json({ ok: true, ...out });
 }

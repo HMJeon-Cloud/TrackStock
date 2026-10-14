@@ -3,6 +3,8 @@
 //   ?manifest=1   → 종목별 갱신일 목록           (CDN 30분)
 //   ?symbol=SYM   → 그 종목 과거 전체(최대 25년) (CDN 24시간: 며칠에 한 번만 바뀐다)
 //   ?popular=1    → 이번 주·지난 주 조회 순위 (CDN 30분)
+//   ?disc=1       → 국내 공시(임원·대주주 지분, 자사주) 최근 120일 (CDN 1시간)   — v11.2
+//   ?guru=1       → 주요 투자자 13F 분기 매수·매도 (CDN 6시간)
 // Redis 읽기 명령은 CDN 캐시 미스 때만 나가므로 하루 수백 회 수준이다.
 import { redisConf, redisCmd, getJsonGzText, KEY } from "./_redis.js";
 import { weekKey } from "./hit.js";
@@ -13,6 +15,8 @@ export default async function handler(req, res) {
   let key = null, cache = null;
   if (req.query.recent === "1") { key = KEY.recent; cache = "s-maxage=3600, stale-while-revalidate=7200"; }   // v9.3: 1년치·코인 76개로 커져 Redis 대역폭 절약 (CDN 1시간)
   else if (req.query.manifest === "1") { key = KEY.manifest; cache = "s-maxage=1800, stale-while-revalidate=3600"; }
+  else if (req.query.disc === "1") { key = "sm:disc"; cache = "s-maxage=3600, stale-while-revalidate=7200"; }
+  else if (req.query.guru === "1") { key = "sm:guru"; cache = "s-maxage=21600, stale-while-revalidate=43200"; }
   else if (symbol) { key = KEY.chart(symbol); cache = "s-maxage=86400, stale-while-revalidate=172800"; }
   if (!key && req.query.popular !== "1") return res.status(400).json({ error: "symbol required" });
 

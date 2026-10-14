@@ -13,6 +13,7 @@
 import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
 import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY, kst } from "./_redis.js";
+import { collectAll } from "./_disc.js";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
@@ -46,7 +47,7 @@ function validateSeries(sym, s) {
 async function loadSymbols(origin) {
   const { pairs, source } = await loadTickerPairs(origin);
   const alias = {}; pairs.forEach((p) => { if (/-USD$/.test(p[0])) alias[p[0]] = p[2] || ""; });
-  return { list: Array.from(new Set(pairs.map((p) => p[0]))), source, alias };
+  return { list: Array.from(new Set(pairs.map((p) => p[0]))), source, alias, pairs };
 }
 
 /* Yahoo 일봉. range=max 는 interval을 무시하고 월봉을 주므로 날짜 범위로 요청한다. */
@@ -231,10 +232,10 @@ export default async function handler(req, res) {
   }
 
   // 종목 목록이 이상하면(로그인 페이지 등) 데이터를 하나도 건드리지 않고 멈추고, 이유를 실행 기록에 남긴다
-  let symbols, symSource, coinAlias = {};
+  let symbols, symSource, coinAlias = {}, tickPairs = [];
   try {
     const r = await loadSymbols(origin);
-    symbols = r.list; symSource = r.source; coinAlias = r.alias || {};
+    symbols = r.list; symSource = r.source; coinAlias = r.alias || {}; tickPairs = r.pairs || [];
   } catch (e) {
     const log = { at: new Date().toISOString(), elapsedMs: Date.now() - started, symbols: 0, recentOk: 0, kept: 0,
       recentSaved: { ok: false, error: "종목 목록을 읽지 못해 이번 실행은 건너뜀 — 지난 데이터 유지" }, symbolsError: String(e.message).slice(0, 300) };
@@ -317,6 +318,14 @@ export default async function handler(req, res) {
     recentSaved = { ok: false, error: "야후에서 한 종목도 받지 못함 — 지난 데이터 유지" };
   }
 
+  /* ①-2 공시·구루 (v11.2) — 새 크론 없이 이 실행 안에서. 과거 전체 받기(야후)와 동시에 돌린다 (서로 다른 서버라 서로 안 막음) */
+  let disc = null, discP = null;
+  const left = TIME_BUDGET_MS - (Date.now() - started) - 7000;
+  if (req.query.disc !== "0" && left > 5000) {
+    discP = collectAll(redis, { pairs: tickPairs, dartMs: left, secMs: left, maxUpdates: 1 })
+      .then((r) => { disc = r; }).catch((e) => { disc = { error: String(e.message).slice(0, 120) }; });
+  } else disc = { skipped: "시간 부족 (" + Math.round(left / 1000) + "초 남음)" };
+
   /* ② 과거 전체 — 남은 시간 안에서, 가장 오래 안 받은 종목부터 */
   const stale = symbols
     .map((s) => ({ s, at: (entries[s] && entries[s].history) || "" }))
@@ -341,6 +350,8 @@ export default async function handler(req, res) {
     }));
   }
 
+  if (discP) await discP;
+
   /* ③ 목록 */
   const withHistory = symbols.filter((s) => entries[s] && entries[s].history).length;
   let manifestOk = true;
@@ -359,7 +370,7 @@ export default async function handler(req, res) {
     at: new Date().toISOString(), elapsedMs: Date.now() - started,
     symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, historyUpdated: done.length,
     historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
-    failedSample: failed.slice(0, 5)
+    failedSample: failed.slice(0, 5), disc: disc && { dart: disc.dart && { ok: disc.dart.ok, added: disc.dart.added, reason: disc.dart.reason }, sec: disc.sec && { ok: disc.sec.ok, updated: disc.sec.updated }, skipped: disc.skipped }
   };
   try { await redisCmd(redis, ["SET", "sm:cronlog", JSON.stringify(log), "EX", String(14 * 86400)]); } catch (e) {}
 
@@ -374,6 +385,7 @@ export default async function handler(req, res) {
     recentSymbols: recentOk, recentKept: kept,
     recentSaved, manifestOk, yahoo: yahooStats,
     failed: failed.slice(0, 10),
+    disc,
     elapsedMs: Date.now() - started,
     note: "과거 전체는 순환 갱신, 최근 " + RECENT_DAYS + "일은 매 실행 전 종목 갱신",
   });

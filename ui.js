@@ -5,7 +5,7 @@
    ============================================================ */
 (function () {
   /* ① 운영자 잠금 — 화면 진입(switchTab)뿐 아니라 함수 자체도 막는다 (주소창·콘솔로 불러도 실행 안 됨) */
-  var GUARD = ["aiOpen", "aiOpenCustom", "aiStudio", "makerGo", "makerRender", "cardsOpen", "onePageOpen", "storyOpen", "perOpen", "perOpen2", "reelOpen", "issuesCardOpen", "pubSingleCard", "pubPolicyOpen", "pubRender", "tplPanel", "libTabRender", "libSave", "loadBrief", "renderChannel"];
+  var GUARD = ["aiOpen", "aiOpenCustom", "aiStudio", "makerGo", "makerRender", "cardsOpen", "onePageOpen", "storyOpen", "perOpen", "perOpen2", "reelOpen", "issuesCardOpen", "pubSingleCard", "pubPolicyOpen", "pubRender", "tplPanel", "libTabRender", "libSave", "loadBrief", "renderChannel", "dvDeckOpen", "dsDeckOpen", "discDeckOpen", "guruDeckOpen"];
   GUARD.forEach(function (name) {
     var f = window[name]; if (typeof f !== "function" || f.__guarded) return;
     var g = function () { if (typeof isOwner === "function" && !isOwner()) { console.warn("운영자 전용: " + name); return; } return f.apply(this, arguments); };
@@ -27,7 +27,8 @@
     sim: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2"/>',
     watch: '<path d="M12 4l2.5 5.2 5.5.6-4.1 3.8 1.2 5.4L12 16.3 6.9 19l1.2-5.4L4 9.8l5.5-.6z"/>',
     mind: '<circle cx="12" cy="9" r="4"/><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5"/>',
-    channel: '<path d="M4 10v4h3l6 4V6L7 10z"/><path d="M17 9a4 4 0 0 1 0 6"/>'
+    channel: '<path d="M4 10v4h3l6 4V6L7 10z"/><path d="M17 9a4 4 0 0 1 0 6"/>',
+    div: '<circle cx="12" cy="12" r="9"/><path d="M7.5 9l2.2 6 2.3-5.5 2.3 5.5 2.2-6M6.8 12h10.4"/>'
   };
   function navIcons() { Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) { var i = b.querySelector("i"), k = b.getAttribute("data-tab"); if (i && NAV_SVG[k] && !i.__svg) { i.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + NAV_SVG[k] + '</svg>'; i.__svg = true; } }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", navIcons); else navIcons();
