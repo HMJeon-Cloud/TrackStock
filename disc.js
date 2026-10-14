@@ -35,10 +35,10 @@ function dsVal(it) { if (it.k !== "insider" && it.k !== "major") return it.amt |
 function dsDart(id) { return "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + encodeURIComponent(id); }
 
 /* ---------- 데이터 ---------- */
-function dsEnsure() {
-  if (DS.disc && DS.guru) return Promise.resolve();
+function dsEnsure(fresh) {
+  if (DS.disc && DS.guru && !fresh) return Promise.resolve();
   if (DS.loading) return DS.loading;
-  function get(q) { return fetch("/api/snap?" + q + "=1").then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); }
+  function get(q) { return fetch("/api/snap?" + q + "=1" + (fresh ? "&fresh=" + Date.now() : "")).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); }
   var rec = typeof fetchRecent === "function" ? fetchRecent().then(function (r) { if (r && typeof DATA !== "undefined") DATA.recentData = r; }).catch(function () {}) : Promise.resolve();
   DS.loading = Promise.all([get("disc"), get("guru"), rec]).then(function (a) { DS.disc = a[0] || { items: [], none: true }; DS.guru = a[1] || { gurus: [], none: true }; DS.loading = null; });
   return DS.loading;
@@ -243,3 +243,26 @@ function thrGuru(names) {
   if (g.sells && g.sells[0]) add("반전형", dsJ(g.nm, "이", "가") + " 판 종목,\n" + dsIss(g.sells[0]) + " " + dsUsd(Math.abs(g.sells[0].dv)) + "어치였어요.", { ask: "반대로 새로 담은 건 뭐였을까요?" });
   return thrSafe(out);
 }
+
+/* ---------- 운영자: 지금 수집 (v11.2.1) ----------
+   주소창으로 /api/channel?op=disc 를 열면 운영자 토큰(x-owner 헤더)이 안 붙어 OWNER_ONLY가 난다 → 앱 안 버튼으로 토큰을 붙여 부른다 */
+function dsRunCollect(btn) {
+  var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
+  var msgs = document.querySelectorAll(".dsRunMsg"), btns = document.querySelectorAll("[data-ds-run]");
+  function say(t) { Array.prototype.forEach.call(msgs, function (m) { m.textContent = t; }); }
+  if (!tok) { say("운영자 토큰이 없어요. 운영자 모드로 들어온 뒤 다시 눌러 주세요."); return; }
+  Array.prototype.forEach.call(btns, function (b) { b.disabled = true; }); say("수집 중… DART 공시와 13F를 받고 있어요 (1~4분, 창을 닫지 마세요)");
+  var t0 = Date.now();
+  fetch("/api/channel?op=disc&run=1&days=30", { headers: { "x-owner": tok }, cache: "no-store" }).then(function (r) { return r.json().catch(function () { return { ok: false, reason: "HTTP_" + r.status }; }); }).then(function (j) {
+    var sec = Math.round((Date.now() - t0) / 1000), d = j.dart || {}, g = j.sec || {}, parts = [];
+    if (!j.ok) parts.push("실패: " + (j.reason || "알 수 없음"));
+    if (d.ok) parts.push("공시 새로 " + (d.added || 0) + "건 (보관 " + (d.total || 0) + "건)"); else if (j.ok) parts.push("공시 실패: " + (d.reason === "NO_DART_KEY" ? "DART_API_KEY 없음" : d.reason || d.error || "?"));
+    if (g.ok) parts.push("13F 확인 " + (g.checked || 0) + "명 · 갱신 " + ((g.updated || []).length) + "명"); else if (j.ok) parts.push("13F 실패: " + (g.error || "?"));
+    var errs = [].concat((d.log && d.log.errors) || [], (g.log && g.log.errors) || []);
+    if (errs.length) parts.push("오류 " + errs.length + "건: " + errs.slice(0, 3).join(" / "));
+    say(parts.join(" · ") + " · " + sec + "초");
+    if (j.ok) { DS.disc = null; DS.guru = null; dsEnsure(true).then(function () { if (typeof watchPane !== "undefined") { if (watchPane === "disc") renderDisc(); if (watchPane === "guru") renderGuru(); } }); }
+  }).catch(function (e) { say("요청 실패: " + (e && e.message || e) + " — 시간이 오래 걸리면 Vercel이 끊었을 수 있어요. 잠시 뒤 다시 눌러 주세요."); })
+    .then(function () { Array.prototype.forEach.call(btns, function (b) { b.disabled = false; }); });
+}
+document.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("[data-ds-run]"); if (b) { if (typeof isOwner === "function" && !isOwner()) return; dsRunCollect(b); } });

@@ -1214,6 +1214,7 @@
   @media (min-width: 760px) and (max-width: 1023px) { .dvCal { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
   /* v11.2 공시 · 구루 */
+  .dsRunBar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; background: #fbf6e8; border-radius: 12px; font-size: 12px; flex-wrap: wrap; } .dsRunBar .chip { background: #14161c; color: #e6c57a; border-color: #14161c; font-weight: 800; } .dsRunMsg { min-width: 0; word-break: keep-all; line-height: 1.5; }
   .dsCols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
   .dsCol { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; min-width: 0; } .dsColH { font-weight: 800; font-size: 13px; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 4px; }
   .dsAgg { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; } .dsAgg:last-child { border-bottom: 0; }
@@ -2286,10 +2287,12 @@
 </div></div>
 <div id="wp-disc" class="subPane hidden"><div class="card" id="discCard">
   <div class="pgHead"><h2>공시 · 지분 변동 <small>등록된 국내 종목의 임원·대주주 매수·매도와 자사주 공시 · 매일 아침 DART에서</small></h2></div>
+  <div class="dsRunBar ownerOnly"><button class="chip" data-ds-run="1">지금 수집</button><span class="dsRunMsg briefDim">운영자 전용 · 지난 30일 공시 + 투자자 전원 13F를 한 번에 (1~4분)</span></div>
   <div id="discBody" style="margin-top:10px"></div>
 </div></div>
 <div id="wp-guru" class="subPane hidden"><div class="card" id="guruCard">
   <div class="pgHead"><h2>구루 13F <small>버핏 등 주요 투자자가 분기마다 산 종목 · 판 종목 · SEC 보고서 기준</small></h2></div>
+  <div class="dsRunBar ownerOnly"><button class="chip" data-ds-run="1">지금 수집</button><span class="dsRunMsg briefDim">운영자 전용 · 지난 30일 공시 + 투자자 전원 13F를 한 번에 (1~4분)</span></div>
   <div id="guruBody" style="margin-top:10px"></div>
 </div></div>
 <div id="wp-news" class="subPane hidden"><div class="card" id="newsCard">
@@ -2360,7 +2363,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.2<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.2.1<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4765,7 +4768,7 @@ window.addEventListener("load", function () {
 <script src="maker.js?v=11.2"></script>
 <script src="lib.js?v=10.7"></script>
 <script src="dividend.js?v=11.1"></script>
-<script src="disc.js?v=11.2"></script>
+<script src="disc.js?v=11.2.1"></script>
 <script src="ui.js?v=11.2"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
