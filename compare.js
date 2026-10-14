@@ -220,7 +220,7 @@ function renderChips() {
   var box = $("cmpChips");
   if (!cmpState.cart.length) {
     box.innerHTML = '<span style="color:var(--sub);font-size:12px">장바구니가 비어 있습니다. ' +
-      '위 검색창으로 담거나, <b>종목</b> 탭에서 종목을 분석한 뒤 🛒 버튼으로 담으세요. ' +
+      '위 검색창으로 담거나, <b>종목</b> 탭에서 종목을 분석한 뒤 담기 버튼으로 담으세요. ' +
       '(비교하려면 2개 이상)</span>';
     return;
   }

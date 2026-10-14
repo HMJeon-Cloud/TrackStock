@@ -132,7 +132,7 @@ function syncSimAssets() {
   var cart = cmpState.cart;
   if (!cart.length) {
     box.innerHTML = '<span style="color:var(--sub);font-size:12px">' +
-      '장바구니가 비어 있어요. <b>종목</b> 탭에서 🛒를 누르거나 <b>비교</b> 탭에서 담아 주세요.</span>';
+      '장바구니가 비어 있어요. <b>종목</b> 탭에서 담기를 누르거나 <b>비교</b> 탭에서 담아 주세요.</span>';
     $("simWeightSum").textContent = "";
     return;
   }

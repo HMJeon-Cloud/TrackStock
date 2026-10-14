@@ -156,7 +156,7 @@ function renderWatchList() {
     }
     html += "<td style='white-space:nowrap'>" +
       '<button class="chip" data-open="' + w.s + '" title="분석 화면 열기">분석</button> ' +
-      '<button class="chip" data-cart="' + w.s + '" title="장바구니 담기">🛒</button> ' +
+      '<button class="chip" data-cart="' + w.s + '" title="장바구니 담기">담기</button> ' +
       '<button class="chip" data-del="' + w.s + '" title="관심 목록에서 빼기">✕</button></td></tr>';
   });
   box.innerHTML = html + "</tbody>";

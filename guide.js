@@ -254,7 +254,7 @@ var GUIDE_METHODS = [
     who: "이미 주력 종목이 있고, 거기에 무엇을 더하면 계좌가 덜 흔들릴지 찾는 사람.",
     idea: "주력 자산이 크게 빠진 <b>바로 그 구간</b>에서 플러스였거나 덜 빠진 자산이 진짜 헷지입니다. 평상시 상관계수보다 위기 때 실제 성과가 더 중요합니다.",
     steps: [
-      { t: "주력 종목을 분석하고 🛒로 장바구니에 담습니다", d: "그 다음 금·장기채·달러·단기채 등 후보를 검색창으로 함께 담습니다.", go: { tab: "single", sub: "analysis", id: "searchCard", needSymbol: false }, label: "종목 분석·담기" },
+      { t: "주력 종목을 분석하고 담기 버튼으로 장바구니에 담습니다", d: "그 다음 금·장기채·달러·단기채 등 후보를 검색창으로 함께 담습니다.", go: { tab: "single", sub: "analysis", id: "searchCard", needSymbol: false }, label: "종목 분석·담기" },
       { t: "사건별 성과 표에서 주력이 빠진 구간의 후보 성과를 봅니다", d: "행을 클릭하면 그 구간만 확대됩니다. 주력이 -30%일 때 +인 자산이 있는지.", go: { tab: "compare", id: "cmpCrisis", needSymbol: false }, label: "사건별 성과" },
       { t: "상관계수 행렬에서 주력과 음수~0인 자산을 고릅니다", d: "음수면 최고의 짝, 0 근처면 따로 움직임, 0.7 이상이면 헷지가 아닙니다.", go: { tab: "compare", id: "cmpCorr", needSymbol: false }, label: "상관계수 행렬" },
       { t: "시뮬레이터로 주력 70 + 헷지 30 등을 돌려 낙폭 개선을 확인합니다", d: "최악 하락 구간 표에서 헷지가 실제로 얼마나 막아줬는지 숫자로 나옵니다.", go: { tab: "sim", id: "simWorst", needSymbol: false }, label: "최악 하락 구간" }

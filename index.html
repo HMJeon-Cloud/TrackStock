@@ -1142,6 +1142,33 @@
   .aiStu .aiGrid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
   .aiStu .aiGrid2 select, .aiStu .aiGrid2 input { width: 100%; }
   @media (max-width: 600px) { .aiStu { padding: 0; } .aiIn { border-radius: 0; } }
+
+  /* ===== v10.9 전체를 '카드 탭' 모양으로 ===== */
+  .emoIcon { display: none !important; }
+  .pubCkRow .emoIcon { display: inline-block !important; width: 8px; height: 8px; border-radius: 50%; background: #03a15b; flex: 0 0 8px; font-size: 0; }
+  .pubCkRow.warn .emoIcon { background: #d97706; } .pubCkRow.bad .emoIcon { background: #dc2626; }
+  /* 위 메뉴: PC는 글자만, 모바일 아래 메뉴는 단색 선 아이콘 */
+  @media (min-width: 701px) { .tabs button i { display: none !important; } }
+  @media (max-width: 700px) { .tabs button i { filter: none !important; opacity: .45; display: inline-flex; } .tabs button.active i { opacity: 1; } .tabs button i svg { display: block; } }
+  /* 하위 탭(종목·내 자산·관심): 카드 탭처럼 밑줄 + 같은 폭 칸 */
+  #subTabs, #pfModeTabs, #watchTabs { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0 !important; border-bottom: 2px solid var(--line); margin: 6px 0 14px; padding: 0 !important; background: none !important; border-radius: 0 !important; }
+  #subTabs button, #pfModeTabs button, #watchTabs button { background: none !important; border: 0 !important; border-radius: 0 !important; border-bottom: 3px solid transparent !important; margin-bottom: -2px; padding: 11px 4px !important; min-width: 0 !important; font-size: 14px !important; font-weight: 700; color: var(--sub) !important; box-shadow: none !important; }
+  #subTabs button.active, #pfModeTabs button.active, #watchTabs button.active { color: var(--txt) !important; border-bottom-color: #b8913f !important; }
+  /* 홈: 그림 없이 목록형 */
+  .hero { padding-top: 20px; }
+  .startCard { padding: 16px 18px !important; gap: 12px !important; min-height: 72px; }
+  .startText b { font-size: 15px; } .startText small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .startText { min-width: 0; flex: 1; }
+  .startArrow { color: #b0b8c1; font-size: 20px; }
+  /* 목록 칸 공통(카드 탭과 같은 줄 높이·여백) */
+  .card { border: 1px solid rgba(0,0,0,0.04); }
+  .card h2 { font-size: 19px; }
+  .homeChips .row { justify-content: center; }
+  html, body { overflow-x: hidden; }
+
+  .pkCols > div { min-width: 0; } .pkItem { min-width: 0; }
+  @media (max-width: 700px) { .pkCols { grid-template-columns: minmax(0, 1fr) !important; } }
+  .cartBtn { font-size: 14px !important; font-weight: 700; padding: 8px 14px !important; }
 </style>
 </head>
 <body>
@@ -1191,7 +1218,7 @@
       <option value="max">전체</option>
     </select>
     <button class="primary" id="loadBtn">분석</button>
-    <button id="addCartBtn" class="cartBtn">🛒<span id="cartCount" class="cartCount hidden">0</span></button>
+    <button id="addCartBtn" class="cartBtn" title="비교 장바구니에 담기">담기<span id="cartCount" class="cartCount hidden">0</span></button>
     <button id="watchBtn" class="cartBtn" title="관심 목록에 넣기">☆</button>
   </div>
   <div class="row hidden" style="margin-top:10px" id="recentRow">
@@ -2151,7 +2178,7 @@
     <ul>
       <li><b>52주 최고 대비</b>가 -5% 안이면 신고가 부근, -20% 아래면 조정 중입니다. 관심 종목 중 어디가 싸졌는지 훑어보는 용도입니다.</li>
       <li><b>1년 최대낙폭</b>은 최근 1년 안에서 겪은 가장 깊은 하락입니다. 이 숫자가 내 한계보다 크면 비중을 줄여야 할 종목입니다.</li>
-      <li><b>분석</b>은 개별 종목 화면으로, <b>🛒</b>는 장바구니로 보냅니다.</li>
+      <li><b>분석</b>은 개별 종목 화면으로, <b>담기</b>는 장바구니로 보냅니다.</li>
       <li>표의 가격은 <b>확정된 최근 거래일 종가</b>이며 장중 실시간 가격이 아닙니다. 종목명 아래 날짜가 그 기준일입니다.</li>
     </ul>
   </div></details>
@@ -2250,7 +2277,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v10.8<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v10.9<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4627,11 +4654,11 @@ window.addEventListener("load", function () {
 <script src="metrics.js?v=9.5"></script>
 <script src="technical.js?v=9.5"></script>
 <script src="company.js?v=9.5"></script>
-<script src="compare.js?v=9.5"></script>
-<script src="sim.js?v=9.5"></script>
+<script src="compare.js?v=10.9"></script>
+<script src="sim.js?v=10.9"></script>
 <script src="insight.js?v=9.5"></script>
-<script src="guide.js?v=9.5"></script>
-<script src="watch.js?v=9.5"></script>
+<script src="guide.js?v=10.9"></script>
+<script src="watch.js?v=10.9"></script>
 <script src="holdings.js?v=9.5"></script>
 <script src="brief.js?v=10.6"></script>
 <script src="channel.js?v=9.7"></script>
@@ -4653,7 +4680,7 @@ window.addEventListener("load", function () {
 <script src="tplx.js?v=10.5"></script>
 <script src="maker.js?v=10.8"></script>
 <script src="lib.js?v=10.7"></script>
-<script src="ui.js?v=10.8"></script>
+<script src="ui.js?v=10.9"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>
