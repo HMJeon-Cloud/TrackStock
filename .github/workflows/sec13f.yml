@@ -1,4 +1,4 @@
-# SEC 13F 수집 (v11.2.8) — SEC가 Vercel 서버를 막아서 GitHub 서버에서 받아 앱으로 올린다
+# SEC 13F 수집 (v11.2.9) — SEC가 Vercel 서버를 막아서 GitHub 서버에서 받아 앱으로 올린다
 #   처음: Actions 탭 → "SEC 13F 수집" → Run workflow 로 한 번 시험
 #   통과하면 아래 schedule 두 줄의 # 를 지워 주 1회 자동 실행 (13F는 분기마다 바뀌어서 주 1회면 충분)
 name: SEC 13F 수집
@@ -19,8 +19,12 @@ jobs:
           node-version: 20
       - name: SEC 접속 확인 (curl)
         run: |
-          curl -sS -o /dev/null -w "data.sec.gov: %{http_code}\n" --compressed -A "$SEC_UA" -H "Accept: */*" https://data.sec.gov/submissions/CIK0001067983.json || true
-          curl -sS -o /dev/null -w "www.sec.gov: %{http_code}\n" --compressed -A "$SEC_UA" -H "Accept: */*" "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=1067983&type=13F-HR&count=10&output=atom" || true
+          U="https://data.sec.gov/submissions/CIK0001067983.json"
+          echo "① 등록한 SEC_UA:   $(curl -s -o /dev/null -w '%{http_code}' --compressed -A "$SEC_UA" -H 'Accept: */*' "$U")"
+          echo "② 사이트 주소 메일: $(curl -s -o /dev/null -w '%{http_code}' --compressed -A 'StockMind admin@track-stock-tau.vercel.app' -H 'Accept: */*' "$U")"
+          echo "③ 일반 브라우저:   $(curl -s -o /dev/null -w '%{http_code}' --compressed -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36' "$U")"
+          echo "④ www.sec.gov:     $(curl -s -o /dev/null -w '%{http_code}' --compressed -A "$SEC_UA" -H 'Accept: */*' 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=1067983&type=13F-HR&count=10&output=atom')"
+          echo "SEC_UA 길이: ${#SEC_UA}자 (앞뒤 공백·따옴표가 들어가면 길이가 달라요)"
         env:
           SEC_UA: ${{ secrets.SEC_UA }}
       - name: 13F 받아서 올리기
