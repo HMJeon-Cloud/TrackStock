@@ -177,7 +177,13 @@ export async function collectDart(redis, opt) {
 }
 
 /* ============================================================ ② SEC 13F ============================================================ */
-function secHeaders() { return { "User-Agent": process.env.SEC_UA || "StockMind track-stock-tau.vercel.app", Accept: "application/json, text/xml, */*" }; }
+/* SEC_UA: HTTP 헤더는 영문·숫자·기호(ASCII)만 가능 — 한글이 섞이면 'Cannot convert argument to a ByteString' 오류로 요청 자체가 안 나간다.
+   그래서 한글 등은 지우고 보낸다 (v11.2.3). 예: "StockMind hm@example.com" */
+export function secUA() {
+  const raw = String(process.env.SEC_UA || ""), ua = raw.replace(/[^\x20-\x7E]/g, " ").replace(/\s+/g, " ").trim();
+  return { ua: ua || "StockMind track-stock-tau.vercel.app", stripped: ua !== raw.trim(), hasMail: /@/.test(ua) };
+}
+function secHeaders() { return { "User-Agent": secUA().ua, Accept: "application/json, text/xml, */*" }; }
 const STOP = new Set(["INC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "LIMITED", "PLC", "HLDGS", "HOLDINGS", "HLDG", "HOLDING", "GROUP", "GRP", "THE", "OF", "NEW", "DEL", "DE", "CL", "CLASS", "A", "B", "C", "COM", "SA", "NV", "AG", "SE", "LP", "LLC", "ADR", "SPONSORED", "SPON", "ADS", "SHS", "ORD", "CAP", "STK", "COS", "MD", "NY", "PA"]);
 const ALIAS = { AMER: "AMERICA", PETE: "PETROLEUM", INTL: "INTERNATIONAL", FINL: "FINANCIAL", SVCS: "SERVICES", SYS: "SYSTEMS", MTRS: "MOTORS", PPTYS: "PROPERTIES", BK: "BANK", MGMT: "MANAGEMENT", TECHNOLOGIES: "TECHNOLOGY", TECH: "TECHNOLOGY", COMMUNICATIONS: "COMMUNICATION", COMMUNICATNS: "COMMUNICATION", HLTHCR: "HEALTHCARE", ENTMT: "ENTERTAINMENT", RES: "RESOURCES", PHARMACEUTICALS: "PHARMA", LABS: "LABORATORIES", MFG: "MANUFACTURING", AMERN: "AMERICAN", NATL: "NATIONAL", SOLUTIONS: "SOLUTION" };
 export function normName(s) {
@@ -242,6 +248,7 @@ export function diffHoldings(cur, prev, total, map) {
 
 export async function collectGurus(redis, opt) {
   const t0 = Date.now(), budget = opt.budgetMs || 15000, maxUpd = opt.maxUpdates || 2, log = { checked: 0, updated: [], errors: [] };
+  const U = secUA(); if (!U.hasMail) log.errors.push("SEC_UA에 이메일이 없어요 — SEC가 거절할 수 있어요 (예: StockMind hm@example.com)"); if (U.stripped) log.note = "SEC_UA의 한글·특수문자는 빼고 보냈어요: " + U.ua;
   const prev = (await readDoc(redis, DISC_KEY.guru)) || { gurus: [] };
   const byId = {}; prev.gurus.forEach((g) => { byId[g.id] = g; });
   let map = null, upd = 0, pend = 0;
@@ -267,7 +274,7 @@ export async function collectGurus(redis, opt) {
       upd++; log.updated.push(G.id);
     } catch (e) {
       const m = String(e.message || e);
-      log.errors.push(G.id + ": " + (/403/.test(m) ? "SEC 거절(403) — SEC_UA에 '이름 이메일주소' 형식이 필요해요" : /abort/i.test(m) ? "시간 초과" : m.slice(0, 60)));
+      log.errors.push(G.id + ": " + (/ByteString/i.test(m) ? "SEC_UA에 한글이 있어요 — 영문 이름과 이메일만 넣어 주세요" : /403/.test(m) ? "SEC 거절(403) — SEC_UA에 '이름 이메일주소' 형식이 필요해요" : /abort/i.test(m) ? "시간 초과" : m.slice(0, 60)));
       if (/403/.test(m)) log.blocked = true;
     }
     if (log.blocked) break;   // SEC가 막으면 나머지도 똑같이 막히니 바로 멈춘다

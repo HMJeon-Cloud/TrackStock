@@ -272,7 +272,7 @@ function dsRunCollect(btn) {
   function runSec(n) {
     say("공시 끝 (새로 " + st.added + "건) · 13F 받는 중 (" + n + "회차) · " + sec(), errs);
     return call("sec").then(function (j) {
-      var g = j.sec || {}; addErr(g.log && g.log.errors); st.chk = Math.max(st.chk, g.checked || 0); (g.updated || []).forEach(function (x) { if (st.upd.indexOf(x) < 0) st.upd.push(x); });
+      var g = j.sec || {}; addErr(g.log && g.log.errors); if (g.log && g.log.note) addErr([g.log.note]); st.chk = Math.max(st.chk, g.checked || 0); (g.updated || []).forEach(function (x) { if (st.upd.indexOf(x) < 0) st.upd.push(x); });
       if (!j.ok || g.reason || g.done || n >= 6) return true;
       return runSec(n + 1);
     });
