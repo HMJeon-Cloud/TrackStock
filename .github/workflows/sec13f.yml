@@ -1,6 +1,6 @@
-# SEC 13F 수집 (v11.2.7) — SEC가 Vercel 서버를 막아서 GitHub 서버에서 받아 앱으로 올린다
+# SEC 13F 수집 (v11.2.8) — SEC가 Vercel 서버를 막아서 GitHub 서버에서 받아 앱으로 올린다
 #   처음: Actions 탭 → "SEC 13F 수집" → Run workflow 로 한 번 시험
-#   통과하면 아래 schedule 두 줄의 # 를 지워 주 1회 자동 실행
+#   통과하면 아래 schedule 두 줄의 # 를 지워 주 1회 자동 실행 (13F는 분기마다 바뀌어서 주 1회면 충분)
 name: SEC 13F 수집
 on:
   workflow_dispatch:
@@ -17,9 +17,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: SEC 접속 확인 (curl)
+        run: |
+          curl -sS -o /dev/null -w "data.sec.gov: %{http_code}\n" --compressed -A "$SEC_UA" -H "Accept: */*" https://data.sec.gov/submissions/CIK0001067983.json || true
+          curl -sS -o /dev/null -w "www.sec.gov: %{http_code}\n" --compressed -A "$SEC_UA" -H "Accept: */*" "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=1067983&type=13F-HR&count=10&output=atom" || true
+        env:
+          SEC_UA: ${{ secrets.SEC_UA }}
       - name: 13F 받아서 올리기
         run: node scripts/sec13f.mjs
         env:
+          SEC_CURL: "1"
           SEC_UA: ${{ secrets.SEC_UA }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SITE_URL: https://track-stock-tau.vercel.app
