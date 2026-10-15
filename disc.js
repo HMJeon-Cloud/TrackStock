@@ -272,13 +272,13 @@ function dsRunCollect(btn) {
   function runSec(n) {
     say("공시 끝 (새로 " + st.added + "건) · 13F 받는 중 (" + n + "회차) · " + sec(), errs);
     return call("sec").then(function (j) {
-      var g = j.sec || {}; addErr(g.log && g.log.errors); if (g.log && g.log.note) addErr([g.log.note]); st.chk = Math.max(st.chk, g.checked || 0); (g.updated || []).forEach(function (x) { if (st.upd.indexOf(x) < 0) st.upd.push(x); });
+      var g = j.sec || {}; addErr(g.log && g.log.errors); if (g.skipped) st.note = (g.log && g.log.note) || "13F는 GitHub Actions에서 받아요"; else if (g.log && g.log.note) addErr([g.log.note]); st.chk = Math.max(st.chk, g.checked || 0); (g.updated || []).forEach(function (x) { if (st.upd.indexOf(x) < 0) st.upd.push(x); });
       if (!j.ok || g.reason || g.done || n >= 6) return true;
       return runSec(n + 1);
     });
   }
   runDart(1).then(function () { return runSec(1); }).then(function () {
-    say("완료 · 공시 새로 " + st.added + "건 (보관 " + st.total + "건" + (st.pending ? " · 숫자 못 채운 " + st.pending + "건은 다음 수집 때 다시" : "") + ") · 13F 확인 " + st.chk + "명 · 갱신 " + st.upd.length + "명 · " + sec(), errs);
+    say("완료 · 공시 새로 " + st.added + "건 (보관 " + st.total + "건" + (st.pending ? " · 숫자 못 채운 " + st.pending + "건은 다음 수집 때 다시" : "") + ") · " + (st.note ? st.note : "13F 확인 " + st.chk + "명 · 갱신 " + st.upd.length + "명") + " · " + sec(), errs);
     DS.disc = null; DS.guru = null; return dsEnsure(true).then(function () { if (typeof watchPane !== "undefined") { if (watchPane === "disc") renderDisc(); if (watchPane === "guru") renderGuru(); } });
   }).catch(function (e) { say("요청 실패: " + (e && e.message || e) + " — 다시 누르면 받은 곳부터 이어서 받아요.", errs); })
     .then(function () { Array.prototype.forEach.call(btns, function (b) { b.disabled = false; }); });

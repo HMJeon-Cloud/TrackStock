@@ -235,13 +235,12 @@ const ALIAS = { AMER: "AMERICA", PETE: "PETROLEUM", INTL: "INTERNATIONAL", FINL:
 export function normName(s) {
   return String(s || "").toUpperCase().replace(/&/g, " AND ").replace(/\/[A-Z]{2,3}\/?/g, " ").replace(/[^A-Z0-9 ]/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w)).map((w) => ALIAS[w] || w);
 }
+export function buildTickMap(j) { const map = {}; Object.keys(j || {}).forEach((k) => { const r = j[k]; const key = normName(r.title).join(" "); if (key && !map[key]) map[key] = r.ticker; }); return map; }
 async function tickMap(redis, ms) {
   const old = await readDoc(redis, DISC_KEY.tick);
   if (old && old.at && Date.now() - Date.parse(old.at) < 30 * 86400e3) return old.map;
   try {
-    const j = await secJson("https://www.sec.gov/files/company_tickers.json", ms || 12000);
-    const map = {};
-    Object.keys(j).forEach((k) => { const r = j[k]; const key = normName(r.title).join(" "); if (key && !map[key]) map[key] = r.ticker; });
+    const map = buildTickMap(await secJson("https://www.sec.gov/files/company_tickers.json", ms || 12000));
     await setJsonGz(redis, DISC_KEY.tick, { at: new Date().toISOString(), map }, 40 * 86400);
     return map;
   } catch (e) { return (old && old.map) || {}; }
@@ -292,10 +291,12 @@ export function diffHoldings(cur, prev, total, map) {
   return { top, buys, sells, nNew: moves.filter((m) => m.kind === "new").length, nExit: moves.filter((m) => m.kind === "exit").length };
 }
 
-export async function collectGurus(redis, opt) {
+/* 13F 계산 본체 — 저장소와 무관 (Vercel 수집기와 GitHub Actions 스크립트가 같이 쓴다)
+   prev: 지난 문서 { gurus } · opt.getMap(ms): 티커 대조표를 돌려주는 함수 */
+export async function buildGurus(prev, opt) {
   const t0 = Date.now(), budget = opt.budgetMs || 15000, maxUpd = opt.maxUpdates || 2, log = { checked: 0, updated: [], errors: [] };
   const U = secUA(); if (!U.hasMail) log.errors.push("SEC_UA에 이메일이 없어요 — SEC가 거절할 수 있어요 (예: StockMind hm@example.com)"); if (U.stripped) log.note = "SEC_UA의 한글·특수문자는 빼고 보냈어요";
-  const prev = (await readDoc(redis, DISC_KEY.guru)) || { gurus: [] };
+  prev = prev || { gurus: [] };
   const byId = {}; prev.gurus.forEach((g) => { byId[g.id] = g; });
   let map = null, upd = 0, pend = 0;
   // 오래 확인 안 한 투자자부터
@@ -311,7 +312,7 @@ export async function collectGurus(redis, opt) {
       if (!q.length) { byId[G.id] = Object.assign(old || { id: G.id }, { checked: new Date().toISOString() }); continue; }
       if (old && old.acc === q[0].acc) { old.checked = new Date().toISOString(); continue; }
       if (upd >= maxUpd || Date.now() - t0 > budget * 0.6) { pend++; continue; }
-      if (!map) map = await tickMap(redis, Math.max(1500, Math.min(12000, budget - (Date.now() - t0))));
+      if (!map) map = (await opt.getMap(Math.max(1500, Math.min(12000, budget - (Date.now() - t0))))) || {};
       const dl = t0 + budget, cur = await filingTable(G.cik, q[0].acc, dl), pv = q[1] ? await filingTable(G.cik, q[1].acc, dl) : [];
       const total = cur.reduce((a, x) => a + x.v, 0), D = diffHoldings(cur, pv, total, map);
       byId[G.id] = { id: G.id, nm: G.nm, org: G.org, cik: G.cik, acc: q[0].acc, filed: q[0].filed, period: q[0].period, prevPeriod: q[1] ? q[1].period : null, total, n: cur.length, ...D, checked: new Date().toISOString() };
@@ -324,9 +325,35 @@ export async function collectGurus(redis, opt) {
     if (log.blocked) break;   // SEC가 막으면 나머지도 똑같이 막히니 바로 멈춘다
   }
   const gurus = GURUS.map((G) => byId[G.id] ? Object.assign(byId[G.id], { nm: G.nm, org: G.org }) : null).filter((g) => g && g.period);
-  const doc = { updated: new Date().toISOString(), gurus, log: { at: new Date().toISOString(), ...log, ms: Date.now() - t0 } };
+  const doc = { updated: new Date().toISOString(), via: opt.via || prev.via || "vercel", gurus, log: { at: new Date().toISOString(), ...log, ms: Date.now() - t0 } };
+  return { doc, result: { ok: !log.blocked, reason: log.blocked ? "SEC_403" : undefined, updated: log.updated, checked: log.checked, pending: pend, done: pend === 0 && !log.blocked, log: doc.log } };
+}
+export async function collectGurus(redis, opt) {
+  const prev = (await readDoc(redis, DISC_KEY.guru)) || { gurus: [] };
+  // v11.2.7 SEC가 Vercel 서버를 막아서 13F는 GitHub Actions가 받아 올린다 → 그 뒤로는 Vercel에서 다시 시도하지 않는다 (opt.force면 시도)
+  if (prev.via === "github" && !opt.force) return { ok: true, skipped: "github", updated: [], checked: 0, pending: 0, done: true, log: { errors: [], note: "13F는 GitHub Actions에서 받아요 (마지막 " + String(prev.updated || "").slice(0, 10) + ")" } };
+  const { doc, result } = await buildGurus(prev, { ...opt, via: "vercel", getMap: (ms) => tickMap(redis, ms) });
   await setJsonGz(redis, DISC_KEY.guru, doc, 400 * 86400);
-  return { ok: !log.blocked, reason: log.blocked ? "SEC_403" : undefined, updated: log.updated, checked: log.checked, pending: pend, done: pend === 0 && !log.blocked, log: doc.log };
+  return result;
+}
+/* GitHub Actions가 올린 13F 문서 저장 (형식 확인 후) */
+export async function saveGurusFromUpload(redis, body) {
+  const ids = {}; GURUS.forEach((G) => { ids[G.id] = G; });
+  const prev = (await readDoc(redis, DISC_KEY.guru)) || { gurus: [] };
+  const byId = {}; prev.gurus.forEach((g) => { byId[g.id] = g; });
+  const arr = Array.isArray(body && body.gurus) ? body.gurus : [];
+  const clip = (a, n) => (Array.isArray(a) ? a.slice(0, n) : []);
+  let n = 0;
+  arr.forEach((g) => {
+    if (!g || !ids[g.id] || !/^\d{4}-\d{2}-\d{2}$/.test(String(g.period || ""))) return;
+    byId[g.id] = { id: g.id, nm: ids[g.id].nm, org: ids[g.id].org, cik: ids[g.id].cik, acc: String(g.acc || "").slice(0, 30), filed: String(g.filed || "").slice(0, 10), period: g.period, prevPeriod: g.prevPeriod || null,
+      total: +g.total || 0, n: +g.n || 0, nNew: +g.nNew || 0, nExit: +g.nExit || 0, top: clip(g.top, 15), buys: clip(g.buys, 12), sells: clip(g.sells, 12), checked: String(g.checked || new Date().toISOString()).slice(0, 30) };
+    n++;
+  });
+  const log = body && body.log ? { at: new Date().toISOString(), checked: +body.log.checked || 0, updated: clip(body.log.updated, 20), errors: clip(body.log.errors, 20).map((x) => String(x).slice(0, 300)), via: "github" } : { at: new Date().toISOString(), via: "github" };
+  const gurus = GURUS.map((G) => byId[G.id]).filter((g) => g && g.period);
+  await setJsonGz(redis, DISC_KEY.guru, { updated: new Date().toISOString(), via: "github", gurus, log }, 400 * 86400);
+  return { ok: true, saved: n, total: gurus.length };
 }
 
 /* 크론·수동 공용: 두 수집을 남은 시간 안에서 */

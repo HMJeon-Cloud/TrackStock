@@ -4,7 +4,7 @@ import { redisConf, getJsonGzText, setJsonGz, redisCmd, KEY } from "./_redis.js"
 import { composeDaily } from "./_compose.js";
 import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
-import { collectAll } from "./_disc.js";
+import { collectAll, saveGurusFromUpload } from "./_disc.js";
 
 export async function loadNames(origin) {
   const { pairs } = await loadTickerPairs(origin);
@@ -28,6 +28,8 @@ export async function buildDaily(origin) {
   return { ok: true, ...out, generated: recent.generated };
 }
 export default async function handler(req, res) {
+  // v11.2.7 GitHub Actions가 받은 13F 올리기 — CRON_SECRET(Bearer)으로 확인 (운영자 토큰과 별개)
+  if (req.query.op === "guruput") return guruPut(req, res);
   // 운영자 전용: 토큰이 없으면 내용 없이 거절 (CDN에도 남기지 않음)
   if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
   if (req.query.op === "ai") return aiHandler(req, res);
@@ -307,4 +309,18 @@ async function discHandler(req, res) {
   const part = req.query.part === "sec" ? "sec" : req.query.part === "dart" ? "dart" : "both";
   const out = await collectAll(redis, { pairs, part, manual: true, dartMs: 45000, secMs: 45000, maxUpdates: 4, backfillDays: days });
   return res.status(200).json({ ok: true, ...out });
+}
+
+/* v11.2.7 SEC는 Vercel 서버를 막는다 → GitHub Actions(scripts/sec13f.mjs)가 받아서 여기로 올린다
+   POST /api/channel?op=guruput  · Authorization: Bearer <CRON_SECRET> · 본문 = { gurus:[...], log } */
+async function guruPut(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") return res.status(405).json({ ok: false, reason: "POST만" });
+  const sec = process.env.CRON_SECRET || "";
+  if (!sec || (req.headers.authorization || "") !== "Bearer " + sec) return res.status(401).json({ ok: false, reason: "unauthorized" });
+  const redis = redisConf(); if (!redis) return res.status(500).json({ ok: false, reason: "NO_REDIS" });
+  let body = req.body; if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = null; } }
+  if (!body || !Array.isArray(body.gurus)) return res.status(400).json({ ok: false, reason: "gurus 배열 필요" });
+  try { return res.status(200).json(await saveGurusFromUpload(redis, body)); }
+  catch (e) { return res.status(500).json({ ok: false, reason: String(e.message).slice(0, 160) }); }
 }
