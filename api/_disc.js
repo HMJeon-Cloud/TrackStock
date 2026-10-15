@@ -13,6 +13,7 @@ import { setJsonGz, getJsonGzText } from "./_redis.js";
 import https from "https";
 import http from "http";
 import { gunzipSync, inflateSync } from "zlib";
+import { execFile } from "child_process";
 
 export const DISC_KEY = { disc: "sm:disc", guru: "sm:guru", tick: "sm:sec:tick" };
 const DART = "https://opendart.fss.or.kr/api/";
@@ -191,10 +192,24 @@ export function secUA() {
 function secHeaders() { return { "User-Agent": secUA().ua, "Accept-Encoding": "gzip, deflate", Accept: "*/*" }; }   // SEC 안내 예시와 같은 헤더
 /* v11.2.5 SEC 전용 요청: Node 내장 fetch는 브라우저 흉내 헤더(sec-fetch-mode·accept-language 등)를 자동으로 붙여
    SEC 방화벽이 '자동화 도구'로 보고 403을 준다 → https 모듈로 SEC 안내 그대로(User-Agent · Accept-Encoding · Host)만 보낸다 */
+/* v11.2.8 SEC_CURL=1(GitHub Actions)이면 curl로 받는다 — SEC 방화벽은 Node의 접속 지문(TLS)을 막는 것으로 보여,
+   SEC 안내 예시에 나오는 curl로 요청한다 (Vercel에는 curl이 없어 기존 방식 유지) */
+function curlText(url, ms) {
+  return new Promise((ok, no) => {
+    const args = ["-sS", "-L", "--compressed", "--max-time", String(Math.max(2, Math.round((ms || 10000) / 1000))), "-A", secUA().ua, "-H", "Accept: */*", "-w", "\n__HTTP__%{http_code}", url];
+    execFile("curl", args, { maxBuffer: 64 * 1024 * 1024 }, (err, out, errOut) => {
+      if (err && !out) return no(new Error(/timed out/i.test(String(errOut)) ? "This operation was aborted" : "curl: " + String(errOut || err.message).slice(0, 120)));
+      const i = out.lastIndexOf("\n__HTTP__"), st = +out.slice(i + 9), txt = out.slice(0, i);
+      if (st < 200 || st >= 300) return no(new Error("HTTP " + st + " — " + txt.replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140)));
+      ok(txt);
+    });
+  });
+}
 export function secText(url, ms, hops) {
+  if (process.env.SEC_CURL === "1") return curlText(url, ms);
   return new Promise((ok, no) => {
     const u = new URL(url), mod = u.protocol === "http:" ? http : https;
-    const req = mod.request({ hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search, method: "GET", headers: { "User-Agent": secUA().ua, "Accept-Encoding": "gzip, deflate", Host: u.host } }, (res) => {
+    const req = mod.request({ hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search, method: "GET", headers: { "User-Agent": secUA().ua, "Accept-Encoding": "gzip, deflate", Accept: "*/*", Host: u.host } }, (res) => {
       const st = res.statusCode;
       if (st >= 300 && st < 400 && res.headers.location && (hops || 0) < 3) { res.resume(); return secText(new URL(res.headers.location, url).toString(), ms, (hops || 0) + 1).then(ok, no); }
       const chunks = []; res.on("data", (c) => chunks.push(c)); res.on("error", no);
