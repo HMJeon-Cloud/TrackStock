@@ -1213,6 +1213,21 @@
   @media (max-width: 759px) { .dvForm { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dvChips { grid-column: span 2; } .dvAccs { grid-template-columns: 1fr; } .dvCal { grid-template-columns: 1fr; } .dvBars { height: 130px; gap: 2px; } .dvBarV { font-size: 9px; } }
   @media (min-width: 760px) and (max-width: 1023px) { .dvCal { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+  /* v11.3 공모주 */
+  .dsD { white-space: nowrap; }
+  @media (max-width: 560px) { .mHide { display: none; } #watchTabs button { padding-left: 2px !important; padding-right: 2px !important; } }
+  .ipoTabs.mkTabs { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .dsTag.ipo-now { background: #fde8ea; color: var(--up); } .dsTag.ipo-soon { background: #fbf1d9; color: #8a6a24; } .dsTag.ipo-wait { background: #e3eefe; color: var(--down); } .dsTag.ipo-listed { background: #14161c; color: #e6c57a; }
+  .dsV small { font-size: 10.5px; color: var(--sub); font-weight: 600; margin-left: 2px; }
+  .ipoT td, .ipoT th { font-variant-numeric: tabular-nums; } .ipoT td.l { min-width: 150px; } .ipoT .linkBtn { padding: 0; border: 0; background: none; font-weight: 700; color: var(--txt); font-size: 13px; }
+  .ipoBk { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px; margin-bottom: 8px; }
+  .ipoBkR { display: grid; grid-template-columns: 120px minmax(0, 1fr) 64px minmax(0, 170px); gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; } .ipoBkR:last-child { border-bottom: 0; }
+  .ipoBkL { font-weight: 800; white-space: nowrap; } .ipoBkL small { display: block; font-weight: 500; color: var(--sub); font-size: 11px; }
+  .ipoBkBar { height: 10px; background: #f0ece2; border-radius: 5px; overflow: hidden; } .ipoBkBar i { display: block; height: 100%; border-radius: 5px; } .ipoBkBar i.up { background: #b8913f; } .ipoBkBar i.dn { background: #7fa3d6; }
+  .ipoBkR b { text-align: right; font-variant-numeric: tabular-nums; } .ipoBkS { color: var(--sub); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ipoScW { border: 1px solid var(--line); border-radius: 14px; padding: 8px; margin-bottom: 8px; } .ipoSc { width: 100%; height: auto; display: block; }
+  .ipoSc text { font-size: 11px; fill: #8b95a1; } .ipoSc .gl { stroke: #eef0f3; } .ipoSc .zl { stroke: #c9ccd1; stroke-dasharray: 4 3; } .ipoSc circle.u { fill: #b8913f; fill-opacity: .75; } .ipoSc circle.d { fill: #7fa3d6; fill-opacity: .8; }
+  @media (max-width: 759px) { .ipoBkR { grid-template-columns: 96px minmax(0, 1fr) 56px; } .ipoBkS { grid-column: 1 / -1; margin-top: -4px; } }
   /* v11.2 공시 · 구루 */
   .dsRunBar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; background: #fbf6e8; border-radius: 12px; font-size: 12px; flex-wrap: wrap; } .dsRunBar .chip { background: #14161c; color: #e6c57a; border-color: #14161c; font-weight: 800; } .dsRunMsg { min-width: 0; word-break: keep-all; line-height: 1.5; flex: 1 1 260px; } .dsErr { margin-top: 4px; } .dsErr summary { cursor: pointer; color: #c2410c; font-weight: 700; } .dsErr ul { margin: 4px 0 0; padding-left: 16px; max-height: 160px; overflow: auto; }
   .dsCols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
@@ -2236,11 +2251,12 @@
 
 <div id="tab-watch" class="hidden">
 <div class="pills" id="watchTabs">
-  <button data-wp="list" class="active">관심 종목</button>
-  <button data-wp="map">전체 종목</button>
+  <button data-wp="list" class="active">관심<span class="mHide"> 종목</span></button>
+  <button data-wp="map">전체<span class="mHide"> 종목</span></button>
   <button data-wp="news">뉴스</button>
   <button data-wp="disc">공시</button>
   <button data-wp="guru">구루</button>
+  <button data-wp="ipo">공모주</button>
 </div>
 <div id="wp-list" class="subPane"><div class="card" id="watchCard">
   <h2>관심 종목 <small>내 종목들의 현재 위치를 한눈에</small></h2>
@@ -2294,6 +2310,11 @@
   <div class="pgHead"><h2>구루 13F <small>버핏 등 주요 투자자가 분기마다 산 종목 · 판 종목 · SEC 보고서 기준</small></h2></div>
   <div class="dsRunBar ownerOnly"><button class="chip" data-ds-run="1">지금 수집</button><span class="dsRunMsg briefDim">운영자 전용 · 지난 30일 공시 + 투자자 13F를 나눠서 끝까지 받아요 (몇 분 걸려요 · 끊겨도 다시 누르면 이어서)</span></div>
   <div id="guruBody" style="margin-top:10px"></div>
+</div></div>
+<div id="wp-ipo" class="subPane hidden"><div class="card" id="ipoCard">
+  <div class="pgHead"><h2>공모주 <small>청약 일정 · 수요예측 경쟁률 · 상장 뒤 수익률 · '경쟁률이 높으면 더 벌었나' · DART 증권신고서 기준</small></h2></div>
+  <div class="dsRunBar ownerOnly"><button class="chip" data-ipo-run="1">지금 수집</button><span class="dsRunMsg briefDim">운영자 전용 · 처음엔 지난 2년치를 나눠서 끝까지 받아요 (몇 분 · 끊겨도 다시 누르면 이어서)</span></div>
+  <div id="ipoBody" style="margin-top:10px"></div>
 </div></div>
 <div id="wp-news" class="subPane hidden"><div class="card" id="newsCard">
   <h2>뉴스 <small>관심 종목 기사와 시장 전체를 흔드는 기사</small></h2>
@@ -2363,7 +2384,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.2.7<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.3<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4745,14 +4766,14 @@ window.addEventListener("load", function () {
 <script src="sim.js?v=10.9"></script>
 <script src="insight.js?v=9.5"></script>
 <script src="guide.js?v=10.9"></script>
-<script src="watch.js?v=11.2"></script>
+<script src="watch.js?v=11.3"></script>
 <script src="holdings.js?v=9.5"></script>
 <script src="brief.js?v=10.6"></script>
 <script src="channel.js?v=9.7"></script>
 <script src="cards.js?v=10.4"></script>
 <script src="mind.js?v=10.4"></script>
 <script src="issues.js?v=10.8"></script>
-<script src="publish.js?v=11.2"></script>
+<script src="publish.js?v=11.3"></script>
 <script src="periodic.js?v=9.5.2"></script>
 <script src="story.js?v=10.4"></script>
 <script src="deep.js?v=10.0"></script>
@@ -4765,11 +4786,12 @@ window.addEventListener("load", function () {
 <script src="picks.js?v=10.8"></script>
 <script src="tpl.js?v=10.7"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=11.2"></script>
+<script src="maker.js?v=11.3"></script>
 <script src="lib.js?v=10.7"></script>
 <script src="dividend.js?v=11.1"></script>
 <script src="disc.js?v=11.2.7"></script>
-<script src="ui.js?v=11.2"></script>
+<script src="ipo.js?v=11.3"></script>
+<script src="ui.js?v=11.3"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>

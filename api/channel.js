@@ -306,8 +306,9 @@ async function discHandler(req, res) {
   let pairs = []; try { pairs = (await loadTickerPairs(origin)).pairs; } catch (e) {}
   const days = Math.max(1, Math.min(90, parseInt(req.query.days, 10) || 30));
   // v11.2.2 한 번에 다 하지 않고 나눠서: part=dart|sec, 한 호출 약 45초 — 화면 버튼이 끝날 때까지 반복해서 부른다 (어디까지 했는지는 서버가 기억)
-  const part = req.query.part === "sec" ? "sec" : req.query.part === "dart" ? "dart" : "both";
-  const out = await collectAll(redis, { pairs, part, manual: true, dartMs: 45000, secMs: 45000, maxUpdates: 4, backfillDays: days });
+  const part = ["sec", "dart", "ipo"].indexOf(req.query.part) >= 0 ? req.query.part : "both";
+  const ipoDays = Math.max(30, Math.min(1095, parseInt(req.query.ipodays, 10) || 730));   // v11.3 공모주 첫 수집: 지난 2년 (백테스트용)
+  const out = await collectAll(redis, { pairs, part, manual: true, dartMs: 45000, secMs: 45000, ipoMs: 45000, ipoDays, maxUpdates: 4, backfillDays: days });
   return res.status(200).json({ ok: true, ...out });
 }
 

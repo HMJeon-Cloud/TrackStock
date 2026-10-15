@@ -141,6 +141,7 @@ function pubPlan() {
   // v11.2 공시·구루: 데이터가 있으면 조건에 맞을 때 자동으로 / 없으면 받아 온 뒤 다시 그린다
   if (typeof dsPlanHints === "function") {
     if (typeof DS !== "undefined" && DS.disc && DS.guru) dsPlanHints().forEach(function (x) { plan.push(x); });
+    if (typeof ipoPlanHints === "function") { if (IPO.doc) ipoPlanHints().forEach(function (x) { plan.push(x); }); else if (typeof isOwner === "function" && isOwner()) ipoEnsure().then(function () { if (typeof currentTab !== "undefined" && currentTab === "onecard" && typeof MK !== "undefined" && MK.tab === "today" && typeof makerRender === "function") makerRender(); }); }
     else if (typeof dsEnsure === "function" && typeof isOwner === "function" && isOwner()) dsEnsure().then(function () { if (typeof currentTab !== "undefined" && currentTab === "onecard" && typeof MK !== "undefined" && MK.tab === "today" && typeof makerRender === "function") makerRender(); });
   }
   plan.push({ id: "term", t: "📖 용어 한 입 — " + pubTerm()[0], d: "매일 1장 — 검색·저장으로 새 사람이 들어오는 상시 콘텐츠", kind: "term" });
@@ -393,6 +394,7 @@ function pubRender(target, onlyTab) {
       else if (k === "policy") pubPolicyOpen(b.getAttribute("data-id"));
       else if (k === "div" && typeof dvDeckOpen === "function") dvDeckOpen();
       else if ((k === "disc" || k === "guru") && typeof dsDeckOpen === "function") dsDeckOpen(k);
+      else if (k === "ipo" && typeof ipoDeckOpen === "function") ipoDeckOpen();
       else if (k === "term") pubSingleCard(function () { return pubTermCard(pubTerm(pubState.termOffset)); }, "uphill.lab_용어_" + pubTerm(pubState.termOffset)[0].replace(/[^\w가-힣]/g, "") + ".png", "📖 용어 한 입", "term");
     };
   });

@@ -136,7 +136,7 @@ function mkDecks() {
   g.push(["오늘", [row("오늘의 브리핑 카드", "시장 온도·업종·급등락·돈 몰린 곳 · 약 10장", "brief", "brief"), row("오늘 한 장", "9칸 한 페이지 요약", "onepage", "onepage"), row("채널 전일 정리", "주식 전일 정리 · 약 6장", "channel", "channel"), row("핵심 이슈 5", "오늘의 이슈 다섯 줄 한 장", "issues", "issues")]]);
   if (typeof PER_SETS !== "undefined") { var td = typeof perToday === "function" ? perToday() : []; g.push(["정기 발행", Object.keys(PER_SETS).map(function (k) { return row(String(PER_SETS[k].t).replace(/^\S+\s/, ""), PER_SETS[k].when + " 발행" + (td.indexOf(k) >= 0 ? " · 오늘" : ""), "per:" + k, "per:" + k, td.indexOf(k) >= 0); })]); }
   if (typeof storyDecks === "function") { var d = []; try { d = storyDecks(); } catch (e) {} g.push(["연구노트", d.map(function (x) { return row(String(x.t).replace(/^\S+\s/, ""), (x.now ? "지금 신호 · " : "") + x.d, "story:" + x.key, "story:" + x.key, x.now); })]); }
-  if (typeof dsDeckOpen === "function") g.push(["공시 · 구루", [row("공시 카드", "임원·대주주 매수·매도(7일) · 자사주 취득 결정(30일) + 업로드 글", "disc"), row("구루 13F 카드", "최근 공개한 투자자 2명 매수·매도 · 같이 움직인 종목 + 업로드 글", "guru")]]);
+  if (typeof dsDeckOpen === "function") g.push(["공시 · 구루", [row("공시 카드", "임원·대주주 매수·매도(7일) · 자사주 취득 결정(30일) + 업로드 글", "disc"), row("구루 13F 카드", "최근 공개한 투자자 2명 매수·매도 · 같이 움직인 종목 + 업로드 글", "guru")].concat(typeof ipoDeckOpen === "function" ? [row("공모주 카드", "청약 일정 · 최근 상장 성적 · 경쟁률 백테스트 + 업로드 글", "ipo")] : [])]);
   if (typeof dvDeckOpen === "function") g.push(["배당", [row("배당 카드 4장", "필요 투자금 · 배당률 TOP · 계좌별 세금 · 이달 배당락 + 업로드 글", "div")]]);
   if (typeof pubPolicyAll === "function") g.push(["정책 · 일정 · 용어", pubPolicyAll().map(function (p) { return row(p.short || p.t, (p.eff || "") + (p.src ? " · " + p.src : ""), "pol:" + p.id, "policy:" + p.id); }).concat([row("이번 주 일정", "앞으로 7일 발표·실적·휴장", "cal", "cal"), row("용어 한 입", "오늘의 용어 한 장", "term", "term")])]);
   return g.map(function (x) { return '<h4 class="mkH">' + x[0] + ' <small>' + x[1].length + '</small></h4><div class="pubPlan">' + x[1].join("") + '</div>'; }).join("");
@@ -158,6 +158,7 @@ function mkDeckBind(box) {
       else if (k === "reel") reelOpen(arg);
       else if (k === "div") dvDeckOpen(MK.mk || "all");
       else if (k === "disc" || k === "guru") dsDeckOpen(k);
+      else if (k === "ipo") ipoDeckOpen();
     };
   });
 }

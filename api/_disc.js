@@ -10,6 +10,7 @@
 //   저장(Redis, 기존 스냅샷과 같은 gzip+base64): sm:disc · sm:guru · sm:sec:tick(티커 대조표, 30일)
 //   실행: 아침 수집 크론(cron-snapshot) 끝에서 남은 시간으로 · 운영자 수동(/api/channel?op=disc&run=1)
 import { setJsonGz, getJsonGzText } from "./_redis.js";
+import { collectIpo } from "./_ipo.js";
 import https from "https";
 import http from "http";
 import { gunzipSync, inflateSync } from "zlib";
@@ -374,9 +375,11 @@ export async function saveGurusFromUpload(redis, body) {
 /* 크론·수동 공용: 두 수집을 남은 시간 안에서 */
 export async function collectAll(redis, opt) {
   const out = {};
-  await Promise.all([   // DART(한국)와 SEC(미국)는 서로 다른 서버라 동시에
-    opt.part === "sec" ? Promise.resolve(null) : collectDart(redis, { pairs: opt.pairs, budgetMs: opt.dartMs || 10000, backfillDays: opt.backfillDays, manual: opt.manual }).then((r) => { if (r) out.dart = r; }).catch((e) => { out.dart = { ok: false, error: String(e.message).slice(0, 120) }; }),
-    opt.part === "dart" ? Promise.resolve(null) : collectGurus(redis, { budgetMs: opt.secMs || 12000, maxUpdates: opt.maxUpdates || 2 }).then((r) => { if (r) out.sec = r; }).catch((e) => { out.sec = { ok: false, error: String(e.message).slice(0, 120) }; }),
+  const only = (p) => !opt.part || opt.part === "both" || opt.part === p;
+  await Promise.all([   // DART(한국)와 SEC(미국)는 서로 다른 서버라 동시에 · v11.3 공모주(DART)도 같이
+    only("ipo") ? collectIpo(redis, { budgetMs: opt.ipoMs || opt.dartMs || 10000, backfillDays: opt.ipoDays, manual: opt.manual }).then((r) => { out.ipo = r; }).catch((e) => { out.ipo = { ok: false, error: String(e.message).slice(0, 120) }; }) : null,
+    !only("dart") ? Promise.resolve(null) : collectDart(redis, { pairs: opt.pairs, budgetMs: opt.dartMs || 10000, backfillDays: opt.backfillDays, manual: opt.manual }).then((r) => { if (r) out.dart = r; }).catch((e) => { out.dart = { ok: false, error: String(e.message).slice(0, 120) }; }),
+    !only("sec") ? Promise.resolve(null) : collectGurus(redis, { budgetMs: opt.secMs || 12000, maxUpdates: opt.maxUpdates || 2 }).then((r) => { if (r) out.sec = r; }).catch((e) => { out.sec = { ok: false, error: String(e.message).slice(0, 120) }; }),
   ]);
   return out;
 }
