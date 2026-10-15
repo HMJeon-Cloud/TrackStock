@@ -34,14 +34,16 @@ function kstYmd(t) { return new Date((t == null ? Date.now() : t) + 9 * 3600e3).
 function ymdAdd(ymd, days) { const t = Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)) + days * 86400e3; return new Date(t).toISOString().slice(0, 10).replace(/-/g, ""); }
 function digits(s) { return String(s || "").replace(/\D/g, ""); }
 export function num(v) { if (v == null) return null; const s = String(v).replace(/,/g, "").trim(); if (!s || s === "-") return null; const n = parseFloat(s); return isFinite(n) ? n : null; }
+/* 실패하면 응답 본문 앞부분을 오류에 붙인다 (SEC 403 같은 거절 사유 확인용) */
+async function httpErr(r) { let b = ""; try { b = (await r.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140); } catch (e) {} return new Error("HTTP " + r.status + (b ? " — " + b : "")); }
 async function getJson(url, ms, headers) {
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 8000);
-  try { const r = await fetch(url, { signal: ac.signal, headers: headers || {} }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
+  try { const r = await fetch(url, { signal: ac.signal, headers: headers || {} }); if (!r.ok) throw await httpErr(r); return await r.json(); }
   finally { clearTimeout(tm); }
 }
 async function getText(url, ms, headers) {
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 10000);
-  try { const r = await fetch(url, { signal: ac.signal, headers: headers || {} }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.text(); }
+  try { const r = await fetch(url, { signal: ac.signal, headers: headers || {} }); if (!r.ok) throw await httpErr(r); return await r.text(); }
   finally { clearTimeout(tm); }
 }
 async function readDoc(redis, key) { try { const t = await getJsonGzText(redis, key); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
@@ -183,7 +185,26 @@ export function secUA() {
   const raw = String(process.env.SEC_UA || ""), ua = raw.replace(/[^\x20-\x7E]/g, " ").replace(/\s+/g, " ").trim();
   return { ua: ua || "StockMind track-stock-tau.vercel.app", stripped: ua !== raw.trim(), hasMail: /@/.test(ua) };
 }
-function secHeaders() { return { "User-Agent": secUA().ua, Accept: "application/json, text/xml, */*" }; }
+function secHeaders() { return { "User-Agent": secUA().ua, "Accept-Encoding": "gzip, deflate", Accept: "*/*" }; }   // SEC 안내 예시와 같은 헤더
+/* 제출 목록: data.sec.gov(JSON)가 막히면 www.sec.gov(Atom 피드)로 다시 (v11.2.4) */
+function qEnd(ymd) { const y = +ymd.slice(0, 4), m = +ymd.slice(5, 7), q = Math.floor((m - 1) / 3); return q === 0 ? (y - 1) + "-12-31" : y + "-" + ["03-31", "06-30", "09-30"][q - 1]; }   // 제출일 직전 분기 말
+async function secFilings(cik, ms) {
+  try {
+    const s = await getJson("https://data.sec.gov/submissions/CIK" + cik.padStart(10, "0") + ".json", ms, secHeaders());
+    const R = s.filings && s.filings.recent; if (!R) throw new Error("filings 없음");
+    const out = []; for (let i = 0; i < R.form.length; i++) if (R.form[i] === "13F-HR") out.push({ acc: R.accessionNumber[i], filed: R.filingDate[i], period: R.reportDate[i] });
+    return { list: out, via: "data" };
+  } catch (e) {
+    if (!/HTTP 403/.test(e.message)) throw e;
+    const xml = await getText("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=" + cik + "&type=13F-HR&dateb=&owner=include&count=10&output=atom", ms, secHeaders()).catch((e2) => { throw new Error(e.message + " / www: " + e2.message); });
+    const out = []; String(xml).split(/<entry>/i).slice(1).forEach((en) => {
+      const tg = (n) => { const m = en.match(new RegExp("<" + n + ">([^<]*)<", "i")); return m ? m[1].trim() : ""; };
+      if (tg("filing-type") !== "13F-HR") return; const filed = tg("filing-date"); const acc = tg("accession-number") || tg("accession-nunber");
+      if (acc && filed) out.push({ acc, filed, period: tg("period-of-report") || qEnd(filed) });
+    });
+    return { list: out, via: "www" };
+  }
+}
 const STOP = new Set(["INC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "LIMITED", "PLC", "HLDGS", "HOLDINGS", "HLDG", "HOLDING", "GROUP", "GRP", "THE", "OF", "NEW", "DEL", "DE", "CL", "CLASS", "A", "B", "C", "COM", "SA", "NV", "AG", "SE", "LP", "LLC", "ADR", "SPONSORED", "SPON", "ADS", "SHS", "ORD", "CAP", "STK", "COS", "MD", "NY", "PA"]);
 const ALIAS = { AMER: "AMERICA", PETE: "PETROLEUM", INTL: "INTERNATIONAL", FINL: "FINANCIAL", SVCS: "SERVICES", SYS: "SYSTEMS", MTRS: "MOTORS", PPTYS: "PROPERTIES", BK: "BANK", MGMT: "MANAGEMENT", TECHNOLOGIES: "TECHNOLOGY", TECH: "TECHNOLOGY", COMMUNICATIONS: "COMMUNICATION", COMMUNICATNS: "COMMUNICATION", HLTHCR: "HEALTHCARE", ENTMT: "ENTERTAINMENT", RES: "RESOURCES", PHARMACEUTICALS: "PHARMA", LABS: "LABORATORIES", MFG: "MANUFACTURING", AMERN: "AMERICAN", NATL: "NATIONAL", SOLUTIONS: "SOLUTION" };
 export function normName(s) {
@@ -248,7 +269,7 @@ export function diffHoldings(cur, prev, total, map) {
 
 export async function collectGurus(redis, opt) {
   const t0 = Date.now(), budget = opt.budgetMs || 15000, maxUpd = opt.maxUpdates || 2, log = { checked: 0, updated: [], errors: [] };
-  const U = secUA(); if (!U.hasMail) log.errors.push("SEC_UA에 이메일이 없어요 — SEC가 거절할 수 있어요 (예: StockMind hm@example.com)"); if (U.stripped) log.note = "SEC_UA의 한글·특수문자는 빼고 보냈어요: " + U.ua;
+  const U = secUA(); if (!U.hasMail) log.errors.push("SEC_UA에 이메일이 없어요 — SEC가 거절할 수 있어요 (예: StockMind hm@example.com)"); if (U.stripped) log.note = "SEC_UA의 한글·특수문자는 빼고 보냈어요";
   const prev = (await readDoc(redis, DISC_KEY.guru)) || { gurus: [] };
   const byId = {}; prev.gurus.forEach((g) => { byId[g.id] = g; });
   let map = null, upd = 0, pend = 0;
@@ -258,10 +279,8 @@ export async function collectGurus(redis, opt) {
     if (Date.now() - t0 > budget * 0.8) break;
     try {
       const cik10 = G.cik.padStart(10, "0");
-      const s = await getJson("https://data.sec.gov/submissions/CIK" + cik10 + ".json", Math.max(1500, Math.min(8000, budget - (Date.now() - t0))), secHeaders()); log.checked++;
-      const R = s.filings && s.filings.recent; if (!R) throw new Error("filings 없음");
-      const list = [];
-      for (let i = 0; i < R.form.length; i++) if (R.form[i] === "13F-HR") list.push({ acc: R.accessionNumber[i], filed: R.filingDate[i], period: R.reportDate[i] });
+      const F = await secFilings(G.cik, Math.max(1500, Math.min(8000, budget - (Date.now() - t0)))); log.checked++; if (F.via === "www") log.via = "www";
+      const list = F.list;
       const seenP = {}, q = list.filter((x) => (seenP[x.period] ? false : (seenP[x.period] = 1)));   // 분기별 최신 1건
       const old = byId[G.id];
       if (!q.length) { byId[G.id] = Object.assign(old || { id: G.id }, { checked: new Date().toISOString() }); continue; }
@@ -274,7 +293,7 @@ export async function collectGurus(redis, opt) {
       upd++; log.updated.push(G.id);
     } catch (e) {
       const m = String(e.message || e);
-      log.errors.push(G.id + ": " + (/ByteString/i.test(m) ? "SEC_UA에 한글이 있어요 — 영문 이름과 이메일만 넣어 주세요" : /403/.test(m) ? "SEC 거절(403) — SEC_UA에 '이름 이메일주소' 형식이 필요해요" : /abort/i.test(m) ? "시간 초과" : m.slice(0, 60)));
+      log.errors.push(G.id + ": " + (/ByteString/i.test(m) ? "SEC_UA에 한글이 있어요 — 영문 이름과 이메일만 넣어 주세요" : /403/.test(m) ? "SEC 거절(403) · 보낸 이름: " + secUA().ua.replace(/([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@/, "$1***@") + " · 응답: " + m.slice(0, 260) : /abort/i.test(m) ? "시간 초과" : m.slice(0, 160)));
       if (/403/.test(m)) log.blocked = true;
     }
     if (log.blocked) break;   // SEC가 막으면 나머지도 똑같이 막히니 바로 멈춘다
