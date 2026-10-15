@@ -303,6 +303,8 @@ async function discHandler(req, res) {
   const proto = req.headers["x-forwarded-proto"] || "https", origin = proto + "://" + req.headers.host;
   let pairs = []; try { pairs = (await loadTickerPairs(origin)).pairs; } catch (e) {}
   const days = Math.max(1, Math.min(90, parseInt(req.query.days, 10) || 30));
-  const out = await collectAll(redis, { pairs, dartMs: 90000, secMs: 150000, maxUpdates: 20, backfillDays: days });
+  // v11.2.2 한 번에 다 하지 않고 나눠서: part=dart|sec, 한 호출 약 45초 — 화면 버튼이 끝날 때까지 반복해서 부른다 (어디까지 했는지는 서버가 기억)
+  const part = req.query.part === "sec" ? "sec" : req.query.part === "dart" ? "dart" : "both";
+  const out = await collectAll(redis, { pairs, part, manual: true, dartMs: 45000, secMs: 45000, maxUpdates: 4, backfillDays: days });
   return res.status(200).json({ ok: true, ...out });
 }
