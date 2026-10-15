@@ -10,6 +10,9 @@
 //   저장(Redis, 기존 스냅샷과 같은 gzip+base64): sm:disc · sm:guru · sm:sec:tick(티커 대조표, 30일)
 //   실행: 아침 수집 크론(cron-snapshot) 끝에서 남은 시간으로 · 운영자 수동(/api/channel?op=disc&run=1)
 import { setJsonGz, getJsonGzText } from "./_redis.js";
+import https from "https";
+import http from "http";
+import { gunzipSync, inflateSync } from "zlib";
 
 export const DISC_KEY = { disc: "sm:disc", guru: "sm:guru", tick: "sm:sec:tick" };
 const DART = "https://opendart.fss.or.kr/api/";
@@ -186,17 +189,39 @@ export function secUA() {
   return { ua: ua || "StockMind track-stock-tau.vercel.app", stripped: ua !== raw.trim(), hasMail: /@/.test(ua) };
 }
 function secHeaders() { return { "User-Agent": secUA().ua, "Accept-Encoding": "gzip, deflate", Accept: "*/*" }; }   // SEC 안내 예시와 같은 헤더
+/* v11.2.5 SEC 전용 요청: Node 내장 fetch는 브라우저 흉내 헤더(sec-fetch-mode·accept-language 등)를 자동으로 붙여
+   SEC 방화벽이 '자동화 도구'로 보고 403을 준다 → https 모듈로 SEC 안내 그대로(User-Agent · Accept-Encoding · Host)만 보낸다 */
+export function secText(url, ms, hops) {
+  return new Promise((ok, no) => {
+    const u = new URL(url), mod = u.protocol === "http:" ? http : https;
+    const req = mod.request({ hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search, method: "GET", headers: { "User-Agent": secUA().ua, "Accept-Encoding": "gzip, deflate", Host: u.host } }, (res) => {
+      const st = res.statusCode;
+      if (st >= 300 && st < 400 && res.headers.location && (hops || 0) < 3) { res.resume(); return secText(new URL(res.headers.location, url).toString(), ms, (hops || 0) + 1).then(ok, no); }
+      const chunks = []; res.on("data", (c) => chunks.push(c)); res.on("error", no);
+      res.on("end", () => {
+        let buf = Buffer.concat(chunks); const enc = String(res.headers["content-encoding"] || "");
+        try { if (/gzip/.test(enc)) buf = gunzipSync(buf); else if (/deflate/.test(enc)) buf = inflateSync(buf); } catch (e) {}
+        const txt = buf.toString("utf8");
+        if (st < 200 || st >= 300) return no(new Error("HTTP " + st + " — " + txt.replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140)));
+        ok(txt);
+      });
+    });
+    req.setTimeout(ms || 10000, () => req.destroy(new Error("This operation was aborted")));
+    req.on("error", no); req.end();
+  });
+}
+export async function secJson(url, ms) { return JSON.parse(await secText(url, ms)); }
 /* 제출 목록: data.sec.gov(JSON)가 막히면 www.sec.gov(Atom 피드)로 다시 (v11.2.4) */
 function qEnd(ymd) { const y = +ymd.slice(0, 4), m = +ymd.slice(5, 7), q = Math.floor((m - 1) / 3); return q === 0 ? (y - 1) + "-12-31" : y + "-" + ["03-31", "06-30", "09-30"][q - 1]; }   // 제출일 직전 분기 말
 async function secFilings(cik, ms) {
   try {
-    const s = await getJson("https://data.sec.gov/submissions/CIK" + cik.padStart(10, "0") + ".json", ms, secHeaders());
+    const s = await secJson("https://data.sec.gov/submissions/CIK" + cik.padStart(10, "0") + ".json", ms);
     const R = s.filings && s.filings.recent; if (!R) throw new Error("filings 없음");
     const out = []; for (let i = 0; i < R.form.length; i++) if (R.form[i] === "13F-HR") out.push({ acc: R.accessionNumber[i], filed: R.filingDate[i], period: R.reportDate[i] });
     return { list: out, via: "data" };
   } catch (e) {
     if (!/HTTP 403/.test(e.message)) throw e;
-    const xml = await getText("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=" + cik + "&type=13F-HR&dateb=&owner=include&count=10&output=atom", ms, secHeaders()).catch((e2) => { throw new Error(e.message + " / www: " + e2.message); });
+    const xml = await secText("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=" + cik + "&type=13F-HR&dateb=&owner=include&count=10&output=atom", ms).catch((e2) => { throw new Error(e.message + " / www: " + e2.message); });
     const out = []; String(xml).split(/<entry>/i).slice(1).forEach((en) => {
       const tg = (n) => { const m = en.match(new RegExp("<" + n + ">([^<]*)<", "i")); return m ? m[1].trim() : ""; };
       if (tg("filing-type") !== "13F-HR") return; const filed = tg("filing-date"); const acc = tg("accession-number") || tg("accession-nunber");
@@ -214,7 +239,7 @@ async function tickMap(redis, ms) {
   const old = await readDoc(redis, DISC_KEY.tick);
   if (old && old.at && Date.now() - Date.parse(old.at) < 30 * 86400e3) return old.map;
   try {
-    const j = await getJson("https://www.sec.gov/files/company_tickers.json", ms || 12000, secHeaders());
+    const j = await secJson("https://www.sec.gov/files/company_tickers.json", ms || 12000);
     const map = {};
     Object.keys(j).forEach((k) => { const r = j[k]; const key = normName(r.title).join(" "); if (key && !map[key]) map[key] = r.ticker; });
     await setJsonGz(redis, DISC_KEY.tick, { at: new Date().toISOString(), map }, 40 * 86400);
@@ -248,11 +273,11 @@ export function parseInfoTable(xml) {
 async function filingTable(cik, acc, deadline) {
   const ms = (cap) => Math.max(1500, Math.min(cap, (deadline || Date.now() + 60000) - Date.now()));
   const dir = "https://www.sec.gov/Archives/edgar/data/" + cik + "/" + acc.replace(/-/g, "") + "/";
-  const idx = await getJson(dir + "index.json", ms(10000), secHeaders());
+  const idx = await secJson(dir + "index.json", ms(10000));
   const files = ((idx && idx.directory && idx.directory.item) || []).map((x) => x.name).filter((n) => /\.xml$/i.test(n) && !/primary_doc/i.test(n));
   if (!files.length) throw new Error("정보표 XML 없음");
   files.sort((a, b) => (/info/i.test(b) ? 1 : 0) - (/info/i.test(a) ? 1 : 0));
-  return parseInfoTable(await getText(dir + files[0], ms(15000), secHeaders()));
+  return parseInfoTable(await secText(dir + files[0], ms(15000)));
 }
 export function diffHoldings(cur, prev, total, map) {
   const P = {}; prev.forEach((x) => { P[x.cu || x.n] = x; });
