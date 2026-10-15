@@ -18,5 +18,8 @@
       "includeFiles": "tickers.js",
       "maxDuration": 300
     }
-  }
+  },
+  "regions": [
+    "icn1"
+  ]
 }
