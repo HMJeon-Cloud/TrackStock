@@ -137,6 +137,9 @@ export async function collectIpo(redis, opt) {
   const cap = opt.manual ? 25000 : 9000, left = () => budget - (Date.now() - t0), tmo = () => Math.max(1500, Math.min(cap, left()));
   if (!key) return { ok: false, reason: "NO_DART_KEY", log };
   const prev = (await readDoc(redis)) || { items: [] }, today = kstYmd();
+  // v11.3.1 지난 공모주가 빠졌던 문제: DART 목록의 법인구분(corp_cls)은 '지금' 기준이라, 이미 상장한 회사는 E(비상장)로 안 잡혔다
+  //   → 법인구분 조건 없이 훑고, 지금 상장사(Y·K)는 '신고서 낸 뒤에 처음 거래가 시작됐는지'(야후 첫 거래일)로 신규 상장을 가려낸다
+  if (prev.ver !== 2) { prev.scan = null; prev.backfilled = false; prev.last = null; }
   const by = {}; prev.items.forEach((x) => { by[x.cc] = x; });
   // ① 발견 — 90일 창으로 끊어서 (회사 고유번호 없이 검색하면 3개월까지만 된다), 어디까지 훑었는지 기억
   let scan = prev.scan && !prev.scan.done ? prev.scan : null;
@@ -147,7 +150,7 @@ export async function collectIpo(redis, opt) {
   }
   while (scan && !scan.done && left() > budget * 0.6) {
     const wEnd = ymdAdd(scan.cur, 89) < scan.end ? ymdAdd(scan.cur, 89) : scan.end;
-    let j; try { j = await dartList(key, "bgn_de=" + scan.cur + "&end_de=" + wEnd + "&pblntf_ty=C&pblntf_detail_ty=C001&corp_cls=E&page_no=" + scan.page, tmo()); log.calls++; }
+    let j; try { j = await dartList(key, "bgn_de=" + scan.cur + "&end_de=" + wEnd + "&pblntf_ty=C&pblntf_detail_ty=C001&page_no=" + scan.page, tmo()); log.calls++; }
     catch (e) { log.errors.push("발견 " + scan.cur + ": " + (/abort/i.test(e.message) ? "시간 초과" : e.message)); break; }
     if (j.status !== "000" && j.status !== "013") { log.errors.push("발견 status " + j.status + " " + (j.message || "")); if (/^(010|011|012|020|021|800|901)$/.test(j.status)) return { ok: false, reason: "DART_" + j.status, log }; break; }
     (j.list || []).forEach((r) => {
@@ -155,7 +158,10 @@ export async function collectIpo(redis, opt) {
       if (!/증권신고서/.test(r.report_nm || "") || /채무|파생/.test(r.report_nm || "")) return;
       const x = by[r.corp_code];
       if (x) { if (r.rcept_dt < x.filed) x.filed = r.rcept_dt; return; }
-      by[r.corp_code] = { cc: r.corp_code, name: String(r.corp_name || "").replace(/\s+/g, " ").trim(), filed: r.rcept_dt, first: r.rcept_no, stage: "new" }; log.found++;
+      const cls = r.corp_cls, code = String(r.stock_code || "").trim();
+      if (cls !== "E" && !((cls === "Y" || cls === "K") && /^\d{6}$/.test(code))) return;   // 코넥스·기타 제외
+      by[r.corp_code] = { cc: r.corp_code, name: String(r.corp_name || "").replace(/\s+/g, " ").trim(), filed: r.rcept_dt, first: r.rcept_no, stage: cls === "E" ? "new" : "cand" };
+      if (cls !== "E") { by[r.corp_code].code = code; by[r.corp_code].mkt = cls === "Y" ? "KS" : "KQ"; } else log.found++;
     });
     if (j.status === "000" && j.total_page && scan.page < j.total_page) scan.page++;
     else { scan.page = 1; if (wEnd >= scan.end) scan.done = true; else scan.cur = ymdAdd(wEnd, 1); }
@@ -166,6 +172,14 @@ export async function collectIpo(redis, opt) {
   let qi = 0;
   async function step(x) {
     x.at = today; x.tries = (x.tries || 0) + 1;
+    if (x.stage === "cand") {   // 지금 상장사: 신고서 이후에 상장했나? (그 전부터 거래됐으면 유상증자 → 제외)
+      const rows = await yahoo(x.code + "." + x.mkt, ymdT(x.filed) - 60 * DAY, tmo()).catch(() => null); log.calls++;
+      if (!rows || !rows.length) { if (x.tries >= 3) x.stage = "drop"; return; }
+      const first = kstYmd(rows[0].t);
+      if (first <= x.filed || first > ymdAdd(x.filed, 240)) { x.stage = "drop"; x.why = "이미 상장 (유상증자)"; return; }
+      x.stage = "new"; x.tries = 0; log.found++; log.ipoFromListed = (log.ipoFromListed || 0) + 1;
+      if (left() < 4000) return;
+    }
     if (x.stage === "new" || !x.sbd) {
       const j = await getJson(DART + "estkRs.json?crtfc_key=" + key + "&corp_code=" + x.cc + "&bgn_de=" + ymdAdd(x.filed, -5) + "&end_de=" + today, tmo()); log.calls++;
       const e = parseEstk(j); Object.assign(x, Object.fromEntries(Object.entries(e).filter(([, v]) => v != null)));
@@ -214,9 +228,9 @@ export async function collectIpo(redis, opt) {
   }
   await Promise.all([worker(), worker(), worker(), worker()]);
   const keep = ymdAdd(today, -1100);   // 3년치 보관
-  const out = items.filter((x) => x.filed >= keep).sort((a, b) => ((b.sbd && b.sbd[0]) || b.filed).localeCompare((a.sbd && a.sbd[0]) || a.filed));
+  const out = items.filter((x) => x.filed >= keep).map((x) => x.stage === "drop" && x.why ? { cc: x.cc, name: x.name, filed: x.filed, stage: "drop", why: x.why } : x).sort((a, b) => ((b.sbd && b.sbd[0]) || b.filed).localeCompare((a.sbd && a.sbd[0]) || a.filed));
   const remain = out.filter((x) => x.stage !== "done" && x.stage !== "drop" && x.at !== today).length;   // 오늘 아직 손 안 댄 회사
-  const doc = { updated: new Date().toISOString(), last: scan ? (scan.done ? scan.end : prev.last || null) : prev.last || today, scan: scan ? (scan.done ? { done: true, end: scan.end } : scan) : prev.scan, backfilled: prev.backfilled || !!(scan && scan.done && scan.back), n: out.length, items: out, log: { at: new Date().toISOString(), ...log, ms: Date.now() - t0 } };
+  const doc = { ver: 2, updated: new Date().toISOString(), last: scan ? (scan.done ? scan.end : prev.last || null) : prev.last || today, scan: scan ? (scan.done ? { done: true, end: scan.end } : scan) : prev.scan, backfilled: prev.backfilled || !!(scan && scan.done && scan.back), n: out.length, items: out, log: { at: new Date().toISOString(), ...log, ms: Date.now() - t0 } };
   await setJsonGz(redis, IPO_KEY, doc, 1200 * 86400);
   const scanDone = !scan || scan.done;
   return { ok: true, found: log.found, total: out.length, remain, done: scanDone && remain === 0, progress: scanDone ? "목록 완료" : "목록 " + scan.cur.slice(0, 4) + "." + scan.cur.slice(4, 6) + "까지", log: doc.log };

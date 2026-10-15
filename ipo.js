@@ -143,7 +143,7 @@ function ipoRunCollect() {
       var d = j.ipo || {}; (d.log && d.log.errors || []).forEach(function (x) { if (errs.indexOf(x) < 0) errs.push(x); });
       if (!j.ok || d.ok === false) { errs.push(d.reason === "NO_DART_KEY" ? "DART_API_KEY 없음" : (j.reason || d.reason || d.error || "실패")); return; }
       tot = d.total || tot; found += d.found || 0;
-      if (d.done || n >= 25) return;
+      if (d.done || n >= 40) return;
       say("공모주 받는 중 (" + n + "회차) · " + (d.progress || "") + " · 회사 " + tot + "개 · 남은 일 " + (d.remain || 0) + "개 · " + Math.round((Date.now() - t0) / 1000) + "초");
       return run(n + 1);
     });
