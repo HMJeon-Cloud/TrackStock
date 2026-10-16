@@ -1237,12 +1237,12 @@
   .rpEx { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; background: #fff; } .rpExH { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; margin-bottom: 8px; } .rpExNo { font-size: 11px; font-weight: 900; color: #fff; background: #14161c; border-radius: 999px; padding: 2px 8px; } .rpExH b { font-size: 14.5px; } .rpExH small { flex: 1 1 100%; color: var(--sub); font-size: 12px; }
   .rpTiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } .rpTile { background: var(--soft); border-radius: 10px; padding: 10px 8px; text-align: center; min-width: 0; } .rpTile b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; } .rpTile small { display: block; font-size: 11px; color: var(--sub); margin-top: 3px; line-height: 1.35; word-break: keep-all; }
   .rpBars { display: grid; gap: 6px; } .rpBarR { display: grid; grid-template-columns: 110px minmax(0, 1fr) 64px; gap: 8px; align-items: center; font-size: 12.5px; } .rpBarR > span:first-child { color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .rpBarW { height: 12px; background: #f0ece2; border-radius: 6px; overflow: hidden; display: block; } .rpBarW i { display: block; height: 100%; border-radius: 6px; } .rpBarW i.up { background: #b8913f; } .rpBarW i.dn { background: #7fa3d6; } .rpBarR b { text-align: right; font-variant-numeric: tabular-nums; }
-  .rpRows { display: grid; } .rpRow { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; } .rpRow:last-child { border-bottom: 0; } .rpL { color: var(--sub); white-space: nowrap; } .rpM { min-width: 0; } .rpM small { display: block; color: var(--sub); font-size: 11px; } .rpRow b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rpRows { display: grid; } .rpRow { display: grid; grid-template-columns: minmax(80px, 30%) minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; } .rpRow:last-child { border-bottom: 0; } .rpL { color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; } .rpM { min-width: 0; } .rpM small { display: block; color: var(--sub); font-size: 11px; } .rpRow b { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .rpRead { margin-top: 10px; font-size: 13px; line-height: 1.6; padding: 8px 10px; border-left: 3px solid #b8913f; background: #fbf8f1; border-radius: 0 8px 8px 0; word-break: keep-all; }
   .rpAiBox { border: 1px dashed #b8913f; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; } .rpAiBox ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
   .rpScen { display: grid; gap: 8px; margin-bottom: 12px; } .rpScR { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; position: relative; overflow: hidden; } .rpScP { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; } .rpScR b small { font-weight: 500; color: var(--sub); margin-left: 4px; } .rpScBar { position: absolute; left: 0; bottom: 0; right: 0; height: 4px; background: #f0ece2; } .rpScBar i { display: block; height: 100%; background: #b8913f; }
   .rpPlan { margin: 0 0 12px; padding-left: 22px; font-size: 13.5px; line-height: 1.7; } .rpWatch { margin: 0 0 12px; padding-left: 20px; font-size: 13px; line-height: 1.7; color: var(--txt); } .rpVer { font-size: 12.5px; margin-top: 6px; line-height: 1.6; }
-  @media (max-width: 559px) { .rpTiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rpTile b { font-size: 16px; } .rpBarR { grid-template-columns: 84px minmax(0, 1fr) 58px; } .rpRow { grid-template-columns: 78px minmax(0, 1fr) auto; font-size: 12px; } .rpStance { grid-template-columns: 1fr; gap: 4px; } }
+  @media (max-width: 559px) { .rpTiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rpTile b { font-size: 16px; } .rpBarR { grid-template-columns: 84px minmax(0, 1fr) 58px; } .rpRow { grid-template-columns: minmax(70px, 32%) minmax(0, 1fr) auto; font-size: 12px; } .rpStance { grid-template-columns: 1fr; gap: 4px; } }
   /* v11.8 리포트 단기·장기 · 전문가 대립 · 오늘의 리포트 */
   .rpHz { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; } .rpHzC { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; } .rpHzL { font-size: 11.5px; font-weight: 800; color: #8a6a24; } .rpHzC > b { display: block; font-size: 15px; margin: 4px 0; } .rpHzT { font-size: 13px; line-height: 1.6; word-break: keep-all; } .rpHzC ul { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--sub); line-height: 1.55; }
   .rpDebate { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; } .rpDbBar { height: 10px; border-radius: 5px; background: #dbe6f7; overflow: hidden; } .rpDbBar i { display: block; height: 100%; background: #f3b0a8; } .rpDbH { display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; margin: 6px 0 10px; }
@@ -2454,7 +2454,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.8<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.9<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4864,8 +4864,8 @@ window.addEventListener("load", function () {
 <script src="ipo.js?v=11.3.4"></script>
 <script src="macro.js?v=11.4"></script>
 <script src="rebal.js?v=11.5"></script>
-<script src="hub.js?v=11.8"></script>
-<script src="report.js?v=11.8"></script>
+<script src="hub.js?v=11.9"></script>
+<script src="report.js?v=11.9"></script>
 <script src="ui.js?v=11.7"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>

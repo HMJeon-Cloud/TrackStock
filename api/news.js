@@ -55,6 +55,23 @@ export default async function handler(req, res) {
   }
 
   const type = (req.query.type || "").trim();
+  // v11.9 기사 본문: 네이버 뉴스 페이지(n.news.naver.com)에서 본문 문단을 읽어 문장 단위로 돌려준다 (검색 API 요약은 중간에 끊겨서)
+  if (type === "body") {
+    const u = String(req.query.url || "").trim();
+    if (!/^https?:\/\/(n\.news\.naver\.com|m\.sports\.naver\.com|news\.naver\.com|m\.entertain\.naver\.com)\//.test(u)) return res.status(200).json({ ok: false, reason: "NOT_NAVER" });
+    try {
+      const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36", "Accept-Language": "ko-KR,ko;q=0.9" } });
+      const html = await r.text();
+      let m = html.match(/<article[^>]*id="dic_area"[^>]*>([\s\S]*?)<\/article>/) || html.match(/id="articeBody"[^>]*>([\s\S]*?)<\/div>/) || html.match(/id="newsEndContents"[^>]*>([\s\S]*?)<\/div>/);
+      let text = m ? m[1] : "";
+      text = text.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<(br|\/p|\/div)[^>]*>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'");
+      text = text.replace(/\[[^\]]{1,30}\]/g, " ").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
+      if (!text) { const og = html.match(/property="og:description"\s+content="([^"]*)"/); text = og ? og[1] : ""; }
+      const sents = text.split(/(?<=[다요음임함]\.|[.!?])\s+/).map((x) => x.trim()).filter((x) => x.length >= 8 && !/기자$|무단 전재|재배포 금지|ⓒ|저작권|구독|클릭|▶|☞/.test(x)).slice(0, 40);
+      res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=172800");
+      return res.status(200).json({ ok: true, n: sents.length, sents });
+    } catch (e) { return res.status(200).json({ ok: false, reason: "FETCH_FAIL" }); }
+  }
   const size = Math.min(30, Math.max(3, parseInt(req.query.size || "10", 10) || 10));
   let query = "";
   if (type === "stock") {
