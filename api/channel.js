@@ -86,6 +86,7 @@ async function aiHandler(req, res) {
   if (b.mode === "image") return aiImage(res, key, imgModel, b);
   if (b.mode === "read") return aiRead(res, key, model, fallback, b);
   if (b.mode === "deck") return aiDeckPlan(res, key, model, fallback, b);   // v11.6 AI 여러 장
+  if (b.mode === "insight") return aiInsight(res, key, model, fallback, b);   // v11.7 리포트 서술
   let schema, user;
   // 참고 이미지(선택): data:image/... 최대 3장, 장당 1.5MB 이하 (화면에서 1024px JPEG로 줄여서 보냄)
   const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => typeof u === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(u) && u.length < 1600000).slice(0, 3);
@@ -144,7 +145,7 @@ async function aiResponses(key, model, sys, user, name, schema, ms, imgs) {
 }
 async function aiChat(key, model, sys, user, name, schema, ms, imgs) {
   const { status, j, err } = await aiPost("https://api.openai.com/v1/chat/completions", key, {
-    model, temperature: 0.4, max_tokens: name === "deck_cards" ? 6000 : 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
+    model, temperature: 0.4, max_tokens: name === "deck_cards" ? 6000 : name === "insight" ? 2500 : 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
     response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }
   }, ms);
   if (err) return { ok: false, reason: err };
@@ -216,6 +217,33 @@ async function aiDeckPlan(res, key, model, fallback, b) {
   let r = await aiResponses(key, model, AI_RULES, user, "deck_cards", AI_SCHEMA_DECK, 150000, []);
   tries.push(model + ": " + (r.ok ? "성공" : r.reason));
   if (!r.ok && fallback && fallback !== model && r.reason !== "REFUSED") { r = await aiChat(key, fallback, AI_RULES, user, "deck_cards", AI_SCHEMA_DECK, 80000, []); tries.push(fallback + ": " + (r.ok ? "성공" : r.reason)); if (r.ok) return res.status(200).json({ ok: true, out: r.out, model: fallback, tries }); }
+  if (r.ok) return res.status(200).json({ ok: true, out: r.out, model, tries });
+  return res.status(200).json({ ok: false, reason: r.reason, detail: r.detail, tries });
+}
+/* ---------- v11.7 리포트: 증거(Exhibit)를 읽고 애널리스트처럼 상황·해석·의견·시나리오·행동·조건을 쓴다 (숫자는 근거 줄 표기 그대로) ---------- */
+const AI_SCHEMA_INSIGHT = {
+  type: "object", additionalProperties: false, required: ["headline", "situation", "interpretation", "opinion", "forecast", "plan", "watch"],
+  properties: {
+    headline: { type: "string", description: "리포트 제목 한 줄 24자 이하 — 질문형 또는 결론형" },
+    situation: { type: "string", description: "지금 상황 2~3문장 120자 이하. 숫자는 근거 줄 표기 그대로" },
+    interpretation: { type: "array", maxItems: 6, items: { type: "string" }, description: "Exhibit마다 한 줄 해석 60자 이하 — 그 숫자가 무슨 뜻인지, 초보가 이해하게" },
+    opinion: { type: "string", description: "내 생각 3~4문장 200자 이하. 규칙 의견(stance)과 같은 방향으로, 단정하되 근거를 붙여. 추천 단어 대신 '검토·관망·나눠서' 같은 행동 표현" },
+    forecast: { type: "object", additionalProperties: false, required: ["회복", "횡보", "추가 하락"], properties: { "회복": { type: "string" }, "횡보": { type: "string" }, "추가 하락": { type: "string" } }, description: "시나리오별 어떤 조건에서 그렇게 되는지 각 50자 이하. 확률 숫자는 쓰지 말 것(앱이 붙임)" },
+    plan: { type: "array", maxItems: 4, items: { type: "string" }, description: "행동안 3~4개, 각 40자 이하. 금액 비중·분할·기준이 들어가게" },
+    watch: { type: "array", maxItems: 4, items: { type: "string" }, description: "생각을 바꿀 조건 3~4개, 각 36자 이하" }
+  }
+};
+async function aiInsight(res, key, model, fallback, b) {
+  const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 300).map((l) => String(l.id).slice(0, 6) + " | " + String(l.text).slice(0, 240));
+  let txt = lines.join("\n"); if (txt.length > 30000) txt = txt.slice(0, 30000);
+  if (!txt) return res.status(400).json({ ok: false, reason: "NO_LINES" });
+  const sys = "너는 한국 개인투자자 대상 리서치 노트를 쓰는 애널리스트다. 독자는 주식 초보. 문장은 짧고 단정하게, 해요체. " +
+    "증거(Exhibit)의 숫자만 쓰고 계산·반올림·새 숫자 생성 금지. 종목을 사라/팔라고 직접 권하지 말고 '검토 구간·관망·나눠서' 같은 행동 표현을 쓴다. 과장·확정 금지('반드시', '확실' 금지). 시나리오는 조건부로 쓴다.";
+  const user = "질문: " + String(b.title || "").slice(0, 80) + "\n규칙 기반 의견(이 방향을 따르되 더 설득력 있게): " + String(b.stance || "").slice(0, 40) + "\n\n증거 줄(id | 내용):\n" + txt;
+  const tries = [];
+  let r = await aiResponses(key, model, sys, user, "insight", AI_SCHEMA_INSIGHT, 120000, []);
+  tries.push(model + ": " + (r.ok ? "성공" : r.reason));
+  if (!r.ok && fallback && fallback !== model && r.reason !== "REFUSED") { r = await aiChat(key, fallback, sys, user, "insight", AI_SCHEMA_INSIGHT, 60000, []); tries.push(fallback + ": " + (r.ok ? "성공" : r.reason)); if (r.ok) return res.status(200).json({ ok: true, out: r.out, model: fallback, tries }); }
   if (r.ok) return res.status(200).json({ ok: true, out: r.out, model, tries });
   return res.status(200).json({ ok: false, reason: r.reason, detail: r.detail, tries });
 }
