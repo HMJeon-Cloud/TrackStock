@@ -1243,6 +1243,23 @@
   .rpScen { display: grid; gap: 8px; margin-bottom: 12px; } .rpScR { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; position: relative; overflow: hidden; } .rpScP { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; } .rpScR b small { font-weight: 500; color: var(--sub); margin-left: 4px; } .rpScBar { position: absolute; left: 0; bottom: 0; right: 0; height: 4px; background: #f0ece2; } .rpScBar i { display: block; height: 100%; background: #b8913f; }
   .rpPlan { margin: 0 0 12px; padding-left: 22px; font-size: 13.5px; line-height: 1.7; } .rpWatch { margin: 0 0 12px; padding-left: 20px; font-size: 13px; line-height: 1.7; color: var(--txt); } .rpVer { font-size: 12.5px; margin-top: 6px; line-height: 1.6; }
   @media (max-width: 559px) { .rpTiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rpTile b { font-size: 16px; } .rpBarR { grid-template-columns: 84px minmax(0, 1fr) 58px; } .rpRow { grid-template-columns: minmax(70px, 32%) minmax(0, 1fr) auto; font-size: 12px; } .rpStance { grid-template-columns: 1fr; gap: 4px; } }
+  /* v12.1 카드 작업대 */
+  .wbStep { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 15px; margin: 14px 0 8px; } .wbStep b { width: 24px; height: 24px; border-radius: 50%; background: #14161c; color: #e6c57a; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; } .wbStep small { font-weight: 500; color: var(--sub); font-size: 12px; } .wbStep .wbClose { margin-left: auto; }
+  .wbKpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; } .wbKpi { background: var(--bg2, #f6f7f9); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; } .wbKpi small { display: block; color: var(--sub); font-size: 11px; } .wbKpi b { font-size: 15px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbKpi b.pos { color: #2e7d4f; } .wbKpi b.neg { color: #c0392b; }
+  .wbSig { margin-top: 6px; font-size: 12.5px; color: #8a6a24; background: #fbf5e6; border-radius: 8px; padding: 6px 10px; } .wbCk { margin-top: 8px; }
+  .wbCols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .wbFilt { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; } .wbFilt button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; color: var(--sub); cursor: pointer; } .wbFilt button.on { background: #14161c; color: #e6c57a; border-color: #14161c; } .wbQ { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; width: 90px; }
+  .wbList { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; } .wbItem { display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; } .wbItem:last-child { border-bottom: 0; } .wbItem:hover { background: #fbf8f1; } .wbItem.on { background: #fff8e6; box-shadow: inset 3px 0 0 #c9a24f; }
+  .wbRank { width: 24px; flex: 0 0 24px; text-align: center; font-weight: 900; font-size: 13px; color: var(--sub); } .wbSc { display: inline-block; font-style: normal; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 5px; background: #eef0f3; color: var(--sub); } .wbSc.mid { background: #fbf5e6; color: #8a6a24; } .wbSc.hi { background: #14161c; color: #e6c57a; }
+  .wbMain { min-width: 0; flex: 1; } .wbMain b { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbMain small { display: block; color: var(--sub); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbDone { font-style: normal; font-size: 11px; color: #2e7d4f; font-weight: 700; } .wbG { flex: 0 0 auto; font-size: 10.5px; color: var(--sub); background: #eef0f3; border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
+  .wbRight { position: sticky; top: 8px; } .wbSel { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 12px; padding: 12px 14px; } .wbSelT { font-weight: 900; font-size: 15px; } .wbSelD { color: var(--sub); font-size: 12.5px; margin-top: 2px; } .wbSel .hubWhy { margin-top: 8px; }
+  .wbBriefBox { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; } .wbBrH { font-weight: 900; font-size: 13.5px; margin-bottom: 6px; } .wbBrH small { display: block; font-weight: 500; color: var(--sub); font-size: 11px; }
+  .wbBrRow { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px dashed var(--line); align-items: start; } .wbBrRow > span { font-size: 11.5px; font-weight: 800; color: #8a6a24; padding-top: 2px; } .wbBrRow ul { margin: 0; padding-left: 16px; } .wbBrRow li { font-size: 12.5px; line-height: 1.5; } .wbBrRow li small { color: var(--sub); } .wbBrRow em { font-style: normal; } .wbBrRow .pos { color: #c0392b; } .wbBrRow .neg { color: #2f6fd6; }
+  .wbNums { display: flex; flex-wrap: wrap; gap: 4px; } .wbNums i { font-style: normal; font-size: 11.5px; background: #f6f7f9; border-radius: 6px; padding: 2px 7px; } .wbNums i b { color: var(--txt); }
+  .wbActs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 10px; } .wbAct { min-width: 0; overflow: hidden; } .wbAct b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbAct small { white-space: normal; word-break: keep-all; } .wbAct { border: 1px solid #14161c; background: #14161c; color: #fff; border-radius: 12px; padding: 10px 12px; text-align: left; cursor: pointer; } .wbAct b { display: block; font-size: 14px; color: #e6c57a; } .wbAct small { display: block; font-size: 11px; color: #cfc9ba; margin-top: 2px; } .wbAct.ai { background: #fffdf7; color: var(--txt); border-color: #e6d3a3; } .wbAct.ai b { color: #8a6a24; } .wbAct.ai small { color: var(--sub); } .wbAct:disabled { opacity: .6; }
+  .wbResult { margin-top: 10px; border-top: 2px solid #e6d3a3; padding-top: 4px; } .wbBrief { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
+  .wbLeft, .wbRight { min-width: 0; }
+  @media (max-width: 900px) { .wbCols { grid-template-columns: minmax(0, 1fr); } .wbRight { position: static; } .wbKpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .wbList { max-height: 380px; } }
   /* v12.0 종합 해석 */
   .rpNar { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 16px; padding: 14px 16px; margin: 10px 0 14px; } .rpNarT { font-weight: 900; font-size: 15px; margin-bottom: 6px; } .rpNarT small { display: block; font-weight: 500; color: var(--sub); font-size: 11.5px; margin-top: 2px; }
   .rpNarS { margin-top: 10px; } .rpNarH { font-size: 12px; font-weight: 800; color: #8a6a24; margin-bottom: 3px; } .rpNarS p { margin: 0; font-size: 14px; line-height: 1.75; word-break: keep-all; }
@@ -2172,7 +2189,7 @@
 
 <div id="tab-onecard" class="hidden">
 <div class="card" id="makerCard">
-  <div class="pgHead"><h2>카드 만들기 <small>시장을 고르고 탭에서 만들기 · 모든 카드와 AI 작업은 여기서</small></h2></div>
+  <div class="pgHead"><h2>카드 만들기 <small>① 오늘 상태 → ② 주제 고르기 → ③ 만들기 → ④ 결과·업로드 — 운영자 작업대</small></h2></div>
   <div id="mkBody" style="margin-top:10px"></div>
 </div>
 </div><!-- /tab-onecard -->
@@ -2459,7 +2476,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.0<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.1<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4862,14 +4879,14 @@ window.addEventListener("load", function () {
 <script src="picks.js?v=10.8"></script>
 <script src="tpl.js?v=11.6"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=11.6"></script>
+<script src="maker.js?v=12.1"></script>
 <script src="lib.js?v=10.7"></script>
 <script src="dividend.js?v=11.6"></script>
 <script src="disc.js?v=11.2.7"></script>
 <script src="ipo.js?v=11.3.4"></script>
 <script src="macro.js?v=11.4"></script>
 <script src="rebal.js?v=11.5"></script>
-<script src="hub.js?v=11.9"></script>
+<script src="hub.js?v=12.1"></script>
 <script src="report.js?v=12.0"></script>
 <script src="ui.js?v=11.7"></script>
 <script src="snapshot.js?v=9.5"></script>

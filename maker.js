@@ -4,8 +4,8 @@
       '고쳐 쓰기'를 누르면 앱 데이터가 입력칸 글로 바뀌어 그대로 고칠 수 있다 (글 ↔ 양식 명세 변환기 MK_FMT)
    ② 카드 묶음(여러 장): 오늘의 브리핑·오늘 한 장·채널·정기 발행·연구노트·정책·일정·용어·릴스를 버튼 하나로
    ============================================================ */
-var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "today" };
-var MK_TABS = [["today", "오늘 할 일"], ["one", "한 장 양식"], ["decks", "묶음 카드"], ["lib", "보관함"]];   // v11.6 릴스는 묶음 카드·한 장 양식으로 합침
+var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "work", sel: null, filt: "today", q: "" };
+var MK_TABS = [["work", "작업대"], ["one", "직접 쓰기 (한 장 양식)"], ["lib", "보관함"]];   // v12.1 오늘 할 일 + 묶음 카드 → 작업대(① 상태 ② 주제 ③ 만들기 ④ 결과)
 /* 다른 화면에서 '카드 만들기 ›'로 들어올 때: 탭·시장을 정해서 연다 */
 function makerGo(tab, mk) { if (tab) MK.tab = tab; if (mk) MK.mk = mk; if (typeof navTo === "function") navTo("onecard"); else switchTab("onecard"); }
 function mkLoad() { try { var j = JSON.parse(localStorage.getItem("sm.maker") || "null"); if (j) { MK.text = j.text || {}; MK.meta = j.meta || {}; MK.cat = j.cat || MK.cat; MK.mode = j.mode || MK.mode; } } catch (e) {} }
@@ -76,9 +76,10 @@ function makerRender() {
   Array.prototype.forEach.call(root.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); if (typeof switchBriefMarket === "function" && briefState.market !== MK.mk) switchBriefMarket(MK.mk); makerRender(); }; });
   Array.prototype.forEach.call(root.querySelectorAll("[data-mtab]"), function (b) { b.onclick = function () { MK.tab = b.getAttribute("data-mtab"); makerRender(); }; });
   var pane = root.querySelector(".mkPane");
-  if (MK.tab === "reels") MK.tab = "decks";
+  if (MK.tab === "reels" || MK.tab === "decks" || MK.tab === "today") MK.tab = "work";
   mkWarm();
-  if (MK.tab === "today") {
+  if (MK.tab === "work") { pane.innerHTML = mkWorkHtml(); mkWorkBind(pane); }
+  else if (MK.tab === "today") {
     pane.innerHTML = typeof hubTodayHtml === "function" ? hubTodayHtml() : "";
     if (typeof hubBind === "function") hubBind(pane);
     if (typeof perToday === "function" && perToday().length) { var pt = document.createElement("div"); pt.className = "briefDim"; pt.style.marginTop = "6px"; pt.textContent = "정기 발행일이에요: " + perToday().map(function (k) { return cPlain(PER_SETS[k].t); }).join(" · "); pane.appendChild(pt); }
@@ -139,7 +140,54 @@ function mkPreview() {
     var sv = box.querySelector("[data-msave]"); if (sv) sv.disabled = false; if (msg) msg.textContent = "";
   });
 }
-/* ---------- 카드 묶음 ---------- */
+/* ============================================================ v12.1 작업대 — ① 오늘 상태 ② 주제 고르기 ③ 만들기 ④ 결과 ============================================================ */
+function mkTopicsScored() { if (MK._T && Date.now() - MK._Tat < 60e3) return MK._T; MK._T = hubTopics().map(function (x) { var sc = { s: 0, why: "" }; try { sc = x.score(); } catch (e) {} return Object.assign({}, x, { s: sc.s, why: sc.why }); }); MK._Tat = Date.now(); return MK._T; }
+function mkWorkHtml() {
+  var R = hubR(), kst = hubKst(), dow = "일월화수목금토"[kst.getUTCDay()], ck = typeof pubChecklist === "function" ? pubChecklist() : [], bad = ck.filter(function (c) { return !c.ok; }), done = hubDoneLoad(), doneCtx = {}; done.forEach(function (d) { doneCtx[d.ctx] = (doneCtx[d.ctx] || 0) + 1; });
+  var temp = R && R.temp, vix = R && (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], newsN = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).length, now = typeof nbNow === "function" ? nbNow() : { why: [] }, per = typeof perToday === "function" ? perToday() : [];
+  var T = mkTopicsScored(), today = hubToday(10), groups = []; T.forEach(function (x) { if (groups.indexOf(x.g) < 0) groups.push(x.g); });
+  if (!MK.sel || !T.some(function (x) { return x.ctx === MK.sel; })) MK.sel = today[0] ? today[0].ctx : (T[0] && T[0].ctx);
+  // ① 오늘 상태
+  var kpi = function (l, v, c) { return '<div class="wbKpi"><small>' + l + '</small><b' + (c ? ' class="' + c + '"' : '') + '>' + v + '</b></div>'; };
+  var h = '<div class="wbStep"><b>1</b> 오늘 상태 <small>' + (kst.getUTCMonth() + 1) + '.' + kst.getUTCDate() + '(' + dow + ') · ' + ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[MK.mk] + ' 시장 기준</small></div><div class="wbKpis">' +
+    kpi("오른 종목", temp ? Math.round(temp.upPct * 100) + "%" : "-", temp ? (temp.upPct >= 0.6 ? "pos" : temp.upPct <= 0.4 ? "neg" : "") : "") + kpi("VIX", vix ? parseFloat(vix.v).toFixed(0) : "-", vix && parseFloat(vix.v) >= 25 ? "neg" : "") + kpi("오늘 기사", newsN ? newsN + "건" : "수집 전") + kpi("시장 신호", now.why.length ? now.why.length + "개" : "없음", now.why.length ? "pos" : "") + kpi("정기 발행", per.length ? per.map(function (k) { return cPlain(PER_SETS[k].t).replace(/^\S+\s/, ""); }).join(", ") : "없음", per.length ? "pos" : "") + kpi("오늘 만든 카드", done.length + "건") +
+    '</div>' + (now.why.length ? '<div class="wbSig">지금 신호 · ' + now.why.map(escapeHtml).join(" / ") + '</div>' : '') +
+    '<details class="hubCk wbCk"' + (bad.length ? ' open' : '') + '><summary>발행 전 점검 ' + (bad.length ? '<b class="rbWarn">확인 ' + bad.length + '건</b>' : '<b style="color:#2e7d4f">이상 없음</b>') + ' <small class="briefDim">· 데이터 기준일 · 휴장 · 오류 종목</small></summary><div class="pubCk">' + ck.map(function (c) { return '<div class="pubCkRow ' + (c.ok ? "ok" : c.w ? "bad" : "warn") + '"><span>' + (c.ok ? "✅" : c.w ? "⛔" : "⚠️") + '</span><span>' + escapeHtml(c.t) + '</span></div>'; }).join("") + '</div></details>';
+  // ② 주제 고르기
+  var L = MK.filt === "today" ? today : MK.filt === "all" ? T.slice().sort(function (a, b) { return b.s - a.s; }) : T.filter(function (x) { return x.g === MK.filt; });
+  if (MK.q) { var q = MK.q.toLowerCase(); L = L.filter(function (x) { return (cPlain(x.t) + " " + x.d + " " + x.g).toLowerCase().indexOf(q) >= 0; }); }
+  h += '<div class="wbCols"><div class="wbLeft"><div class="wbStep"><b>2</b> 주제 고르기 <small>' + L.length + '개 · 점수 = 시장 신호·일정·데이터</small></div>';
+  h += '<div class="wbFilt"><button data-wf="today"' + (MK.filt === "today" ? ' class="on"' : '') + '>오늘 추천 10</button><button data-wf="all"' + (MK.filt === "all" ? ' class="on"' : '') + '>전체 ' + T.length + '</button>' + groups.map(function (g) { return '<button data-wf="' + escapeHtml(g) + '"' + (MK.filt === g ? ' class="on"' : '') + '>' + escapeHtml(g) + '</button>'; }).join("") + '<input class="wbQ" placeholder="검색" value="' + escapeHtml(MK.q) + '"></div>';
+  h += '<div class="wbList">' + L.map(function (x, i) { var sc = x.s >= 8 ? "hi" : x.s >= 5 ? "mid" : ""; return '<div class="wbItem' + (x.ctx === MK.sel ? ' on' : '') + '" data-wsel="' + escapeHtml(x.ctx) + '"><span class="wbRank">' + (MK.filt === "today" ? i + 1 : '<i class="wbSc ' + sc + '">' + Math.round(x.s) + '</i>') + '</span><div class="wbMain"><b>' + escapeHtml(x.t) + (doneCtx[x.ctx] ? ' <em class="wbDone">✓ 만듦 ' + doneCtx[x.ctx] + '</em>' : '') + '</b><small>' + escapeHtml(x.why || x.d) + '</small></div><span class="wbG">' + escapeHtml(x.g.split(" · ")[0]) + '</span></div>'; }).join("") + (L.length ? "" : '<div class="briefDim">해당하는 주제가 없어요</div>') + '</div></div>';
+  // ③ 만들기
+  var S = T.filter(function (x) { return x.ctx === MK.sel; })[0];
+  h += '<div class="wbRight"><div class="wbStep"><b>3</b> 만들기</div>' + (S ? mkMakeHtml(S) : '<div class="briefDim">왼쪽에서 주제를 고르세요</div>') + '</div></div>';
+  // ④ 결과
+  h += '<div id="mkResult" class="wbResult" hidden></div>';
+  return h;
+}
+function mkMakeHtml(S) {
+  var h = '<div class="wbSel"><div class="wbSelT">' + escapeHtml(S.t) + '</div><div class="wbSelD">' + escapeHtml(S.d) + '</div>' + (S.why ? '<div class="hubWhy"><span>왜 지금</span>' + escapeHtml(S.why) + '</div>' : '') + '</div>';
+  h += '<div class="wbBriefBox" data-brief="' + escapeHtml(S.ctx) + '"><div class="briefDim">읽는 요약(숫자 + 요즘 이슈 + 전문가)을 준비하는 중…</div></div>';
+  h += '<div class="wbActs">' +
+    '<button class="wbAct" data-hub="one" data-ctx="' + escapeHtml(S.ctx) + '"><b>한 장</b><small>핵심 숫자 + 이슈·전문가 띠 · 1장 · AI 없음</small></button>' +
+    '<button class="wbAct" data-hub="multi" data-ctx="' + escapeHtml(S.ctx) + '"><b>여러 장</b><small>표지 + 읽는 요약 + 근거 카드 전부</small></button>' +
+    '<button class="wbAct ai" data-hub="ai1" data-ctx="' + escapeHtml(S.ctx) + '"><b>AI 한 장</b><small>AI가 전체를 읽고 한 장 기획</small></button>' +
+    '<button class="wbAct ai" data-hub="aiN" data-ctx="' + escapeHtml(S.ctx) + '"><b>AI 여러 장</b><small>AI가 숫자·이슈·의견을 엮어 5~8장</small></button></div>' +
+    '<div class="briefDim" style="margin-top:8px">만든 카드는 아래 ④에 바로 떠요 · 업로드 글(스레드·인스타)도 같이 · 숫자는 앱 데이터 그대로</div>';
+  return h;
+}
+function mkWorkBind(pane) {
+  Array.prototype.forEach.call(pane.querySelectorAll("[data-wf]"), function (b) { b.onclick = function () { MK.filt = b.getAttribute("data-wf"); makerRender(); }; });
+  var q = pane.querySelector(".wbQ"); if (q) { q.oninput = function () { MK.q = q.value; clearTimeout(MK.qt); MK.qt = setTimeout(function () { var pos = q.selectionStart; makerRender(); var q2 = document.querySelector("#mkBody .wbQ"); if (q2) { q2.focus(); try { q2.setSelectionRange(pos, pos); } catch (e) {} } }, 350); }; }
+  Array.prototype.forEach.call(pane.querySelectorAll("[data-wsel]"), function (b) { b.onclick = function () { MK.sel = b.getAttribute("data-wsel"); makerRender(); var r = document.querySelector("#mkBody .wbRight"); if (r && window.innerWidth < 900) try { r.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }; });
+  if (typeof hubBind === "function") hubBind(pane);
+  var bb = pane.querySelector("[data-brief]");
+  if (bb && typeof hubBrief === "function") { var ctx = bb.getAttribute("data-brief"); hubBrief(ctx).then(function (B) { var cur = document.querySelector('#mkBody [data-brief="' + ctx.replace(/"/g, '\\"') + '"]'); if (cur) cur.innerHTML = hubBriefHtml(B); }).catch(function (e) { var cur = document.querySelector("#mkBody [data-brief]"); if (cur) cur.innerHTML = '<div class="briefDim">읽는 요약을 만들지 못했어요: ' + escapeHtml(e.message) + '</div>'; }); }
+}
+function mkMarkDone(ctx) { var el = document.querySelector('#mkBody .wbItem[data-wsel="' + ctx.replace(/"/g, '\\"') + '"] b'); if (!el) return; var em = el.querySelector(".wbDone"); if (em) em.textContent = "✓ 만듦 " + (parseInt(em.textContent.replace(/\D/g, "")) + 1 || 1); else el.insertAdjacentHTML("beforeend", ' <em class="wbDone">✓ 만듦 1</em>'); var k = document.querySelector("#mkBody .wbKpis .wbKpi:last-child b"); if (k) k.textContent = hubDoneLoad().length + "건"; }
+
+/* ---------- 카드 묶음 (구 탭 · 참고용) ---------- */
 function mkDecks() {
   function row(t, d, act, ai, now) { return '<div class="pubPlanItem' + (now ? ' per' : '') + '"><div><b>' + escapeHtml(t) + '</b><small>' + escapeHtml(d || "") + '</small></div><div class="rlActs"><button class="chip" data-mdeck="' + act + '">만들기</button>' + (ai ? aiBtn(ai, "AI") : "") + '</div></div>'; }
   var g = [];
