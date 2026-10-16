@@ -145,7 +145,7 @@ async function aiResponses(key, model, sys, user, name, schema, ms, imgs) {
 }
 async function aiChat(key, model, sys, user, name, schema, ms, imgs) {
   const { status, j, err } = await aiPost("https://api.openai.com/v1/chat/completions", key, {
-    model, temperature: 0.4, max_tokens: name === "deck_cards" ? 6000 : name === "insight" ? 2500 : 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
+    model, temperature: 0.4, max_tokens: name === "deck_cards" ? 6000 : name === "insight" ? 3500 : 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
     response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }
   }, ms);
   if (err) return { ok: false, reason: err };
@@ -222,8 +222,9 @@ async function aiDeckPlan(res, key, model, fallback, b) {
 }
 /* ---------- v11.7 리포트: 증거(Exhibit)를 읽고 애널리스트처럼 상황·해석·의견·시나리오·행동·조건을 쓴다 (숫자는 근거 줄 표기 그대로) ---------- */
 const AI_SCHEMA_INSIGHT = {
-  type: "object", additionalProperties: false, required: ["headline", "situation", "interpretation", "opinion", "forecast", "plan", "watch"],
+  type: "object", additionalProperties: false, required: ["headline", "situation", "narrative", "interpretation", "opinion", "forecast", "plan", "watch"],
   properties: {
+    narrative: { type: "string", description: "종합 해석 글 4~5문단(문단 사이 빈 줄). 순서: 한 줄로 → 숫자가 말하는 것 → 숫자 뒤의 속사정(기사·전문가 의견, 언론사 이름 붙여) → 양쪽 의견을 겹쳐 보면 → 그래서(단기·장기·행동·바꿀 조건). 700자 이하. 숫자는 근거 줄 표기 그대로. 초보가 끝까지 읽게 쉬운 문장으로" },
     headline: { type: "string", description: "리포트 제목 한 줄 24자 이하 — 질문형 또는 결론형" },
     situation: { type: "string", description: "지금 상황 2~3문장 120자 이하. 숫자는 근거 줄 표기 그대로" },
     interpretation: { type: "array", maxItems: 6, items: { type: "string" }, description: "Exhibit마다 한 줄 해석 60자 이하 — 그 숫자가 무슨 뜻인지, 초보가 이해하게" },
@@ -239,7 +240,7 @@ async function aiInsight(res, key, model, fallback, b) {
   if (!txt) return res.status(400).json({ ok: false, reason: "NO_LINES" });
   const sys = "너는 한국 개인투자자 대상 리서치 노트를 쓰는 애널리스트다. 독자는 주식 초보. 문장은 짧고 단정하게, 해요체. " +
     "증거(Exhibit)의 숫자만 쓰고 계산·반올림·새 숫자 생성 금지. 종목을 사라/팔라고 직접 권하지 말고 '검토 구간·관망·나눠서' 같은 행동 표현을 쓴다. 과장·확정 금지('반드시', '확실' 금지). 시나리오는 조건부로 쓴다.";
-  const user = "질문: " + String(b.title || "").slice(0, 80) + "\n규칙 기반 의견(이 방향을 따르되 더 설득력 있게): " + String(b.stance || "").slice(0, 40) + "\n\n증거 줄(id | 내용):\n" + txt;
+  const user = "질문: " + String(b.title || "").slice(0, 80) + "\n규칙 기반 의견(이 방향을 따르되 더 설득력 있게): " + String(b.stance || "").slice(0, 40) + (b.draft ? "\n\n규칙으로 쓴 초안(구조는 유지, 문장을 사람이 읽기 좋게 다시 써):\n" + String(b.draft).slice(0, 2500) : "") + "\n\n증거 줄(id | 내용):\n" + txt;
   const tries = [];
   let r = await aiResponses(key, model, sys, user, "insight", AI_SCHEMA_INSIGHT, 120000, []);
   tries.push(model + ": " + (r.ok ? "성공" : r.reason));
