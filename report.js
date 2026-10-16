@@ -131,7 +131,7 @@ function rpStock(sym) {
   if (fwdPer && per && fwdPer < per * 0.6) { score += 1; why.push("예상 PER " + fwdPer.toFixed(1) + "배로 낮아짐"); }
   if (tech && tech.ma200 && last < tech.ma200 && tech.chg20 < 0) why.push("아직 200일선 아래 · 20일 하락 중");
   var stance = score >= 3 ? "검토 구간" : score >= 1 ? "관심 · 분할" : "관망";
-  var view = { stance: stance, score: score, txt: stance === "검토 구간" ? name + "은 지금 충분히 매력적인 검토 구간이다. 많이 떨어졌다고 무조건 싼 건 아니지만, 낙폭·과거 사례·배수가 같은 방향을 가리킨다. 금액을 정해 나눠서 대응하면 된다." : stance === "관심 · 분할" ? name + "은 관심 종목에 올려 둘 구간이다. 일부 신호는 좋지만 확인이 더 필요하다. 사더라도 작게, 나눠서." : name + "은 아직 서두를 이유가 없다. 낙폭이 얕거나 신호가 엇갈린다. 조건이 맞을 때까지 기다린다.", why: why,
+  var view = { stance: stance, score: score, txt: stance === "검토 구간" ? nbJosa(name, "은/는") + " 지금 충분히 매력적인 검토 구간이다. 많이 떨어졌다고 무조건 싼 건 아니지만, 낙폭·과거 사례·배수가 같은 방향을 가리킨다. 금액을 정해 나눠서 대응하면 된다." : stance === "관심 · 분할" ? nbJosa(name, "은/는") + " 관심 종목에 올려 둘 구간이다. 일부 신호는 좋지만 확인이 더 필요하다. 사더라도 작게, 나눠서." : nbJosa(name, "은/는") + " 아직 서두를 이유가 없다. 낙폭이 얕거나 신호가 엇갈린다. 조건이 맞을 때까지 기다린다.", why: why,
     plan: stance === "관망" ? ["살 금액의 상한을 먼저 정한다(계좌의 5~10%)", "고점 대비 " + rpPct(Math.min(cur - 0.1, avgMdd * 1.5), 0) + " 또는 RSI 30 아래에서 1차", "이익 전망(예상 EPS)이 더 깎이는지 매달 확인"] : ["살 금액의 상한을 먼저 정한다(계좌의 5~10%)", "지금 1/3 · 추가 -10%에 1/3 · 20일선 회복 확인 뒤 1/3", "예상 이익이 깎이면 계획을 멈춘다 — 가격이 아니라 이익이 기준"] };
   var watch = ["올해 예상 EPS" + (ceps ? "(지금 " + rpNum(ceps) + ")" : "") + "가 내려가는가", "20일선(" + rpPrice(sym, tech && tech.ma20) + ") 위로 돌아오는가", "RSI가 30 아래에서 올라오는가", "시장 전체(지수)가 같이 빠지는가 — 종목 문제인지 시장 문제인지"];
   return { kind: "stock", id: "stock:" + sym, title: name + ", 기회인가 위기인가", sym: sym, name: name, asOf: rpD(rows[n - 1].t), price: last, situation: [name + " " + rpPrice(sym, last) + " — 고점(" + rpYm(pkT) + " " + rpPrice(sym, pk) + ") 대비 " + rpPct(cur, 1) + ".", "최근 10년 평균 최대 낙폭 " + rpPct(avgMdd, 1) + "의 " + (cur / avgMdd).toFixed(1) + "배 깊이.", tech ? "RSI " + tech.rsi.toFixed(0) + " · 20일 " + rpPct(tech.chg20, 1) + " · 1년 " + rpPct(tech.chg250, 1) : ""].filter(Boolean), exhibits: ex, scen: scen, view: view, watch: watch, src: "야후 파이낸스 종가(" + rpD(rows[n - 1].t) + ") · 네이버 증권 투자지표 · StockMind 계산", numbers: { cur: cur, avgMdd: avgMdd, rsi: tech && tech.rsi, simUp: sim.up, simN: sim.n, simMed: sim.med, simMin: sim.min, fwdPer: fwdPer, per: per, ma20: tech && tech.ma20, ma200: tech && tech.ma200 }, thr: { up: 0.2, dn: -0.1 } };
@@ -227,6 +227,69 @@ function rpExpertHtml(E) {
   return h;
 }
 
+/* ============================================================ 종합 해석 (사람이 읽는 글) ============================================================ */
+/* 숫자(Exhibit) · 기사·전문가 의견 · 규칙 의견을 한 편의 글로 엮는다 — 문장마다 근거 표시 [E3] · (언론사 날짜)
+   구조: 한 줄로 → 숫자가 말하는 것 → 숫자 뒤의 속사정(기사·의견) → 양쪽 의견을 겹쳐 보면 → 그래서(단기·장기·행동·바꿀 조건) */
+function rpRef(n) { return "[E" + n + "]"; }
+function rpNarrative(rp) {
+  var N = rp.numbers || {}, ex = rp.exhibits, E = rp.exp, hz = rp.hz, V = rp.view, k = rp.kind, name = rp.name, S = {};
+  function exBy(re) { return ex.filter(function (e) { return re.test(e.title); })[0]; }
+  function tag(e) { return e ? " " + rpRef(e.no) : ""; }
+  function art(x) { return " (" + (x.press || "기사") + (x.time ? " " + String(x.time).slice(0, 10).replace(/-/g, ".") : "") + ")"; }
+  var up = N.cur != null ? N.cur : null, e1 = exBy(/평소보다|지금 위치/), e2 = exBy(/10년, 이만큼|시장의 폭/), e3 = exBy(/과매도|공포/), e4 = exBy(/전고점|조정은 얼마나/), e5 = exBy(/샀다면/), e6 = exBy(/배수로|매크로 조건/), e7 = exBy(/목표주가|월의 과거|월은 과거/);
+  // ① 한 줄로
+  S.one = V.stance + " — " + V.txt.split(/(?<=\.)\s/)[0] + (hz ? " 짧게는 '" + hz.s.stance.replace(/^단기[:\s]*/, "") + "', 길게는 '" + hz.l.stance.replace(/^장기[:\s]*/, "") + "'." : "");
+  // ② 숫자가 말하는 것
+  var P2 = [];
+  if (k === "stock" || k === "market") {
+    if (e1) P2.push(nbJosa(name, "은/는") + " 고점 대비 " + rpPct(up, 1) + "" + tag(e1) + (N.avgMdd != null ? ". 최근 10년 평소 해의 최대 낙폭이 " + rpPct(N.avgMdd, 1) + "이니 그 " + (up / N.avgMdd).toFixed(1) + "배 깊이다" : "") + ".");
+    if (e2) P2.push(e2.read.replace(/\s+/g, " ") + tag(e2));
+    if (e3) P2.push(e3.read.split(/(?<=\.)\s/)[0] + tag(e3));
+    if (e5 && N.simN) P2.push("과거 지금과 비슷하게 빠졌던 " + N.simN + "번 중 1년 뒤 오른 건 " + N.simUp + "번, 중앙값 " + rpPct(N.simMed, 0) + (N.simMin != null ? ", 최악 " + rpPct(N.simMin, 0) : "") + tag(e5) + ". 확률은 유리하지만 '바닥'이라는 뜻은 아니다.");
+    if (e4) P2.push(e4.read.split(/(?<=\.)\s/)[0] + tag(e4));
+    if (e6 && N.fwdPer) P2.push("배수로는 올해 예상 PER " + N.fwdPer.toFixed(1) + "배" + (N.per ? "(최근 실적 " + N.per.toFixed(1) + "배)" : "") + tag(e6) + " — 이익 전망이 지켜지느냐가 이 숫자의 생명이다.");
+    else if (e6) P2.push(e6.read.split(/(?<=\.)\s/)[0] + tag(e6));
+  } else if (k === "macro") { ex.slice(0, 3).forEach(function (e) { P2.push(e.read.split(/(?<=\.)\s/)[0] + tag(e)); }); }
+  else { ex.slice(0, 3).forEach(function (e) { P2.push(e.read.split(/(?<=\.)\s/)[0] + tag(e)); }); }
+  S.numbers = P2.join(" ");
+  // ③ 숫자 뒤의 속사정 — 기사·의견
+  var P3 = [];
+  if (E && E.n) {
+    var all = E.bull.concat(E.bear).concat(E.mixed || []);
+    if (E.tp && k === "stock") { var r = rp.price ? E.tp.med / rp.price : 0; P3.push("증권사 목표주가는 기사 " + E.tp.n + "건 기준 중앙값 " + rpNum(E.tp.med) + "원(" + rpNum(E.tp.lo) + "~" + rpNum(E.tp.hi) + "원)" + (r >= 0.2 && r <= 5 ? "으로 지금보다 " + rpPct(r - 1, 0) : "") + "."); }
+    if (E.bull.length) P3.push("오르는 쪽 근거로는 " + E.bull.slice(0, 2).map(function (x) { return "'" + x.t + "'" + art(x); }).join(", ") + " 등이 있다.");
+    if (E.bear.length) P3.push("반대로 " + E.bear.slice(0, 2).map(function (x) { return "'" + x.t + "'" + art(x); }).join(", ") + "처럼 조심하라는 목소리도 있다.");
+    if (!E.bull.length && !E.bear.length) P3.push("최근 기사 " + E.n + "건에서 뚜렷한 상승·하락 근거는 찾지 못했다 — 시장의 관심 자체가 식어 있다는 뜻일 수 있다.");
+  } else P3.push("기사·전문가 의견은 아직 모으지 못했다(기사 수집 전). 숫자만으로 판단한다.");
+  S.story = P3.join(" ");
+  // ④ 양쪽 의견을 겹쳐 보면
+  var P4 = [];
+  if (E && E.bull.length + E.bear.length >= 2) {
+    var tot = E.bull.length + E.bear.length, bp = E.bull.length / tot;
+    P4.push("전문가 의견은 상승 " + E.bull.length + " 대 하락 " + E.bear.length + ". " + (bp >= 0.7 ? "한쪽으로 쏠려 있다." : bp <= 0.3 ? "비관이 짙다." : "팽팽하다."));
+    var agree = (bp >= 0.6 && V.score >= 2) || (bp <= 0.4 && V.score <= 0);
+    P4.push(agree ? "숫자 쪽 결론(" + V.stance + ")과 같은 방향이다. 다만 모두가 같은 쪽을 볼 때는 '이미 가격에 들어 있나'를 의심해야 한다." : "숫자 쪽 결론(" + V.stance + ")과는 결이 다르다. 숫자는 과거 빈도를, 기사는 지금의 재료를 본다 — 둘이 갈릴 때 결과를 정한 건 대개 '이익이 실제로 어떻게 나오느냐'였다.");
+    if (E.bear.length) P4.push("하락 쪽이 말하는 위험(" + E.bear[0].t.slice(0, 30) + ")이 현실이 되면 숫자 쪽 시나리오 중 '추가 하락'" + (rp.scen && rp.scen[2] && rp.scen[2].p > 0 ? "(과거 빈도 " + Math.round(rp.scen[2].p * 100) + "%)" : "(과거엔 드물었던 경우)") + "이 그 경우다.");
+  } else P4.push("의견을 겹쳐 볼 만큼 기사가 모이지 않아, 이번엔 숫자 쪽 결론을 그대로 쓴다.");
+  S.both = P4.join(" ");
+  // ⑤ 그래서
+  var P5 = [];
+  if (rp.scen && rp.scen.length) P5.push("기준 시나리오는 " + rp.scen.slice().sort(function (a, b) { return b.p - a.p; })[0].name + "(" + Math.round(rp.scen.slice().sort(function (a, b) { return b.p - a.p; })[0].p * 100) + "%, 과거 빈도).");
+  if (hz) { var h1 = hz.s.txt.split(/(?<=\.)\s/)[0].replace(/^(짧게|단기로) 보면 /, ""), h2 = hz.l.txt.split(/(?<=\.)\s/)[0].replace(/^(길게|장기로) 보면 /, ""); P5.push("짧게 보면 " + h1 + " 길게 보면 " + h2); }
+  P5.push("행동은 " + V.plan.map(function (x, i) { return (i + 1) + ") " + x; }).join(" ") + ".");
+  P5.push("생각을 바꿀 신호는 " + rp.watch.slice(0, 2).join(", ") + ".");
+  S.so = P5.join(" ");
+  S.srcs = ex.map(function (e) { return { id: rpRef(e.no), t: e.title }; });
+  S.arts = E ? E.bull.concat(E.bear).slice(0, 8).map(function (x) { return { t: x.t, press: x.press, time: String(x.time || "").slice(0, 10), url: x.url }; }) : [];
+  return S;
+}
+function rpNarrativeHtml(S, rp) {
+  function fmt(t) { return rpEsc(t).replace(/\[E(\d+)\]/g, function (m, n) { return '<a class="rpRefTag" href="#rpEx' + n + '" title="Exhibit ' + n + '">E' + n + '</a>'; }).replace(/\(([^()]{2,14}) (\d{4}\.\d{1,2}\.\d{1,2})\)/g, '<span class="rpSrcTag">$1 $2</span>'); }
+  var sec = function (h, t) { return '<div class="rpNarS"><div class="rpNarH">' + h + '</div><p>' + fmt(t) + '</p></div>'; };
+  return '<div class="rpNar"><div class="rpNarT">종합 해석 <small>숫자(앱 계산) + 기사·전문가 의견 + 규칙 의견을 한 편으로 · 문장마다 근거 표시</small></div>' + sec("한 줄로", S.one) + sec("숫자가 말하는 것", S.numbers) + sec("숫자 뒤의 속사정", S.story) + sec("양쪽 의견을 겹쳐 보면", S.both) + sec("그래서", S.so) +
+    '<div class="rpNarSrc">근거 ' + S.srcs.map(function (x) { return '<a href="#rpEx' + x.id.replace(/\D/g, "") + '">' + x.id + ' ' + rpEsc(x.t) + '</a>'; }).join(" · ") + (S.arts.length ? '<br>출처 ' + S.arts.map(function (a) { return '<a href="' + rpEsc(a.url) + '" target="_blank" rel="noopener">' + rpEsc(a.press) + ' ' + rpEsc(a.time) + '</a>'; }).join(" · ") : '') + '</div></div>';
+}
+
 /* ============================================================ 단기 · 장기 해석 ============================================================ */
 /* 단기(1~3개월): 과매도·20일선·변동성·3개월 분포 / 장기(1~3년): 낙폭 깊이·밸류·장기 승률·구조 */
 function rpHorizon(rp) {
@@ -291,8 +354,10 @@ function rpVerify(saved) {
 
 /* ============================================================ 글: 스레드 연재 · 캡션 ============================================================ */
 function rpThreadSeries(rp) {
-  var L = [], n = 0;
-  L.push(rp.title + "\n\n" + rp.situation.join("\n") + "\n\n아래에 번호로 이어 씁니다.");
+  var L = [], n = 0, NR = null; try { NR = rpNarrative(rp); } catch (e) {}
+  var plain = function (t) { return String(t || "").replace(/\s?\[E\d+\]/g, ""); };
+  L.push(rp.title + "\n\n" + (NR ? plain(NR.one) : rp.situation.join("\n")) + "\n\n아래에 번호로 이어 씁니다.");
+  if (NR) { L.push((++n) + ". 숫자가 말하는 것\n" + plain(NR.numbers)); L.push((++n) + ". 숫자 뒤의 속사정\n" + plain(NR.story)); L.push((++n) + ". 양쪽 의견을 겹쳐 보면\n" + plain(NR.both)); L.push((++n) + ". 그래서\n" + plain(NR.so)); L.push((++n) + ". 아래는 근거 하나씩."); }
   rp.exhibits.forEach(function (e) { L.push((++n) + ". " + e.title + "\n" + e.read.replace(/\s+/g, " ")); });
   if (rp.scen.length) L.push((++n) + ". 앞으로 1년, 과거 빈도로 보면\n" + rp.scen.map(function (s) { return s.name + " " + Math.round(s.p * 100) + "% (" + s.range + ")"; }).join("\n"));
   if (rp.hz) { L.push((++n) + ". 짧게 보면 — " + rp.hz.s.stance + "\n" + rp.hz.s.txt); L.push((++n) + ". 길게 보면 — " + rp.hz.l.stance + "\n" + rp.hz.l.txt); }
@@ -303,7 +368,9 @@ function rpThreadSeries(rp) {
   return L.map(function (t) { return t.length > 500 ? t.slice(0, 495) + "…" : t; });
 }
 function rpCaption(rp) {
-  var L = [rp.title, ""].concat(rp.situation.map(function (s) { return "· " + s; }), [""], rp.exhibits.slice(0, 5).map(function (e) { return "Exhibit " + String(e.no).padStart(2, "0") + " " + e.title + " → " + e.big; }), ["", "내 생각: " + rp.view.stance + ". " + rp.view.txt, "", "바꿀 조건: " + rp.watch.slice(0, 2).join(" · "), "", "※ " + rp.src + " · 개인 의견이며 투자 권유 아님", "", "#우상향연구소 #" + String(rp.name).replace(/\s/g, "") + " #투자분석 #주식공부 #재테크"]);
+  var NR = null; try { NR = rpNarrative(rp); } catch (e) {}
+  var plain = function (t) { return String(t || "").replace(/\s?\[E\d+\]/g, ""); };
+  var L = [rp.title, ""].concat(NR ? [plain(NR.one), "", plain(NR.numbers), "", plain(NR.story), "", plain(NR.both), "", plain(NR.so), ""] : rp.situation.map(function (s) { return "· " + s; }).concat([""]), rp.exhibits.slice(0, 5).map(function (e) { return "Exhibit " + String(e.no).padStart(2, "0") + " " + e.title + " → " + e.big; }), ["", "내 생각: " + rp.view.stance + ". " + rp.view.txt, "", "바꿀 조건: " + rp.watch.slice(0, 2).join(" · "), "", "※ " + rp.src + " · 개인 의견이며 투자 권유 아님", "", "#우상향연구소 #" + String(rp.name).replace(/\s/g, "") + " #투자분석 #주식공부 #재테크"]);
   return L.join("\n");
 }
 
@@ -311,16 +378,20 @@ function rpCaption(rp) {
 function rpAiLines(rp) {
   var L = [], id = 0; function add(t) { L.push({ id: "F" + (++id), text: t }); }
   rp.situation.forEach(add); rp.exhibits.forEach(function (e) { add("Exhibit " + e.no + " " + e.title + " · " + e.sub); add("핵심값 " + e.big); add(e.read); (e.kind === "rows" ? e.data.map(function (r) { return r.slice(0, 3).join(" · "); }) : e.kind === "tiles" ? e.data.map(function (t) { return t.l + " " + t.v; }) : e.data.map(function (b) { return b.l + " " + (b.txt || rpPct(b.v, 1)); })).forEach(add); });
+  if (rp.exp) { rp.exp.bull.forEach(function (x) { add("상승 근거 기사: " + x.t + " (" + x.press + ")"); }); rp.exp.bear.forEach(function (x) { add("하락 근거 기사: " + x.t + " (" + x.press + ")"); }); if (rp.exp.tp) add("기사 목표주가 중앙값 " + rpNum(rp.exp.tp.med) + "원 (" + rp.exp.tp.n + "건)"); }
+  if (rp.hz) { add("단기 해석: " + rp.hz.s.stance + " — " + rp.hz.s.txt); add("장기 해석: " + rp.hz.l.stance + " — " + rp.hz.l.txt); }
   rp.scen.forEach(function (s) { add("시나리오 " + s.name + " " + Math.round(s.p * 100) + "% " + s.range + " " + s.txt); }); add("규칙 의견: " + rp.view.stance + " — " + rp.view.txt); rp.view.why.forEach(function (w) { add("근거 " + w); });
   return L;
 }
 function rpAiWrite(rp) {
-  return fetch("/api/channel?op=ai", { method: "POST", headers: { "x-owner": typeof ocTok === "function" ? ocTok() : "", "Content-Type": "application/json" }, body: JSON.stringify({ mode: "insight", title: rp.title, lines: rpAiLines(rp), stance: rp.view.stance }) }).then(function (r) { return r.json(); });
+  return fetch("/api/channel?op=ai", { method: "POST", headers: { "x-owner": typeof ocTok === "function" ? ocTok() : "", "Content-Type": "application/json" }, body: JSON.stringify({ mode: "insight", title: rp.title, lines: rpAiLines(rp), stance: rp.view.stance, draft: (function () { try { var N = rpNarrative(rp); return [N.one, N.numbers, N.story, N.both, N.so].join("\n\n"); } catch (e) { return ""; } })() }) }).then(function (r) { return r.json(); });
 }
 
 /* ============================================================ 카드 덱 (Exhibit 카드) ============================================================ */
 function rpDeck(rp) {
-  var pages = rp.exhibits.map(function (e) { return { name: "Exhibit" + e.no, top: [e.title.indexOf(",") > 0 ? e.title.split(",")[0] + "," : e.title, "[[" + e.big + "]]", "", e.read.split(/(?<=\.)\s/)[0]], title: "Exhibit " + String(e.no).padStart(2, "0") + " · " + e.title, sub: e.sub, kind: e.kind, data: e.kind === "tiles" ? { tiles: e.data } : e.data, note: e.read, foot: rp.src + " · 투자 권유 아님" }; });
+  var NR = null; try { NR = rpNarrative(rp); } catch (e) {}
+  var plain = function (t) { return String(t || "").replace(/\s?\[E\d+\]/g, "").replace(/\s?\([^()]{2,14} \d{4}\.\d{1,2}\.\d{1,2}\)/g, ""); };
+  var pages = (NR ? [{ name: "종합", top: ["한 줄로:", "[[" + rp.view.stance + "]]", "", plain(NR.one).split(/(?<=\.)\s/)[1] || ""], title: "종합 해석", sub: "숫자 · 기사 · 의견을 한 편으로 (근거는 다음 장부터)", kind: "text", data: { paras: [plain(NR.numbers), plain(NR.story), plain(NR.both)], after: ["그래서", (function (t) { var o = ""; t.split(/(?<=\.)\s/).some(function (x) { if ((o + x).length > 110) return true; o += (o ? " " : "") + x; }); return o || t.slice(0, 110); })(plain(NR.so))] } }] : []).concat(rp.exhibits.map(function (e) { return { name: "Exhibit" + e.no, top: [e.title.indexOf(",") > 0 ? e.title.split(",")[0] + "," : e.title, "[[" + e.big + "]]", "", e.read.split(/(?<=\.)\s/)[0]], title: "Exhibit " + String(e.no).padStart(2, "0") + " · " + e.title, sub: e.sub, kind: e.kind, data: e.kind === "tiles" ? { tiles: e.data } : e.data, note: e.read, foot: rp.src + " · 투자 권유 아님" }; }));
   if (rp.scen.length) pages.push({ name: "시나리오", top: ["앞으로 1년, 과거 빈도로 보면", "[[" + rp.scen[0].name + " " + Math.round(rp.scen[0].p * 100) + "%]]"], title: "시나리오 — 과거 비슷한 상황의 결과 분포", sub: "확률 = 과거 사례 빈도 · 예측이 아니라 참고", kind: "rows", data: rp.scen.map(function (s) { return [Math.round(s.p * 100) + "%", s.name + " · " + s.range, s.txt.split(".")[0], s.name.indexOf("하락") >= 0 ? NB_C.down : NB_C.up]; }), leftW: 110 });
   if (rp.hz) pages.push({ name: "단기장기", top: ["짧게 보면 [[" + rp.hz.s.stance + "]]", "길게 보면 [[" + rp.hz.l.stance + "]]"], title: "단기 · 장기 해석", sub: "단기 = 1~3개월 · 장기 = 1~3년 · 같은 숫자를 다른 시간으로", kind: "rows", data: rp.hz.s.pts.slice(0, 3).map(function (x) { return ["단기", x, "", NB_C.navy]; }).concat(rp.hz.l.pts.slice(0, 3).map(function (x) { return ["장기", x, "", NB_C.up]; })), leftW: 90 });
   if (rp.exp && rp.exp.bull.length + rp.exp.bear.length >= 2) pages.push({ name: "전문가", top: ["전문가 의견은", "[[상승 " + rp.exp.bull.length + " vs 하락 " + rp.exp.bear.length + "]]"], title: "전문가·증권사 의견 — 대립 구조", sub: "최근 기사 제목에서 상승·하락 근거를 나눠 모음 · " + rp.exp.src, kind: "rows", data: rp.exp.bull.slice(0, 4).map(function (x) { return ["▲ 상승", x.t, x.press || "", NB_C.up]; }).concat(rp.exp.bear.slice(0, 4).map(function (x) { return ["▼ 하락", x.t, x.press || "", NB_C.down]; })), leftW: 100 });
@@ -362,12 +433,15 @@ function rpExhibitHtml(e) {
   if (e.kind === "tiles") body = '<div class="rpTiles">' + e.data.map(function (t) { return '<div class="rpTile"><b>' + rpEsc(t.v) + '</b><small>' + rpEsc(t.l) + '</small></div>'; }).join("") + '</div>';
   else if (e.kind === "bars") { var mx = Math.max.apply(null, e.data.map(function (b) { return Math.abs(b.v || 0); }).concat([0.01])); body = '<div class="rpBars">' + e.data.map(function (b) { return '<div class="rpBarR"><span>' + rpEsc(b.l) + '</span>' + rpBar(b.v || 0, mx) + '<b class="' + ((b.v || 0) >= 0 ? "pos" : "neg") + '">' + rpEsc(b.txt || rpPct(b.v, 1)) + '</b></div>'; }).join("") + '</div>'; }
   else if (e.kind === "rows") body = '<div class="rpRows">' + e.data.map(function (r) { return '<div class="rpRow"><span class="rpL">' + rpEsc(r[0]) + '</span><span class="rpM">' + rpEsc(r[1]) + (r[4] ? '<small>' + rpEsc(r[4]) + '</small>' : '') + '</span><b style="color:' + (r[3] || "inherit") + '">' + rpEsc(r[2]) + '</b></div>'; }).join("") + '</div>';
-  return '<div class="rpEx"><div class="rpExH"><span class="rpExNo">Exhibit ' + String(e.no).padStart(2, "0") + '</span><b>' + rpEsc(e.title) + '</b><small>' + rpEsc(e.sub) + '</small></div>' + body + '<div class="rpRead">' + rpEsc(e.read) + '</div></div>';
+  return '<div class="rpEx" id="rpEx' + e.no + '"><div class="rpExH"><span class="rpExNo">Exhibit ' + String(e.no).padStart(2, "0") + '</span><b>' + rpEsc(e.title) + '</b><small>' + rpEsc(e.sub) + '</small></div>' + body + '<div class="rpRead">' + rpEsc(e.read) + '</div></div>';
 }
 function rpShow(pane, rp) {
   var ai = RP.ai, V = ai && ai.ok ? ai.out : null;
   var h = '<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="chip" data-rpa="back">‹ 다른 질문</button><button class="chip" data-rpa="save">💾 저장(검증용)</button><button class="chip" data-rpa="deck">🃏 Exhibit 카드 덱</button><button class="chip" data-rpa="thread">🧵 스레드 연재 글</button><button class="chip aiBtn" data-rpa="ai">' + (V ? "✨ AI 서술 다시" : "✨ AI가 다시 쓰기") + '</button></div>';
   h += '<div class="rpHead"><div class="rpKicker">' + rpEsc(rp.asOf) + ' 기준 · ' + ({ stock: "종목", market: "시장", macro: "매크로", timing: "시점" })[rp.kind] + ' 리포트</div><h3>' + rpEsc(V && V.headline || rp.title) + '</h3><div class="rpSit">' + (V && V.situation ? rpEsc(V.situation) : rp.situation.map(function (s) { return '<div>· ' + rpEsc(s) + '</div>'; }).join("")) + '</div></div>';
+  var NR = null; try { NR = rpNarrative(rp); } catch (e) { console.warn(e); }
+  if (V && V.narrative) h += '<div class="rpNar"><div class="rpNarT">종합 해석 <small>AI 서술 · 숫자는 근거 줄 그대로</small></div>' + V.narrative.split(/\n{2,}/).map(function (p) { return '<div class="rpNarS"><p>' + rpEsc(p) + '</p></div>'; }).join("") + '</div>';
+  else if (NR) h += rpNarrativeHtml(NR, rp);
   h += '<div class="rpStance ' + (rp.view.score >= 3 ? "good" : rp.view.score >= 1 ? "mid" : "low") + '"><div class="rpStL">내 생각</div><div><b>' + rpEsc(rp.view.stance) + '</b><div class="rpStT">' + rpEsc(V && V.opinion || rp.view.txt) + '</div><div class="rpWhy">근거: ' + rpEsc(rp.view.why.join(" · ")) + '</div></div></div>';
   if (rp.hz) h += '<div class="rpHz">' + [rp.hz.s, rp.hz.l].map(function (z) { return '<div class="rpHzC"><div class="rpHzL">' + rpEsc(z.label) + '</div><b>' + rpEsc(z.stance) + '</b><div class="rpHzT">' + rpEsc(z.txt) + '</div><ul>' + z.pts.map(function (x) { return '<li>' + rpEsc(x) + '</li>'; }).join("") + '</ul></div>'; }).join("") + '</div>';
   if (rp.exp) h += rpExpertHtml(rp.exp);
