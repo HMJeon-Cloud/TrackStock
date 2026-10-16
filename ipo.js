@@ -1,34 +1,27 @@
 /* ============================================================
-   공모주 (v11.3) — 관심 탭 '공모주'
-   ① 일정: 청약 예정·진행 중·상장 대기 (공모가 밴드/확정가 · 수요예측 경쟁률 · 확약 · 주관사)
-   ② 상장 결과: 공모가 대비 상장일 시가·종가 · 1개월(20거래일) · 지금
-   ③ 백테스트: '수요예측 경쟁률이 높으면 수익도 높았나' — 구간별 중앙값·승률 · 순위 상관 · 산점도
-   데이터: /api/snap?ipo=1 (DART 증권신고서·투자설명서·증권발행실적보고서 원문 + 상장 후 야후 종가) — 새 함수·크론 없음
+   공모주 (v11.3.4) — 관심 탭 '공모주'
+   ① 청약 일정: 언제(청약·상장 예정일) · 어디서(인수단 증권사) · 얼마에(밴드/확정 공모가) · 몇 주(최소 단위·증거금·일반 배정 물량)
+      + 얼마까지(참고): 상장일 가격 범위(공모가 60~400%) · 최근 1년 상장주 첫날 종가 분포
+   ② 상장 결과: 공모가 → 첫날 시가 · 첫날 종가 · 1개월(20거래일) · 지금
+   v11.3.4: 수요예측·청약 경쟁률과 경쟁률 백테스트는 뺐다 (DART 원문에 일정한 형식으로 남지 않아 대부분 비어 있었음)
+   데이터: /api/snap?ipo=1 (DART 증권신고서·투자설명서 + 상장 뒤 야후 종가) — 새 함수·크론 없음
    ============================================================ */
-var IPO = { doc: null, loading: null, tab: "sched", metric: "m1" };
-(function () { try { var j = JSON.parse(localStorage.getItem("sm.ipo") || "null"); if (j) { IPO.tab = j.tab || IPO.tab; IPO.metric = j.metric || IPO.metric; } } catch (e) {} })();
-function ipoSave() { try { localStorage.setItem("sm.ipo", JSON.stringify({ tab: IPO.tab, metric: IPO.metric })); } catch (e) {} }
-var IPO_BK = [[0, 500, "500:1 미만"], [500, 1000, "500~1,000:1"], [1000, 1500, "1,000~1,500:1"], [1500, 1e9, "1,500:1 이상"]];
-var IPO_MET = { c0: "상장일 종가", o0: "상장일 시가", m1: "1개월(20거래일)" };
+var IPO = { doc: null, loading: null, tab: "sched" };
+(function () { try { var j = JSON.parse(localStorage.getItem("sm.ipo") || "null"); if (j && (j.tab === "sched" || j.tab === "res")) IPO.tab = j.tab; } catch (e) {} })();
+function ipoSave() { try { localStorage.setItem("sm.ipo", JSON.stringify({ tab: IPO.tab })); } catch (e) {} }
+var IPO_FD = [[-9, 0, "공모가 아래"], [0, 0.5, "0~50%"], [0.5, 1, "50~100%"], [1, 2, "100~200%"], [2, 9, "200% 넘게"]];   // 첫날 종가 구간
+var IPO_DEF = { minQ: 10, depPct: 50, genPct: 25 };   // 원문에서 못 읽으면 쓰는 보통값
 
 function ipoEsc(s) { return typeof escapeHtml === "function" ? escapeHtml(s) : String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 function ipoPct(x, d) { return x == null || !isFinite(x) ? "-" : (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 1 : d) + "%"; }
 function ipoWon(v) { return v == null || !isFinite(v) ? "-" : Math.round(v).toLocaleString("ko-KR") + "원"; }
-function ipoRatio(v) { return v == null ? "-" : (v >= 100 ? Math.round(v).toLocaleString("ko-KR") : v.toFixed(1)) + ":1"; }
+function ipoNum(v) { return v == null || !isFinite(v) ? "-" : Math.round(v).toLocaleString("ko-KR"); }
 function ipoD(d) { d = String(d || ""); return d.length >= 8 ? +d.slice(4, 6) + "." + +d.slice(6, 8) : "-"; }
 function ipoToday() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, ""); }
 function ipoAdd(ymd, d) { var t = Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)) + d * 864e5; return new Date(t).toISOString().slice(0, 10).replace(/-/g, ""); }
 function ipoPrice(x) { return x.price || x.offer || null; }
 function ipoMed(a) { if (!a.length) return null; var s = a.slice().sort(function (x, y) { return x - y; }), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
-function ipoAvg(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
-/* 순위 상관(스피어만): 경쟁률 순서와 수익률 순서가 얼마나 같이 움직였나 (-1~+1) */
-function ipoSpear(xs, ys) {
-  var n = xs.length; if (n < 5) return null;
-  function rank(a) { var idx = a.map(function (v, i) { return [v, i]; }).sort(function (p, q) { return p[0] - q[0]; }), r = new Array(n); for (var i = 0; i < n;) { var j = i; while (j + 1 < n && idx[j + 1][0] === idx[i][0]) j++; for (var k = i; k <= j; k++) r[idx[k][1]] = (i + j) / 2 + 1; i = j + 1; } return r; }
-  var rx = rank(xs), ry = rank(ys), mx = ipoAvg(rx), my = ipoAvg(ry), sxy = 0, sxx = 0, syy = 0;
-  for (var i = 0; i < n; i++) { sxy += (rx[i] - mx) * (ry[i] - my); sxx += (rx[i] - mx) * (rx[i] - mx); syy += (ry[i] - my) * (ry[i] - my); }
-  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
-}
+function ipoQ(a, q) { if (!a.length) return null; var s = a.slice().sort(function (x, y) { return x - y; }), i = (s.length - 1) * q, lo = Math.floor(i); return s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo); }
 function ipoStatus(x) {
   var t = ipoToday(), s = x.sbd || [], e = s[1] || s[0];
   if (x.ret && x.ret.listDate) return ["listed", "상장"];
@@ -52,88 +45,75 @@ function ipoSched() {
   return ipoItems().filter(function (x) { var s = x.sbd; if (!s) return false; var e = s[1] || s[0]; return e >= lo && s[0] <= hi && !(x.ret && x.ret.days > 3); }).sort(function (a, b) { return a.sbd[0].localeCompare(b.sbd[0]); });
 }
 function ipoListed() { return ipoItems().filter(function (x) { return x.ret && x.ret.listDate; }).sort(function (a, b) { return b.ret.listDate.localeCompare(a.ret.listDate); }); }
-function ipoBack(metric) {
-  var S = ipoListed().filter(function (x) { return x.demand != null && x.ret[metric] != null; });
-  var bk = IPO_BK.map(function (b) { var L = S.filter(function (x) { return x.demand >= b[0] && x.demand < b[1]; }), v = L.map(function (x) { return x.ret[metric]; }); return { lab: b[2], n: L.length, med: ipoMed(v), avg: ipoAvg(v), win: L.length ? v.filter(function (r) { return r > 0; }).length / L.length : null, best: L.slice().sort(function (a, b) { return b.ret[metric] - a.ret[metric]; })[0] || null }; });
-  var rho = ipoSpear(S.map(function (x) { return x.demand; }), S.map(function (x) { return x.ret[metric]; }));
-  var Lk = S.filter(function (x) { return x.lockup != null; }), rhoL = ipoSpear(Lk.map(function (x) { return x.lockup; }), Lk.map(function (x) { return x.ret[metric]; }));
-  var from = S.length ? S.map(function (x) { return x.ret.listDate; }).sort()[0] : null;
-  return { S: S, bk: bk, rho: rho, rhoL: rhoL, nL: Lk.length, from: from };
+
+/* 청약 계산: 기준 가격(확정가, 없으면 밴드 상단) · 최소 단위 · 최소 증거금 · 일반청약 배정 물량 */
+function ipoBuy(x) {
+  var px = x.price || (x.band && x.band[1]) || x.offer || null, fixed = !!x.price || (!x.band && !!x.offer);
+  var minQ = x.minQ || IPO_DEF.minQ, dep = x.depPct || IPO_DEF.depPct, gen = x.genPct || IPO_DEF.genPct;
+  return { px: px, fixed: fixed, minQ: minQ, dep: dep, gen: gen, guess: { minQ: !x.minQ, dep: !x.depPct, gen: !x.genPct },
+    minDep: px ? px * minQ * dep / 100 : null, genShares: x.shares ? x.shares * gen / 100 : null, lo: px ? px * 0.6 : null, hi: px ? px * 4 : null };
 }
-function ipoRhoTxt(r) { if (r == null) return "표본 부족"; var a = Math.abs(r); return a < 0.1 ? "거의 관계없음" : (a < 0.3 ? "약하게 " : a < 0.5 ? "어느 정도 " : "뚜렷하게 ") + (r > 0 ? "같이 움직임" : "반대로 움직임"); }
+/* 최근 1년 상장주 첫날 종가 분포 — '얼마까지 오를까'의 참고값 (예측 아님) */
+function ipoFirstDay() {
+  var y = ipoListed().filter(function (x) { return x.ret.listDate >= ipoAdd(ipoToday(), -365) && x.ret.c0 != null; }), v = y.map(function (x) { return x.ret.c0; });
+  return { n: v.length, med: ipoMed(v), q1: ipoQ(v, 0.25), q3: ipoQ(v, 0.75), up: v.length ? v.filter(function (r) { return r > 0; }).length / v.length : null,
+    bk: IPO_FD.map(function (b) { var L = y.filter(function (x) { return x.ret.c0 >= b[0] && x.ret.c0 < b[1]; }); return { lab: b[2], n: L.length, ex: L.slice(0, 3).map(function (x) { return x.name; }) }; }) };
+}
+function ipoUw(x, max) {
+  var U = x.uw && x.uw.length ? x.uw : x.lead ? [{ n: x.lead, lead: true }] : [];
+  var tot = U.reduce(function (s, u) { return s + (u.q || 0); }, 0);
+  return U.slice(0, max || 6).map(function (u) { return u.n + (u.lead ? "(대표)" : "") + (tot && u.q && U.length > 1 ? " " + Math.round(u.q / tot * 100) + "%" : ""); });
+}
 
 /* ============================================================ 화면 ============================================================ */
 function renderIpo() {
   var box = document.getElementById("ipoBody"); if (!box) return;
   if (!IPO.doc) { box.innerHTML = '<div class="dvEmpty">공모주 기록을 불러오는 중…</div>'; ipoEnsure().then(renderIpo); return; }
-  if (IPO.doc.none || !ipoItems().length) { box.innerHTML = '<div class="dvEmpty">아직 수집된 공모주가 없어요. 매일 아침 수집이 돌면 DART 증권신고서에서 청약 일정과 경쟁률을 모으고, 상장 뒤 수익률을 쌓아요.</div>'; return; }
-  var h = '<div class="mkTabs ipoTabs">' + [["sched", "청약 일정"], ["res", "상장 결과"], ["back", "경쟁률 백테스트"]].map(function (t) { return '<button data-ipot="' + t[0] + '" class="' + (IPO.tab === t[0] ? "on" : "") + '">' + t[1] + '</button>'; }).join("") + '</div><div id="ipoPane"></div>';
+  if (IPO.doc.none || !ipoItems().length) { box.innerHTML = '<div class="dvEmpty">아직 수집된 공모주가 없어요. 매일 아침 수집이 돌면 DART 증권신고서에서 청약 일정을 모으고, 상장 뒤 가격을 쌓아요.</div>'; return; }
+  var h = '<div class="mkTabs ipoTabs">' + [["sched", "청약 일정"], ["res", "상장 결과"]].map(function (t) { return '<button data-ipot="' + t[0] + '" class="' + (IPO.tab === t[0] ? "on" : "") + '">' + t[1] + '</button>'; }).join("") + '</div><div id="ipoPane"></div>';
   box.innerHTML = h;
   Array.prototype.forEach.call(box.querySelectorAll("[data-ipot]"), function (b) { b.onclick = function () { IPO.tab = b.getAttribute("data-ipot"); ipoSave(); renderIpo(); }; });
   var pane = document.getElementById("ipoPane");
-  if (IPO.tab === "res") ipoResRender(pane); else if (IPO.tab === "back") ipoBackRender(pane); else ipoSchedRender(pane);
+  if (IPO.tab === "res") ipoResRender(pane); else ipoSchedRender(pane);
   Array.prototype.forEach.call(box.querySelectorAll("[data-ipoopen]"), function (b) { b.onclick = function () { var s = b.getAttribute("data-ipoopen"); if (typeof navTo === "function") navTo("single", "analysis"); var i = document.getElementById("searchInput"); if (i) i.value = s; if (typeof loadSymbol === "function") loadSymbol(s); }; });
 }
 function ipoName(x) { return x.sym ? '<button class="linkBtn" data-ipoopen="' + x.sym + '">' + ipoEsc(x.name) + '</button>' : '<b>' + ipoEsc(x.name) + '</b>'; }
 function ipoKpi(l, v, s) { return '<div class="kpi"><div class="kl">' + l + '</div><div class="kv">' + v + '</div>' + (s ? '<div class="kl" style="margin-top:2px">' + s + '</div>' : '') + '</div>'; }
 function ipoSchedRender(pane) {
-  var L = ipoSched(), t = ipoToday();
-  var now = L.filter(function (x) { return ipoStatus(x)[0] === "now"; }).length, soon = L.filter(function (x) { return ipoStatus(x)[0] === "soon"; }).length, wait = L.filter(function (x) { return ipoStatus(x)[0] === "wait"; }).length;
-  var h = '<div class="kpiStrip">' + ipoKpi("청약 중", now + "<small>건</small>") + ipoKpi("청약 예정 (45일)", soon + "<small>건</small>") + ipoKpi("상장 대기", wait + "<small>건</small>") + ipoKpi("쌓인 상장 기록", ipoListed().length + "<small>건</small>", "백테스트 표본") + '</div>';
-  h += L.length ? '<div class="dsList">' + L.map(function (x) {
-    var st = ipoStatus(x), p = x.price ? ipoWon(x.price) + ' <small>확정</small>' : x.band ? ipoWon(x.band[0]).replace("원", "") + "~" + ipoWon(x.band[1]) + ' <small>희망</small>' : x.offer ? ipoWon(x.offer) + ' <small>예정</small>' : "-";
-    var bits = [x.lead ? "주관 " + x.lead : "", x.demand != null ? "수요예측 " + ipoRatio(x.demand) : "수요예측 전", x.lockup != null ? "확약 " + x.lockup.toFixed(1) + "%" : "", x.sub != null ? "청약 " + ipoRatio(x.sub) : x.subP != null ? "비례 청약 " + ipoRatio(x.subP) : "", x.listPlan ? "상장 예정 " + ipoD(x.listPlan) : ""].filter(Boolean);
-    return '<div class="dsRow"><div class="dsR1"><span class="dsD">' + ipoD(x.sbd[0]) + (x.sbd[1] && x.sbd[1] !== x.sbd[0] ? "~" + ipoD(x.sbd[1]) : "") + '</span>' + ipoName(x) + '<span class="dsTag ipo-' + st[0] + '">' + st[1] + '</span><b class="dsV">' + p + '</b></div><div class="dsR2"><span>' + ipoEsc(bits.join(" · ")) + '</span>' + (x.dDoc || x.first ? '<a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=' + (x.dDoc || x.first) + '" target="_blank" rel="noopener">원문 ›</a>' : '') + '</div></div>';
+  var L = ipoSched(), F = ipoFirstDay();
+  var now = L.filter(function (x) { return ipoStatus(x)[0] === "now"; }).length, soon = L.filter(function (x) { return ipoStatus(x)[0] === "soon"; }).length;
+  var h = '<div class="kpiStrip">' + ipoKpi("청약 중", now + "<small>건</small>") + ipoKpi("청약 예정 (45일)", soon + "<small>건</small>") + ipoKpi("최근 1년 첫날 종가 중앙값", ipoPct(F.med, 0), F.n + "개 · 참고용") + ipoKpi("첫날 공모가 위로 마감", F.up == null ? "-" : Math.round(F.up * 100) + "<small>%</small>", "최근 1년") + '</div>';
+  h += L.length ? '<div class="ipoCards">' + L.map(function (x) {
+    var st = ipoStatus(x), B = ipoBuy(x), U = ipoUw(x);
+    var p = x.price ? ipoWon(x.price) + ' <small>확정</small>' : x.band ? ipoNum(x.band[0]) + "~" + ipoWon(x.band[1]) + ' <small>희망</small>' : x.offer ? ipoWon(x.offer) + ' <small>예정</small>' : "-";
+    var when = "청약 " + ipoD(x.sbd[0]) + (x.sbd[1] && x.sbd[1] !== x.sbd[0] ? "~" + ipoD(x.sbd[1]) : "") + (x.pymd ? " · 환불·납입 " + ipoD(x.pymd) : "") + (x.listPlan ? " · 상장 예정 " + ipoD(x.listPlan) : "");
+    var many = B.px ? "최소 " + B.minQ + "주" + (B.guess.minQ ? "(보통)" : "") + " = 증거금 " + ipoWon(B.minDep) + " (" + B.dep + "%" + (B.fixed ? "" : " · 밴드 상단 기준") + ")" : "공모가 나오면 계산";
+    var gen = B.genShares ? "일반청약 몫 약 " + ipoNum(B.genShares) + "주 (" + B.gen + "%" + (B.guess.gen ? " 가정" : "") + ")" : "";
+    var up = B.px ? "상장일 가격 범위 " + ipoWon(B.lo) + " ~ " + ipoWon(B.hi) + (F.n >= 5 ? " · 최근 1년 중앙값이면 약 " + ipoWon(B.px * (1 + F.med)) : "") : "";
+    function li(k, v) { return v ? '<li><b>' + k + '</b><span>' + ipoEsc(v) + '</span></li>' : ""; }
+    return '<div class="ipoCardI"><div class="dsR1"><span class="dsD">' + ipoD(x.sbd[0]) + '</span>' + ipoName(x) + '<span class="dsTag ipo-' + st[0] + '">' + st[1] + '</span><b class="dsV">' + p + '</b></div><ul class="ipoFacts">' +
+      li("언제", when) + li("어디서", U.length ? U.join(" · ") : "신고서 확인 중") + li("몇 주", many + (gen ? " · " + gen : "")) + li("참고", up) + '</ul>' +
+      (x.dDoc || x.first ? '<div class="dsR2"><span></span><a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=' + (x.dDoc || x.first) + '" target="_blank" rel="noopener">원문 ›</a></div>' : '') + '</div>';
   }).join("") + '</div>' : '<div class="dvEmpty sm">앞으로 45일 안에 청약하는 공모주가 아직 없어요.</div>';
-  h += '<details class="howto"><summary>일정 읽는 법</summary><div class="body"><ul><li>DART <b>증권신고서</b>를 낸 비상장 회사만 모았어요(스팩 제외). 청약일·공모가는 신고서 요약 정보, 경쟁률·확정가·확약은 <b>투자설명서·정정 신고서 원문</b>에서 읽었어요.</li><li><b>수요예측</b>은 기관투자자 대상이라 청약 며칠 전에 끝나요. 경쟁률·확정 공모가는 그 뒤에 채워져요.</li><li>원문 문장이 회사마다 달라 일부 숫자를 못 읽을 수 있어요. 그럴 땐 \'원문\'에서 확인해 주세요.</li></ul></div></details>';
+  if (F.n >= 5) {
+    var mx = Math.max.apply(null, F.bk.map(function (b) { return b.n; }).concat([1]));
+    h += '<div class="mkStep"><b>i</b>참고 · 최근 1년 상장주 첫날 종가 <small class="briefDim">공모가 대비 · ' + F.n + '개 · 가운데 절반은 ' + ipoPct(F.q1, 0) + ' ~ ' + ipoPct(F.q3, 0) + '</small></div><div class="ipoBk">' + F.bk.map(function (b, i) {
+      return '<div class="ipoBkR"><span class="ipoBkL">' + b.lab + '</span><span class="ipoBkBar"><i class="' + (i ? "up" : "dn") + '" style="width:' + Math.round(b.n / mx * 100) + '%"></i></span><b>' + b.n + '개</b><span class="ipoBkS">' + ipoEsc(b.ex.join(" · ")) + '</span></div>';
+    }).join("") + '</div>';
+  }
+  h += '<details class="howto"><summary>일정 읽는 법</summary><div class="body"><ul><li><b>어디서</b> — 인수단에 든 증권사 계좌로 청약해요. 대표 주관사가 보통 물량이 가장 많아요(옆 숫자 = 인수 물량 비중).</li><li><b>몇 주</b> — 최소 청약 단위만 넣어도 <b>균등배정</b>(일반 물량의 절반 이상을 청약자 수대로 나눔) 추첨 대상이에요. 인기 종목은 1주도 못 받거나 1~2주만 받는 경우가 많아요. 증거금은 청약 금액의 일부를 먼저 내고, 배정 안 된 돈은 환불일에 돌려받아요.</li><li><b>참고</b> — 2023년 6월부터 상장 첫날 가격은 공모가의 60~400% 안에서 움직여요. 중앙값은 지난 종목들의 가운데 값일 뿐 <b>이 종목의 예상가가 아니에요.</b></li><li>원문에서 못 읽은 값은 보통값(최소 10주 · 증거금 50% · 일반 몫 25%)으로 계산하고 \'보통\'·\'가정\'으로 표시했어요. 정확한 값은 \'원문\'과 증권사 공지를 확인해 주세요.</li></ul></div></details>';
   pane.innerHTML = h;
 }
 function ipoResRender(pane) {
-  var L = ipoListed().slice(0, 80);
-  var y = ipoListed().filter(function (x) { return x.ret.listDate >= ipoAdd(ipoToday(), -365); }), c0 = y.map(function (x) { return x.ret.c0; }).filter(function (v) { return v != null; }), m1 = y.map(function (x) { return x.ret.m1; }).filter(function (v) { return v != null; });
-  var h = '<div class="kpiStrip">' + ipoKpi("최근 1년 상장", y.length + "<small>개</small>") + ipoKpi("상장일 종가 중앙값", ipoPct(ipoMed(c0))) + ipoKpi("1개월 중앙값", ipoPct(ipoMed(m1))) + ipoKpi("1개월 뒤 공모가 위", m1.length ? Math.round(m1.filter(function (v) { return v > 0; }).length / m1.length * 100) + "<small>%</small>" : "-") + '</div>';
-  h += '<div class="tableWrap"><table class="dvTable ipoT"><thead><tr><th class="l">상장일 · 종목</th><th>공모가</th><th>수요예측</th><th>청약</th><th>첫날 시가</th><th>첫날 종가</th><th>1개월</th><th>지금</th></tr></thead><tbody>' + L.map(function (x) {
-    var r = x.ret; function c(v) { return '<td class="' + (v > 0 ? "pos" : v < 0 ? "neg" : "") + '">' + ipoPct(v, 0) + '</td>'; }
-    return '<tr><td class="l"><span class="dsD">' + ipoD(r.listDate) + '</span> ' + ipoName(x) + '</td><td>' + ipoWon(ipoPrice(x)) + '</td><td>' + ipoRatio(x.demand) + '</td><td>' + (x.sub != null ? ipoRatio(x.sub) : x.subP != null ? '<small>비례</small> ' + ipoRatio(x.subP) : '-') + '</td>' + c(r.o0) + c(r.c0) + c(r.m1) + c(r.last) + '</tr>';
+  var L = ipoListed().slice(0, 80), F = ipoFirstDay();
+  var y = ipoListed().filter(function (x) { return x.ret.listDate >= ipoAdd(ipoToday(), -365); }), m1 = y.map(function (x) { return x.ret.m1; }).filter(function (v) { return v != null; }), last = y.map(function (x) { return x.ret.last; }).filter(function (v) { return v != null; });
+  var h = '<div class="kpiStrip">' + ipoKpi("최근 1년 상장", y.length + "<small>개</small>") + ipoKpi("첫날 종가 중앙값", ipoPct(F.med, 0)) + ipoKpi("1개월 중앙값", ipoPct(ipoMed(m1), 0)) + ipoKpi("지금 공모가 위", last.length ? Math.round(last.filter(function (v) { return v > 0; }).length / last.length * 100) + "<small>%</small>" : "-", last.length + "개 중") + '</div>';
+  h += '<div class="tableWrap"><table class="dvTable ipoT"><thead><tr><th class="l">상장일 · 종목</th><th>공모가</th><th>첫날 시가</th><th>첫날 종가</th><th>1개월</th><th>지금</th></tr></thead><tbody>' + L.map(function (x) {
+    var r = x.ret, px = ipoPrice(x); function c(v) { return '<td class="' + (v > 0 ? "pos" : v < 0 ? "neg" : "") + '">' + (v == null ? "-" : ipoNum(px * (1 + v)) + '<small>' + ipoPct(v, 0) + '</small>') + '</td>'; }
+    return '<tr><td class="l"><span class="dsD">' + ipoD(r.listDate) + '</span> ' + ipoName(x) + '</td><td>' + ipoNum(px) + '</td>' + c(r.o0) + c(r.c0) + c(r.m1) + c(r.last) + '</tr>';
   }).join("") + '</tbody></table></div>';
-  // v11.3.2 운영자 진단: 경쟁률을 못 읽은 종목의 원문 주변 글
-  var dbg = ipoListed().concat(ipoSched()).filter(function (x) { return x.dbg; }).slice(0, 12);
-  if (dbg.length && typeof isOwner === "function" && isOwner()) h += '<details class="howto ipoDbg"><summary>경쟁률 읽기 진단 (운영자) · ' + dbg.length + '개</summary><div class="body">' + dbg.map(function (x) {
-    var d = x.dbg, part = function (k, t) { var v = d[k]; if (!v) return ""; return '<div><b>' + t + '</b> ' + ipoEsc(v.nm || "") + ' · 파일 ' + v.files + '개 · ' + (v.len || 0).toLocaleString("ko-KR") + '자' + (v.snips && v.snips.length ? '<ul>' + v.snips.map(function (z) { return '<li>' + ipoEsc(z) + '</li>'; }).join("") + '</ul>' : ' · <span class="dvWarn">N:1 꼴 숫자가 없음</span>') + '</div>'; };
-    return '<div class="ipoDbgI"><b>' + ipoEsc(x.name) + '</b>' + part("d", "수요예측 문서 (N:1 앞 글)") + part("s", "발행실적 문서 (N:1 앞 글)") + (d.list ? '<div><b>발행공시 목록</b> ' + ipoEsc(d.list.join(" / ")) + '</div>' : '') + '</div>';
-  }).join("") + '</div></details>';
-  h += '<p class="mentalNote">수익률 = 공모가 대비. 1개월은 상장 뒤 20거래일째 종가예요(아직 20일이 안 된 종목은 비어 있어요). 실제로는 배정 물량이 적고 수수료가 있어 체감 수익과 달라요.</p>';
+  h += '<p class="mentalNote">가격(원) 아래 작은 글씨 = 공모가 대비. 1개월은 상장 뒤 20거래일째 종가(아직이면 \'-\'), 지금은 최근 종가예요. 실제로는 배정 물량이 몇 주뿐이고 수수료가 있어 체감 수익과 달라요.</p>';
   pane.innerHTML = h;
-}
-function ipoBackRender(pane) {
-  var M = IPO.metric, B = ipoBack(M);
-  var h = '<div class="dvBar2"><div class="pills dvPills">' + Object.keys(IPO_MET).map(function (k) { return '<button data-ipom="' + k + '" class="' + (M === k ? "active" : "") + '">' + ({ c0: "첫날 종가", o0: "첫날 시가", m1: "1개월" })[k] + '</button>'; }).join("") + '</div></div>';
-  if (B.S.length < 8) { pane.innerHTML = h + '<div class="dvEmpty sm">경쟁률과 ' + IPO_MET[M] + ' 수익률이 모두 있는 종목이 ' + B.S.length + '개뿐이라 아직 비교하기 어려워요. 수집이 쌓이면 자동으로 채워져요.</div>'; ipoBindMet(pane); return; }
-  var hi = B.bk[3], lo = B.bk[0];
-  h += '<div class="kpiStrip">' + ipoKpi("표본", B.S.length + "<small>개</small>", (B.from ? B.from.slice(0, 4) + "." + ipoD(B.from) + " 상장부터" : "")) + ipoKpi("경쟁률과 수익 순위 상관", B.rho == null ? "-" : (B.rho > 0 ? "+" : "") + B.rho.toFixed(2), ipoRhoTxt(B.rho)) + ipoKpi(hi.lab + " 중앙값", ipoPct(hi.med), hi.n + "개") + ipoKpi(lo.lab + " 중앙값", ipoPct(lo.med), lo.n + "개") + '</div>';
-  var mx = Math.max.apply(null, B.bk.map(function (b) { return Math.abs(b.med || 0); }).concat([0.01]));
-  h += '<div class="mkStep"><b>1</b>수요예측 경쟁률 구간별 ' + IPO_MET[M] + ' 수익률 <small class="briefDim">중앙값 · 공모가 대비</small></div><div class="ipoBk">' + B.bk.map(function (b) {
-    return '<div class="ipoBkR"><span class="ipoBkL">' + b.lab + '<small>' + b.n + '개</small></span><span class="ipoBkBar"><i class="' + ((b.med || 0) >= 0 ? "up" : "dn") + '" style="width:' + Math.round(Math.abs(b.med || 0) / mx * 100) + '%"></i></span><b class="' + ((b.med || 0) >= 0 ? "pos" : "neg") + '">' + ipoPct(b.med) + '</b><span class="ipoBkS">평균 ' + ipoPct(b.avg) + ' · 공모가 위 ' + (b.win == null ? "-" : Math.round(b.win * 100) + "%") + '</span></div>';
-  }).join("") + '</div>';
-  h += '<div class="mkStep"><b>2</b>종목 하나하나 <small class="briefDim">가로 = 경쟁률(로그) · 세로 = ' + IPO_MET[M] + ' 수익률</small></div>' + ipoScatter(B.S, M);
-  var conc = hi.med != null && lo.med != null ? (hi.med > lo.med ? "경쟁률 " + hi.lab + " 구간의 " + IPO_MET[M] + " 수익률 중앙값은 " + ipoPct(hi.med) + "로, " + lo.lab + " 구간(" + ipoPct(lo.med) + ")보다 높았어요." : "경쟁률이 높았던 구간이 오히려 수익률이 낮거나 비슷했어요 (" + hi.lab + " " + ipoPct(hi.med) + " · " + lo.lab + " " + ipoPct(lo.med) + ").") : "";
-  h += '<p class="mentalNote"><b>읽는 법</b> ' + conc + ' 순위 상관은 ' + (B.rho == null ? "-" : B.rho.toFixed(2)) + '로 "' + ipoRhoTxt(B.rho) + '"이에요(+1이면 경쟁률 순서대로 수익도 높음, 0이면 무관). 같은 구간 안에서도 결과가 크게 갈렸어요(점이 위아래로 넓게 퍼짐).' + (B.rhoL != null ? ' 의무보유 확약 비율과의 상관은 ' + B.rhoL.toFixed(2) + '(' + B.nL + '개)였어요.' : '') + '</p>';
-  h += '<details class="howto"><summary>한계</summary><div class="body"><ul><li>표본이 작아요(' + B.S.length + '개). 몇 종목만 바뀌어도 숫자가 크게 움직여요.</li><li>2023년 6월부터 상장일 가격 제한이 공모가의 60~400%로 넓어져, 그 전후의 상장일 수익률은 성격이 달라요.</li><li>경쟁률이 높을수록 실제로 받는 주식 수는 적어요. 수익률이 높아도 손에 쥐는 금액은 작을 수 있어요.</li><li>스팩·상장하지 않은 공모는 뺐고, 경쟁률을 원문에서 못 읽은 종목도 빠져 있어요.</li></ul></div></details>';
-  pane.innerHTML = h; ipoBindMet(pane);
-}
-function ipoBindMet(pane) { Array.prototype.forEach.call(pane.querySelectorAll("[data-ipom]"), function (b) { b.onclick = function () { IPO.metric = b.getAttribute("data-ipom"); ipoSave(); renderIpo(); }; }); }
-/* 산점도 (SVG) — 점 하나 = 종목 하나 */
-function ipoScatter(S, M) {
-  var W = 640, H = 260, pl = 46, pr = 12, pt = 10, pb = 30, xs = S.map(function (x) { return Math.log10(Math.max(1, x.demand)); }), ys = S.map(function (x) { return x.ret[M]; });
-  var x0 = Math.floor(Math.min.apply(null, xs) * 2) / 2, x1 = Math.ceil(Math.max.apply(null, xs) * 2) / 2 || x0 + 1, y0 = Math.min(-0.2, Math.min.apply(null, ys)), y1 = Math.max(0.2, Math.max.apply(null, ys));
-  y1 = Math.min(y1, 4.5); y0 = Math.max(y0, -0.8);
-  function X(v) { return pl + (v - x0) / ((x1 - x0) || 1) * (W - pl - pr); } function Y(v) { return pt + (y1 - Math.max(y0, Math.min(y1, v))) / (y1 - y0) * (H - pt - pb); }
-  var g = '<svg class="ipoSc" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="경쟁률과 수익률 산점도">';
-  [0.5, 1, 2].concat([y0, y1]).filter(function (v, i, a) { return a.indexOf(v) === i && v >= y0 && v <= y1; }).forEach(function (v) { g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" class="gl"/><text x="' + (pl - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + ipoPct(v, 0) + '</text>'; });
-  g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" class="zl"/>';
-  for (var v = Math.ceil(x0); v <= x1; v += 0.5) g += '<text x="' + X(v) + '" y="' + (H - 10) + '" text-anchor="middle">' + Math.round(Math.pow(10, v)).toLocaleString("ko-KR") + ':1</text>';
-  S.forEach(function (x, i) { g += '<circle cx="' + X(xs[i]).toFixed(1) + '" cy="' + Y(ys[i]).toFixed(1) + '" r="4" class="' + (ys[i] >= 0 ? "u" : "d") + '"><title>' + ipoEsc(x.name) + ' · ' + ipoRatio(x.demand) + ' · ' + ipoPct(ys[i]) + '</title></circle>'; });
-  return '<div class="ipoScW">' + g + '</svg></div>';
 }
 
 /* ---------- 운영자: 지금 수집 (공모주) — 지난 2년을 나눠서 끝까지 ---------- */
@@ -161,33 +141,33 @@ function ipoRunCollect() {
 document.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("[data-ipo-run]"); if (b && !(typeof isOwner === "function" && !isOwner())) ipoRunCollect(); });
 
 /* ============================================================ 카드 (운영자) ============================================================ */
-function ipoSrc() { return "DART 증권신고서·투자설명서·증권발행실적보고서 · 야후 파이낸스 종가 · StockMind 정리"; }
+function ipoSrc() { return "DART 증권신고서·투자설명서 · 야후 파이낸스 종가 · StockMind 정리"; }
 function ipoSpec(cat, src) {
   if (src === "ipoSched" && cat === "table") {
-    var L = ipoSched().filter(function (x) { return ipoStatus(x)[0] !== "listed"; }).slice(0, 10); if (!L.length) return null;
-    return { meta: { title: "이번에 청약하는 공모주", sub: "청약일 순 · 경쟁률은 기관 수요예측 결과 (끝난 곳만)", source: ipoSrc(), catName: "공모주" },
-      spec: { cols: ["청약일", "종목", "공모가", "수요예측", "주관사"], widths: [0.17, 0.27, 0.19, 0.17, 0.2], hlCols: [3], rows: L.map(function (x) { return [ipoD(x.sbd[0]) + (x.sbd[1] && x.sbd[1] !== x.sbd[0] ? "~" + ipoD(x.sbd[1]) : ""), x.name, x.price ? ipoWon(x.price) : x.band ? Math.round(x.band[0] / 100) / 10 + "~" + Math.round(x.band[1] / 100) / 10 + "천원" : "-", x.demand != null ? ipoRatio(x.demand) : "예측 전", x.lead || "-"]; }), note: "경쟁률이 높을수록 받는 주식 수는 적어요 · 증거금은 청약 금액의 50%" } };
+    var L = ipoSched().filter(function (x) { return ipoStatus(x)[0] === "soon" || ipoStatus(x)[0] === "now"; }).slice(0, 10); if (!L.length) return null;
+    return { meta: { title: "이번에 청약하는 공모주", sub: "청약일 순 · 최소 증거금 = 최소 단위 × 공모가 × 증거금률", source: ipoSrc(), catName: "공모주" },
+      spec: { cols: ["청약일", "종목", "공모가", "최소 증거금", "주관사"], widths: [0.16, 0.26, 0.2, 0.18, 0.2], hlCols: [3], rows: L.map(function (x) { var B = ipoBuy(x); return [ipoD(x.sbd[0]) + (x.sbd[1] && x.sbd[1] !== x.sbd[0] ? "~" + ipoD(x.sbd[1]) : ""), x.name, x.price ? ipoWon(x.price) : x.band ? ipoNum(x.band[0]) + "~" + ipoNum(x.band[1]) : x.offer ? ipoWon(x.offer) : "-", B.minDep ? ipoWon(B.minDep) : "-", (x.uw && x.uw.length > 1 ? x.uw[0].n + " 외 " + (x.uw.length - 1) : x.lead) || "-"]; }), note: "밴드만 나온 종목은 상단 가격 기준 · 균등배정은 최소 단위만 넣어도 추첨 대상" } };
   }
   if (src === "ipoResult" && cat === "table") {
     var R = ipoListed().slice(0, 10); if (!R.length) return null;
-    return { meta: { title: "최근 상장한 공모주 성적", sub: "공모가 대비 · 첫날 종가와 1개월(20거래일)", source: ipoSrc(), catName: "공모주" },
-      spec: { cols: ["상장일", "종목", "수요예측", "첫날", "1개월"], widths: [0.15, 0.3, 0.19, 0.18, 0.18], hlCols: [4], rows: R.map(function (x) { return [ipoD(x.ret.listDate), x.name, ipoRatio(x.demand), ipoPct(x.ret.c0, 0), ipoPct(x.ret.m1, 0)]; }), note: "1개월이 '-'면 아직 20거래일이 안 된 종목" } };
+    return { meta: { title: "최근 상장한 공모주 성적", sub: "공모가 대비 · 첫날 시가·종가 · 1개월(20거래일) · 지금", source: ipoSrc(), catName: "공모주" },
+      spec: { cols: ["상장일", "종목", "첫날 시가", "첫날 종가", "1개월", "지금"], widths: [0.13, 0.27, 0.15, 0.15, 0.15, 0.15], hlCols: [5], rows: R.map(function (x) { return [ipoD(x.ret.listDate), x.name, ipoPct(x.ret.o0, 0), ipoPct(x.ret.c0, 0), ipoPct(x.ret.m1, 0), ipoPct(x.ret.last, 0)]; }), note: "1개월이 '-'면 아직 20거래일이 안 된 종목" } };
   }
-  if (src === "ipoBack" && cat === "table") {
-    var B1 = ipoBack("c0"), B2 = ipoBack("m1"); if (B2.S.length < 8) return null;
-    return { meta: { title: "경쟁률이 높으면 더 벌었을까", sub: "수요예측 경쟁률 구간별 · 공모가 대비 중앙값 · 표본 " + B2.S.length + "개", source: ipoSrc(), catName: "공모주" },
-      spec: { cols: ["경쟁률", "종목 수", "첫날 종가", "1개월", "1개월 공모가 위"], widths: [0.26, 0.14, 0.2, 0.18, 0.22], hlCols: [3], rows: B2.bk.map(function (b, i) { return [b.lab, b.n + "개", ipoPct(B1.bk[i].med, 0), ipoPct(b.med, 0), b.win == null ? "-" : Math.round(b.win * 100) + "%"]; }), note: "순위 상관 " + (B2.rho == null ? "-" : B2.rho.toFixed(2)) + " (" + ipoRhoTxt(B2.rho) + ") · 같은 구간 안에서도 결과가 크게 갈렸어요" } };
+  if (src === "ipoFirst" && cat === "table") {
+    var F = ipoFirstDay(); if (F.n < 8) return null;
+    return { meta: { title: "공모주, 첫날 얼마에 끝났을까", sub: "최근 1년 상장 " + F.n + "개 · 첫날 종가 (공모가 대비)", source: ipoSrc(), catName: "공모주" },
+      spec: { cols: ["첫날 종가", "종목 수", "비중", "예"], widths: [0.22, 0.14, 0.14, 0.5], hlCols: [1], rows: F.bk.map(function (b) { return [b.lab, b.n + "개", Math.round(b.n / F.n * 100) + "%", b.ex.join(" · ") || "-"]; }), note: "중앙값 " + ipoPct(F.med, 0) + " · 가운데 절반 " + ipoPct(F.q1, 0) + "~" + ipoPct(F.q3, 0) + " · 다음 종목의 예상이 아니에요" } };
   }
   return null;
 }
 (function () {
   if (typeof TPL_SOURCES === "undefined" || typeof tplSpec !== "function") return;
-  TPL_SOURCES.table.push({ id: "ipoSched", t: "공모주 청약 일정" }, { id: "ipoResult", t: "최근 상장 공모주 성적" }, { id: "ipoBack", t: "경쟁률 구간별 수익 (백테스트)" });
+  TPL_SOURCES.table.push({ id: "ipoSched", t: "공모주 청약 일정" }, { id: "ipoResult", t: "최근 상장 공모주 성적" }, { id: "ipoFirst", t: "공모주 첫날 종가 분포" });
   var s0 = tplSpec; tplSpec = function (cat, src, mk) { if (/^ipo/.test(src || "")) return ipoSpec(cat, src); return s0.apply(this, arguments); };
   var p0 = tplPrep; tplPrep = function (cat, mk, src) { if (/^ipo/.test(src || "")) return ipoEnsure(); return p0.apply(this, arguments); };
 })();
 function ipoDeckOpen() {
-  var plan = [["ipoSched", "청약일정"], ["ipoResult", "상장성적"], ["ipoBack", "경쟁률백테스트"]];
+  var plan = [["ipoSched", "청약일정"], ["ipoResult", "상장성적"], ["ipoFirst", "첫날분포"]];
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   ready.then(function () { return ipoEnsure(); }).then(function () {
     var list = []; plan.forEach(function (p) { var x = ipoSpec("table", p[0]); if (x) list.push({ cv: tplCard("table", x.meta, x.spec), name: (list.length + 1) + "_" + p[1] }); });
@@ -206,27 +186,23 @@ function ipoPlanHints() {
   if (!IPO.doc) return [];
   var t = ipoToday(), s = ipoSched().filter(function (x) { return x.sbd[0] <= ipoAdd(t, 7) && (x.sbd[1] || x.sbd[0]) >= t; }), l = ipoListed().filter(function (x) { return x.ret.listDate >= ipoAdd(t, -3); });
   if (!s.length && !l.length) return [];
-  return [{ id: "ipo", t: "🎟️ 공모주 — " + (s.length ? "이번 주 청약 " + s.length + "곳" : "") + (s.length && l.length ? " · " : "") + (l.length ? "최근 상장 " + l.length + "곳" : ""), d: "청약 직전·상장 직후가 '경쟁률 높으면 벌까?'가 가장 많이 읽히는 때", kind: "ipo" }];
+  return [{ id: "ipo", t: "🎟️ 공모주 — " + (s.length ? "이번 주 청약 " + s.length + "곳" : "") + (s.length && l.length ? " · " : "") + (l.length ? "최근 상장 " + l.length + "곳" : ""), d: "청약 직전엔 '어디서 얼마로 몇 주', 상장 직후엔 '첫날 얼마에 끝났나'가 가장 많이 읽혀요", kind: "ipo" }];
 }
 
 /* ---------- 업로드 글 (v11.0 스레드 공식) ---------- */
 function thrIpo(names) {
   if (typeof thrCompose !== "function") return [];
-  var B = ipoBack("m1"), B0 = ipoBack("c0"), S = ipoSched().filter(function (x) { return ipoStatus(x)[0] !== "listed"; }), R = ipoListed().slice(0, 5);
-  var data = B.S.length >= 8 ? B.bk.slice().reverse().map(function (b) { return b.lab + " → 1개월 " + ipoPct(b.med, 0) + " (" + b.n + "개)"; }) : R.map(function (x) { return x.name + " 첫날 " + ipoPct(x.ret.c0, 0) + " · 경쟁률 " + ipoRatio(x.demand); });
-  var LIM = ["한계도 적어둘게요.", "경쟁률이 높을수록 실제로 받는 주식은 몇 주뿐이라, 수익률이 높아도 손에 쥐는 돈은 작을 수 있어요.", "2023년 6월부터 상장 첫날 가격 제한이 바뀌어서, 그 전후 숫자는 성격이 달라요.", "표본이 " + B.S.length + "개라 몇 종목만 바뀌어도 결과가 움직입니다."];
-  var base = { summary: data.concat(S.slice(0, 3).map(function (x) { return "청약 " + ipoD(x.sbd[0]) + " " + x.name + (x.demand != null ? " · 수요예측 " + ipoRatio(x.demand) : ""); })), insights: [B.rho != null ? "경쟁률과 1개월 수익률의 순위 상관은 " + B.rho.toFixed(2) + " — " + ipoRhoTxt(B.rho) + "이었어요(1이면 완전히 같은 순서)." : "", "같은 구간 안에서도 결과가 크게 갈렸어요."].filter(Boolean),
-    cardList: (names || []).map(function (n) { return n.replace("_", " "); }), question: "공모주 청약, 경쟁률 보고 넣으시나요 아니면 일정마다 넣으시나요?", tags: ["우상향연구소", "공모주", "공모주청약", "IPO", "재테크"], foot: "DART 증권신고서·투자설명서 · 야후 종가 · 공모가 대비 · 투자 권유 아님",
-    data: data, sort: false, thFoot: "DART 공시 · 공모가 대비 · 투자 권유 아님", limit: LIM, reply: "이 결과에서 제일 의외인 건 뭐였나요?" };
+  var F = ipoFirstDay(), t7 = ipoToday(), S = ipoSched().filter(function (x) { var k = ipoStatus(x)[0]; return (k === "soon" || k === "now") && x.sbd[0] <= ipoAdd(t7, 7); }), R = ipoListed().slice(0, 5);
+  var sLines = S.slice(0, 4).map(function (x) { var B = ipoBuy(x), U = ipoUw(x, 2); return ipoD(x.sbd[0]) + " " + x.name + (B.px ? " · " + ipoWon(B.px) + (B.fixed ? "" : "(상단)") : "") + (B.minDep ? " · 최소 증거금 " + ipoWon(B.minDep) : "") + (U.length ? " · " + U[0].replace(/ \d+%$/, "") : ""); });
+  var rLines = R.map(function (x) { return x.name + " 첫날 종가 " + ipoPct(x.ret.c0, 0) + (x.ret.m1 != null ? " · 1개월 " + ipoPct(x.ret.m1, 0) : ""); });
+  var LIM = ["한계도 적어둘게요.", "인기 공모주는 최소 단위로 넣으면 1~2주, 못 받는 경우도 많아요. 수익률이 높아도 손에 쥐는 돈은 작을 수 있어요.", "지난 종목의 중앙값은 다음 종목의 예상가가 아니에요.", "증거금·최소 단위는 증권사마다 다를 수 있어 공지를 꼭 확인해 주세요."];
+  var base = { summary: sLines.concat(rLines.slice(0, 3)), insights: [F.n >= 8 ? "최근 1년 상장 " + F.n + "개의 첫날 종가 중앙값은 공모가 대비 " + ipoPct(F.med, 0) + ", 공모가 위로 끝난 비율은 " + Math.round(F.up * 100) + "%였어요." : ""].filter(Boolean),
+    cardList: (names || []).map(function (n) { return n.replace("_", " "); }), question: "공모주 청약, 최소 단위만 넣으시나요 아니면 더 넣으시나요?", tags: ["우상향연구소", "공모주", "공모주청약", "IPO", "재테크"], foot: "DART 증권신고서·투자설명서 · 야후 종가 · 공모가 대비 · 투자 권유 아님",
+    data: sLines.length ? sLines : rLines, sort: false, thFoot: "DART 공시 · 공모가 대비 · 투자 권유 아님", limit: LIM, reply: "공모주 고를 때 제일 먼저 보는 게 뭐예요?" };
   var out = [];
   function add(label, hook, ex) { var c = thrCompose(Object.assign({}, base, ex || {}, { hook: hook })); out.push({ label: label, th: c.th, r1: c.r1, r2: c.r2, ig: c.ig }); }
-  if (B.S.length >= 8) {
-    var hi = B.bk[3], lo = B.bk[0];
-    add("초보 질문형", "공모주 경쟁률이 높으면,\n수익도 높았을까요?", { ask: "최근 " + B.S.length + "개 공모주를 경쟁률 구간으로 나눠 봤어요.", interp: [hi.med != null && lo.med != null ? (hi.med > lo.med ? "높은 구간이 1개월 중앙값으로 더 좋았지만, 같은 구간 안에서도 크게 갈렸어요." : "경쟁률이 높다고 1개월 수익이 더 좋진 않았어요.") : ""] });
-    add("숫자 한 방형", ipoPct(hi.med, 0) + ".\n수요예측 " + hi.lab + " 공모주의 1개월 수익률 중앙값이에요.", { ask: "경쟁률이 낮았던 곳은 어땠을까요?", reply: "경쟁률 몇 대 1부터 관심이 가세요?" });
-  }
-  var t7 = ipoToday(), S7 = S.filter(function (x) { return x.sbd[0] <= ipoAdd(t7, 7) && (x.sbd[1] || x.sbd[0]) >= t7; });
-  if (S7.length) add("반전형", "이번 주 청약 " + S7.length + "곳.\n경쟁률이 제일 높은 곳이 제일 많이 올랐을까요?", { ask: "지난 공모주 숫자부터 확인해 볼게요." });
-  if (!out.length && R.length) add("초보 질문형", "최근 상장한 공모주,\n첫날 얼마나 올랐을까요?", { ask: "공모가 대비로 놓아봤어요." });
+  if (S.length) add("초보 질문형", "이번 주 공모주 청약 " + S.length + "곳,\n얼마 있으면 넣을 수 있을까요?", { ask: "청약일 · 공모가 · 최소 증거금 · 증권사만 정리했어요.", data: sLines });
+  if (F.n >= 8) add("숫자 한 방형", ipoPct(F.med, 0) + ".\n최근 1년 공모주의 상장 첫날 종가 중앙값이에요.", { ask: "공모가 아래로 끝난 곳은 몇 개였을까요?", data: F.bk.map(function (b) { return b.lab + " " + b.n + "개"; }), reply: "첫날에 파시나요, 더 들고 가시나요?" });
+  if (R.length) add("반전형", "첫날 올랐던 공모주,\n한 달 뒤에도 올라 있었을까요?", { ask: "최근 상장한 종목을 공모가 대비로 놓아봤어요.", data: rLines });
   return thrSafe(out);
 }

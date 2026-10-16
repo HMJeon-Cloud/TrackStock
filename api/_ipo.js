@@ -112,6 +112,14 @@ export function parseDemand(t) {
   m = t.match(/(?:매매\s*개시|상장)\s*(?:예정)?\s*일[^0-9\n]{0,20}(\d{4}\s*[.\-년]\s*\d{1,2}\s*[.\-월]\s*\d{1,2})/); if (m) { const d = parseDates(m[1])[0]; if (d) out.listPlan = d; }
   return out;
 }
+/* 청약 정보: 일반청약자 배정 비율(25~30%) · 최소 청약 단위(주) · 청약 증거금률(%) */
+export function parseSubInfo(t) {
+  t = String(t || ""); const out = {}; let m;
+  m = t.match(/일반\s*청약자[^\n]{0,80}?(2\d(?:\.\d+)?|30(?:\.0+)?)\s*%/); if (m) out.genPct = num(m[1]);
+  m = t.match(/(?:최저|최소)\s*청약\s*(?:주식\s*수|수량|단위)[^\d\n]{0,30}([\d,]{1,6})\s*주/); if (m && num(m[1]) >= 1 && num(m[1]) <= 1000) out.minQ = num(m[1]);
+  m = t.match(/청약\s*증거금(?:율|률)?[^\n]{0,60}?(\d{2,3})\s*%/); if (m && num(m[1]) >= 10 && num(m[1]) <= 100) out.depPct = num(m[1]);
+  return out;
+}
 export function parseSubProp(t) {
   const m = String(t || "").match(new RegExp("비례\\s*(?:배정|청약)?\\s*경쟁\\s*률[^0-9\\n]{0,20}" + R_RATIO)); return m && ratioOk(num(m[1])) ? num(m[1]) : null;
 }
@@ -140,7 +148,13 @@ export function parseEstk(j) {
       const a = pick(first), b = pick(last);
       out.offer0 = num(rowGet(a, ["slprc"], /prc/)); out.offer = num(rowGet(b, ["slprc"], /prc/)); out.amt = num(rowGet(b, ["slta"], /slta|amt/)); out.shares = num(rowGet(b, ["stkcnt"], /cnt/));
     }
-    if (/인수인/.test(g.title)) { const lead = L.filter((r) => /대표|주관/.test(String(r.actsen || ""))).concat(L)[0]; if (lead) out.lead = String(rowGet(lead, ["actnmn"], /nm/) || "").replace(/주식회사|\(주\)|㈜/g, "").trim().slice(0, 30); }
+    if (/인수인/.test(g.title)) {
+      const clean = (v) => String(v || "").replace(/주식회사|\(주\)|㈜/g, "").trim().slice(0, 30);
+      const lead = L.filter((r) => /대표|주관/.test(String(r.actsen || ""))).concat(L)[0]; if (lead) out.lead = clean(rowGet(lead, ["actnmn"], /nm/));
+      // 인수단 = 청약할 수 있는 증권사 (마지막 신고서 기준) · 인수 수량 비율
+      const lastNo = L[L.length - 1].rcept_no, rows = L.filter((r) => !r.rcept_no || r.rcept_no === lastNo), seen = {};
+      out.uw = rows.map((r) => ({ n: clean(rowGet(r, ["actnmn"], /nm/)), lead: /대표|주관/.test(String(r.actsen || "")), q: num(rowGet(r, ["udtcnt"], /cnt/)) })).filter((u) => u.n && !seen[u.n] && (seen[u.n] = 1)).sort((a, b) => (b.lead - a.lead) || ((b.q || 0) - (a.q || 0))).slice(0, 6);
+    }
   }
   return out;
 }
@@ -167,8 +181,8 @@ export async function collectIpo(redis, opt) {
   const prev = (await readDoc(redis)) || { items: [] }, today = kstYmd();
   // v11.3.1 지난 공모주가 빠졌던 문제: DART 목록의 법인구분(corp_cls)은 '지금' 기준이라, 이미 상장한 회사는 E(비상장)로 안 잡혔다
   //   → 법인구분 조건 없이 훑고, 지금 상장사(Y·K)는 '신고서 낸 뒤에 처음 거래가 시작됐는지'(야후 첫 거래일)로 신규 상장을 가려낸다
-  if (prev.ver !== 2 && prev.ver !== 3 && prev.ver !== 4) { prev.scan = null; prev.backfilled = false; prev.last = null; }
-  if (prev.ver !== 4) prev.items.forEach((x) => { if (x.demand == null || x.sub == null) { x.docAt = null; x.docTries = 0; x.at = null; if (x.stage === "done") x.stage = "info"; } });   // v11.3.2 원문 다시 읽기
+  if (prev.ver !== 2 && prev.ver !== 3 && prev.ver !== 4 && prev.ver !== 5) { prev.scan = null; prev.backfilled = false; prev.last = null; }
+  if (prev.ver !== 5) prev.items.forEach((x) => { ["demand", "sub", "subP", "lockup", "dbg", "demandSrc", "sDoc"].forEach((k) => delete x[k]); x.docAt = null; x.docTries = 0; if (x.stage !== "done" && x.stage !== "drop") x.at = null; });   // v11.3.4 경쟁률 항목 정리 + 청약 정보 다시 읽기
   const by = {}; prev.items.forEach((x) => { by[x.cc] = x; });
   // ① 발견 — 90일 창으로 끊어서 (회사 고유번호 없이 검색하면 3개월까지만 된다), 어디까지 훑었는지 기억
   let scan = prev.scan && !prev.scan.done ? prev.scan : null;
@@ -209,39 +223,28 @@ export async function collectIpo(redis, opt) {
       x.stage = "new"; x.tries = 0; log.found++; log.ipoFromListed = (log.ipoFromListed || 0) + 1;
       if (left() < 4000) return;
     }
-    if (x.stage === "new" || !x.sbd) {
+    const soon = x.sbd && (x.sbd[1] || x.sbd[0]) >= ymdAdd(today, -3);
+    if (x.stage === "new" || !x.sbd || (soon && !x.uw && !x.uwAt)) {   // v11.3.4 청약 앞둔 종목은 인수단(증권사)도 받는다
+      x.uwAt = today;
       const j = await getJson(DART + "estkRs.json?crtfc_key=" + key + "&corp_code=" + x.cc + "&bgn_de=" + ymdAdd(x.filed, -5) + "&end_de=" + today, tmo()); log.calls++;
       const e = parseEstk(j); Object.assign(x, Object.fromEntries(Object.entries(e).filter(([, v]) => v != null)));
       if (x.sbd) { x.stage = "info"; log.info++; } else { if (x.tries >= 4) x.stage = "drop"; return; }
       if (left() < 4000) return;   // 시간이 남으면 같은 회사의 다음 단계까지 이어서
     }
     const sEnd = x.sbd[1] || x.sbd[0];
-    // ③ 원문: 청약 시작 2일 전부터(수요예측이 끝난 뒤) 경쟁률을 찾는다 · 청약 끝난 뒤엔 발행실적보고서
-    if (today >= ymdAdd(x.sbd[0], -2) && (x.demand == null || (x.sub == null && today > sEnd)) && (x.docTries || 0) < 8 && (!x.docAt || x.docAt < today)) {
+    // ③ 원문 (v11.3.4): 경쟁률은 DART 원문에 일정한 형식으로 남지 않아 뺐다 → 청약할 사람에게 필요한 것만 읽는다
+    //    희망 공모가 밴드 · 확정 공모가 · 상장 예정일 · 일반청약자 배정 비율 · 최소 청약 단위 · 청약 증거금률 — 청약이 끝나기 전 종목만
+    if (sEnd >= ymdAdd(today, -3) && (x.docTries || 0) < 4 && (!x.docAt || x.docAt < today) && left() > 5000) {
       const j = await dartList(key, "corp_code=" + x.cc + "&bgn_de=" + ymdAdd(x.filed, -5) + "&end_de=" + today + "&pblntf_ty=C", tmo()); log.calls++;
       const L = (j.list || []).sort((a, b) => String(b.rcept_no).localeCompare(String(a.rcept_no)));
-      if (!L.length || !L.some((r) => /투자설명서|증권신고서|발행실적/.test(r.report_nm))) (x.dbg = x.dbg || {}).list = L.slice(0, 8).map((r) => r.report_nm);
-      const dDoc = L.find((r) => /투자설명서/.test(r.report_nm)) || L.find((r) => /증권신고서/.test(r.report_nm) && /정정|발행조건확정/.test(r.report_nm) && r.rcept_dt >= ymdAdd(x.sbd[0], -10));
-      const sDoc = L.find((r) => /증권발행실적보고서/.test(r.report_nm));
-      for (const [d, kind] of [[x.demand == null && dDoc, "d"], [(x.sub == null || x.demand == null) && sDoc, "s"]]) {
-        if (!d || left() < 4000) continue;
+      const d = L.find((r) => /투자설명서|증권신고서/.test(r.report_nm) && !/채무/.test(r.report_nm));
+      if (d && d.rcept_no !== x.dDoc) {
         const buf = await getRes(DART + "document.xml?crtfc_key=" + key + "&rcept_no=" + d.rcept_no, tmo()); log.calls++; log.docs++;
-        if (buf[0] !== 0x50 || buf[1] !== 0x4b) { log.errors.push(x.name + ": 원문이 zip이 아님 " + buf.slice(0, 80).toString("utf8").replace(/\s+/g, " ")); continue; }
-        const files = unzip(buf), text = files.map((f) => docText(f.data)).join("\n");
-        if (kind === "d") { const p = parseDemand(text); if (p.demand != null) x.demand = p.demand; if (p.price) x.price = p.price; if (p.band) x.band = p.band; if (p.lockup != null) x.lockup = p.lockup; if (p.listPlan) x.listPlan = p.listPlan; x.dDoc = d.rcept_no; }
-        else {
-          const s = parseSub(text); if (s != null) x.sub = s; x.sDoc = d.rcept_no;
-          const sp = parseSubProp(text); if (sp != null) x.subP = sp;   // 비례배정 경쟁률 (통합 경쟁률과 다름 — 따로 보관)
-          if (x.demand == null) { const p2 = parseDemand(text); if (p2.demand != null) { x.demand = p2.demand; x.demandSrc = "발행실적"; } if (!x.price && p2.price) x.price = p2.price; }   // v11.3.3 발행실적보고서의 '유효 경쟁률 60.49 : 1'
-        }
-        // v11.3.2 못 읽었으면 원문의 '경쟁률' 주변 글을 조금 남겨 둔다 (읽는 규칙을 실제 문장에 맞추기 위한 진단 — 운영자 화면에만 표시)
-        if ((kind === "d" && x.demand == null) || (kind === "s" && x.sub == null)) {
-          // v11.3.3 'N:1' 꼴 숫자가 어떤 말 뒤에 나오는지 (앞 150자) — 경쟁률이 실제로 어떻게 적히는지 보기 위함
-          const snips = [], re = /\d[\d,]*(?:\.\d+)?\s*(?::|대)\s*1(?![\d.,])/g; let m;
-          while ((m = re.exec(text)) && snips.length < 8) { snips.push(text.slice(Math.max(0, m.index - 150), m.index + m[0].length + 10).replace(/\s+/g, " ")); }
-          if (!snips.length) { const r2 = /수요\s*예측\s*결과\s*\|/g; let k; while ((k = r2.exec(text)) && snips.length < 2) snips.push("[표] " + text.slice(k.index, k.index + 600).replace(/\s+/g, " ")); }
-          (x.dbg = x.dbg || {})[kind] = { rcp: d.rcept_no, nm: d.report_nm, files: files.length, len: text.length, snips };
-        } else if (x.dbg) delete x.dbg[kind];
+        if (buf[0] === 0x50 && buf[1] === 0x4b) {
+          const text = unzip(buf).map((f) => docText(f.data)).join("\n"), p = parseDemand(text), q = parseSubInfo(text);
+          if (p.price) x.price = p.price; if (p.band) x.band = p.band; if (p.listPlan) x.listPlan = p.listPlan;
+          Object.assign(x, q); x.dDoc = d.rcept_no;
+        } else log.errors.push(x.name + ": 원문이 zip이 아님");
       }
       x.docTries = (x.docTries || 0) + 1; x.docAt = today;
     }
@@ -260,7 +263,7 @@ export async function collectIpo(redis, opt) {
       x.pxAt = today;
       if (!x.code && today > ymdAdd(sEnd, 120)) x.stage = "drop";
     }
-    if (x.ret && x.ret.days >= 62 && (x.sub != null || (x.docTries || 0) >= 8)) x.stage = "done";
+    if (x.ret && x.ret.days >= 62) x.stage = "done";
   }
   async function worker() {
     while (qi < todo.length && left() > 3000) {
@@ -269,10 +272,20 @@ export async function collectIpo(redis, opt) {
     }
   }
   await Promise.all([worker(), worker(), worker(), worker()]);
+  // ⑤ 지금 얼마 (v11.3.4): 1년 안에 상장한 종목은 하루 한 번 현재가만 새로 — 남는 시간에만
+  const fresh = items.filter((x) => x.stage === "done" && x.ret && x.sym && x.ret.listDate >= ymdAdd(today, -380) && (!x.pxAt || x.pxAt < today));
+  let fi = 0;
+  async function fw() {
+    while (fi < fresh.length && left() > 2500) {
+      const x = fresh[fi++], price = x.price || x.offer; x.pxAt = today;
+      try { const rows = await yahoo(x.sym, Date.now() - 10 * DAY, tmo()); log.calls++; if (rows && rows.length && price) { const z = rows[rows.length - 1]; x.ret.last = z.c / price - 1; x.ret.lastDate = kstYmd(z.t); log.fresh = (log.fresh || 0) + 1; } } catch (e) {}
+    }
+  }
+  await Promise.all([fw(), fw(), fw(), fw()]);
   const keep = ymdAdd(today, -1100);   // 3년치 보관
   const out = items.filter((x) => x.filed >= keep).map((x) => x.stage === "drop" && x.why ? { cc: x.cc, name: x.name, filed: x.filed, stage: "drop", why: x.why } : x).sort((a, b) => ((b.sbd && b.sbd[0]) || b.filed).localeCompare((a.sbd && a.sbd[0]) || a.filed));
   const remain = out.filter((x) => x.stage !== "done" && x.stage !== "drop" && x.at !== today).length;   // 오늘 아직 손 안 댄 회사
-  const doc = { ver: 4, updated: new Date().toISOString(), last: scan ? (scan.done ? scan.end : prev.last || null) : prev.last || today, scan: scan ? (scan.done ? { done: true, end: scan.end } : scan) : prev.scan, backfilled: prev.backfilled || !!(scan && scan.done && scan.back), n: out.length, items: out, log: { at: new Date().toISOString(), ...log, ms: Date.now() - t0 } };
+  const doc = { ver: 5, updated: new Date().toISOString(), last: scan ? (scan.done ? scan.end : prev.last || null) : prev.last || today, scan: scan ? (scan.done ? { done: true, end: scan.end } : scan) : prev.scan, backfilled: prev.backfilled || !!(scan && scan.done && scan.back), n: out.length, items: out, log: { at: new Date().toISOString(), ...log, ms: Date.now() - t0 } };
   await setJsonGz(redis, IPO_KEY, doc, 1200 * 86400);
   const scanDone = !scan || scan.done;
   return { ok: true, found: log.found, total: out.length, remain, done: scanDone && remain === 0, progress: scanDone ? "목록 완료" : "목록 " + scan.cur.slice(0, 4) + "." + scan.cur.slice(4, 6) + "까지", log: doc.log };
