@@ -62,12 +62,15 @@ export default async function handler(req, res) {
     if (!query) return res.status(400).json({ error: "q required" });
     // 종목명만 넣으면 잡음이 섞이므로 '주가'를 붙여 증권 기사 위주로 좁힌다
     query = query.replace(/\(.*?\)/g, "").trim() + " 주가";
+  } else if (type === "raw") {   // v11.8 리포트 '전문가 의견' 코너: 검색어 그대로 (예: "삼성전자 목표주가 투자의견")
+    query = (req.query.q || "").trim().slice(0, 60);
+    if (!query) return res.status(400).json({ error: "q required" });
   } else if (type === "market") {
     const cat = (req.query.cat || "main").trim();
     query = MARKET_QUERY[cat];
     if (!query) return res.status(400).json({ error: "unknown cat" });
   } else {
-    return res.status(400).json({ error: "type must be stock|market" });
+    return res.status(400).json({ error: "type must be stock|market|raw" });
   }
 
   try {

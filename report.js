@@ -10,7 +10,7 @@
    저장: localStorage sm.reports (운영자 브라우저)
    원칙: 이 페이지는 의견을 말한다. 다만 모든 숫자는 계산값이고, 의견·시나리오는 '과거 빈도'를 근거로 쓰며 그렇게 표시한다.
    ============================================================ */
-var RP = { tab: "new", q: null, cur: null, loading: false, hist: {}, fund: {}, ai: null, saved: [] };
+var RP = { tab: "today", q: null, cur: null, loading: false, hist: {}, fund: {}, ai: null, saved: [], today: null };
 (function () { try { RP.saved = JSON.parse(localStorage.getItem("sm.reports") || "[]"); } catch (e) { RP.saved = []; } })();
 function rpSave() { try { localStorage.setItem("sm.reports", JSON.stringify(RP.saved.slice(0, 200))); } catch (e) {} }
 var RP_DAY = 86400e3;
@@ -199,6 +199,66 @@ function rpTiming() {
     watch: ["월말 지수가 20일선 위인가", "VIX가 30을 넘는 날(추가 매수일)", "다음 달 일정(FOMC·실적)"], src: "야후 파이낸스 종가 · 달력 달 기준 · StockMind 계산", numbers: { rank: rank, up: a.up, n: a.n, med: a.med }, thr: { up: 0.03, dn: -0.03 } };
 }
 
+/* ============================================================ 전문가 · 증권사 의견 (대립 구조) ============================================================ */
+/* 네이버 뉴스 검색(공식 API)으로 '목표주가·투자의견·전망' 기사를 모아 제목 키워드로 상승/하락 근거를 나눈다 — 원문은 링크로 */
+var RP_BULL = /(상향|목표가↑|목표주가 (올|상향|높)|매수 (의견|추천|유지)|저가 매수|저평가|반등|회복|호조|사상 최대|기대|수혜|긍정|호재|최선호|톱픽|탑픽|비중 확대|강세|낙관|돌파|신고가)/;
+var RP_BEAR = /(하향|목표가↓|목표주가 (내|하향|낮)|매도 (의견|추천)|중립|비관|우려|악화|부진|리스크|둔화|적자|감익|하락|약세|경고|과열|고점|거품|버블|조정|차익실현|불확실)/;
+function rpExpertFetch(rp) {
+  if (typeof fetchNews !== "function") return Promise.resolve(null);
+  var name = rp.kind === "stock" ? rp.name : rp.kind === "market" ? (rp.sym === "^KS11" ? "코스피" : rp.sym === "SPY" ? "S&P500 미국 증시" : "나스닥") : rp.kind === "macro" ? rp.name : "증시 전망";
+  var qs = rp.kind === "stock" ? [name + " 목표주가 투자의견", name + " 증권사 전망"] : rp.kind === "market" ? [name + " 전망 증권사", name + " 애널리스트 하락 상승"] : [name + " 전망 전문가", name + " 영향 증시"];
+  return Promise.all(qs.map(function (q) { return fetchNews({ type: "raw", q: q, size: 15 }).catch(function () { return []; }); })).then(function (lists) {
+    var seen = {}, items = [];
+    lists.forEach(function (L) { (L || []).forEach(function (it) { var t = cNewsClean(it.title || ""); var key = t.slice(0, 20); if (!t || seen[key]) return; seen[key] = 1; items.push({ t: t, press: it.press || "", time: it.time || "", url: it.url || "", desc: cNewsClean(it.desc || "") }); }); });
+    var bull = [], bear = [], mixed = [];
+    items.forEach(function (x) { var b = RP_BULL.test(x.t + " " + x.desc.slice(0, 80)), r = RP_BEAR.test(x.t + " " + x.desc.slice(0, 80)); if (b && !r) bull.push(x); else if (r && !b) bear.push(x); else if (b && r) mixed.push(x); });
+    var tp = []; items.forEach(function (x) { var m = (x.t + " " + x.desc).match(/목표(?:주)?가[^\d]{0,14}(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(만\s*원|원|달러|\$)/); if (m) { var v = parseFloat(m[1].replace(/,/g, "")); if (/만/.test(m[2])) v *= 1e4; if (v > 0) tp.push(v); } });
+    return { n: items.length, bull: bull.slice(0, 6), bear: bear.slice(0, 6), mixed: mixed.slice(0, 4), tp: tp.length ? { n: tp.length, med: rpMed(tp), lo: Math.min.apply(null, tp), hi: Math.max.apply(null, tp) } : null, src: "네이버 뉴스 검색 · 최근 기사 " + items.length + "건", at: new Date().toISOString() };
+  });
+}
+function rpExpertHtml(E) {
+  var tot = E.bull.length + E.bear.length, bp = tot ? Math.round(E.bull.length / tot * 100) : 50;
+  function li(x, cls) { return '<li class="' + cls + '"><a href="' + rpEsc(x.url) + '" target="_blank" rel="noopener">' + rpEsc(x.t) + '</a><small>' + rpEsc(x.press) + (x.time ? " · " + rpEsc(String(x.time).slice(0, 10)) : "") + '</small></li>'; }
+  var h = '<div class="mkStep"><b>E</b>전문가 · 증권사는 어떻게 보나 <small class="briefDim">' + rpEsc(E.src) + ' · 제목 키워드로 자동 분류</small></div>';
+  h += '<div class="rpDebate"><div class="rpDbBar"><i style="width:' + bp + '%"></i></div><div class="rpDbH"><span class="pos">▲ 상승 근거 ' + E.bull.length + '</span><span class="neg">▼ 하락 근거 ' + E.bear.length + '</span></div>';
+  h += '<div class="rpDbCols"><ul>' + (E.bull.length ? E.bull.map(function (x) { return li(x, "b"); }).join("") : '<li class="briefDim">상승 쪽 기사가 없어요</li>') + '</ul><ul>' + (E.bear.length ? E.bear.map(function (x) { return li(x, "r"); }).join("") : '<li class="briefDim">하락 쪽 기사가 없어요</li>') + '</ul></div>';
+  if (E.tp) h += '<div class="rpDbTp">기사에 나온 목표주가 ' + E.tp.n + '건 · 중앙값 <b>' + rpNum(E.tp.med) + '원</b> (' + rpNum(E.tp.lo) + ' ~ ' + rpNum(E.tp.hi) + '원)</div>';
+  h += '<div class="rpDbQ">' + (tot < 2 ? "의견을 나눌 만큼 기사가 모이지 않았어요." : bp >= 70 ? "전문가 의견은 상승 쪽으로 기울어 있어요. 다들 같은 쪽을 볼 때가 오히려 조심할 때이기도 해요 — 하락 근거 " + E.bear.length + "개를 먼저 읽어 보세요." : bp <= 30 ? "전문가 의견은 하락 쪽이 많아요. 비관이 가장 짙을 때가 저점이었던 적이 많지만, 근거가 '이익 감소'라면 가볍게 볼 수 없어요." : "상승과 하락 근거가 팽팽해요. 이럴 땐 '어느 쪽이 맞나'보다 '내가 틀리면 얼마를 잃나'로 비중을 정하는 게 나아요.") + '<br><b>여러분은 어느 쪽인가요?</b></div></div>';
+  return h;
+}
+
+/* ============================================================ 단기 · 장기 해석 ============================================================ */
+/* 단기(1~3개월): 과매도·20일선·변동성·3개월 분포 / 장기(1~3년): 낙폭 깊이·밸류·장기 승률·구조 */
+function rpHorizon(rp) {
+  var N = rp.numbers || {}, k = rp.kind, S = { label: "단기 (1~3개월)", stance: "", txt: "", pts: [] }, L = { label: "장기 (1~3년)", stance: "", txt: "", pts: [] };
+  if (k === "stock" || k === "market") {
+    var rows = rpRows(rp.sym), tech = rows.length ? rpTech(rows) : null, sim = rows.length ? rpSimilar(rows, Math.min(N.cur || -0.1, -0.1)) : null;
+    var sS = 0;
+    if (tech) { if (tech.rsi < 30) { sS += 2; S.pts.push("RSI " + tech.rsi.toFixed(0) + " — 과매도, 되돌림(반등)이 자주 나오는 자리"); } else if (tech.rsi > 70) { sS -= 2; S.pts.push("RSI " + tech.rsi.toFixed(0) + " — 과열, 단기 쉬어갈 가능성"); } else S.pts.push("RSI " + tech.rsi.toFixed(0) + " — 중립");
+      if (tech.last > tech.ma20) { sS += 1; S.pts.push("20일선 위 — 단기 추세는 살아 있음"); } else { sS -= 1; S.pts.push("20일선 아래(" + rpPct(tech.last / tech.ma20 - 1, 1) + ") — 단기 추세 약함, 20일선 회복이 첫 확인 신호"); }
+      S.pts.push("하루 평균 변동 " + (tech.dayVol * 100).toFixed(1) + "% — 한 달이면 ±" + Math.round(tech.dayVol * 100 * 4.5) + "% 정도는 '평소'"); }
+    if (sim && sim.m3 != null) { S.pts.push("비슷한 낙폭 뒤 3개월 중앙값 " + rpPct(sim.m3, 0) + " · 6개월 " + rpPct(sim.m6, 0)); if (sim.m3 > 0.03) sS += 1; }
+    S.stance = sS >= 2 ? "단기 반등 가능성 우세" : sS <= -2 ? "단기 약세 · 쫓지 않기" : "단기 방향 불명확";
+    S.txt = sS >= 2 ? "짧게 보면 되돌림이 나올 자리다. 다만 반등을 노린 매매는 손절 기준이 있어야 한다 — 20일선 아래로 다시 밀리면 접는다." : sS <= -2 ? "짧게는 불리하다. 지금 들어가면 몇 주 동안 평가손을 볼 확률이 높다. 급할 이유가 없다." : "짧게는 동전 던지기에 가깝다. 단기 수익을 기대하고 들어갈 자리는 아니고, 분할의 '첫 번째 몫'으로만.";
+    var lS = 0;
+    if (N.cur != null && N.avgMdd != null) { if (N.cur <= N.avgMdd * 1.5) { lS += 2; L.pts.push("평소 해 최대 낙폭의 " + (N.cur / N.avgMdd).toFixed(1) + "배 — 길게 보면 드문 가격"); } else if (N.cur <= -0.2) { lS += 1; L.pts.push("고점 대비 " + rpPct(N.cur, 0) + " — 길게 보면 나쁘지 않은 출발점"); } else L.pts.push("고점 근처 — 길게 봐도 '싸다'고는 못 함"); }
+    else if (N.cur != null) { if (N.cur <= -0.2) { lS += 2; L.pts.push("약세장 구간 — 지수의 장기 승률이 가장 높았던 구간"); } else if (N.cur <= -0.1) { lS += 1; L.pts.push("조정 구간"); } else L.pts.push("고점 근처"); }
+    if (N.simN >= 3) { L.pts.push("비슷한 위치에서 1년 뒤 상승 " + N.simUp + "/" + N.simN + " · 중앙값 " + rpPct(N.simMed, 0)); if (N.simUp / N.simN >= 0.7) lS += 1; else if (N.simUp / N.simN < 0.5) lS -= 1; }
+    if (N.fwdPer) { L.pts.push("올해 예상 PER " + N.fwdPer.toFixed(1) + "배" + (N.per ? " (최근 실적 " + N.per.toFixed(1) + "배)" : "")); if (N.per && N.fwdPer < N.per * 0.6) lS += 1; }
+    if (k === "market") { L.pts.push("지수는 종목과 달리 0이 되지 않는다 — 시간을 아군으로 쓸 수 있는 자산"); lS += 1; }
+    if (k === "stock" && tech && tech.ma200 && tech.last < tech.ma200) L.pts.push("200일선 아래 — 장기 추세는 아직 꺾인 상태, 돌아서는 데 몇 달");
+    L.stance = lS >= 3 ? "장기 매력 높음" : lS >= 1 ? "장기 보통 · 나눠서" : "장기 근거 부족";
+    L.txt = lS >= 3 ? "길게 보면 지금은 좋은 출발점이다. 1~3년을 보고 금액을 정해 나눠 담으면 단기 흔들림은 비용이 아니라 기회가 된다." + (k === "stock" ? " 단, 종목은 이익이 깎이면 이야기가 달라진다 — 분기마다 예상 EPS를 확인한다." : "") : lS >= 1 ? "길게 보면 나쁘지 않지만 특별히 싸지도 않다. 정액 적립을 유지하고, 큰 추가 매수는 더 빠질 때로 미룬다." : "길게 봐도 지금 서둘러 살 근거가 약하다. 오르면 못 산 것이고, 그래도 괜찮다 — 다음 기회는 늘 온다.";
+  } else if (k === "macro") {
+    S.stance = "단기: 헤드라인 변동"; S.txt = "매크로 조건은 발표 직후 며칠 흔들리고 지나간다. 단기 대응은 하지 않는 게 낫다."; S.pts = ["발표·돌파 당일 변동은 보통 1~2주 안에 되돌아옴", "환율·금리는 주가보다 느리게 움직인다"];
+    L.stance = N.ksN >= 3 && N.ksMed != null ? (N.ksMed >= 0.05 ? "장기: 평소보다 좋았음" : N.ksMed <= -0.05 ? "장기: 평소보다 나빴음" : "장기: 평소와 비슷") : "장기: 표본 부족"; L.txt = N.ksN ? "이 조건 뒤 1년 코스피 중앙값 " + rpPct(N.ksMed, 0) + " (" + N.ksUp + "/" + N.ksN + "). 금리·환율은 6~12개월 뒤 실적과 수급에 반영된다." : "사례가 적어 장기 결론을 내기 어렵다."; L.pts = ["금리 인하 '시작'과 '장기금리 하락'은 다르다", "환율은 1년 뒤 대체로 되돌아오는 경향"];
+  } else if (k === "timing") {
+    S.stance = N.rank <= 4 ? "단기: 유리한 달" : N.rank >= 9 ? "단기: 약한 달" : "단기: 중립"; S.txt = "이번 달 오른 해 " + N.up + "/" + N.n + " · 중앙값 " + rpPct(N.med, 1) + ". 한 달 결과는 계절성보다 그달의 사건이 정한다."; S.pts = ["계절성은 추가 매수 '시점' 참고용", "급락일엔 계절과 상관없이 산다"];
+    L.stance = "장기: 시점보다 기간"; L.txt = "10년 단위로 보면 어느 달에 샀는지는 결과에 거의 영향이 없었다. 몇 년을 들고 있었는지가 결정했다."; L.pts = ["최악의 날 뒤 1년은 대부분 상승", "가장 좋은 10일을 놓치면 수익의 절반이 사라진다"];
+  }
+  return { s: S, l: L };
+}
+
 /* ============================================================ 질문 후보 (오늘 데이터로 자동) ============================================================ */
 function rpQuestions() {
   var Q = [], R = typeof briefState !== "undefined" && briefState.result, S = R ? (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); }) : [];
@@ -213,7 +273,7 @@ function rpQuestions() {
 function rpBuild(q) {
   var need = q.kind === "stock" ? [q.sym] : q.kind === "market" ? [q.sym, "^VIX"] : q.kind === "timing" ? ["SPY", "^KS11"] : [];
   var p = rpLoad(need).then(function () { return q.kind === "stock" ? rpFund(q.sym) : null; }).then(function () { return q.kind === "macro" && typeof macroEnsure === "function" ? macroEnsure().then(function (d) { return d && !d.none ? macPxLoad() : null; }) : null; });
-  return p.then(function () { var rp = q.kind === "stock" ? rpStock(q.sym) : q.kind === "market" ? rpMarket(q.sym) : q.kind === "macro" ? rpMacro(q.arg) : rpTiming(); if (!rp) throw new Error("이 질문에 필요한 데이터가 부족해요(과거 주가가 짧거나 아직 안 받음)"); rp.made = new Date().toISOString(); return rp; });
+  return p.then(function () { var rp = q.kind === "stock" ? rpStock(q.sym) : q.kind === "market" ? rpMarket(q.sym) : q.kind === "macro" ? rpMacro(q.arg) : rpTiming(); if (!rp) throw new Error("이 질문에 필요한 데이터가 부족해요(과거 주가가 짧거나 아직 안 받음)"); rp.made = new Date().toISOString(); try { rp.hz = rpHorizon(rp); } catch (e) { rp.hz = null; } return rp; });
 }
 
 /* ============================================================ 회상 · 검증 ============================================================ */
@@ -235,6 +295,8 @@ function rpThreadSeries(rp) {
   L.push(rp.title + "\n\n" + rp.situation.join("\n") + "\n\n아래에 번호로 이어 씁니다.");
   rp.exhibits.forEach(function (e) { L.push((++n) + ". " + e.title + "\n" + e.read.replace(/\s+/g, " ")); });
   if (rp.scen.length) L.push((++n) + ". 앞으로 1년, 과거 빈도로 보면\n" + rp.scen.map(function (s) { return s.name + " " + Math.round(s.p * 100) + "% (" + s.range + ")"; }).join("\n"));
+  if (rp.hz) { L.push((++n) + ". 짧게 보면 — " + rp.hz.s.stance + "\n" + rp.hz.s.txt); L.push((++n) + ". 길게 보면 — " + rp.hz.l.stance + "\n" + rp.hz.l.txt); }
+  if (rp.exp && rp.exp.bull.length + rp.exp.bear.length >= 2) L.push((++n) + ". 전문가들은 — 상승 " + rp.exp.bull.length + " vs 하락 " + rp.exp.bear.length + "\n" + rp.exp.bull.slice(0, 2).map(function (x) { return "▲ " + x.t; }).concat(rp.exp.bear.slice(0, 2).map(function (x) { return "▼ " + x.t; })).join("\n"));
   L.push((++n) + ". 내 생각 — " + rp.view.stance + "\n" + rp.view.txt);
   L.push((++n) + ". 그래서\n" + rp.view.plan.map(function (p, i) { return "· " + p; }).join("\n"));
   L.push((++n) + ". 생각을 바꿀 조건\n" + rp.watch.map(function (w) { return "· " + w; }).join("\n") + "\n\n(" + rp.src + " · 개인 의견이며 투자 권유 아님)");
@@ -260,6 +322,8 @@ function rpAiWrite(rp) {
 function rpDeck(rp) {
   var pages = rp.exhibits.map(function (e) { return { name: "Exhibit" + e.no, top: [e.title.indexOf(",") > 0 ? e.title.split(",")[0] + "," : e.title, "[[" + e.big + "]]", "", e.read.split(/(?<=\.)\s/)[0]], title: "Exhibit " + String(e.no).padStart(2, "0") + " · " + e.title, sub: e.sub, kind: e.kind, data: e.kind === "tiles" ? { tiles: e.data } : e.data, note: e.read, foot: rp.src + " · 투자 권유 아님" }; });
   if (rp.scen.length) pages.push({ name: "시나리오", top: ["앞으로 1년, 과거 빈도로 보면", "[[" + rp.scen[0].name + " " + Math.round(rp.scen[0].p * 100) + "%]]"], title: "시나리오 — 과거 비슷한 상황의 결과 분포", sub: "확률 = 과거 사례 빈도 · 예측이 아니라 참고", kind: "rows", data: rp.scen.map(function (s) { return [Math.round(s.p * 100) + "%", s.name + " · " + s.range, s.txt.split(".")[0], s.name.indexOf("하락") >= 0 ? NB_C.down : NB_C.up]; }), leftW: 110 });
+  if (rp.hz) pages.push({ name: "단기장기", top: ["짧게 보면 [[" + rp.hz.s.stance + "]]", "길게 보면 [[" + rp.hz.l.stance + "]]"], title: "단기 · 장기 해석", sub: "단기 = 1~3개월 · 장기 = 1~3년 · 같은 숫자를 다른 시간으로", kind: "rows", data: rp.hz.s.pts.slice(0, 3).map(function (x) { return ["단기", x, "", NB_C.navy]; }).concat(rp.hz.l.pts.slice(0, 3).map(function (x) { return ["장기", x, "", NB_C.up]; })), leftW: 90 });
+  if (rp.exp && rp.exp.bull.length + rp.exp.bear.length >= 2) pages.push({ name: "전문가", top: ["전문가 의견은", "[[상승 " + rp.exp.bull.length + " vs 하락 " + rp.exp.bear.length + "]]"], title: "전문가·증권사 의견 — 대립 구조", sub: "최근 기사 제목에서 상승·하락 근거를 나눠 모음 · " + rp.exp.src, kind: "rows", data: rp.exp.bull.slice(0, 4).map(function (x) { return ["▲ 상승", x.t, x.press || "", NB_C.up]; }).concat(rp.exp.bear.slice(0, 4).map(function (x) { return ["▼ 하락", x.t, x.press || "", NB_C.down]; })), leftW: 100 });
   pages.push({ name: "내생각", top: ["내 생각:", "[[" + rp.view.stance + "]]", "", rp.view.txt.split(/(?<=\.)\s/)[0]], title: "결론과 행동안", sub: "근거: " + rp.view.why.join(" · "), kind: "text", data: { paras: [rp.view.txt].concat(rp.view.plan.map(function (p) { return "· " + p; })), after: ["생각을 바꿀 조건", rp.watch.slice(0, 2).join(" · ")] } });
   return hubDraw({ small: rp.asOf + " 기준 · 리포트", hook: rp.title.split(", ").length > 1 ? [rp.title.split(", ")[0] + ",", "[[" + rp.title.split(", ").slice(1).join(", ") + "]]"] : [rp.title], lead: rp.situation.join(" "), meta: rp.src + " · 개인 의견이며 투자 권유 아님", pages: pages, close: ["여러분은 어떻게 보시나요?", ["저장해 두고 3개월 뒤", "이 리포트의 결론을 다시 채점해 보세요."]], foot: rp.src + " · 투자 권유 아님" });
 }
@@ -270,11 +334,11 @@ function renderReport() {
   if (!(typeof isOwner === "function" && isOwner())) { box.innerHTML = '<div class="dvEmpty">운영자 전용 페이지예요.</div>'; return; }
   if (typeof briefState !== "undefined" && !briefState.result && typeof loadBrief === "function" && !RP.warm) { RP.warm = true; try { loadBrief(false); } catch (e) {} setTimeout(renderReport, 2500); }
   if (typeof macroEnsure === "function" && !RP.macroWarm) { RP.macroWarm = true; macroEnsure().then(function (d) { return d && !d.none ? macPxLoad() : null; }).then(function () { if (currentTab === "report" && RP.tab === "new" && !RP.cur) renderReport(); }); }
-  var h = '<div class="mkTabs rpTabs">' + [["new", "새 리포트"], ["saved", "회상 · 검증 (" + RP.saved.length + ")"]].map(function (t) { return '<button data-rpt="' + t[0] + '" class="' + (RP.tab === t[0] ? "on" : "") + '">' + t[1] + '</button>'; }).join("") + '</div><div id="rpPane"></div>';
+  var h = '<div class="mkTabs rpTabs">' + [["today", "오늘의 리포트"], ["new", "질문 고르기"], ["saved", "회상 · 검증 (" + RP.saved.length + ")"]].map(function (t) { return '<button data-rpt="' + t[0] + '" class="' + (RP.tab === t[0] ? "on" : "") + '">' + t[1] + '</button>'; }).join("") + '</div><div id="rpPane"></div>';
   box.innerHTML = h;
   Array.prototype.forEach.call(box.querySelectorAll("[data-rpt]"), function (b) { b.onclick = function () { RP.tab = b.getAttribute("data-rpt"); renderReport(); }; });
   var pane = document.getElementById("rpPane");
-  if (RP.tab === "saved") rpSavedRender(pane); else if (RP.cur) rpShow(pane, RP.cur); else rpPick(pane);
+  if (RP.tab === "saved") rpSavedRender(pane); else if (RP.cur) rpShow(pane, RP.cur); else if (RP.tab === "today") rpTodayRender(pane); else rpPick(pane);
 }
 function rpPick(pane) {
   var Q = rpQuestions();
@@ -290,7 +354,7 @@ function rpPick(pane) {
 function rpGo(q, btn) {
   var old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "계산 중…"; btn.disabled = true; }
   RP.ai = null;
-  rpBuild(q).then(function (rp) { RP.cur = rp; RP.tab = "new"; renderReport(); window.scrollTo({ top: 0, behavior: "smooth" }); }).catch(function (e) { alert("리포트를 만들지 못했어요: " + e.message); if (btn) { btn.textContent = old; btn.disabled = false; } });
+  rpBuild(q).then(function (rp) { RP.cur = rp; RP.tab = "new"; renderReport(); window.scrollTo({ top: 0, behavior: "smooth" }); rpExpertFetch(rp).then(function (E) { if (E && RP.cur === rp) { rp.exp = E; renderReport(); } }).catch(function () {}); }).catch(function (e) { alert("리포트를 만들지 못했어요: " + e.message); if (btn) { btn.textContent = old; btn.disabled = false; } });
 }
 function rpBar(v, max) { var w = Math.min(100, Math.abs(v) / (max || 1) * 100); return '<span class="rpBarW"><i class="' + (v >= 0 ? "up" : "dn") + '" style="width:' + w.toFixed(1) + '%"></i></span>'; }
 function rpExhibitHtml(e) {
@@ -305,6 +369,8 @@ function rpShow(pane, rp) {
   var h = '<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="chip" data-rpa="back">‹ 다른 질문</button><button class="chip" data-rpa="save">💾 저장(검증용)</button><button class="chip" data-rpa="deck">🃏 Exhibit 카드 덱</button><button class="chip" data-rpa="thread">🧵 스레드 연재 글</button><button class="chip aiBtn" data-rpa="ai">' + (V ? "✨ AI 서술 다시" : "✨ AI가 다시 쓰기") + '</button></div>';
   h += '<div class="rpHead"><div class="rpKicker">' + rpEsc(rp.asOf) + ' 기준 · ' + ({ stock: "종목", market: "시장", macro: "매크로", timing: "시점" })[rp.kind] + ' 리포트</div><h3>' + rpEsc(V && V.headline || rp.title) + '</h3><div class="rpSit">' + (V && V.situation ? rpEsc(V.situation) : rp.situation.map(function (s) { return '<div>· ' + rpEsc(s) + '</div>'; }).join("")) + '</div></div>';
   h += '<div class="rpStance ' + (rp.view.score >= 3 ? "good" : rp.view.score >= 1 ? "mid" : "low") + '"><div class="rpStL">내 생각</div><div><b>' + rpEsc(rp.view.stance) + '</b><div class="rpStT">' + rpEsc(V && V.opinion || rp.view.txt) + '</div><div class="rpWhy">근거: ' + rpEsc(rp.view.why.join(" · ")) + '</div></div></div>';
+  if (rp.hz) h += '<div class="rpHz">' + [rp.hz.s, rp.hz.l].map(function (z) { return '<div class="rpHzC"><div class="rpHzL">' + rpEsc(z.label) + '</div><b>' + rpEsc(z.stance) + '</b><div class="rpHzT">' + rpEsc(z.txt) + '</div><ul>' + z.pts.map(function (x) { return '<li>' + rpEsc(x) + '</li>'; }).join("") + '</ul></div>'; }).join("") + '</div>';
+  if (rp.exp) h += rpExpertHtml(rp.exp);
   h += '<div class="mkStep"><b>1</b>증거 <small class="briefDim">Exhibit ' + rp.exhibits.length + '개 · 모두 앱 데이터 계산값</small></div>' + rp.exhibits.map(rpExhibitHtml).join("");
   if (V && V.interpretation && V.interpretation.length) h += '<div class="rpAiBox"><b>AI 해석</b><ul>' + V.interpretation.map(function (x) { return '<li>' + rpEsc(x) + '</li>'; }).join("") + '</ul></div>';
   if (rp.scen.length) h += '<div class="mkStep"><b>2</b>앞으로 1년 <small class="briefDim">과거 비슷한 상황의 결과 분포 — 예측이 아니라 빈도</small></div><div class="rpScen">' + rp.scen.map(function (s) { return '<div class="rpScR"><span class="rpScP">' + Math.round(s.p * 100) + '%</span><div><b>' + rpEsc(s.name) + ' <small>' + rpEsc(s.range) + '</small></b><div class="briefDim">' + rpEsc(V && V.forecast && V.forecast[s.name] || s.txt) + '</div></div><span class="rpScBar"><i style="width:' + Math.round(s.p * 100) + '%"></i></span></div>'; }).join("") + '</div>';
@@ -322,6 +388,33 @@ function rpAction(a, btn) {
   if (a === "thread") { var T = rpThreadSeries(rp), box = document.createElement("div"); box.innerHTML = '<div class="briefDim" style="margin-bottom:8px">본문 1개 + 번호 답글 — 참고한 연재 형식(1. 2. 3. …). 한 칸씩 복사해서 답글로 이어 올리세요.</div>' + T.map(function (t, i) { return '<div class="thrPart"><div class="thrLbl"><b>' + (i ? "답글 " + i : "본문") + '</b><span class="thrCnt">' + t.length + ' / 500자</span><button class="chip thrCopy">복사</button></div><textarea class="thrText" spellcheck="false">' + rpEsc(t) + '</textarea></div>'; }).join("") + '<div class="thrPart"><div class="thrLbl"><b>인스타 캡션</b><button class="chip thrCopy">복사</button></div><textarea class="thrText" spellcheck="false">' + rpEsc(rpCaption(rp)) + '</textarea></div>'; Array.prototype.forEach.call(box.querySelectorAll(".thrCopy"), function (b) { b.onclick = function () { chCopy(b.parentNode.nextSibling.value, b); }; }); infoModal.open("스레드 연재 · " + rp.title, box); return; }
   if (a === "deck") { var old = btn.textContent; btn.textContent = "만드는 중…"; hubFonts(function () { return rpDeck(rp); }).then(function (list) { btn.textContent = old; hubShow(rp.title, list, { note: "Exhibit 카드 덱 — 표지 · 증거 " + rp.exhibits.length + "장 · 시나리오 · 내 생각 · 마무리. 카드에는 숫자와 해석을, 의견은 '내 생각' 장에만.", thr: [] }); }).catch(function (e) { btn.textContent = old; alert("덱을 만들지 못했어요: " + e.message); }); return; }
   if (a === "ai") { var o2 = btn.textContent; btn.textContent = "AI 쓰는 중…"; btn.disabled = true; rpAiWrite(rp).then(function (j) { RP.ai = j; renderReport(); }).catch(function (e) { RP.ai = { ok: false, reason: e.message }; renderReport(); }); return; }
+}
+/* 오늘의 리포트 — 시장 상황으로 질문을 자동 고르고(점수), 하루 한 번 계산 · 상황이 바뀌면 다음 날 자동으로 다른 리포트 */
+function rpTodayPicks() {
+  var Q = rpQuestions(), R = typeof briefState !== "undefined" && briefState.result, now = typeof nbNow === "function" ? nbNow() : { match: {}, why: [] };
+  var vix = R && (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], v = vix ? parseFloat(vix.v) : 0, ks = typeof nbStat === "function" ? nbStat("^KS11") : null, sp = typeof nbStat === "function" ? nbStat("SPY") : null, dd = new Date(Date.now() + 9 * 3600e3).getUTCDate();
+  Q.forEach(function (q) {
+    var s = 1, why = [];
+    if (q.kind === "market") { var st = q.sym === "^KS11" ? ks : sp; if (st && st.vsHi <= -0.2) { s += 4; why.push("약세장 구간(" + rpPct(st.vsHi, 0) + ")"); } else if (st && st.vsHi <= -0.1) { s += 3; why.push("조정 구간(" + rpPct(st.vsHi, 0) + ")"); } else if (st && st.vsHi >= -0.02) { s += 1; why.push("고점 근처 — '쫓아가도 되나'"); } if (v >= 25) { s += 2; why.push("VIX " + v.toFixed(0)); } if (q.sym === "^KS11") s += 0.5; }
+    if (q.kind === "stock") { s += /지금 인기/.test(q.d) ? 2 : 1; if (/크게 빠짐/.test(q.d)) { s += 2; why.push("고점 대비 30% 이상 하락"); } else why.push("지금 가장 많이 찾는 종목"); }
+    if (q.kind === "macro") { s += 3; why.push("지금 해당하는 매크로 조건"); }
+    if (q.kind === "timing") { s += dd <= 5 ? 3 : dd >= 26 ? 2 : 0; why.push(dd <= 5 ? "월초" : dd >= 26 ? "월말 — 다음 달 미리보기" : "월중"); }
+    if (now.why.length && (q.kind === "market" || q.kind === "macro")) { s += 1; why.push("국면 신호 " + now.why.length + "개"); }
+    q.score = s; q.pickWhy = why.join(" · ") || q.why;
+  });
+  var out = [], kinds = {}; Q.sort(function (a, b) { return b.score - a.score; }).forEach(function (q) { if (out.length >= 4) return; kinds[q.kind] = (kinds[q.kind] || 0) + 1; if (kinds[q.kind] > 2) return; out.push(q); });
+  return out;
+}
+function rpTodayRender(pane) {
+  var day = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), R = typeof briefState !== "undefined" && briefState.result;
+  if (!R) { pane.innerHTML = '<div class="dvEmpty sm">시장 데이터를 불러오는 중… 잠시 뒤 다시 열어 주세요.</div>'; return; }
+  var picks = rpTodayPicks(), ready = RP.today && RP.today.day === day && RP.today.list.length;
+  var h = '<div class="briefDim" style="margin-bottom:8px">오늘 시장 신호(고점 대비 · VIX · 매크로 조건 · 인기 종목 · 월초/월말)로 질문 ' + picks.length + '개를 자동으로 골랐어요. 내일 시장이 바뀌면 질문도 바뀌어요.</div>';
+  h += '<div class="hubList">' + picks.map(function (q, i) { var r = ready ? RP.today.list[i] : null; return '<div class="hubItem"><div class="hubRank">' + (i + 1) + '</div><div class="hubMain"><b>' + rpEsc(q.t) + '</b><small>' + rpEsc(q.d) + '</small><div class="hubWhy"><span>왜 오늘</span>' + rpEsc(q.pickWhy) + '</div>' + (r ? '<div class="rpTdV ' + (r.view.score >= 3 ? "good" : r.view.score >= 1 ? "mid" : "low") + '"><b>' + rpEsc(r.view.stance) + '</b>' + (r.hz ? ' · 단기 ' + rpEsc(r.hz.s.stance) + ' · 장기 ' + rpEsc(r.hz.l.stance) : '') + '<div>' + rpEsc(r.view.txt) + '</div></div>' : '') + '<div class="hubActs"><button class="chip" data-rpq="' + q.id + '" data-kind="' + q.kind + '" data-sym="' + (q.sym || "") + '" data-arg="' + (q.arg || "") + '">' + (r ? "자세히 보기" : "리포트 만들기") + '</button></div></div></div>'; }).join("") + '</div>';
+  if (!ready) h += '<div class="row" style="gap:8px;margin-top:6px"><button class="primary" id="rpTodayAll">오늘의 리포트 ' + picks.length + '개 한 번에 계산</button><span class="briefDim">종목 과거 주가·투자지표를 받아 10~30초 걸려요</span></div>';
+  pane.innerHTML = h;
+  Array.prototype.forEach.call(pane.querySelectorAll("[data-rpq]"), function (b) { b.onclick = function () { rpGo({ id: b.getAttribute("data-rpq"), kind: b.getAttribute("data-kind"), sym: b.getAttribute("data-sym") || null, arg: b.getAttribute("data-arg") || null }, b); }; });
+  var all = document.getElementById("rpTodayAll"); if (all) all.onclick = function () { all.disabled = true; all.textContent = "계산 중…"; Promise.all(picks.map(function (q) { return rpBuild(q).catch(function () { return null; }); })).then(function (L) { RP.today = { day: day, list: L.map(function (r, i) { return r || { view: { stance: "데이터 부족", txt: "", score: 0 } }; }) }; renderReport(); }); };
 }
 /* 회상 · 검증 */
 function rpSavedRender(pane) {

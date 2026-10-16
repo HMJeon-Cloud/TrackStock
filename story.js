@@ -93,7 +93,9 @@ function nbClose(q, lines, foot) {
 /* ---------- 시각 자료 (밝은 패널 안, c.y부터) ---------- */
 function nbTiles(c, tiles) {
   var g = c.g, P = NB.PAD, W = NB.W - P * 2, n = tiles.length, tw = W / n, y = c.y + 40;
-  tiles.forEach(function (t, i) { var x = P + tw * i + tw / 2; cText(g, t.v, x, y + 70, 62, 800, t.color || NB_C.navy, "center"); cWrap(g, t.l, x, y + 116, tw - 20, 22, 500, NB_C.sub, 30, 2, "center"); });
+  // v11.8 값이 길면 칸 안에 들어가도록 글씨를 줄인다 (칸끼리 겹치지 않게) — 모든 칸이 같은 크기로
+  var vs = 62; tiles.forEach(function (t) { while (vs > 26 && cW(g, String(t.v), vs, 800) > tw - 24) vs -= 2; });
+  tiles.forEach(function (t, i) { var x = P + tw * i + tw / 2; cText(g, t.v, x, y + 70, vs, 800, t.color || NB_C.navy, "center"); cWrap(g, t.l, x, y + 116, tw - 20, 22, 500, NB_C.sub, 30, 2, "center"); });
   g.strokeStyle = NB_C.line; g.lineWidth = 2; g.beginPath(); g.moveTo(P, y + 196); g.lineTo(P + W, y + 196); g.stroke();
   c.y = y + 226;
 }

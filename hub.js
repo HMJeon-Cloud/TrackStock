@@ -52,7 +52,8 @@ function hubFillRest(c, p) {
   cRound(g, P, c.y + 10, W, h, 16, NB_C.box || "#efe9dc");
   g.fillStyle = NB_C.gold2; g.fillRect(P, c.y + 10, 8, h);
   var fs = 26; while (fs > 19 && cWrapCount(g, p.note, W - 64, fs, 700) * fs * 1.5 > h - 36) fs -= 1;
-  cWrap(g, p.note, P + 32, c.y + 10 + 24 + fs, W - 64, fs, 700, NB_C.txt, fs * 1.5, 8);
+  var nl = cWrapCount(g, p.note, W - 64, fs, 700), th = nl * fs * 1.5, y0 = c.y + 10 + (h - th) / 2 + fs * 0.95;   // v11.8 세로 가운데 정렬
+  cWrap(g, p.note, P + 32, y0, W - 64, fs, 700, NB_C.txt, fs * 1.5, 8);
   c.y += h + 20;
 }
 /* 줄 목록을 남은 높이에 꽉 맞게 (줄이 적으면 글씨를 키운다) — [왼쪽 회색, 가운데 굵게, 오른쪽 값, 색, 작은 설명] */
@@ -94,7 +95,7 @@ function hubTextFill(c, d) {
   var fs = 34; function need() { var n = 0; paras.forEach(function (p) { n += cWrapCount(g, p, W - 56, fs, 600); }); return n * fs * 1.55 + paras.length * 18 + 40; }
   while (need() > avail && fs > 20) fs -= 1;
   var h = Math.max(140, Math.min(avail, need())); cRound(g, P, c.y, W, h, 16, "#ffffff"); g.strokeStyle = NB_C.line; g.lineWidth = 2; g.stroke();
-  var y = c.y + 28 + fs; paras.forEach(function (p) { var k = cWrapCount(g, p, W - 56, fs, 600); cWrap(g, p, P + 28, y, W - 56, fs, 600, NB_C.txt, fs * 1.55, 30); y += k * fs * 1.55 + 18; });
+  var y = c.y + Math.max(28, (h - need() + 40) / 2) + fs * 0.9; paras.forEach(function (p) { var k = cWrapCount(g, p, W - 56, fs, 600); cWrap(g, p, P + 28, y, W - 56, fs, 600, NB_C.txt, fs * 1.55, 30); y += k * fs * 1.55 + 18; });
   c.y += h + 16;
   if (d.tiles && d.tiles.length) { var keep = c.y; c.y -= 40; nbTiles(c, d.tiles); c.y = Math.max(c.y - 30, keep + 170); }
   if (d.after) { var g2 = c.g, ah = Math.min(120, NB.H - 96 - c.y); if (ah > 60) { cRound(g2, P, c.y, W, ah, 14, NB_INK); cText(g2, d.after[0], P + 24, c.y + 40, 20, 800, NB_C.gold); cWrap(g2, d.after[1], P + 24, c.y + 76, W - 48, 22, 600, "#f3efe6", 30, 2); c.y += ah; } }
