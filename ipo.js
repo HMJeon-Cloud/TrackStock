@@ -96,6 +96,12 @@ function ipoResRender(pane) {
     var r = x.ret; function c(v) { return '<td class="' + (v > 0 ? "pos" : v < 0 ? "neg" : "") + '">' + ipoPct(v, 0) + '</td>'; }
     return '<tr><td class="l"><span class="dsD">' + ipoD(r.listDate) + '</span> ' + ipoName(x) + '</td><td>' + ipoWon(ipoPrice(x)) + '</td><td>' + ipoRatio(x.demand) + '</td><td>' + ipoRatio(x.sub) + '</td>' + c(r.o0) + c(r.c0) + c(r.m1) + c(r.last) + '</tr>';
   }).join("") + '</tbody></table></div>';
+  // v11.3.2 운영자 진단: 경쟁률을 못 읽은 종목의 원문 주변 글
+  var dbg = ipoListed().concat(ipoSched()).filter(function (x) { return x.dbg; }).slice(0, 12);
+  if (dbg.length && typeof isOwner === "function" && isOwner()) h += '<details class="howto ipoDbg"><summary>경쟁률 읽기 진단 (운영자) · ' + dbg.length + '개</summary><div class="body">' + dbg.map(function (x) {
+    var d = x.dbg, part = function (k, t) { var v = d[k]; if (!v) return ""; return '<div><b>' + t + '</b> ' + ipoEsc(v.nm || "") + ' · 파일 ' + v.files + '개 · ' + (v.len || 0).toLocaleString("ko-KR") + '자' + (v.snips && v.snips.length ? '<ul>' + v.snips.map(function (z) { return '<li>' + ipoEsc(z) + '</li>'; }).join("") + '</ul>' : ' · <span class="dvWarn">\'경쟁률\' 글자가 없음</span>') + '</div>'; };
+    return '<div class="ipoDbgI"><b>' + ipoEsc(x.name) + '</b>' + part("d", "수요예측 문서") + part("s", "발행실적 문서") + (d.list ? '<div><b>발행공시 목록</b> ' + ipoEsc(d.list.join(" / ")) + '</div>' : '') + '</div>';
+  }).join("") + '</div></details>';
   h += '<p class="mentalNote">수익률 = 공모가 대비. 1개월은 상장 뒤 20거래일째 종가예요(아직 20일이 안 된 종목은 비어 있어요). 실제로는 배정 물량이 적고 수수료가 있어 체감 수익과 달라요.</p>';
   pane.innerHTML = h;
 }
