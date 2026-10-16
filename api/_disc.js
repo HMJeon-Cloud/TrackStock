@@ -10,6 +10,7 @@
 //   저장(Redis, 기존 스냅샷과 같은 gzip+base64): sm:disc · sm:guru · sm:sec:tick(티커 대조표, 30일)
 //   실행: 아침 수집 크론(cron-snapshot) 끝에서 남은 시간으로 · 운영자 수동(/api/channel?op=disc&run=1)
 import { setJsonGz, getJsonGzText } from "./_redis.js";
+import { collectMacro } from "./_macro.js";
 import { collectIpo } from "./_ipo.js";
 import https from "https";
 import http from "http";
@@ -377,6 +378,7 @@ export async function collectAll(redis, opt) {
   const out = {};
   const only = (p) => !opt.part || opt.part === "both" || opt.part === p;
   await Promise.all([   // DART(한국)와 SEC(미국)는 서로 다른 서버라 동시에 · v11.3 공모주(DART)도 같이
+    only("macro") ? collectMacro(redis, { budgetMs: opt.macroMs || opt.dartMs || 10000, manual: opt.manual, force: opt.force }).then((r) => { out.macro = r; }).catch((e) => { out.macro = { ok: false, error: String(e.message).slice(0, 120) }; }) : null,   // v11.4 매크로(ECOS·FRED)
     only("ipo") ? collectIpo(redis, { budgetMs: opt.ipoMs || opt.dartMs || 10000, backfillDays: opt.ipoDays, manual: opt.manual }).then((r) => { out.ipo = r; }).catch((e) => { out.ipo = { ok: false, error: String(e.message).slice(0, 120) }; }) : null,
     !only("dart") ? Promise.resolve(null) : collectDart(redis, { pairs: opt.pairs, budgetMs: opt.dartMs || 10000, backfillDays: opt.backfillDays, manual: opt.manual }).then((r) => { if (r) out.dart = r; }).catch((e) => { out.dart = { ok: false, error: String(e.message).slice(0, 120) }; }),
     !only("sec") ? Promise.resolve(null) : collectGurus(redis, { budgetMs: opt.secMs || 12000, maxUpdates: opt.maxUpdates || 2 }).then((r) => { if (r) out.sec = r; }).catch((e) => { out.sec = { ok: false, error: String(e.message).slice(0, 120) }; }),

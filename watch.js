@@ -437,10 +437,10 @@ Array.prototype.forEach.call(document.querySelectorAll("#mapFilters [data-mf]"),
 /* 관심 탭 하위 화면: 관심 종목 / 전체 종목 / 뉴스 */
 var watchPane = "list";
 function switchWatchPane(p, fromHistory) {
-  if (["list", "map", "news", "disc", "guru", "ipo"].indexOf(p) < 0) p = "list";
+  if (["list", "map", "news", "disc", "guru", "ipo", "macro"].indexOf(p) < 0) p = "list";
   if (!fromHistory && p !== watchPane && typeof pushPaneState === "function") pushPaneState({ wp: p });
   watchPane = p;
-  ["list", "map", "news", "disc", "guru", "ipo"].forEach(function (k) { var el = $("wp-" + k); if (el) el.classList.toggle("hidden", k !== p); });
+  ["list", "map", "news", "disc", "guru", "ipo", "macro"].forEach(function (k) { var el = $("wp-" + k); if (el) el.classList.toggle("hidden", k !== p); });
   Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-wp") === p);
   });
@@ -450,6 +450,7 @@ function switchWatchPane(p, fromHistory) {
   if (p === "disc" && typeof renderDisc === "function") renderDisc();   // v11.2 공시
   if (p === "guru" && typeof renderGuru === "function") renderGuru();   // v11.2 구루 13F
   if (p === "ipo" && typeof renderIpo === "function") renderIpo();   // v11.3 공모주
+  if (p === "macro" && typeof renderMacro === "function") renderMacro();   // v11.4 매크로
 }
 Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {
   b.onclick = function () { switchWatchPane(b.getAttribute("data-wp")); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -467,6 +468,7 @@ function renderWatchTab(force) {
   if (watchPane === "disc" && typeof renderDisc === "function") renderDisc();
   if (watchPane === "guru" && typeof renderGuru === "function") renderGuru();
   if (watchPane === "ipo" && typeof renderIpo === "function") renderIpo();
+  if (watchPane === "macro" && typeof renderMacro === "function") renderMacro();
 }
 
 /* ---------- 이벤트 ---------- */

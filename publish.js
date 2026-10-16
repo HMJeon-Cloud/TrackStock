@@ -144,6 +144,8 @@ function pubPlan() {
     if (typeof ipoPlanHints === "function") { if (IPO.doc) ipoPlanHints().forEach(function (x) { plan.push(x); }); else if (typeof isOwner === "function" && isOwner()) ipoEnsure().then(function () { if (typeof currentTab !== "undefined" && currentTab === "onecard" && typeof MK !== "undefined" && MK.tab === "today" && typeof makerRender === "function") makerRender(); }); }
     else if (typeof dsEnsure === "function" && typeof isOwner === "function" && isOwner()) dsEnsure().then(function () { if (typeof currentTab !== "undefined" && currentTab === "onecard" && typeof MK !== "undefined" && MK.tab === "today" && typeof makerRender === "function") makerRender(); });
   }
+  // v11.4 매크로: 조건이 새로 나온 직후에만
+  if (typeof macroPlanHints === "function" && typeof isOwner === "function" && isOwner()) { if (MAC.doc && MAC.px.ks) macroPlanHints().forEach(function (x) { plan.push(x); }); else if (!MAC.loading && !MAC.pxP) macroEnsure().then(function (d) { return d && !d.none ? macPxLoad() : null; }).then(function () { if (typeof currentTab !== "undefined" && currentTab === "onecard" && typeof MK !== "undefined" && MK.tab === "today" && typeof makerRender === "function" && macroPlanHints().length) makerRender(); }); }
   plan.push({ id: "term", t: "📖 용어 한 입 — " + pubTerm()[0], d: "매일 1장 — 검색·저장으로 새 사람이 들어오는 상시 콘텐츠", kind: "term" });
   return { plan: plan, why: why, dow: "일월화수목금토"[dow] };
 }
@@ -395,6 +397,7 @@ function pubRender(target, onlyTab) {
       else if (k === "div" && typeof dvDeckOpen === "function") dvDeckOpen();
       else if ((k === "disc" || k === "guru") && typeof dsDeckOpen === "function") dsDeckOpen(k);
       else if (k === "ipo" && typeof ipoDeckOpen === "function") ipoDeckOpen();
+      else if (k === "macro" && typeof macroDeckOpen === "function") macroDeckOpen(b.getAttribute("data-pick") || "all");
       else if (k === "term") pubSingleCard(function () { return pubTermCard(pubTerm(pubState.termOffset)); }, "uphill.lab_용어_" + pubTerm(pubState.termOffset)[0].replace(/[^\w가-힣]/g, "") + ".png", "📖 용어 한 입", "term");
     };
   });

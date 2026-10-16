@@ -1230,6 +1230,15 @@
   .ipoCardI .dsR1 { display: flex; flex-wrap: wrap; row-gap: 2px; } .ipoCardI .dsR1 > b:not(.dsV), .ipoCardI .dsR1 .linkBtn { white-space: nowrap; } .ipoCardI .dsV { margin-left: auto; white-space: nowrap; }
   .ipoT td small { display: block; font-size: 10.5px; opacity: .85; }
   @media (max-width: 759px) { .ipoBkR { grid-template-columns: 96px minmax(0, 1fr) 56px; } .ipoBkS { grid-column: 1 / -1; margin-top: -4px; } }
+  /* v11.4 매크로 */
+  .macKpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 6px; } .macK { position: relative; min-width: 0; padding-bottom: 38px !important; }
+  .macK .kv { font-size: 20px; } .macKs { margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .macSpark { position: absolute; left: 12px; right: 12px; bottom: 8px; width: calc(100% - 24px); height: 26px; } .macSpark polyline { fill: none; stroke: #b8913f; stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+  .macAsOf { font-size: 11.5px; margin-bottom: 12px; }
+  .macConds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; } .macConds button { font-size: 12.5px; padding: 6px 10px; } .macConds small { margin-left: 4px; font-size: 10.5px; color: var(--sub); } .macConds button.active small { color: inherit; opacity: .8; } .macOn { font-style: normal; color: var(--up); margin-right: 3px; font-size: 10px; }
+  .macSel { border: 1px solid var(--line); border-left: 4px solid #b8913f; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; } .macSelH { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 15px; } .macSelM { font-size: 12.5px; color: var(--sub); margin-top: 4px; line-height: 1.5; } .macSelN { font-size: 13px; font-weight: 700; margin-top: 6px; }
+  .macAssets.pills { margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; overflow: visible; } .macT td, .macT th { font-variant-numeric: tabular-nums; white-space: nowrap; } .macT td small { font-size: 10.5px; color: var(--sub); } .macT .linkBtn { padding: 0; border: 0; background: none; font-weight: 700; color: var(--txt); font-size: 13px; text-align: left; } .macBaseRow td { background: #faf7ef; font-weight: 700; }
+  @media (max-width: 759px) { .macKpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .macK .kv { font-size: 18px; } .macT th, .macT td { padding-left: 4px !important; padding-right: 4px !important; font-size: 12px !important; } .macT .linkBtn { font-size: 12px; white-space: normal; text-align: left; } .macT td.l { white-space: normal; min-width: 0; } }
   /* v11.2 공시 · 구루 */
   .dsRunBar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; background: #fbf6e8; border-radius: 12px; font-size: 12px; flex-wrap: wrap; } .dsRunBar .chip { background: #14161c; color: #e6c57a; border-color: #14161c; font-weight: 800; } .dsRunMsg { min-width: 0; word-break: keep-all; line-height: 1.5; flex: 1 1 260px; } .dsErr { margin-top: 4px; } .dsErr summary { cursor: pointer; color: #c2410c; font-weight: 700; } .dsErr ul { margin: 4px 0 0; padding-left: 16px; max-height: 160px; overflow: auto; }
   .dsCols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
@@ -2259,6 +2268,7 @@
   <button data-wp="disc">공시</button>
   <button data-wp="guru">구루</button>
   <button data-wp="ipo">공모주</button>
+  <button data-wp="macro">매크로</button>
 </div>
 <div id="wp-list" class="subPane"><div class="card" id="watchCard">
   <h2>관심 종목 <small>내 종목들의 현재 위치를 한눈에</small></h2>
@@ -2317,6 +2327,11 @@
   <div class="pgHead"><h2>공모주 <small>언제 · 어디서 · 얼마에 · 몇 주 · 상장 뒤 첫날·1개월·지금 · DART 증권신고서 기준</small></h2></div>
   <div class="dsRunBar ownerOnly"><button class="chip" data-ipo-run="1">지금 수집</button><span class="dsRunMsg briefDim">운영자 전용 · 처음엔 지난 2년치를 나눠서 끝까지 받아요 (몇 분 · 끊겨도 다시 누르면 이어서)</span></div>
   <div id="ipoBody" style="margin-top:10px"></div>
+</div></div>
+<div id="wp-macro" class="subPane hidden"><div class="card" id="macroCard">
+  <div class="pgHead"><h2>매크로 <small>환율 · 기준금리(한·미) · 미 10년 금리 · M2 — 이런 조건일 때 과거 1년 뒤 코스피는? · 한국은행 ECOS · 미국 FRED</small></h2></div>
+  <div class="dsRunBar ownerOnly"><button class="chip" data-macro-run="1">지금 수집</button><span class="dsRunMsg briefDim">운영자 전용 · 매일 아침 수집이 하루 한 번 받아요. 처음이거나 바로 확인할 때만 누르세요</span></div>
+  <div id="macroBody" style="margin-top:10px"></div>
 </div></div>
 <div id="wp-news" class="subPane hidden"><div class="card" id="newsCard">
   <h2>뉴스 <small>관심 종목 기사와 시장 전체를 흔드는 기사</small></h2>
@@ -2386,7 +2401,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.3.4<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.4<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4768,14 +4783,14 @@ window.addEventListener("load", function () {
 <script src="sim.js?v=10.9"></script>
 <script src="insight.js?v=9.5"></script>
 <script src="guide.js?v=10.9"></script>
-<script src="watch.js?v=11.3"></script>
+<script src="watch.js?v=11.4"></script>
 <script src="holdings.js?v=9.5"></script>
 <script src="brief.js?v=10.6"></script>
 <script src="channel.js?v=9.7"></script>
 <script src="cards.js?v=10.4"></script>
 <script src="mind.js?v=10.4"></script>
 <script src="issues.js?v=10.8"></script>
-<script src="publish.js?v=11.3"></script>
+<script src="publish.js?v=11.4"></script>
 <script src="periodic.js?v=9.5.2"></script>
 <script src="story.js?v=10.4"></script>
 <script src="deep.js?v=10.0"></script>
@@ -4788,12 +4803,13 @@ window.addEventListener("load", function () {
 <script src="picks.js?v=10.8"></script>
 <script src="tpl.js?v=10.7"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=11.3.4"></script>
+<script src="maker.js?v=11.4"></script>
 <script src="lib.js?v=10.7"></script>
 <script src="dividend.js?v=11.1"></script>
 <script src="disc.js?v=11.2.7"></script>
 <script src="ipo.js?v=11.3.4"></script>
-<script src="ui.js?v=11.3"></script>
+<script src="macro.js?v=11.4"></script>
+<script src="ui.js?v=11.4"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>

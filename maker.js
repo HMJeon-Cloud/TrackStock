@@ -137,6 +137,7 @@ function mkDecks() {
   if (typeof PER_SETS !== "undefined") { var td = typeof perToday === "function" ? perToday() : []; g.push(["정기 발행", Object.keys(PER_SETS).map(function (k) { return row(String(PER_SETS[k].t).replace(/^\S+\s/, ""), PER_SETS[k].when + " 발행" + (td.indexOf(k) >= 0 ? " · 오늘" : ""), "per:" + k, "per:" + k, td.indexOf(k) >= 0); })]); }
   if (typeof storyDecks === "function") { var d = []; try { d = storyDecks(); } catch (e) {} g.push(["연구노트", d.map(function (x) { return row(String(x.t).replace(/^\S+\s/, ""), (x.now ? "지금 신호 · " : "") + x.d, "story:" + x.key, "story:" + x.key, x.now); })]); }
   if (typeof dsDeckOpen === "function") g.push(["공시 · 구루", [row("공시 카드", "임원·대주주 매수·매도(7일) · 자사주 취득 결정(30일) + 업로드 글", "disc"), row("구루 13F 카드", "최근 공개한 투자자 2명 매수·매도 · 같이 움직인 종목 + 업로드 글", "guru")].concat(typeof ipoDeckOpen === "function" ? [row("공모주 카드", "청약 일정(공모가·최소 증거금·증권사) · 최근 상장 성적 · 첫날 종가 분포 + 업로드 글", "ipo")] : [])]);
+  if (typeof macDeckList === "function") { var ml = macDeckList(); if (ml.length) g.push(["매크로 · 환율·금리", ml.map(function (x) { return row(x.t, (x.now ? "지금 해당 · " : "") + x.d, "macro:" + x.id, null, x.now); })]); else if (typeof isOwner === "function" && isOwner() && !MAC.doc && !MAC.loading) macroEnsure().then(function (d) { return d && !d.none ? macPxLoad() : null; }).then(function () { if (typeof MK !== "undefined" && MK.tab === "decks" && typeof makerRender === "function" && macDeckList().length) makerRender(); }); }
   if (typeof dvDeckOpen === "function") g.push(["배당", [row("배당 카드 4장", "필요 투자금 · 배당률 TOP · 계좌별 세금 · 이달 배당락 + 업로드 글", "div")]]);
   if (typeof pubPolicyAll === "function") g.push(["정책 · 일정 · 용어", pubPolicyAll().map(function (p) { return row(p.short || p.t, (p.eff || "") + (p.src ? " · " + p.src : ""), "pol:" + p.id, "policy:" + p.id); }).concat([row("이번 주 일정", "앞으로 7일 발표·실적·휴장", "cal", "cal"), row("용어 한 입", "오늘의 용어 한 장", "term", "term")])]);
   return g.map(function (x) { return '<h4 class="mkH">' + x[0] + ' <small>' + x[1].length + '</small></h4><div class="pubPlan">' + x[1].join("") + '</div>'; }).join("");
@@ -159,6 +160,7 @@ function mkDeckBind(box) {
       else if (k === "div") dvDeckOpen(MK.mk || "all");
       else if (k === "disc" || k === "guru") dsDeckOpen(k);
       else if (k === "ipo") ipoDeckOpen();
+      else if (k === "macro") macroDeckOpen(arg);
     };
   });
 }
