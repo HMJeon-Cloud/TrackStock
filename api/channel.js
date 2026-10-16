@@ -85,6 +85,7 @@ async function aiHandler(req, res) {
   if (b.mode === "plan") return aiPlan(res, key, model, fallback, b);
   if (b.mode === "image") return aiImage(res, key, imgModel, b);
   if (b.mode === "read") return aiRead(res, key, model, fallback, b);
+  if (b.mode === "deck") return aiDeckPlan(res, key, model, fallback, b);   // v11.6 AI 여러 장
   let schema, user;
   // 참고 이미지(선택): data:image/... 최대 3장, 장당 1.5MB 이하 (화면에서 1024px JPEG로 줄여서 보냄)
   const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => typeof u === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(u) && u.length < 1600000).slice(0, 3);
@@ -143,7 +144,7 @@ async function aiResponses(key, model, sys, user, name, schema, ms, imgs) {
 }
 async function aiChat(key, model, sys, user, name, schema, ms, imgs) {
   const { status, j, err } = await aiPost("https://api.openai.com/v1/chat/completions", key, {
-    model, temperature: 0.4, max_tokens: 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
+    model, temperature: 0.4, max_tokens: name === "deck_cards" ? 6000 : 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
     response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }
   }, ms);
   if (err) return { ok: false, reason: err };
@@ -183,6 +184,38 @@ async function aiPlan(res, key, model, fallback, b) {
   let r = await aiResponses(key, model, AI_RULES, user, "plan_card", AI_SCHEMA_PLAN, 120000, imgs);
   tries.push(model + ": " + (r.ok ? "성공" : r.reason));
   if (!r.ok && fallback && fallback !== model && r.reason !== "REFUSED") { r = await aiChat(key, fallback, AI_RULES, user, "plan_card", AI_SCHEMA_PLAN, 60000, imgs); tries.push(fallback + ": " + (r.ok ? "성공" : r.reason)); if (r.ok) return res.status(200).json({ ok: true, out: r.out, model: fallback, tries }); }
+  if (r.ok) return res.status(200).json({ ok: true, out: r.out, model, tries });
+  return res.status(200).json({ ok: false, reason: r.reason, detail: r.detail, tries });
+}
+/* ---------- v11.6 AI 여러 장: 묶음의 '모든 내용'을 읽고 5~8장 상세 카드로 풀어 쓰기 (숫자는 근거 줄 표기 그대로 · 앱이 그림) ---------- */
+const AI_SCHEMA_DECK = {
+  type: "object", additionalProperties: false, required: ["cards", "question"],
+  properties: {
+    question: { type: "string", description: "마지막 장 질문 한 줄 30자 이하 (자기 노출 강요 없이)" },
+    cards: { type: "array", minItems: 4, maxItems: 9, items: { type: "object", additionalProperties: false, required: ["kicker", "title", "lead", "sub", "rows", "takeaway"], properties: {
+      kicker: { type: "string", description: "말머리 12자 이하" },
+      title: { type: "string", description: "결론 문장 1~2줄(\n), 줄당 18자 이하. 숫자는 근거 줄 표기 그대로, 강조할 숫자는 [[ ]]로" },
+      lead: { type: "string", description: "초보용 풀이 한두 문장 60자 이하. 숫자는 근거 줄 표기 그대로만" },
+      sub: { type: "string", description: "근거 설명 한 줄 40자 이하 (기준·기간·단위)" },
+      rows: { type: "array", maxItems: 8, items: { type: "object", additionalProperties: false, required: ["label", "value", "ref", "tag", "note"], properties: {
+        label: { type: "string", description: "항목 이름 16자 이하" }, value: { type: "string", description: "ref 줄 안에 있는 숫자 표기를 그대로 복사(계산·반올림·단위 변경 금지)" }, ref: { type: "string", description: "근거 줄 id (F12 등)" }, tag: { type: "string", description: "왼쪽 작은 꼬리표 8자 이하(예: 1위, 2023년). 없으면 빈 문자열" }, note: { type: "string", description: "보조 설명 24자 이하, 숫자는 근거 표기 그대로. 없으면 빈 문자열" } } } },
+      takeaway: { type: "string", description: "그 장의 한 줄 정리 26자 이하. 추천·예측 금지" } } } }
+  }
+};
+async function aiDeckPlan(res, key, model, fallback, b) {
+  const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 600).map((l) => String(l.id).slice(0, 6) + " | " + String(l.text).slice(0, 220));
+  let txt = lines.join("\n"); if (txt.length > 40000) txt = txt.slice(0, 40000);
+  if (!txt) return res.status(400).json({ ok: false, reason: "NO_LINES" });
+  const n = Math.max(4, Math.min(9, +b.n || 6));
+  const user = "주제: " + String(b.title || "").slice(0, 80) + " / 카드 " + n + "장(첫 장은 표지: title=훅, lead=무엇을 다루는지, rows는 빈 배열)" +
+    "\n\n아래는 앱이 만든 카드들의 '모든 내용'이야(줄마다 id). 전체를 읽고 초보 투자자가 처음부터 끝까지 이해할 수 있게 " + n + "장으로 풀어서 다시 구성해. " +
+    "장마다 하나의 질문에 답하고(무엇이 · 얼마나 · 왜 중요한가 · 그래서 무엇을 볼까), 각 장의 rows는 근거 숫자 3~8개로 빈칸 없이 채워." +
+    "\n규칙: 모든 숫자·날짜·이름은 근거 줄 표기 그대로 복사(계산·반올림·단위 변경 금지). row.value는 ref 줄 안에 그대로 있어야 함. 근거 없는 내용 금지. 종목 추천·매수매도 권유·가격 예측 금지." +
+    (b.request ? "\n\n운영자 요청(최우선): " + String(b.request).slice(0, 600) : "") + "\n\n---\n" + txt;
+  const tries = [];
+  let r = await aiResponses(key, model, AI_RULES, user, "deck_cards", AI_SCHEMA_DECK, 150000, []);
+  tries.push(model + ": " + (r.ok ? "성공" : r.reason));
+  if (!r.ok && fallback && fallback !== model && r.reason !== "REFUSED") { r = await aiChat(key, fallback, AI_RULES, user, "deck_cards", AI_SCHEMA_DECK, 80000, []); tries.push(fallback + ": " + (r.ok ? "성공" : r.reason)); if (r.ok) return res.status(200).json({ ok: true, out: r.out, model: fallback, tries }); }
   if (r.ok) return res.status(200).json({ ok: true, out: r.out, model, tries });
   return res.status(200).json({ ok: false, reason: r.reason, detail: r.detail, tries });
 }

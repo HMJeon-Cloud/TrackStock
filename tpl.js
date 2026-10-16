@@ -113,7 +113,7 @@ function tplMarket(c, s) {
 /* ---------- ② 순위 12칸: {items:[{rank,tag,name,value,sub}]} ---------- */
 function tplRank(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, items = (s.items || []).slice(0, 12), n = items.length;
-  var cols = n <= 4 ? 2 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(300, (TPL.H - 74 - y - gap * (rows - 1)) / rows);
+  var cols = n <= 4 ? 2 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(420, (TPL.H - 74 - y - gap * (rows - 1)) / rows);
   items.forEach(function (it, i) {
     var x = P + (i % cols) * (bw + gap), yy = y + Math.floor(i / cols) * (bh + gap);
     var top3 = (it.rank || i + 1) <= 3; tplBox(g, x, yy, bw, bh, 10, "#ffffff", top3 ? 5 : 3, top3 ? TPL_C.gold2 : TPL_C.ink);
@@ -131,14 +131,14 @@ function tplRank(c, s) {
 /* ---------- ③ 표: {cols:[..], rows:[[..]], badges:[문자열] (왼쪽 세로 파란 칸·선택), hlCols:[열 index] } ---------- */
 function tplTable(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, cols = s.cols || [], rows = (s.rows || []).slice(0, 10), n = cols.length;
-  var bx = s.badges && s.badges.length ? 120 : 0, tw = W - bx, ws = s.widths || cols.map(function (_, i) { return i === 0 ? 0.34 : 0.66 / Math.max(1, n - 1); }), hh = 60, rh = Math.min(112, (TPL.H - 84 - y - hh) / Math.max(1, rows.length));
+  var bx = s.badges && s.badges.length ? 120 : 0, tw = W - bx, ws = s.widths || cols.map(function (_, i) { return i === 0 ? 0.34 : 0.66 / Math.max(1, n - 1); }), hh = 60, rh = Math.min(rows.length <= 3 ? 240 : 170, (TPL.H - 84 - y - hh - (s.note ? 50 : 0)) / Math.max(1, rows.length));   // v11.6 행이 적으면 키워서 빈 곳 없이
   var xs = [P + bx]; ws.forEach(function (w) { xs.push(xs[xs.length - 1] + w * tw); });
   cRound(g, P + bx, y, tw, hh, 0, TPL_C.black);
   cols.forEach(function (h, i) { cText(g, cFit(g, h, xs[i + 1] - xs[i] - 12, 28, 900), (xs[i] + xs[i + 1]) / 2, y + hh / 2 + 10, 28, 900, TPL_C.gold, "center"); });
   rows.forEach(function (r, k) {
     var yy = y + hh + k * rh; g.fillStyle = k % 2 ? "#ffffff" : TPL_C.box; g.fillRect(P + bx, yy, tw, rh);
     r.forEach(function (v, i) {
-      var hl = (s.hlCols || []).indexOf(i) >= 0, cx = (xs[i] + xs[i + 1]) / 2, mw = xs[i + 1] - xs[i] - 14, fs = i === 0 ? 27 : 30;
+      var hl = (s.hlCols || []).indexOf(i) >= 0, cx = (xs[i] + xs[i + 1]) / 2, mw = xs[i + 1] - xs[i] - 14, fsB = Math.max(30, Math.min(42, Math.round(rh * 0.3))), fs = i === 0 ? fsB - 3 : fsB;
       if (hl) { var tw2 = cW(g, v, fs, 900) + 16; cRound(g, cx - tw2 / 2, yy + rh / 2 - fs * 0.62, tw2, fs * 1.25, 4, TPL_C.hl); }
       var wt = i === 0 ? 800 : 900, col = i === 0 ? TPL_C.ink : tplCol(v);
       if (cW(g, String(v), fs * 0.8, wt) > mw && rh >= 64) { var ws = Math.min(fs - 4, (rh - 14) / 2 / 1.2), nl = Math.min(2, cWrapCount(g, String(v), mw, ws, 700)); cWrap(g, String(v), cx, yy + rh / 2 - (nl - 1) * ws * 0.6 + ws * 0.36, mw, ws, 700, col, ws * 1.2, 2, "center"); }   // v10.4: 긴 칸은 두 줄
@@ -157,7 +157,7 @@ function tplCompare(c, s) {
   var lx = P, ax = P + 300 + (W - 300) / 4, bx = P + 300 + (W - 300) * 3 / 4;
   cText(g, s.aLabel || "그때", ax, y + 52, 54, 900, TPL_C.sub, "center"); cText(g, s.bLabel || "지금", bx, y + 52, 54, 900, TPL_C.gold2, "center");
   if (s.aSub) cText(g, s.aSub, ax, y + 84, 20, 600, TPL_C.sub, "center"); if (s.bSub) cText(g, s.bSub, bx, y + 84, 20, 600, TPL_C.sub, "center");
-  y += 110; var rh = Math.min(230, (TPL.H - 84 - y) / Math.max(1, rows.length));
+  y += 110; var rh = Math.min(300, (TPL.H - 84 - y) / Math.max(1, rows.length));
   rows.forEach(function (r, i) {
     var yy = y + i * rh, mid = yy + rh / 2;
     if (r.badge) { var bw = cW(g, r.badge, 30, 900) + 40; tplBox(g, lx, mid - 50, Math.min(280, bw), 54, 27); cText(g, cFit(g, r.badge, 240, 30, 900), lx + Math.min(280, bw) / 2, mid - 12, 30, 900, TPL_C.ink, "center"); }
@@ -187,6 +187,8 @@ function tplQuote(c, s) {
   var fs = 34, lh = 50;
   function total() { var n = 0; paras.forEach(function (p) { n += cWrapCount(g, p, rw, fs, 700); }); return n * lh + (paras.length - 1) * 40; }
   while (total() > avail && fs > 22) { fs -= 2; lh = Math.round(fs * 1.5); }
+  while (total() < avail * 0.62 && fs < 46) { fs += 2; lh = Math.round(fs * 1.5); }   // v11.6 요지가 짧으면 키워서 빈 곳 없이
+  if (total() > avail) { fs -= 2; lh = Math.round(fs * 1.5); }
   var ty = ry + lh; paras.forEach(function (p) { var n = cWrapCount(g, p, rw, fs, 700); cWrap(g, p, rx + rw / 2, ty, rw, fs, 700, TPL_C.ink, lh, 8, "center"); ty += n * lh + 40; });
   return tplFoot(c);
 }
@@ -194,7 +196,7 @@ function tplQuote(c, s) {
 function tplTimeline(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, blocks = (s.blocks || []).slice(0, 4), gap = 14;
   var totalItems = blocks.reduce(function (a, b) { return a + Math.min(6, (b.items || []).length); }, 0);
-  var avail = TPL.H - 84 - y - gap * (blocks.length - 1), headH = 60, ih = Math.max(34, Math.min(78, (avail - blocks.length * (headH + 24)) / Math.max(1, totalItems)));
+  var avail = TPL.H - 84 - y - gap * (blocks.length - 1), headH = 60, ih = Math.max(34, Math.min(110, (avail - blocks.length * (headH + 24)) / Math.max(1, totalItems)));
   blocks.forEach(function (b) {
     var items = (b.items || []).slice(0, 6), h = headH + 24 + items.length * ih, dw = 140;
     tplBox(g, P, y, W, h, 10, "#ffffff", 3); cRound(g, P, y, dw, h, 10, TPL_C.black); g.fillStyle = TPL_C.gold2; g.fillRect(P + dw - 4, y, 4, h);
@@ -213,7 +215,7 @@ function tplTimeline(c, s) {
 /* ---------- ⑦ 숫자 12칸: {boxes:[{label, value, unit}] ≤12, note} ---------- */
 function tplGrid(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, boxes = (s.boxes || []).slice(0, 12), n = boxes.length;
-  var cols = n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(260, (TPL.H - 104 - y - gap * (rows - 1)) / rows);
+  var cols = n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(330, (TPL.H - 104 - y - gap * (rows - 1)) / rows);
   if (s.lead) { cWrap(g, s.lead, P, y + 30, W, 28, 800, TPL_C.ink, 36, 2); y += 76; bh = Math.min(bh, (TPL.H - 104 - y - gap * (rows - 1)) / rows); }
   boxes.forEach(function (b, i) {
     var x = P + (i % cols) * (bw + gap), yy = y + Math.floor(i / cols) * (bh + gap);
@@ -229,12 +231,13 @@ function tplGrid(c, s) {
 /* ---------- ⑧ 한 줄 상식: {rows:[{icon,left,right,sub}] ≤7, punch:{left,right}, closing} ---------- */
 function tplLines(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, rows = (s.rows || []).slice(0, 7);
-  var punchH = s.punch ? 110 : 0, closeH = s.closing ? 90 : 0, rh = Math.min(118, (TPL.H - 94 - y - punchH - closeH - 30) / Math.max(1, rows.length));
+  var punchH = s.punch ? 110 : 0, closeH = s.closing ? 90 : 0, rh = Math.min(170, (TPL.H - 94 - y - punchH - closeH - 30) / Math.max(1, rows.length));
   tplBox(g, P, y, W, rows.length * rh + 20, 18);
   rows.forEach(function (r, i) {
     var yy = y + 10 + i * rh, mid = yy + rh / 2;
     if (r.icon) cText(g, r.icon, P + 70, mid + 16, 40, 400, TPL_C.ink, "center");
-    cText(g, cFit(g, r.left, 330, 38, 900), P + 130, mid + 14, 38, 900, TPL_C.ink);
+    var lsz = 38; while (lsz > 26 && cW(g, r.left, lsz, 900) > (r.icon ? 340 : 400)) lsz -= 2;   // v11.6 길면 줄여서 다 보이게
+    cText(g, cFit(g, r.left, r.icon ? 340 : 400, lsz, 900), r.icon ? P + 130 : P + 40, mid + 14, lsz, 900, TPL_C.ink);
     cText(g, "➜", P + 500, mid + 14, 38, 900, TPL_C.red, "center");
     var rw = W - 580, rs = 40; while (rs > 32 && cW(g, r.right, rs, 900) > rw) rs -= 2;
     if (cW(g, r.right, rs, 900) <= rw) { cText(g, r.right, P + 560, mid + (r.sub ? 6 : 14), rs, 900, TPL_C.red); if (r.sub) cText(g, cFit(g, r.sub, rw, 19, 600), P + 560, mid + 36, 19, 600, TPL_C.sub); }

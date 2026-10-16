@@ -41,6 +41,8 @@ function nbTop(c, n, lines, page, total) {
   var size = 50, lh = 66, flat;
   function build() { flat = []; lines.forEach(function (l) { flat = flat.concat(nbSplit(g, l, NB.W - P * 2, size)); }); }
   build(); while (flat.length * lh > 320 && size > 34) { size -= 2; lh = size * 1.32; build(); }
+  // v11.6 결론이 짧으면 글씨를 키워 위쪽 빈 곳을 줄인다 (최대 68)
+  while (size < 68) { var keep = [size, lh, flat]; size += 2; lh = size * 1.32; build(); if (flat.length * lh > 330) { size = keep[0]; lh = keep[1]; flat = keep[2]; break; } }
   var y0 = NB.SPLIT - 70 - (flat.length - 1) * lh;
   flat.forEach(function (l, i) { cRich(g, l, P, y0 + i * lh, size, 800, NB_INK, NB_HI); });
 }
@@ -124,7 +126,7 @@ function nbBars(c, items) {
   c.y = base + negH + 70;
 }
 function nbRows(c, rows, leftW) {   // [왼쪽 회색, 가운데 굵게, 오른쪽 값, 색]
-  var g = c.g, P = NB.PAD, W = NB.W - P * 2, h = Math.min(92, Math.floor((NB.H - 110 - c.y) / rows.length)), y = c.y, lw = leftW || 300;
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, h = Math.min(140, Math.floor((NB.H - 110 - c.y) / rows.length)), y = c.y, lw = leftW || 300;   // v11.6 줄이 적으면 키워서 빈 곳 없이
   rows.forEach(function (r) {
     cText(g, cFit(g, r[0], lw - 20, 23, 500), P, y + h / 2 + 9, 23, 500, NB_C.sub); cText(g, cFit(g, r[1], W - lw - 170, 29, 800), P + lw, y + h / 2 + 10, 29, 800, NB_C.txt);
     cText(g, r[2], P + W, y + h / 2 + 10, 32, 800, r[3] || NB_C.navy, "right");
@@ -143,7 +145,7 @@ function nbChecks(c, items) {
   c.y = y + 2 * h + gap + 10;
 }
 function nbTable(c, rows) {   // [조건, 구성(2줄 가능), 성격, 색]
-  var g = c.g, P = NB.PAD, W = NB.W - P * 2, h = Math.min(118, Math.floor((NB.H - 110 - c.y) / rows.length)), y = c.y;
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, h = Math.min(160, Math.floor((NB.H - 110 - c.y) / rows.length)), y = c.y;
   rows.forEach(function (r) {
     cWrap(g, r[0], P, y + h / 2 - 2, 270, 21, 500, NB_C.sub, 27, 2);
     cWrap(g, r[1], P + 300, y + h / 2 - 2, W - 300 - 130, 24, 800, NB_C.txt, 31, 2);
@@ -185,12 +187,12 @@ function nbMissBest(rows, years, n) {
 function storyDecks() {
   var now = nbNow(), out = [];
   if (typeof CH_SCEN !== "undefined") CH_SCEN.forEach(function (sc) {
-    out.push({ key: "scene:" + sc.id, t: sc.icon + " " + sc.tag + "이(가) 오면", d: "과거 " + sc.eps.length + "번 — 그 뒤 1년 무엇이 강했나 · 조건부 승률표 · 닮은 날 · 데이터 기준 제안", now: !!now.match[sc.id], ready: storyReady("scene"), group: "국면" });
+    out.push({ key: "scene:" + sc.id, t: sc.icon + " " + sc.tag + (typeof nbJosa === "function" ? nbJosa(sc.tag.replace(/\s*\(.*\)$/, ""), "이/가").slice(-1) : "이(가)") + " 오면", d: "과거 " + sc.eps.length + "번 — 그 뒤 1년 무엇이 강했나 · 조건부 승률표 · 닮은 날 · 데이터 기준 제안", now: !!now.match[sc.id], ready: storyReady("scene"), group: "국면" });
   });
   out.unshift({ key: "today", t: "🔍 오늘의 관찰 — 오늘 가장 이례적인 것부터", d: "그날 데이터에서 평소와 다른 것 5~6가지를 골라 매일 다른 순서·다른 틀로 엮어요 (숫자만 바뀌는 덱이 아니라 구성 자체가 바뀜)", now: true, ready: !!nbRecent(), group: "매일" });
   out.push({ key: "drawdown", t: "🕳️ 지금 고점 대비 얼마나 빠졌나", d: "낙폭 · 회복 기간 · 지금 낙폭에서 샀다면 3·6·12개월 뒤 승률 · 한 번에 vs 나눠 사기 제안", now: !!now.match.panic, ready: storyReady("drawdown"), group: "낙폭" });
   out.push({ key: "dca", t: "🗓️ 적금처럼 샀다면", d: "1년 전 100만원 · 매달 10만원 · 좋은 10일 · 시작 시점 " + "별 10년 결과 분포 · 200일선 아래 2배 적립 제안", now: false, ready: storyReady("dca"), group: "적립" });
-  out.push({ key: "news", t: "📰 오늘 기사 vs 실제 숫자", d: "아침 뉴스 제목과 그 자산의 종가 변화를 나란히", now: typeof CARD_NEWS !== "undefined" && CARD_NEWS.items.length > 0, ready: storyReady("news"), group: "뉴스" });
+  out.push({ key: "news", t: "📰 오늘의 기사 — 1건 = 1장", d: "기사 제목 · 본문 요약 · 관련 자산 실제 등락 · 단어 풀이", now: typeof CARD_NEWS !== "undefined" && CARD_NEWS.items.length > 0, ready: storyReady("news"), group: "뉴스" });
   return out;
 }
 function storyReady(kind) {
@@ -217,7 +219,7 @@ function storyCards(key) {
   if (kind === "scene") return nbSceneDeck(id);
   if (kind === "drawdown") return nbDrawdownDeck();
   if (kind === "dca") return nbDcaDeck();
-  if (kind === "news") return nbNewsDeck();
+  if (kind === "news") return typeof hubNewsDeck === "function" ? hubNewsDeck() : nbNewsDeck();   // v11.6 기사 1건 = 1장
   if (kind === "today") return nbTodayDeck();
   return [];
 }

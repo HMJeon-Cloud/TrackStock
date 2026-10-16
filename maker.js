@@ -5,7 +5,7 @@
    ② 카드 묶음(여러 장): 오늘의 브리핑·오늘 한 장·채널·정기 발행·연구노트·정책·일정·용어·릴스를 버튼 하나로
    ============================================================ */
 var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "today" };
-var MK_TABS = [["today", "오늘 할 일"], ["one", "한 장 양식"], ["decks", "묶음 카드"], ["reels", "릴스"], ["lib", "보관함"]];
+var MK_TABS = [["today", "오늘 할 일"], ["one", "한 장 양식"], ["decks", "묶음 카드"], ["lib", "보관함"]];   // v11.6 릴스는 묶음 카드·한 장 양식으로 합침
 /* 다른 화면에서 '카드 만들기 ›'로 들어올 때: 탭·시장을 정해서 연다 */
 function makerGo(tab, mk) { if (tab) MK.tab = tab; if (mk) MK.mk = mk; if (typeof navTo === "function") navTo("onecard"); else switchTab("onecard"); }
 function mkLoad() { try { var j = JSON.parse(localStorage.getItem("sm.maker") || "null"); if (j) { MK.text = j.text || {}; MK.meta = j.meta || {}; MK.cat = j.cat || MK.cat; MK.mode = j.mode || MK.mode; } } catch (e) {} }
@@ -50,6 +50,16 @@ function mkReady() {
   if (typeof loadBrief === "function" && !MK.loading) { MK.loading = true; loadBrief(false); var n = 0, iv = setInterval(function () { if ((briefState && briefState.recent) || ++n > 60) { clearInterval(iv); MK.loading = false; if (currentTab === "onecard") makerRender(); } }, 500); }
   return false;
 }
+/* v11.6 추천 점수에 쓰는 데이터를 한 번씩 미리 받아 두고, 받으면 다시 그린다 (운영자 화면이라 과금 없는 공개 데이터만) */
+function mkWarm() {
+  if (MK.warmed || !(typeof isOwner === "function" && isOwner())) return; MK.warmed = true;
+  var ps = [];
+  if (typeof dsEnsure === "function") ps.push(dsEnsure().catch(function () {}));
+  if (typeof ipoEnsure === "function") ps.push(ipoEnsure().catch(function () {}));
+  if (typeof macroEnsure === "function") ps.push(macroEnsure().then(function (d) { return d && !d.none ? macPxLoad() : null; }).catch(function () {}));
+  if (typeof cardsNewsFetch === "function" && typeof briefState !== "undefined" && briefState.result) ps.push(cardsNewsFetch(briefState.result).catch(function () {}));
+  Promise.all(ps).then(function () { if (typeof currentTab !== "undefined" && currentTab === "onecard" && (MK.tab === "today" || MK.tab === "decks")) makerRender(); });
+}
 function mkChannelReady() { if (typeof chState === "undefined" || !chState.recent) { if (typeof renderChannel === "function") try { renderChannel(); } catch (e) {} } }
 
 /* ---------- 화면 ---------- */
@@ -66,14 +76,14 @@ function makerRender() {
   Array.prototype.forEach.call(root.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); if (typeof switchBriefMarket === "function" && briefState.market !== MK.mk) switchBriefMarket(MK.mk); makerRender(); }; });
   Array.prototype.forEach.call(root.querySelectorAll("[data-mtab]"), function (b) { b.onclick = function () { MK.tab = b.getAttribute("data-mtab"); makerRender(); }; });
   var pane = root.querySelector(".mkPane");
+  if (MK.tab === "reels") MK.tab = "decks";
+  mkWarm();
   if (MK.tab === "today") {
-    pane.innerHTML = '<div class="briefDim" style="margin-bottom:8px">발행 전 점검 → 오늘 요일·신호에 맞는 추천 세트. 각 줄의 🃏는 카드 묶음, ✨는 그 묶음을 AI 한 장으로.</div><div class="mkToday"></div>';
-    if (typeof pubRender === "function") try { pubRender(pane.querySelector(".mkToday"), "plan"); } catch (e) { console.warn(e); }
+    pane.innerHTML = typeof hubTodayHtml === "function" ? hubTodayHtml() : "";
+    if (typeof hubBind === "function") hubBind(pane);
+    if (typeof perToday === "function" && perToday().length) { var pt = document.createElement("div"); pt.className = "briefDim"; pt.style.marginTop = "6px"; pt.textContent = "정기 발행일이에요: " + perToday().map(function (k) { return cPlain(PER_SETS[k].t); }).join(" · "); pane.appendChild(pt); }
   } else if (MK.tab === "decks") {
-    pane.innerHTML = mkDecks(); mkDeckBind(pane);
-  } else if (MK.tab === "reels") {
-    pane.innerHTML = typeof reelTabHtml === "function" ? reelTabHtml() : "";
-    Array.prototype.forEach.call(pane.querySelectorAll("[data-reel]"), function (b) { b.onclick = function () { reelOpen(b.getAttribute("data-reel")); }; });
+    pane.innerHTML = typeof hubDecksHtml === "function" ? hubDecksHtml() : mkDecks(); if (typeof hubBind === "function") hubBind(pane); else mkDeckBind(pane);
   } else if (MK.tab === "lib") { if (typeof libTabRender === "function") libTabRender(pane); }
   else mkOneRender(pane);
   if (!MK.iconsLoaded && typeof libLoadIcons === "function") { MK.iconsLoaded = true; libLoadIcons().then(function () { if (Object.keys(TPL_ICON).length && MK.tab === "one") mkPreview(); }).catch(function () {}); }

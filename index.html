@@ -1230,6 +1230,14 @@
   .ipoCardI .dsR1 { display: flex; flex-wrap: wrap; row-gap: 2px; } .ipoCardI .dsR1 > b:not(.dsV), .ipoCardI .dsR1 .linkBtn { white-space: nowrap; } .ipoCardI .dsV { margin-left: auto; white-space: nowrap; }
   .ipoT td small { display: block; font-size: 10.5px; opacity: .85; }
   @media (max-width: 759px) { .ipoBkR { grid-template-columns: 96px minmax(0, 1fr) 56px; } .ipoBkS { grid-column: 1 / -1; margin-top: -4px; } }
+  /* v11.6 카드 허브 (오늘의 주제 10 · 묶음 카드 · 버튼 4개) */
+  .hubList { display: grid; gap: 8px; margin-bottom: 10px; } .hubItem { display: flex; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; background: #fff; min-width: 0; } .hubItem.sm { padding: 9px 11px; }
+  .hubRank { flex: 0 0 30px; height: 30px; border-radius: 50%; background: #14161c; color: #e6c57a; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .hubMain { min-width: 0; flex: 1 1 auto; } .hubMain > b { display: block; font-size: 14.5px; line-height: 1.4; word-break: keep-all; } .hubMain > small { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; line-height: 1.45; word-break: keep-all; }
+  .hubWhy { margin-top: 6px; font-size: 12.5px; line-height: 1.5; background: #fbf6e8; border-radius: 8px; padding: 6px 9px; word-break: keep-all; } .hubWhy span { font-weight: 800; color: #8a6a24; margin-right: 6px; } .hubWhyS { color: #8a6a24; }
+  .hubActs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; } .hubActs .chip { padding: 5px 11px; font-size: 12px; } .hubActs .chip[data-hub="one"], .hubActs .chip[data-hub="multi"] { background: #14161c; color: #e6c57a; border-color: #14161c; font-weight: 800; }
+  .hubG > summary { cursor: pointer; list-style: none; } .hubG > summary::-webkit-details-marker { display: none; } .hubG > summary::before { content: "▸ "; color: var(--sub); } .hubG[open] > summary::before { content: "▾ "; }
+  .hubCk { margin-bottom: 10px; font-size: 13px; } .hubCk > summary { cursor: pointer; font-weight: 700; }
   /* v11.5 리밸런싱 계산기 */
   .rbTop { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; margin-bottom: 10px; } .rbAdd { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--sub); } .rbAdd input { font-size: 18px; font-weight: 800; width: 200px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-variant-numeric: tabular-nums; }
   .rbMode.pills { display: flex; gap: 6px; flex-wrap: wrap; } .rbPresets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 12px; } .rbImp { background: #14161c !important; color: #e6c57a !important; border-color: #14161c !important; }
@@ -1292,7 +1300,6 @@
     <button data-tab="single"><i>📊</i><span>종목</span></button>
     <button data-tab="compare"><i>⚖️</i><span>비교</span></button>
     <button data-tab="sim"><i>💼</i><span>내 자산</span></button>
-    <button data-tab="div"><i>💰</i><span>배당</span></button>
     <button data-tab="watch"><i>⭐</i><span>관심</span></button>
   </nav>
 </header>
@@ -2137,12 +2144,7 @@
 </div>
 </div><!-- /tab-onecard -->
 
-<div id="tab-div" class="hidden">
-<div class="card" id="divCard">
-  <div class="pgHead"><h2>배당 · 세금 <small>월 얼마 받으려면 얼마가 필요한지 · 계좌별 세후 · 배당락 달력</small></h2></div>
-  <div id="dvBody" style="margin-top:10px"></div>
-</div>
-</div><!-- /tab-div -->
+<!-- v11.6 배당은 관심 탭 안(wp-div)으로 옮김 -->
 
 <div id="tab-mind" class="hidden">
 <div class="card" id="mindCard">
@@ -2283,10 +2285,11 @@
   <button data-wp="list" class="active">관심<span class="mHide"> 종목</span></button>
   <button data-wp="map">전체<span class="mHide"> 종목</span></button>
   <button data-wp="news">뉴스</button>
-  <button data-wp="disc">공시</button>
-  <button data-wp="guru">구루</button>
-  <button data-wp="ipo">공모주</button>
-  <button data-wp="macro">매크로</button>
+  <button data-wp="div" class="ownerOnly">배당</button>
+  <button data-wp="disc" class="ownerOnly">공시</button>
+  <button data-wp="guru" class="ownerOnly">구루</button>
+  <button data-wp="ipo" class="ownerOnly">공모주</button>
+  <button data-wp="macro" class="ownerOnly">매크로</button>
 </div>
 <div id="wp-list" class="subPane"><div class="card" id="watchCard">
   <h2>관심 종목 <small>내 종목들의 현재 위치를 한눈에</small></h2>
@@ -2330,6 +2333,10 @@
       <li>데이터는 매일 아침 갱신되는 사전 수집분(최근 90일 + 52주 범위)입니다. 3개월 수익률은 90일 데이터의 최대 범위입니다.</li>
     </ul>
   </div></details>
+</div></div>
+<div id="wp-div" class="subPane hidden"><div class="card" id="divCard">
+  <div class="pgHead"><h2>배당 · 세금 <small>월 얼마 받으려면 얼마가 필요한지 · 계좌별 세후 · 배당락 달력</small></h2></div>
+  <div id="dvBody" style="margin-top:10px"></div>
 </div></div>
 <div id="wp-disc" class="subPane hidden"><div class="card" id="discCard">
   <div class="pgHead"><h2>공시 · 지분 변동 <small>등록된 국내 종목의 임원·대주주 매수·매도와 자사주 공시 · 매일 아침 DART에서</small></h2></div>
@@ -2419,7 +2426,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.5<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4001,7 +4008,7 @@ function renderRecent() {
 renderRecent();
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "div"];
+var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard"];   // v11.6 배당(div)은 관심 탭 안으로
 var currentTab = "home";
 
 var SUBS = ["chart", "history", "insight", "tech", "company"];
@@ -4038,6 +4045,7 @@ function refreshSubPanes() {
 }
 
 function switchTab(target, sub, noScroll) {
+  if (target === "div") { target = "watch"; setTimeout(function () { if (typeof switchWatchPane === "function") switchWatchPane("div"); }, 0); }   // v11.6 배당은 관심 탭 안
   if (TABS.indexOf(target) < 0) target = "home";
   if ((target === "brief" || target === "channel" || target === "onecard") && !isOwner()) { if (typeof OWNER !== "undefined" && OWNER.token && !OWNER.checked) OWNER.want = target; target = "home"; }   // 운영자 전용 화면
   currentTab = target;
@@ -4056,7 +4064,6 @@ function switchTab(target, sub, noScroll) {
   if (target === "channel" && typeof renderChannel === "function") renderChannel();
   if (target === "mind" && typeof renderMind === "function") renderMind();
   if (target === "onecard" && typeof makerRender === "function") makerRender();   // v10.5 카드 만들기 화면
-  if (target === "div" && typeof renderDiv === "function") renderDiv();   // v11.1 배당 · 세금
   document.querySelectorAll(".tabItem.open").forEach(function (el) { el.classList.remove("open"); });
   resizeVisibleCharts();
   if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -4801,7 +4808,7 @@ window.addEventListener("load", function () {
 <script src="sim.js?v=10.9"></script>
 <script src="insight.js?v=9.5"></script>
 <script src="guide.js?v=10.9"></script>
-<script src="watch.js?v=11.4"></script>
+<script src="watch.js?v=11.6"></script>
 <script src="holdings.js?v=11.5"></script>
 <script src="brief.js?v=10.6"></script>
 <script src="channel.js?v=9.7"></script>
@@ -4810,25 +4817,26 @@ window.addEventListener("load", function () {
 <script src="issues.js?v=10.8"></script>
 <script src="publish.js?v=11.4"></script>
 <script src="periodic.js?v=9.5.2"></script>
-<script src="story.js?v=10.4"></script>
+<script src="story.js?v=11.6"></script>
 <script src="deep.js?v=10.0"></script>
 <script src="threads.js?v=11.0"></script>
-<script src="reels.js?v=10.4"></script>
+<script src="reels.js?v=11.6"></script>
 <script src="slides.js?v=10.6"></script>
 <script src="onecard.js?v=9.7"></script>
-<script src="aicard.js?v=10.8"></script>
+<script src="aicard.js?v=11.6"></script>
 <script src="onepage.js?v=10.1"></script>
 <script src="picks.js?v=10.8"></script>
-<script src="tpl.js?v=10.7"></script>
+<script src="tpl.js?v=11.6"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=11.4"></script>
+<script src="maker.js?v=11.6"></script>
 <script src="lib.js?v=10.7"></script>
-<script src="dividend.js?v=11.1"></script>
+<script src="dividend.js?v=11.6"></script>
 <script src="disc.js?v=11.2.7"></script>
 <script src="ipo.js?v=11.3.4"></script>
 <script src="macro.js?v=11.4"></script>
 <script src="rebal.js?v=11.5"></script>
-<script src="ui.js?v=11.4"></script>
+<script src="hub.js?v=11.6"></script>
+<script src="ui.js?v=11.6"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>
 </html>

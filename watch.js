@@ -434,19 +434,22 @@ Array.prototype.forEach.call(document.querySelectorAll("#mapFilters [data-mf]"),
   };
 });
 
-/* 관심 탭 하위 화면: 관심 종목 / 전체 종목 / 뉴스 */
+/* 관심 탭 하위 화면: 관심 종목 / 전체 종목 / 뉴스 (+ 운영자: 배당 · 공시 · 구루 · 공모주 · 매크로) */
 var watchPane = "list";
+var WATCH_ADMIN = ["div", "disc", "guru", "ipo", "macro"];
 function switchWatchPane(p, fromHistory) {
-  if (["list", "map", "news", "disc", "guru", "ipo", "macro"].indexOf(p) < 0) p = "list";
+  if (["list", "map", "news", "div", "disc", "guru", "ipo", "macro"].indexOf(p) < 0) p = "list";
+  if (WATCH_ADMIN.indexOf(p) >= 0 && !(typeof isOwner === "function" && isOwner())) p = "list";   // v11.6 배당·공시·구루·공모주·매크로는 운영자만
   if (!fromHistory && p !== watchPane && typeof pushPaneState === "function") pushPaneState({ wp: p });
   watchPane = p;
-  ["list", "map", "news", "disc", "guru", "ipo", "macro"].forEach(function (k) { var el = $("wp-" + k); if (el) el.classList.toggle("hidden", k !== p); });
+  ["list", "map", "news", "div", "disc", "guru", "ipo", "macro"].forEach(function (k) { var el = $("wp-" + k); if (el) el.classList.toggle("hidden", k !== p); });
   Array.prototype.forEach.call(document.querySelectorAll("#watchTabs [data-wp]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-wp") === p);
   });
   // 보이는 화면의 데이터만 불러온다 (뉴스·전체 종목은 처음 열 때 한 번)
   if (p === "map") loadMarketMap();
   if (p === "news") { renderNewsFilters(); loadWatchNews(); loadMarketNews(); }
+  if (p === "div" && typeof renderDiv === "function") renderDiv();   // v11.6 배당 (관심 탭 안으로)
   if (p === "disc" && typeof renderDisc === "function") renderDisc();   // v11.2 공시
   if (p === "guru" && typeof renderGuru === "function") renderGuru();   // v11.2 구루 13F
   if (p === "ipo" && typeof renderIpo === "function") renderIpo();   // v11.3 공모주
@@ -465,6 +468,8 @@ function renderWatchTab(force) {
   if (force) mapState.rows = null;
   if (watchPane === "map") loadMarketMap();
   if (watchPane === "news") { loadWatchNews(); loadMarketNews(); }
+  if (WATCH_ADMIN.indexOf(watchPane) >= 0 && !(typeof isOwner === "function" && isOwner())) { switchWatchPane("list", true); return; }
+  if (watchPane === "div" && typeof renderDiv === "function") renderDiv();
   if (watchPane === "disc" && typeof renderDisc === "function") renderDisc();
   if (watchPane === "guru" && typeof renderGuru === "function") renderGuru();
   if (watchPane === "ipo" && typeof renderIpo === "function") renderIpo();

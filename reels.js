@@ -304,7 +304,7 @@ function reelOpen(id) {
         '<div class="thrGrid"><div><div class="thrLbl">인스타 캡션 <span class="briefDim">' + T.cap.length + ' / 2,200자</span></div><textarea class="thrText rlCap" spellcheck="false"></textarea><button class="primary" data-c="cap">캡션 복사</button></div>' +
         '<div><div class="thrLbl">화면 자막 · 편집 순서</div><textarea class="thrText rlScr" spellcheck="false"></textarea><button class="primary" data-c="scr">자막 복사</button></div></div>' +
         '<div class="thrLbl" style="margin-top:8px">고정 댓글</div><textarea class="thrText rlPin" style="min-height:70px" spellcheck="false"></textarea><button class="primary" data-c="pin" style="width:100%">고정 댓글 복사</button></div>' +
-        '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 이미지 전부 저장</button><span class="briefDim">1080×1920 · 9:16 · 위아래는 인스타 화면에 가려지지 않게 비워 뒀어요</span></div><div class="cardsWrap reelWrap"></div>';
+        '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 이미지 전부 저장</button><span class="briefDim">1080×1350 · 다른 카드와 같은 종이 틀 · 캐러셀·릴스 모두 사용</span></div><div class="cardsWrap reelWrap"></div>';
       box.querySelector(".rlCap").value = T.cap; box.querySelector(".rlScr").value = T.script; box.querySelector(".rlPin").value = T.pin;
       Array.prototype.forEach.call(box.querySelectorAll("[data-c]"), function (b) { b.onclick = function () { var k = b.getAttribute("data-c"); chCopy(box.querySelector(k === "cap" ? ".rlCap" : k === "scr" ? ".rlScr" : ".rlPin").value, b); }; });
       var wrap = box.querySelector(".cardsWrap");

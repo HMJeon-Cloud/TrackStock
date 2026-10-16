@@ -37,7 +37,7 @@ function aiLinesFrom(list, rec) {
       row.items.forEach(function (r) { if (px !== null) t += r.l - px > 30 ? " · " : r.l - px > 2 ? " " : ""; t += r.s; px = r.l + r.w; });
       t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B00}-\u{2BFF}]/gu, "").replace(/\s+/g, " ").trim();
       if (!t || AI_SKIP.test(t) || t === prev || seen[t]) return; prev = t; seen[t] = 1;
-      out.push({ id: "F" + (++id), card: card, text: t });
+      out.push({ id: "F" + (++id), card: card, text: t, size: Math.max.apply(null, row.items.map(function (r) { return r.size || 0; })) });   // v11.6 글자 크기(제목 찾기용)
     });
   });
   return out;
