@@ -1230,6 +1230,18 @@
   .ipoCardI .dsR1 { display: flex; flex-wrap: wrap; row-gap: 2px; } .ipoCardI .dsR1 > b:not(.dsV), .ipoCardI .dsR1 .linkBtn { white-space: nowrap; } .ipoCardI .dsV { margin-left: auto; white-space: nowrap; }
   .ipoT td small { display: block; font-size: 10.5px; opacity: .85; }
   @media (max-width: 759px) { .ipoBkR { grid-template-columns: 96px minmax(0, 1fr) 56px; } .ipoBkS { grid-column: 1 / -1; margin-top: -4px; } }
+  /* v11.5 리밸런싱 계산기 */
+  .rbTop { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; margin-bottom: 10px; } .rbAdd { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--sub); } .rbAdd input { font-size: 18px; font-weight: 800; width: 200px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-variant-numeric: tabular-nums; }
+  .rbMode.pills { display: flex; gap: 6px; flex-wrap: wrap; } .rbPresets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 12px; } .rbImp { background: #14161c !important; color: #e6c57a !important; border-color: #14161c !important; }
+  .rbGrid { display: grid; gap: 6px; } .rbHead, .rbRow { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.3fr) minmax(0, .7fr) minmax(0, 1fr) 30px; gap: 6px; align-items: center; } .rbHead { font-size: 11.5px; color: var(--sub); font-weight: 700; } .rbHead small { font-weight: 500; }
+  .rbRow input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 9px; font-size: 14px; font-variant-numeric: tabular-nums; } .rbRow .rbV, .rbRow .rbW, .rbRow .rbP { text-align: right; } .rbDel { border: 0; background: none; color: var(--sub); font-size: 15px; cursor: pointer; padding: 4px; }
+  .rbActs { gap: 10px; margin: 8px 0 14px; align-items: center; font-size: 12.5px; } .rbClear { margin-left: auto; } .rbWarn { color: var(--up); }
+  .rbAns { border: 1px solid #e6d3a3; background: #fbf6e8; border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; } .rbAnsT { font-size: 16px; font-weight: 700; line-height: 1.55; word-break: keep-all; } .rbAnsT b { color: #8a6a24; } .rbAnsS { font-size: 12.5px; color: var(--sub); margin-top: 6px; line-height: 1.6; } .rbAnsS b { color: var(--txt); }
+  .rbBand { font-size: 12.5px; margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; } .rbBand select { padding: 3px 6px; border-radius: 8px; border: 1px solid var(--line); } .rbOk { color: #2e7d4f; font-weight: 700; } .rbNo { color: var(--up); font-weight: 700; }
+  .rbT td, .rbT th { font-variant-numeric: tabular-nums; white-space: nowrap; } .rbT td small { font-size: 10.5px; color: var(--sub); } .rbT .rbOffT { color: var(--up); font-weight: 700; } .rbSum td { font-weight: 800; background: #faf7ef; }
+  .rbBars { margin: 12px 0 6px; display: grid; gap: 8px; } .rbBarR { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 8px; align-items: center; font-size: 12px; font-weight: 700; color: var(--sub); } .rbBar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: #f0ece2; } .rbBar i { display: flex; align-items: center; justify-content: center; color: #fff; font-style: normal; font-size: 10.5px; font-weight: 700; overflow: hidden; white-space: nowrap; }
+  .rbLeg { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--sub); padding-left: 62px; } .rbLeg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  @media (max-width: 559px) { .rbHead, .rbRow { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.25fr) minmax(0, .6fr) minmax(0, .95fr) 24px; gap: 4px; } .rbRow input { padding: 7px 5px; font-size: 13px; } .rbHead { font-size: 10.5px; } .rbLeg { padding-left: 0; } .rbAdd input { width: 100%; } .rbAdd { flex: 1 1 100%; } }
   /* v11.4 매크로 */
   .macKpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 6px; } .macK { position: relative; min-width: 0; padding-bottom: 38px !important; }
   .macK .kv { font-size: 20px; } .macKs { margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1843,6 +1855,12 @@
 <div class="pills" id="pfModeTabs">
   <button data-pm="hold" class="active">내 보유 현황</button>
   <button data-pm="sim">과거 시뮬레이션</button>
+  <button data-pm="rebal">리밸런싱</button>
+</div>
+
+<div class="card hidden" id="rebalCard">
+  <h2>리밸런싱 계산기 <small>지금 금액 · 목표 비중 · 이번 달 넣을 돈 → 어디에 얼마나 · 로그인 없이 이 브라우저에만 저장</small></h2>
+  <div id="rbBody"></div>
 </div>
 
 <div class="card" id="holdCard">
@@ -2401,7 +2419,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.4<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v11.5<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4134,7 +4152,7 @@ window.addEventListener("popstate", function (e) {
   switchTab(s.tab, s.sub || undefined, true);
   toggleBackPill(!!s.fromGuide);
   if (s.wp && typeof switchWatchPane === "function" && s.wp !== watchPane) switchWatchPane(s.wp, true);
-  if (s.pm && typeof switchPortfolioMode === "function") { var hc = $("holdCard"); if (hc && (hc.classList.contains("hidden") ? "sim" : "hold") !== s.pm) switchPortfolioMode(s.pm, true); }
+  if (s.pm && typeof switchPortfolioMode === "function") { var hc = $("holdCard"), rc = $("rebalCard"); if (hc && (!hc.classList.contains("hidden") ? "hold" : rc && !rc.classList.contains("hidden") ? "rebal" : "sim") !== s.pm) switchPortfolioMode(s.pm, true); }
   if (s.bm && typeof switchBriefMode === "function" && briefState.mode !== s.bm) switchBriefMode(s.bm, true);
   if (s.bk && typeof switchBriefMarket === "function" && briefState.market !== s.bk) switchBriefMarket(s.bk, true);
   // 안내 탭: 선택했던 투자 방법 상세를 되살리거나, 없으면 목록으로 돌아간다
@@ -4784,7 +4802,7 @@ window.addEventListener("load", function () {
 <script src="insight.js?v=9.5"></script>
 <script src="guide.js?v=10.9"></script>
 <script src="watch.js?v=11.4"></script>
-<script src="holdings.js?v=9.5"></script>
+<script src="holdings.js?v=11.5"></script>
 <script src="brief.js?v=10.6"></script>
 <script src="channel.js?v=9.7"></script>
 <script src="cards.js?v=10.4"></script>
@@ -4809,6 +4827,7 @@ window.addEventListener("load", function () {
 <script src="disc.js?v=11.2.7"></script>
 <script src="ipo.js?v=11.3.4"></script>
 <script src="macro.js?v=11.4"></script>
+<script src="rebal.js?v=11.5"></script>
 <script src="ui.js?v=11.4"></script>
 <script src="snapshot.js?v=9.5"></script>
 </body>

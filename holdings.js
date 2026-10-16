@@ -611,15 +611,17 @@ $("hToSim").onclick = function () {
 
 /* ---------- 보유 현황 / 과거 시뮬레이션 전환 ---------- */
 function switchPortfolioMode(mode, fromHistory) {
-  var cur = $("holdCard").classList.contains("hidden") ? "sim" : "hold";
+  var cur = !$("holdCard").classList.contains("hidden") ? "hold" : $("rebalCard") && !$("rebalCard").classList.contains("hidden") ? "rebal" : "sim";
   if (!fromHistory && mode !== cur && typeof pushPaneState === "function") pushPaneState({ pm: mode });
   $("holdCard").classList.toggle("hidden", mode !== "hold");
   $("simCard").classList.toggle("hidden", mode !== "sim");
+  if ($("rebalCard")) $("rebalCard").classList.toggle("hidden", mode !== "rebal");   // v11.5 리밸런싱 계산기
   Array.prototype.forEach.call(document.querySelectorAll("#pfModeTabs [data-pm]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-pm") === mode);
   });
   try { localStorage.setItem("sm.pfMode", mode); } catch (e) {}
   if (mode === "hold") renderHoldings();
+  if (mode === "rebal" && typeof renderRebal === "function") renderRebal();
   if (typeof resizeVisibleCharts === "function") resizeVisibleCharts();
 }
 Array.prototype.forEach.call(document.querySelectorAll("#pfModeTabs [data-pm]"), function (b) {
@@ -642,7 +644,9 @@ Array.prototype.forEach.call(document.querySelectorAll("#pfModeTabs [data-pm]"),
   try { mode = localStorage.getItem("sm.pfMode") || "hold"; } catch (e) {}
   $("holdCard").classList.toggle("hidden", mode !== "hold");
   $("simCard").classList.toggle("hidden", mode !== "sim");
+  if ($("rebalCard")) $("rebalCard").classList.toggle("hidden", mode !== "rebal");
   Array.prototype.forEach.call(document.querySelectorAll("#pfModeTabs [data-pm]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-pm") === mode);
   });
+  if (mode === "rebal") setTimeout(function () { if (typeof renderRebal === "function") renderRebal(); }, 0);
 })();
