@@ -287,18 +287,18 @@ function reelTexts(r) {
 
 /* ---------- 열기 ---------- */
 function reelOpen(id) {
-  var btn = document.querySelector('[data-reel="' + id + '"]'), old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
+  var btn = document.querySelector('[data-reel="' + id + '"]'), old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var need = REEL_DATA[id] && id !== "loss";
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   ready.then(function () { return need && typeof nbLoad === "function" ? nbLoad(REEL_HIST) : null; }).then(function () {
     var r = reelGet(id);
-    if (!r) { if (btn) btn.textContent = old; alert("이 릴스에 필요한 과거 데이터가 아직 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요."); return; }
+    if (!r) { if (btn) btn.innerHTML = old; alert("이 릴스에 필요한 과거 데이터가 아직 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요."); return; }
     if (typeof PUB_BANNED !== "undefined" && PUB_BANNED.test(reelTexts(r).cap)) console.warn("릴스 금칙어 확인 필요");
     reelImages(r);
     var txt = CARD_TXT.replace(/\s+/g, "");
     var fl = document.fonts && document.fonts.load ? Promise.all([500, 600, 700, 800, 900].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); })) : Promise.resolve();
     return fl.then(function () {
-      if (btn) btn.textContent = old;
+      if (btn) btn.innerHTML = old;
       var list = reelImages(r), T = reelTexts(r), day = pubToday().replace(/-/g, ""), box = document.createElement("div");
       box.innerHTML = '<div class="thrPanel"><div class="thrHead"><b>릴스 글</b><small>표지 문구: <b>' + escapeHtml(T.cover) + '</b></small></div>' +
         '<div class="thrGrid"><div><div class="thrLbl">인스타 캡션 <span class="briefDim">' + T.cap.length + ' / 2,200자</span></div><textarea class="thrText rlCap" spellcheck="false"></textarea><button class="primary" data-c="cap">캡션 복사</button></div>' +

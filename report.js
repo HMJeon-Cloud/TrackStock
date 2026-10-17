@@ -423,9 +423,9 @@ function rpPick(pane) {
   inp.addEventListener("blur", function () { setTimeout(function () { res.style.display = "none"; }, 150); });
 }
 function rpGo(q, btn) {
-  var old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "계산 중…"; btn.disabled = true; }
+  var old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "계산 중…"; btn.disabled = true; }
   RP.ai = null;
-  rpBuild(q).then(function (rp) { RP.cur = rp; RP.tab = "new"; renderReport(); window.scrollTo({ top: 0, behavior: "smooth" }); rpExpertFetch(rp).then(function (E) { if (E && RP.cur === rp) { rp.exp = E; renderReport(); } }).catch(function () {}); }).catch(function (e) { alert("리포트를 만들지 못했어요: " + e.message); if (btn) { btn.textContent = old; btn.disabled = false; } });
+  rpBuild(q).then(function (rp) { RP.cur = rp; RP.tab = "new"; renderReport(); window.scrollTo({ top: 0, behavior: "smooth" }); rpExpertFetch(rp).then(function (E) { if (E && RP.cur === rp) { rp.exp = E; renderReport(); } }).catch(function () {}); }).catch(function (e) { alert("리포트를 만들지 못했어요: " + e.message); if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 function rpBar(v, max) { var w = Math.min(100, Math.abs(v) / (max || 1) * 100); return '<span class="rpBarW"><i class="' + (v >= 0 ? "up" : "dn") + '" style="width:' + w.toFixed(1) + '%"></i></span>'; }
 function rpExhibitHtml(e) {
@@ -460,7 +460,7 @@ function rpAction(a, btn) {
   if (a === "back") { RP.cur = null; renderReport(); return; }
   if (a === "save") { var rec = { id: rp.id + ":" + rp.made.slice(0, 10), made: rp.made, kind: rp.kind, sym: rp.sym, name: rp.name, title: rp.title, asOf: rp.asOf, price: rp.price, view: { stance: rp.view.stance, txt: rp.view.txt, score: rp.view.score }, scen: rp.scen.map(function (s) { return { name: s.name, p: s.p, range: s.range }; }), numbers: rp.numbers, thr: rp.thr, ex: rp.exhibits.map(function (e) { return { no: e.no, title: e.title, big: e.big }; }) }; RP.saved = RP.saved.filter(function (x) { return x.id !== rec.id; }); RP.saved.unshift(rec); rpSave(); btn.textContent = "저장됨 ✓"; return; }
   if (a === "thread") { var T = rpThreadSeries(rp), box = document.createElement("div"); box.innerHTML = '<div class="briefDim" style="margin-bottom:8px">본문 1개 + 번호 답글 — 참고한 연재 형식(1. 2. 3. …). 한 칸씩 복사해서 답글로 이어 올리세요.</div>' + T.map(function (t, i) { return '<div class="thrPart"><div class="thrLbl"><b>' + (i ? "답글 " + i : "본문") + '</b><span class="thrCnt">' + t.length + ' / 500자</span><button class="chip thrCopy">복사</button></div><textarea class="thrText" spellcheck="false">' + rpEsc(t) + '</textarea></div>'; }).join("") + '<div class="thrPart"><div class="thrLbl"><b>인스타 캡션</b><button class="chip thrCopy">복사</button></div><textarea class="thrText" spellcheck="false">' + rpEsc(rpCaption(rp)) + '</textarea></div>'; Array.prototype.forEach.call(box.querySelectorAll(".thrCopy"), function (b) { b.onclick = function () { chCopy(b.parentNode.nextSibling.value, b); }; }); infoModal.open("스레드 연재 · " + rp.title, box); return; }
-  if (a === "deck") { var old = btn.textContent; btn.textContent = "만드는 중…"; hubFonts(function () { return rpDeck(rp); }).then(function (list) { btn.textContent = old; hubShow(rp.title, list, { note: "Exhibit 카드 덱 — 표지 · 증거 " + rp.exhibits.length + "장 · 시나리오 · 내 생각 · 마무리. 카드에는 숫자와 해석을, 의견은 '내 생각' 장에만.", thr: [] }); }).catch(function (e) { btn.textContent = old; alert("덱을 만들지 못했어요: " + e.message); }); return; }
+  if (a === "deck") { var old = btn.innerHTML; btn.textContent = "만드는 중…"; hubFonts(function () { return rpDeck(rp); }).then(function (list) { btn.innerHTML = old; hubShow(rp.title, list, { note: "Exhibit 카드 덱 — 표지 · 증거 " + rp.exhibits.length + "장 · 시나리오 · 내 생각 · 마무리. 카드에는 숫자와 해석을, 의견은 '내 생각' 장에만.", thr: [] }); }).catch(function (e) { btn.innerHTML = old; alert("덱을 만들지 못했어요: " + e.message); }); return; }
   if (a === "ai") { var o2 = btn.textContent; btn.textContent = "AI 쓰는 중…"; btn.disabled = true; rpAiWrite(rp).then(function (j) { RP.ai = j; renderReport(); }).catch(function (e) { RP.ai = { ok: false, reason: e.message }; renderReport(); }); return; }
 }
 /* 오늘의 리포트 — 시장 상황으로 질문을 자동 고르고(점수), 하루 한 번 계산 · 상황이 바뀌면 다음 날 자동으로 다른 리포트 */

@@ -5,7 +5,7 @@
    ② 카드 묶음(여러 장): 오늘의 브리핑·오늘 한 장·채널·정기 발행·연구노트·정책·일정·용어·릴스를 버튼 하나로
    ============================================================ */
 var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "work", sel: null, filt: "today", q: "" };
-var MK_TABS = [["work", "작업대"], ["one", "직접 쓰기 (한 장 양식)"], ["lib", "보관함"]];   // v12.1 오늘 할 일 + 묶음 카드 → 작업대(① 상태 ② 주제 ③ 만들기 ④ 결과)
+var MK_TABS = [["work", "작업대"], ["one", "직접 쓰기"], ["lib", "보관함"]];   // v12.1 오늘 할 일 + 묶음 카드 → 작업대(① 상태 ② 주제 ③ 만들기 ④ 결과)
 /* 다른 화면에서 '카드 만들기 ›'로 들어올 때: 탭·시장을 정해서 연다 */
 function makerGo(tab, mk) { if (tab) MK.tab = tab; if (mk) MK.mk = mk; if (typeof navTo === "function") navTo("onecard"); else switchTab("onecard"); }
 function mkLoad() { try { var j = JSON.parse(localStorage.getItem("sm.maker") || "null"); if (j) { MK.text = j.text || {}; MK.meta = j.meta || {}; MK.cat = j.cat || MK.cat; MK.mode = j.mode || MK.mode; } } catch (e) {} }
@@ -158,7 +158,7 @@ function mkWorkHtml() {
   if (MK.q) { var q = MK.q.toLowerCase(); L = L.filter(function (x) { return (cPlain(x.t) + " " + x.d + " " + x.g).toLowerCase().indexOf(q) >= 0; }); }
   h += '<div class="wbCols"><div class="wbLeft"><div class="wbStep"><b>2</b> 주제 고르기 <small>' + L.length + '개 · 점수 = 시장 신호·일정·데이터</small></div>';
   h += '<div class="wbFilt"><button data-wf="today"' + (MK.filt === "today" ? ' class="on"' : '') + '>오늘 추천 10</button><button data-wf="all"' + (MK.filt === "all" ? ' class="on"' : '') + '>전체 ' + T.length + '</button>' + groups.map(function (g) { return '<button data-wf="' + escapeHtml(g) + '"' + (MK.filt === g ? ' class="on"' : '') + '>' + escapeHtml(g) + '</button>'; }).join("") + '<input class="wbQ" placeholder="검색" value="' + escapeHtml(MK.q) + '"></div>';
-  h += '<div class="wbList">' + L.map(function (x, i) { var sc = x.s >= 8 ? "hi" : x.s >= 5 ? "mid" : ""; return '<div class="wbItem' + (x.ctx === MK.sel ? ' on' : '') + '" data-wsel="' + escapeHtml(x.ctx) + '"><span class="wbRank">' + (MK.filt === "today" ? i + 1 : '<i class="wbSc ' + sc + '">' + Math.round(x.s) + '</i>') + '</span><div class="wbMain"><b>' + escapeHtml(x.t) + (doneCtx[x.ctx] ? ' <em class="wbDone">✓ 만듦 ' + doneCtx[x.ctx] + '</em>' : '') + '</b><small>' + escapeHtml(x.why || x.d) + '</small></div><span class="wbG">' + escapeHtml(x.g.split(" · ")[0]) + '</span></div>'; }).join("") + (L.length ? "" : '<div class="briefDim">해당하는 주제가 없어요</div>') + '</div></div>';
+  h += '<div class="wbList">' + L.map(function (x, i) { var sc = x.s >= 8 ? "hi" : x.s >= 5 ? "mid" : ""; return '<div class="wbItem' + (x.ctx === MK.sel ? ' on' : '') + '" data-wsel="' + escapeHtml(x.ctx) + '"><span class="wbRank">' + (MK.filt === "today" ? i + 1 : '<i class="wbSc ' + sc + '">' + Math.round(x.s) + '</i>') + '</span><div class="wbMain"><b>' + escapeHtml(x.t) + (doneCtx[x.ctx] ? ' <em class="wbDone">✓ 만듦 ' + doneCtx[x.ctx] + '</em>' : '') + '</b><small>' + escapeHtml(x.why || x.d) + '</small></div><span class="wbG">' + escapeHtml(x.g.split(" · ")[0].replace(/^데이터로 보는 투자$/, "데이터").replace(/^재미로 보는 숫자$/, "재미").replace(/^투자 상식 리스트$/, "투자 상식")) + '</span></div>'; }).join("") + (L.length ? "" : '<div class="briefDim">해당하는 주제가 없어요</div>') + '</div></div>';
   // ③ 만들기
   var S = T.filter(function (x) { return x.ctx === MK.sel; })[0];
   h += '<div class="wbRight"><div class="wbStep"><b>3</b> 만들기</div>' + (S ? mkMakeHtml(S) : '<div class="briefDim">왼쪽에서 주제를 고르세요</div>') + '</div></div>';
@@ -170,10 +170,10 @@ function mkMakeHtml(S) {
   var h = '<div class="wbSel"><div class="wbSelT">' + escapeHtml(S.t) + '</div><div class="wbSelD">' + escapeHtml(S.d) + '</div>' + (S.why ? '<div class="hubWhy"><span>왜 지금</span>' + escapeHtml(S.why) + '</div>' : '') + '</div>';
   h += '<div class="wbBriefBox" data-brief="' + escapeHtml(S.ctx) + '"><div class="briefDim">읽는 요약(숫자 + 요즘 이슈 + 전문가)을 준비하는 중…</div></div>';
   h += '<div class="wbActs">' +
-    '<button class="wbAct" data-hub="one" data-ctx="' + escapeHtml(S.ctx) + '"><b>한 장</b><small>핵심 숫자 + 이슈·전문가 띠 · 1장 · AI 없음</small></button>' +
-    '<button class="wbAct" data-hub="multi" data-ctx="' + escapeHtml(S.ctx) + '"><b>여러 장</b><small>표지 + 읽는 요약 + 근거 카드 전부</small></button>' +
-    '<button class="wbAct ai" data-hub="ai1" data-ctx="' + escapeHtml(S.ctx) + '"><b>AI 한 장</b><small>AI가 전체를 읽고 한 장 기획</small></button>' +
-    '<button class="wbAct ai" data-hub="aiN" data-ctx="' + escapeHtml(S.ctx) + '"><b>AI 여러 장</b><small>AI가 숫자·이슈·의견을 엮어 5~8장</small></button></div>' +
+    '<button class="wbAct" data-hub="one" data-ctx="' + escapeHtml(S.ctx) + '"><b>한 장</b><small>핵심 숫자 + 이슈 띠 · 1장</small></button>' +
+    '<button class="wbAct" data-hub="multi" data-ctx="' + escapeHtml(S.ctx) + '"><b>여러 장</b><small>요약 + 근거 카드 전부</small></button>' +
+    '<button class="wbAct ai" data-hub="ai1" data-ctx="' + escapeHtml(S.ctx) + '"><b>AI 한 장</b><small>AI가 읽고 1장 기획</small></button>' +
+    '<button class="wbAct ai" data-hub="aiN" data-ctx="' + escapeHtml(S.ctx) + '"><b>AI 여러 장</b><small>AI가 엮어 5~8장</small></button></div>' +
     '<div class="briefDim" style="margin-top:8px">만든 카드는 아래 ④에 바로 떠요 · 업로드 글(스레드·인스타)도 같이 · 숫자는 앱 데이터 그대로</div>';
   return h;
 }

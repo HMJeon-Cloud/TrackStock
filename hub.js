@@ -483,11 +483,11 @@ function hubFonts(fn) {
   return ready.then(function () { CARD_TXT = ""; try { fn(); } catch (e) {} if (!document.fonts || !document.fonts.load) return; var txt = CARD_TXT.replace(/\s+/g, ""); return Promise.all([500, 600, 700, 800, 900].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); })); }).then(function () { return fn(); });
 }
 function hubOpenList(ctx, btn) {
-  var t = hubTopic(ctx), old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "만드는 중…"; btn.disabled = true; }
-  var S = hubSrc(ctx); if (!S) { if (btn) { btn.textContent = old; btn.disabled = false; } return; }
+  var t = hubTopic(ctx), old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "만드는 중…"; btn.disabled = true; }
+  var S = hubSrc(ctx); if (!S) { if (btn) { btn.innerHTML = old; btn.disabled = false; } return; }
   Promise.all([Promise.resolve(S.prep()).then(function () { return hubFonts(S.build); }), hubBrief(ctx).catch(function () { return null; })])
     .then(function (r) { var list = r[0], B = r[1]; if (!list || !list.length) throw new Error("데이터가 아직 없어요"); if (B) { var bc = hubBriefCard(B, hubTitleOf(ctx), list.length + 1); if (bc) list.splice(list[0] && list[0].name === "표지" ? 1 : 0, 0, { name: "읽는요약", cv: bc }); } hubShow(t ? cPlain(t.t).replace(/^\S+\s/, "") : "카드", list, { ctx: ctx, brief: B, note: "위 검정 = 결론 먼저, 아래 종이 = 근거. 2번째 '읽는 요약' 장 = 숫자 + 요즘 이슈 + 전문가 의견을 한 장에. 나머지는 과거·오늘 숫자만.", thr: hubThreads(ctx, list, B) }); })
-    .catch(function (e) { alert("만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.textContent = old; btn.disabled = false; } });
+    .catch(function (e) { alert("만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 
 /* ---------- [한 장] 묶음 전체에서 핵심만 꽉 채운 한 장 (AI 없이) ----------
@@ -594,16 +594,16 @@ function hubOneMake(ctx) {
   });
 }
 function hubOne(ctx, btn) {
-  var old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "만드는 중…"; btn.disabled = true; }
+  var old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "만드는 중…"; btn.disabled = true; }
   Promise.all([hubOneMake(ctx), hubBrief(ctx).catch(function () { return null; })]).then(function (r) { HUB.oneBrief = r[1]; return hubFonts(r[0]).then(function (cv) { HUB.oneBrief = null; return cv; }, function (e) { HUB.oneBrief = null; throw e; }); }).then(function (cv) {
     if (!cv) throw new Error("데이터가 아직 없어요");
     hubShow(hubTitleOf(ctx) + " · 한 장", [{ name: "한장요약", cv: cv }], { ctx: ctx, note: "상세 묶음의 핵심을 한 장에 담았어요(AI 없음 · 숫자는 앱 데이터 그대로) + 아래 띠에 요즘 이슈·전문가 의견. 게시물 첫 장·스토리·스레드 이미지로 쓰기 좋아요.", thr: hubThreads(ctx, [{ name: "한장요약" }]) });
-  }).catch(function (e) { alert("한 장을 만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.textContent = old; btn.disabled = false; } });
+  }).catch(function (e) { alert("한 장을 만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 
 /* ---------- [AI 여러 장] AI가 묶음 전체를 읽고 5~8장으로 풀어 씀 — 숫자는 근거 줄에 있는 그대로만, 앱이 그림 ---------- */
 function hubAiMulti(ctx, btn) {
-  var t = hubTopic(ctx), old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "AI 기획 중…"; btn.disabled = true; }
+  var t = hubTopic(ctx), old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "AI 기획 중…"; btn.disabled = true; }
   var lines = null, title = t ? cPlain(t.t).replace(/^\S+\s/, "") : ctx, B = null;
   Promise.all([aiDeck(ctx), hubBrief(ctx).catch(function () { return null; })]).then(function (r) {
     var d = r[0]; B = r[1];
@@ -614,7 +614,7 @@ function hubAiMulti(ctx, btn) {
     if (!j || !j.ok) throw new Error((typeof OC_REASON !== "undefined" && OC_REASON[j && j.reason]) || (j && j.reason) || "AI 실패");
     var chk = hubAiCheck(j.out, lines);
     return hubFonts(function () { var L = hubAiCards(j.out, chk, title); if (B) { var bc = hubBriefCard(B, title, L.length + 1); if (bc) L.splice(1, 0, { name: "읽는요약", cv: bc }); } return L; }).then(function (list) { hubShow(title + " · AI 여러 장", list, { ctx: ctx, brief: B, note: "AI(" + j.model + ")가 묶음 " + lines.length + "줄을 읽고 기획했어요. 숫자는 근거 줄에 있는 표기만 썼고, 근거와 다른 숫자 줄은 뺐어요.", log: chk.log, thr: hubAiThreads(j.out, title, list) }); });
-  }).catch(function (e) { alert("AI 여러 장을 만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.textContent = old; btn.disabled = false; } });
+  }).catch(function (e) { alert("AI 여러 장을 만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 function hubNorm(s) { return String(s || "").replace(/[\s,]/g, "").replace(/[‐-―−]/g, "-"); }
 function hubAiCheck(out, lines) {

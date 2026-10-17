@@ -606,17 +606,17 @@ function storyCaption(key) {
 function storyOpen(key) {
   key = key || "scene:" + ((nbNow().match && Object.keys(nbNow().match)[0]) || "none");
   var deck = storyDecks().filter(function (d) { return d.key === key; })[0] || { t: "연구노트" };
-  var btn = document.querySelector('[data-story="' + key + '"]'), old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
+  var btn = document.querySelector('[data-story="' + key + '"]'), old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   ready.then(function () { return storyPrepare(key); }).then(function () {
-    if (!storyReady(key.split(":")[0])) { if (btn) btn.textContent = old; alert("이 덱에 필요한 데이터가 아직 준비되지 않았어요. 채널 페이지 계산이 끝난 뒤 다시 눌러 주세요."); return; }
+    if (!storyReady(key.split(":")[0])) { if (btn) btn.innerHTML = old; alert("이 덱에 필요한 데이터가 아직 준비되지 않았어요. 채널 페이지 계산이 끝난 뒤 다시 눌러 주세요."); return; }
     CARD_TXT = ""; try { storyCards(key); } catch (e) { console.warn(e); }
     if (!document.fonts || !document.fonts.load) return true;
     var txt = CARD_TXT.replace(/\s+/g, "");
     return Promise.all([500, 600, 700, 800].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); })).then(function () { return true; });
   }).then(function (go) {
     if (!go) return;
-    if (btn) btn.textContent = old;
+    if (btn) btn.innerHTML = old;
     var list; try { list = storyCards(key); } catch (e) { console.warn(e); list = []; }
     if (!list.length) { alert("아직 데이터가 준비되지 않았어요. (뉴스 덱은 기사 제목에서 자산을 2개 이상 찾아야 만들어져요)"); return; }
     var cap = storyCaption(key), day = pubToday().replace(/-/g, ""), box = document.createElement("div"), slug = deck.t.replace(/[^가-힣A-Za-z0-9]/g, "").slice(0, 12);

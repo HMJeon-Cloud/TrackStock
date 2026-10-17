@@ -392,7 +392,7 @@ function perOpen(kind, force) {
   if (!force && (S.mode ? (V.hard || V.early || !V.ok) : false)) return perGateModal(kind, V);
   var draft = PER_FORCE_DRAFT != null ? PER_FORCE_DRAFT : (S.mode && (V.hard || V.early));
   var need = kind === "monthPreview" || kind === "monthReview" ? PER_SEASON.map(function (a) { return a[0]; }) : [];
-  var btn = document.querySelector('[data-per="' + kind + '"]'), old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
+  var btn = document.querySelector('[data-per="' + kind + '"]'), old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   ready.then(function () { return perLoad(need); }).then(function () {
     CARD_TXT = ""; try { perCards(kind); } catch (e) { console.warn(e); }
@@ -400,7 +400,7 @@ function perOpen(kind, force) {
     var txt = CARD_TXT.replace(/\s+/g, "");
     return Promise.all([500, 600, 700, 800].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); }));
   }).then(function () {
-    if (btn) btn.textContent = old;
+    if (btn) btn.innerHTML = old;
     var list; try { list = perCards(kind, draft); } catch (e) { console.warn(e); list = []; }
     if (!list.length) { alert("아직 데이터가 다 준비되지 않았어요."); return; }
     var day = pubToday().replace(/-/g, ""), cap = perCaption(kind), box = document.createElement("div");

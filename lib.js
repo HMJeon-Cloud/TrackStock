@@ -134,7 +134,7 @@ function libSaveMenu(st, el, api) {
 var LIBUI = { kind: "all" };
 function libTabRender(pane) {
   pane.innerHTML = '<div class="briefDim">보관함 불러오는 중…</div>';
-  libLoad(true).then(function (items) {
+  libLoad(true).then(function (items) { items = items || [];
     if (LIBS.err) { pane.innerHTML = '<div class="briefDim">보관함을 쓸 수 없어요 (' + LIBS.err + ') — 서버 저장소(Upstash Redis) 연결을 확인해 주세요.</div>'; return; }
     var bytes = items.reduce(function (a, x) { return a + (x.size || 0); }, 0), kinds = ["all", "bg", "style", "preset", "icon"];
     var h = '<div class="briefDim" style="margin-bottom:8px">AI로 만든 배경·스타일·구성·아이콘을 서버에 보관해 PC·휴대폰 어디서나 다시 써요. 지금 ' + items.length + '개 · ' + (bytes / 1e6).toFixed(1) + 'MB (즐겨찾기 아닌 것 300개 · 120MB를 넘으면 오래되고 덜 쓴 것부터 자동 정리)</div>';

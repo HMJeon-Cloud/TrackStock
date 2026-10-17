@@ -748,7 +748,7 @@
   .briefThemeBar > div { height: 100%; border-radius: 999px; }
   .briefThemeBar > div.up { background: var(--up); } .briefThemeBar > div.down { background: var(--down); }
   .briefThemeBest { grid-area: best; font-size: 12px; color: var(--sub); }
-  .briefTwoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .briefTwoCol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; } .briefTwoCol > div, .briefThreeCol > div, .briefMover { min-width: 0; }
   /* v10.1 선별 종목 */
   .pkItem { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--card, #fff); }
   .pkItem.open { border-color: var(--gold, #c9a24f); }
@@ -1071,7 +1071,7 @@
   .briefSym.linkBtn { color: var(--txt); font-weight: 600; text-decoration: none; padding: 0; font-size: inherit; }
   .briefSym.linkBtn:hover { color: var(--accent); }
   @media (max-width: 700px) {
-    .briefTemp, .briefThemeList, .briefTwoCol, .briefPickGrid, .briefThreeCol { grid-template-columns: 1fr; }
+    .briefTemp, .briefThemeList, .briefTwoCol, .briefPickGrid, .briefThreeCol { grid-template-columns: minmax(0, 1fr); }
     .briefNumGrid { grid-template-columns: 1fr 1fr; }
     .briefPopGrid { grid-template-columns: 1fr; gap: 0; }
     .briefPopCol + .briefPopCol .briefRowHead { display: none; }
@@ -1121,8 +1121,8 @@
   .mkTop { flex-wrap: nowrap !important; }
   .mkTop .pills.seg { flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; }
   .mkTop .pills.seg button { padding: 7px 14px; font-size: 13px; }
-  .mkTabs { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 !important; }
-  .mkTabs button { padding: 11px 4px !important; font-size: 14px !important; text-align: center; }
+  .mkTabs { display: grid !important; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0 !important; }
+  .mkTabs button { padding: 11px 4px !important; font-size: 14px !important; text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 480px) { .mkTabs button { font-size: 13px !important; } .mkTop .aiBtn { padding: 6px 10px; font-size: 12px; } }
   .mkCats { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)) !important; }
   .mkCats button { flex-direction: row !important; justify-content: center; padding: 10px 6px !important; font-size: 13px !important; font-weight: 700; }
@@ -1251,14 +1251,15 @@
   .wbFilt { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; } .wbFilt button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; color: var(--sub); cursor: pointer; } .wbFilt button.on { background: #14161c; color: #e6c57a; border-color: #14161c; } .wbQ { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; width: 90px; }
   .wbList { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; } .wbItem { display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; } .wbItem:last-child { border-bottom: 0; } .wbItem:hover { background: #fbf8f1; } .wbItem.on { background: #fff8e6; box-shadow: inset 3px 0 0 #c9a24f; }
   .wbRank { width: 24px; flex: 0 0 24px; text-align: center; font-weight: 900; font-size: 13px; color: var(--sub); } .wbSc { display: inline-block; font-style: normal; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 5px; background: #eef0f3; color: var(--sub); } .wbSc.mid { background: #fbf5e6; color: #8a6a24; } .wbSc.hi { background: #14161c; color: #e6c57a; }
-  .wbMain { min-width: 0; flex: 1; } .wbMain b { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbMain small { display: block; color: var(--sub); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbDone { font-style: normal; font-size: 11px; color: #2e7d4f; font-weight: 700; } .wbG { flex: 0 0 auto; font-size: 10.5px; color: var(--sub); background: #eef0f3; border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
+  .wbMain { min-width: 0; flex: 1; } .wbMain b { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbMain small { display: block; color: var(--sub); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbDone { font-style: normal; font-size: 11px; color: #2e7d4f; font-weight: 700; } .wbG { flex: 0 0 84px; width: 84px; text-align: center; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; font-size: 10.5px; color: var(--sub); background: #eef0f3; border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
   .wbRight { position: sticky; top: 8px; } .wbSel { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 12px; padding: 12px 14px; } .wbSelT { font-weight: 900; font-size: 15px; } .wbSelD { color: var(--sub); font-size: 12.5px; margin-top: 2px; } .wbSel .hubWhy { margin-top: 8px; }
   .wbBriefBox { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; } .wbBrH { font-weight: 900; font-size: 13.5px; margin-bottom: 6px; } .wbBrH small { display: block; font-weight: 500; color: var(--sub); font-size: 11px; }
   .wbBrRow { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px dashed var(--line); align-items: start; } .wbBrRow > span { font-size: 11.5px; font-weight: 800; color: #8a6a24; padding-top: 2px; } .wbBrRow ul { margin: 0; padding-left: 16px; } .wbBrRow li { font-size: 12.5px; line-height: 1.5; } .wbBrRow li small { color: var(--sub); } .wbBrRow em { font-style: normal; } .wbBrRow .pos { color: #c0392b; } .wbBrRow .neg { color: #2f6fd6; }
   .wbNums { display: flex; flex-wrap: wrap; gap: 4px; } .wbNums i { font-style: normal; font-size: 11.5px; background: #f6f7f9; border-radius: 6px; padding: 2px 7px; } .wbNums i b { color: var(--txt); }
-  .wbActs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 10px; } .wbAct { min-width: 0; overflow: hidden; } .wbAct b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbAct small { white-space: normal; word-break: keep-all; } .wbAct { border: 1px solid #14161c; background: #14161c; color: #fff; border-radius: 12px; padding: 10px 12px; text-align: left; cursor: pointer; } .wbAct b { display: block; font-size: 14px; color: #e6c57a; } .wbAct small { display: block; font-size: 11px; color: #cfc9ba; margin-top: 2px; } .wbAct.ai { background: #fffdf7; color: var(--txt); border-color: #e6d3a3; } .wbAct.ai b { color: #8a6a24; } .wbAct.ai small { color: var(--sub); } .wbAct:disabled { opacity: .6; }
+  .wbActs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 10px; } .wbAct { min-width: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; min-height: 62px; box-sizing: border-box; } .wbAct b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbAct small { white-space: normal; word-break: keep-all; } .wbAct { border: 1px solid #14161c; background: #14161c; color: #fff; border-radius: 12px; padding: 10px 12px; text-align: left; cursor: pointer; } .wbAct b { display: block; font-size: 14px; color: #e6c57a; } .wbAct small { display: block; font-size: 11px; color: #cfc9ba; margin-top: 2px; } .wbAct.ai { background: #fffdf7; color: var(--txt); border-color: #e6d3a3; } .wbAct.ai b { color: #8a6a24; } .wbAct.ai small { color: var(--sub); } .wbAct:disabled { opacity: .6; }
   .wbResult { margin-top: 10px; border-top: 2px solid #e6d3a3; padding-top: 4px; } .wbBrief { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
   .wbLeft, .wbRight { min-width: 0; }
+  @media (max-width: 480px) { .wbG { flex-basis: 64px; width: 64px; } }
   @media (max-width: 900px) { .wbCols { grid-template-columns: minmax(0, 1fr); } .wbRight { position: static; } .wbKpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .wbList { max-height: 380px; } }
   /* v12.0 종합 해석 */
   .rpNar { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 16px; padding: 14px 16px; margin: 10px 0 14px; } .rpNarT { font-weight: 900; font-size: 15px; margin-bottom: 6px; } .rpNarT small { display: block; font-weight: 500; color: var(--sub); font-size: 11.5px; margin-top: 2px; }
@@ -2476,7 +2477,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.1<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.2<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4862,33 +4863,33 @@ window.addEventListener("load", function () {
 <script src="watch.js?v=11.6"></script>
 <script src="holdings.js?v=11.5"></script>
 <script src="brief.js?v=10.6"></script>
-<script src="channel.js?v=9.7"></script>
-<script src="cards.js?v=10.4"></script>
+<script src="channel.js?v=12.2"></script>
+<script src="cards.js?v=12.2"></script>
 <script src="mind.js?v=10.4"></script>
 <script src="issues.js?v=10.8"></script>
 <script src="publish.js?v=11.4"></script>
-<script src="periodic.js?v=9.5.2"></script>
-<script src="story.js?v=11.8"></script>
+<script src="periodic.js?v=12.2"></script>
+<script src="story.js?v=12.2"></script>
 <script src="deep.js?v=10.0"></script>
 <script src="threads.js?v=11.0"></script>
-<script src="reels.js?v=11.6"></script>
+<script src="reels.js?v=12.2"></script>
 <script src="slides.js?v=10.6"></script>
-<script src="onecard.js?v=9.7"></script>
-<script src="aicard.js?v=11.6"></script>
-<script src="onepage.js?v=10.1"></script>
+<script src="onecard.js?v=12.2"></script>
+<script src="aicard.js?v=12.2"></script>
+<script src="onepage.js?v=12.2"></script>
 <script src="picks.js?v=10.8"></script>
 <script src="tpl.js?v=11.6"></script>
 <script src="tplx.js?v=10.5"></script>
-<script src="maker.js?v=12.1"></script>
-<script src="lib.js?v=10.7"></script>
+<script src="maker.js?v=12.2"></script>
+<script src="lib.js?v=12.2"></script>
 <script src="dividend.js?v=11.6"></script>
 <script src="disc.js?v=11.2.7"></script>
 <script src="ipo.js?v=11.3.4"></script>
 <script src="macro.js?v=11.4"></script>
-<script src="rebal.js?v=11.5"></script>
-<script src="hub.js?v=12.1"></script>
-<script src="report.js?v=12.0"></script>
+<script src="rebal.js?v=12.2"></script>
+<script src="hub.js?v=12.2"></script>
+<script src="report.js?v=12.2"></script>
 <script src="ui.js?v=11.7"></script>
-<script src="snapshot.js?v=9.5"></script>
+<script src="snapshot.js?v=12.2"></script>
 </body>
 </html>

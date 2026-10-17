@@ -211,7 +211,7 @@ function onePageCard(R, iss, news) {
 /* ---------- 열기 ---------- */
 function onePageOpen(btn) {
   var R = briefState.result; if (!R) { alert("오늘의 브리핑 데이터를 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요."); return; }
-  var old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
+  var old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   ready.then(function () { return Promise.all([typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : [], typeof pkEnsure === "function" ? pkEnsure(R).catch(function () { return null; }) : null]); }).then(function () {
     var iss = []; try { iss = issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }); } catch (e) {}
@@ -223,7 +223,7 @@ function onePageOpen(btn) {
     var fl = document.fonts && document.fonts.load ? Promise.all([500, 600, 700, 800, 900].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); })) : Promise.resolve();
     return fl.then(function () {
       var cv; try { cv = draw(); } finally { CARD_MKT = keep; }
-      if (btn) btn.textContent = old;
+      if (btn) btn.innerHTML = old;
       var url = cv.toDataURL("image/png"), day = pubToday().replace(/-/g, ""), mk = cMktInfo(R), box = document.createElement("div");
       var file = "uphill.lab_오늘한장_" + (mk ? mk.name : "전체") + "_" + day + ".png";
       box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:10px"><button class="primary" data-act="save">⬇ 저장</button>' + (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유</button>' : '') + '<span class="briefDim">1080×1350 · 게시물·릴스 표지로 · 선별 종목은 추세·RSI·대금·재무·기사를 겹쳐 고른 후보 · 판단과 책임은 본인에게</span></div><img alt="" style="width:100%;max-width:520px;border-radius:12px;display:block;margin:0 auto;box-shadow:0 4px 18px rgba(0,0,0,.2)">';
@@ -232,5 +232,5 @@ function onePageOpen(btn) {
       var sh = box.querySelector('[data-act="share"]'); if (sh) sh.onclick = function () { cv.toBlob(function (b) { var f = new File([b], file, { type: "image/png" }); if (navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(function () {}); }); };
       infoModal.open("📄 오늘 한 장 · " + (mk ? mk.name : "전체"), box);
     });
-  }).catch(function (e) { if (btn) btn.textContent = old; alert("만들지 못했어요: " + e.message); });
+  }).catch(function (e) { if (btn) btn.innerHTML = old; alert("만들지 못했어요: " + e.message); });
 }

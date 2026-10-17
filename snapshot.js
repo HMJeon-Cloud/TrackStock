@@ -308,7 +308,7 @@
       alert("먼저 그래프가 나오도록 조회해 주세요."); return;
     }
     var info = describe(wrap);
-    var old = btn.textContent;
+    var old = btn.innerHTML;
     btn.disabled = true; btn.textContent = "만드는 중…";
     (isChart ? chartImage(wrap, info) : tableImage(wrap, info))
       .then(function (c) { showResult(c, info); })
@@ -318,7 +318,7 @@
           ? "이미지 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요."
           : "이미지를 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
       })
-      .then(function () { btn.disabled = false; btn.textContent = old; });
+      .then(function () { btn.disabled = false; btn.innerHTML = old; });
   }
 
   /* ---------- 버튼 달기 ---------- */

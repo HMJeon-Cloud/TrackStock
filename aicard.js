@@ -240,14 +240,14 @@ function aiOpenCustom(text, tpl, title) {
 }
 function aiOpen(ctx, btn) {
   if (ctx === "custom") return aiStudio({ ctx: "custom", title: "내 글 · 데이터 한 장 카드", custom: true, lines: [], list: [] });
-  var old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "카드 읽는 중…"; btn.disabled = true; }
+  var old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "카드 읽는 중…"; btn.disabled = true; }
   aiDeck(ctx).then(function (d) {
-    if (btn) { btn.textContent = old; btn.disabled = false; }
+    if (btn) { btn.innerHTML = old; btn.disabled = false; }
     var names = (d.list || []).map(function (it) { return it.name; });
     var spec = null; try { spec = ctx.indexOf("reel:") === 0 ? null : ocDeckSpec(ctx, names, { draft: !!d.draft }); } catch (e) {}
     if (!d.lines.length) { alert("카드 묶음에서 읽을 내용이 없어요. 데이터가 준비된 뒤 다시 눌러 주세요."); return; }
     aiStudio({ ctx: ctx, title: aiTitleOf(ctx), lines: d.lines, list: d.list, spec: spec, reel: d.reel, draft: !!d.draft, tpl: d.tpl || "" });
-  }).catch(function (e) { if (btn) { btn.textContent = old; btn.disabled = false; } alert("준비하지 못했어요: " + e.message); });
+  }).catch(function (e) { if (btn) { btn.innerHTML = old; btn.disabled = false; } alert("준비하지 못했어요: " + e.message); });
 }
 function aiStudioClose() { var el = document.getElementById("aiStudio"); if (el) el.remove(); document.removeEventListener("keydown", aiStudioKey, true); }
 function aiStudioKey(e) { if (e.key === "Escape" && document.getElementById("aiStudio")) { e.stopPropagation(); aiStudioClose(); } }

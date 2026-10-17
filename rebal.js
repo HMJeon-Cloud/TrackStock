@@ -151,7 +151,7 @@ function rbBind(box) {
 /* 내 보유 현황(같은 브라우저 기록)에서 종목별 지금 평가금액을 가져온다 — 목표 비중은 그대로 두거나 지금 비중으로 */
 function rbImport(btn) {
   var H = loadHoldings(), groups = groupLots(H.lots), syms = Object.keys(groups); if (!syms.length) return;
-  var old = btn.textContent; btn.textContent = "시세 불러오는 중…"; btn.disabled = true;
+  var old = btn.innerHTML; btn.textContent = "시세 불러오는 중…"; btn.disabled = true;
   ensureHoldData(syms).then(function () {
     var fx = hState.fx, fxNow = fx ? fx.rates[fx.rates.length - 1] : null, rows = [];
     syms.forEach(function (s) { var R = hState.series[s] || [], last = R[R.length - 1], pos = positionFromLots(groups[s]); if (!last || !(pos.qty > 0)) return; var krw = isKrwSymbol(s, hState.meta[s]), rate = krw ? 1 : (fxNow || 0); if (!rate) return;
@@ -162,7 +162,7 @@ function rbImport(btn) {
     rows.forEach(function (r) { var o = same.filter(function (x) { return x.s === r.s || x.n === r.n; })[0]; r.w = o && o.w ? o.w : +(r.v / T * 100).toFixed(1); });
     RB.a = rows.sort(function (a, b) { return b.v - a.v; }).slice(0, 15); RB.sample = false; rbSave(); renderRebal();
     var o2 = document.getElementById("rbOut"); if (o2) o2.insertAdjacentHTML("afterbegin", '<p class="mentalNote">보유 현황에서 ' + rows.length + '종목을 가져왔어요. 목표 비중이 없던 종목은 <b>지금 비중</b>으로 채웠으니, 원하는 비중으로 바꿔 주세요. 1주 가격은 최근 종가(원화)예요.</p>');
-  }).catch(function () { alert("시세를 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요."); }).then(function () { btn.textContent = old; btn.disabled = false; });
+  }).catch(function () { alert("시세를 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요."); }).then(function () { btn.innerHTML = old; btn.disabled = false; });
 }
 /* 처음 열 때 '리밸런싱'이 마지막으로 보던 화면이면 바로 그린다 (holdings.js가 먼저 읽혀 renderRebal이 아직 없을 수 있음) */
 (function () { var c = document.getElementById("rebalCard"); if (c && !c.classList.contains("hidden") && !document.querySelector("#rbBody .rbTop")) renderRebal(); })();

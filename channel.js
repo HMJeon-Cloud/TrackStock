@@ -18,7 +18,7 @@ function chSave(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catc
 function chName(sym) { return (typeof BRIEF_KO !== "undefined" && BRIEF_KO[sym]) ? BRIEF_KO[sym].replace(/\s*\(.*?\)\s*/g, "").trim() : sym; }
 function chPct(x, d) { if (x == null || !isFinite(x)) return "-"; d = d == null ? 1 : d; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
 function chCopy(text, btn) {
-  function done(ok) { var old = btn.textContent; btn.textContent = ok ? "✓ 복사됨" : "복사 실패"; setTimeout(function () { btn.textContent = old; }, 1500); }
+  function done(ok) { var old = btn.innerHTML; btn.textContent = ok ? "✓ 복사됨" : "복사 실패"; setTimeout(function () { btn.innerHTML = old; }, 1500); }
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
   else { var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(true); } catch (e) { done(false); } ta.remove(); }
 }

@@ -829,7 +829,7 @@ function cardsOpen(kind) {
     return list;
   };
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-  var btn = document.getElementById(kind === "brief" ? "briefCards" : "chCards"), old = btn ? btn.textContent : "";
+  var btn = document.getElementById(kind === "brief" ? "briefCards" : "chCards"), old = btn ? btn.innerHTML : "";
   if (btn) btn.textContent = "만드는 중…";
   var mkt = kind === "brief" && typeof briefState !== "undefined" ? (briefState.market || "all") : null;
   ready.then(function () { return mkt ? cardsPrefetch(mkt) : null; }).then(function () { return kind === "brief" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : null; }).then(function () {
@@ -840,7 +840,7 @@ function cardsOpen(kind) {
     var txt = CARD_TXT.replace(/\s+/g, "");
     return Promise.all([400, 500, 600, 700, 800].map(function (w) { return document.fonts.load(w + " 40px \"Pretendard Variable\"", txt).catch(function () {}); }));
   }).then(function () {
-    if (btn) btn.textContent = old;
+    if (btn) btn.innerHTML = old;
     var list;
     try { list = make(); } catch (e) { console.warn(e); list = []; }
     CARD_STYLE = "regular"; CARD_SERIES = ""; CARD_UNIT = ""; CARD_MKT = null;

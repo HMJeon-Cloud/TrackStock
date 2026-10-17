@@ -321,12 +321,12 @@ function ocCaption(sp) {
 function ocOpenItem(k, useAi) {
   var sp = ocSpec(k);
   if (!sp) { alert("이 항목에 필요한 데이터가 아직 없어요. (채널 항목은 채널 화면 계산이 끝난 뒤, 뉴스는 카드를 한 번 만든 뒤 준비돼요)"); return; }
-  var btn = document.querySelector('[data-oc="' + k + '"][data-ai="' + (useAi ? 1 : 0) + '"]'), old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
+  var btn = document.querySelector('[data-oc="' + k + '"][data-ai="' + (useAi ? 1 : 0) + '"]'), old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var p = useAi ? ocAi({ mode: "item", title: sp.title, facts: sp.facts.map(function (x) { return { id: x.id, label: x.label, value: x.value }; }) }).then(function (j) {
     if (j && j.ok) { var nx = ocApplyAi(sp, j.out); nx.aiLog.unshift({ ok: true, t: "AI 모델: " + j.model + (j.tries && j.tries.length > 1 ? " (" + j.tries.join(" → ") + ")" : "") }); return nx; }
     var s2 = Object.assign({}, sp, { aiLog: [{ ok: false, t: "AI 실패: " + (OC_REASON[j && j.reason] || (j && j.reason) || "알 수 없음") + (j && j.detail ? " — " + j.detail : "") + (j && j.tries ? " [" + j.tries.join(" → ") + "]" : "") + " → 규칙 문구로 만들었어요" }] }); return s2;
   }).catch(function (e) { return Object.assign({}, sp, { aiLog: [{ ok: false, t: "AI 호출 실패: " + e.message + " → 규칙 문구" }] }); }) : Promise.resolve(sp);
-  p.then(function (s) { if (btn) btn.textContent = old; ocShowItem(s); });
+  p.then(function (s) { if (btn) btn.innerHTML = old; ocShowItem(s); });
 }
 function ocShowItem(sp) {
   ocFontsThen(function () { ocItemCard(sp); }, function () {
@@ -367,7 +367,7 @@ function ocOpenCustom(useAi) {
     if (j && j.ok && j.out) { var o = j.out; return { cs: { kicker: ocClean(o.kicker || hint), hook: String(o.hook || base.hook).replace(/\\n/g, "\n"), layout: o.layout, points: o.points || [], table: o.table || { head: [], rows: [] }, takeaway: o.takeaway || "", source: o.source || "" }, log: [{ ok: true, t: "AI 정리 (" + (j.model || "") + (j.tries && j.tries.length > 1 ? " · " + j.tries.join(" → ") : "") + ")" }] }; }
     return { cs: base, log: [{ ok: false, t: "AI 실패: " + (OC_REASON[j && j.reason] || (j && j.reason)) + " → 규칙 정리" }] };
   }).catch(function (e) { return { cs: base, log: [{ ok: false, t: "AI 호출 실패: " + e.message + " → 규칙 정리" }] }; }) : Promise.resolve({ cs: base, log: [{ ok: true, t: "규칙 정리(줄 단위)" }] });
-  p.then(function (r) { btn.textContent = old; if (lay !== "auto") r.cs.layout = lay; if (r.cs.layout === "table" && !(r.cs.table && r.cs.table.rows && r.cs.table.rows.length)) r.cs.layout = "list"; ocShowCustom(r.cs, text, r.log); });
+  p.then(function (r) { btn.innerHTML = old; if (lay !== "auto") r.cs.layout = lay; if (r.cs.layout === "table" && !(r.cs.table && r.cs.table.rows && r.cs.table.rows.length)) r.cs.layout = "list"; ocShowCustom(r.cs, text, r.log); });
 }
 function ocShowCustom(cs, text, log) {
   ocFontsThen(function () { ocCustomCard(cs); }, function () {
@@ -494,12 +494,12 @@ function ocHook(ctx, names, box, opt) {
 function ocDeckOpen(ctx, names, useAi, opt, btn) {
   var sp = ocDeckSpec(ctx, names, opt);
   if (!sp) { alert("이 묶음의 대표 카드에 필요한 데이터가 아직 없어요."); return; }
-  var old = btn ? btn.textContent : ""; if (btn) btn.textContent = "만드는 중…";
+  var old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var p = useAi ? ocAi({ mode: "item", title: sp.title + " (게시물 " + sp.n + "장: " + (sp.deck || []).join(", ") + ")", facts: sp.facts.map(function (x) { return { id: x.id, label: x.label, value: x.value }; }) }).then(function (j) {
     if (j && j.ok) { var nx = ocApplyAi(sp, j.out); nx.aiLog.unshift({ ok: true, t: "AI 모델: " + j.model + (j.tries && j.tries.length > 1 ? " (" + j.tries.join(" → ") + ")" : "") }); return nx; }
     return Object.assign({}, sp, { aiLog: [{ ok: false, t: "AI 실패: " + (OC_REASON[j && j.reason] || (j && j.reason) || "알 수 없음") + (j && j.tries ? " [" + j.tries.join(" → ") + "]" : "") + " → 규칙 문구로 만들었어요" }] });
   }).catch(function (e) { return Object.assign({}, sp, { aiLog: [{ ok: false, t: "AI 호출 실패: " + e.message + " → 규칙 문구" }] }); }) : Promise.resolve(sp);
-  p.then(function (s) { if (btn) btn.textContent = old; infoModal.close && infoModal.close(); ocShowItem(s); });
+  p.then(function (s) { if (btn) btn.innerHTML = old; infoModal.close && infoModal.close(); ocShowItem(s); });
 }
 /* 대표 카드 페이지 → 묶음을 만들고 곧바로 대표 카드로 */
 function ocGo(ctx, ai, run) { OC_PENDING = { ctx: ctx, ai: ai }; try { run(); } catch (e) { OC_PENDING = null; alert("만들지 못했어요: " + e.message); } setTimeout(function () { if (OC_PENDING && OC_PENDING.ctx === ctx) OC_PENDING = null; }, 90000); }
@@ -765,13 +765,13 @@ function ocDeckNames(ctx) {
   return Promise.resolve([]);
 }
 function ocOpenDeck(ctx, btn, title) {
-  var old = btn ? btn.textContent : ""; if (btn) { btn.textContent = "준비 중…"; btn.disabled = true; }
+  var old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "준비 중…"; btn.disabled = true; }
   var kind = ctx.split(":")[0], arg = ctx.split(":").slice(1).join(":");
   var draft = false; if (kind === "per") { var S = PER_SETS[arg], V = perVerify(arg); draft = !!(S.mode && (V.hard || V.early)); }
   ocDeckNames(ctx).then(function (names) {
-    if (btn) { btn.textContent = old; btn.disabled = false; }
+    if (btn) { btn.innerHTML = old; btn.disabled = false; }
     var sp = ocDeckSpec(ctx, names, { draft: draft });
     if (!sp) { alert("이 묶음에 필요한 데이터가 아직 없어요. (연구노트·채널 항목은 채널 화면 계산이 끝난 뒤 준비돼요)"); return; }
     ocStudio({ mode: "deck", title: "대표 카드 · " + (title || sp.title), spec: sp });
-  }, function (e) { if (btn) { btn.textContent = old; btn.disabled = false; } alert("준비하지 못했어요: " + e.message); });
+  }, function (e) { if (btn) { btn.innerHTML = old; btn.disabled = false; } alert("준비하지 못했어요: " + e.message); });
 }
