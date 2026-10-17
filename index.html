@@ -1243,6 +1243,19 @@
   .rpScen { display: grid; gap: 8px; margin-bottom: 12px; } .rpScR { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; position: relative; overflow: hidden; } .rpScP { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; } .rpScR b small { font-weight: 500; color: var(--sub); margin-left: 4px; } .rpScBar { position: absolute; left: 0; bottom: 0; right: 0; height: 4px; background: #f0ece2; } .rpScBar i { display: block; height: 100%; background: #b8913f; }
   .rpPlan { margin: 0 0 12px; padding-left: 22px; font-size: 13.5px; line-height: 1.7; } .rpWatch { margin: 0 0 12px; padding-left: 20px; font-size: 13px; line-height: 1.7; color: var(--txt); } .rpVer { font-size: 12.5px; margin-top: 6px; line-height: 1.6; }
   @media (max-width: 559px) { .rpTiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rpTile b { font-size: 16px; } .rpBarR { grid-template-columns: 84px minmax(0, 1fr) 58px; } .rpRow { grid-template-columns: minmax(70px, 32%) minmax(0, 1fr) auto; font-size: 12px; } .rpStance { grid-template-columns: 1fr; gap: 4px; } }
+  /* v12.3 애널리스트 */
+  .anGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } .anMod { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 10px 12px; text-align: left; cursor: pointer; min-width: 0; } .anMod.on { border-color: #c9a24f; background: #fff8e6; box-shadow: inset 0 0 0 1px #c9a24f; }
+  .anNo { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; background: #5a3b16; color: #fff; font-weight: 900; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; } .anNo.big { width: 44px; height: 44px; font-size: 19px; }
+  .anMain { min-width: 0; } .anMain b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .anMain small { display: block; color: var(--sub); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .anHead { display: flex; gap: 14px; align-items: flex-start; margin: 14px 0 8px; flex-wrap: wrap; } .anHeadT { display: flex; gap: 10px; align-items: center; min-width: 200px; } .anHeadT b { display: block; font-size: 18px; font-weight: 900; } .anHeadT small { color: var(--sub); font-size: 12px; }
+  .anCkList { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; flex: 1; min-width: 240px; } .anCkList li { font-size: 12.5px; padding-left: 18px; position: relative; } .anCkList li::before { content: "✓"; position: absolute; left: 0; color: #8a6a24; font-weight: 900; }
+  .anPick { margin: 6px 0 4px; } .anChips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; } .anChips .chip.on { background: #14161c; color: #e6c57a; border-color: #14161c; } .anChips .chip small { opacity: .7; }
+  .anSec { margin-top: 14px; } .anT { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; } .anT th { text-align: left; font-weight: 700; color: var(--sub); width: 34%; padding: 7px 8px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 12.5px; word-break: break-word; overflow-wrap: anywhere; white-space: normal; position: static; background: none; } .anT td { padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; text-align: left; white-space: normal; } .anT td b, .anT td small { white-space: normal; text-align: left; } .anT td b { display: block; word-break: break-word; overflow-wrap: anywhere; } .anT td small { word-break: break-word; overflow-wrap: anywhere; } .anT td small { display: block; color: var(--sub); font-size: 11.5px; margin-top: 2px; }
+  .anCks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .anCk { display: flex; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; } .anCk .anSt { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; background: #eef0f3; color: var(--sub); } .anCk.ok .anSt { background: #e3f3e8; color: #2e7d4f; } .anCk.mid .anSt { background: #fbf5e6; color: #8a6a24; } .anCk.bad .anSt { background: #fde8e6; color: #c0392b; } .anCk > div { min-width: 0; } .anCk b { display: block; font-size: 13.5px; } .anCk small { display: block; color: var(--sub); font-size: 12px; line-height: 1.5; margin-top: 2px; word-break: keep-all; }
+  .anSum { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 14px; padding: 12px 16px; } .anSum p { margin: 0 0 8px; font-size: 14px; line-height: 1.75; word-break: keep-all; } .anSum p:last-child { margin-bottom: 0; } .anAi .anSum { background: #f7f9ff; border-color: #c9d6f2; }
+  .anActs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; } .anPr { margin-top: 8px; }
+  @media (max-width: 760px) { .anGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .anCkList { grid-template-columns: 1fr; } .anCks { grid-template-columns: 1fr; } .anT th { width: 40%; } }
+  @media (max-width: 420px) { .anGrid { gap: 6px; } .anMod { padding: 8px 9px; gap: 7px; } .anMain small { display: none; } .anNo { width: 28px; height: 28px; font-size: 13px; border-radius: 7px; } }
   /* v12.1 카드 작업대 */
   .wbStep { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 15px; margin: 14px 0 8px; } .wbStep b { width: 24px; height: 24px; border-radius: 50%; background: #14161c; color: #e6c57a; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; } .wbStep small { font-weight: 500; color: var(--sub); font-size: 12px; } .wbStep .wbClose { margin-left: auto; }
   .wbKpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; } .wbKpi { background: var(--bg2, #f6f7f9); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; } .wbKpi small { display: block; color: var(--sub); font-size: 11px; } .wbKpi b { font-size: 15px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbKpi b.pos { color: #2e7d4f; } .wbKpi b.neg { color: #c0392b; }
@@ -1340,6 +1353,7 @@
     <button data-tab="brief" class="ownerOnly"><i>📰</i><span>오늘</span></button>
     <button data-tab="onecard" class="ownerOnly"><i>🃏</i><span>카드</span></button>
     <button data-tab="report" class="ownerOnly"><i>📑</i><span>리포트</span></button>
+    <button data-tab="analyst" class="ownerOnly"><i>🧑‍💼</i><span>분석</span></button>
     <button data-tab="guide"><i>🧭</i><span>투자법</span></button>
     <button data-tab="single"><i>📊</i><span>종목</span></button>
     <button data-tab="compare"><i>⚖️</i><span>비교</span></button>
@@ -2188,6 +2202,13 @@
 </div>
 </div><!-- /tab-report -->
 
+<div id="tab-analyst" class="hidden">
+<div class="card" id="analystCard">
+  <div class="pgHead"><h2>애널리스트 <small>월가 애널리스트처럼 — 기업 · 차트 · 실적 · 재무제표 · 포트폴리오 · 매크로 6가지 틀로 제시 → 평가 → 정리 — 운영자 전용</small></h2></div>
+  <div id="anBody" style="margin-top:10px"></div>
+</div>
+</div><!-- /tab-analyst -->
+
 <div id="tab-onecard" class="hidden">
 <div class="card" id="makerCard">
   <div class="pgHead"><h2>카드 만들기 <small>① 오늘 상태 → ② 주제 고르기 → ③ 만들기 → ④ 결과·업로드 — 운영자 작업대</small></h2></div>
@@ -2477,7 +2498,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.2<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.3<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4059,7 +4080,7 @@ function renderRecent() {
 renderRecent();
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "report"];   // v11.6 배당(div)은 관심 탭 안으로
+var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "report", "analyst"];   // v11.6 배당(div)은 관심 탭 안으로
 var currentTab = "home";
 
 var SUBS = ["chart", "history", "insight", "tech", "company"];
@@ -4098,7 +4119,7 @@ function refreshSubPanes() {
 function switchTab(target, sub, noScroll) {
   if (target === "div") { target = "watch"; setTimeout(function () { if (typeof switchWatchPane === "function") switchWatchPane("div"); }, 0); }   // v11.6 배당은 관심 탭 안
   if (TABS.indexOf(target) < 0) target = "home";
-  if ((target === "brief" || target === "channel" || target === "onecard" || target === "report") && !isOwner()) { if (typeof OWNER !== "undefined" && OWNER.token && !OWNER.checked) OWNER.want = target; target = "home"; }   // 운영자 전용 화면
+  if ((target === "brief" || target === "channel" || target === "onecard" || target === "report" || target === "analyst") && !isOwner()) { if (typeof OWNER !== "undefined" && OWNER.token && !OWNER.checked) OWNER.want = target; target = "home"; }   // 운영자 전용 화면
   currentTab = target;
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-tab") === target);
@@ -4116,6 +4137,7 @@ function switchTab(target, sub, noScroll) {
   if (target === "mind" && typeof renderMind === "function") renderMind();
   if (target === "onecard" && typeof makerRender === "function") makerRender();   // v10.5 카드 만들기 화면
   if (target === "report" && typeof renderReport === "function") renderReport();   // v11.7 리포트(인사이트)
+  if (target === "analyst" && typeof renderAnalyst === "function") { renderAnalyst(); if (!AN.out && !AN.busy && (anMod().need !== "stock" || AN.sym)) anRun(); }   // v12.3 애널리스트
   document.querySelectorAll(".tabItem.open").forEach(function (el) { el.classList.remove("open"); });
   resizeVisibleCharts();
   if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -4148,7 +4170,7 @@ function pushPaneState(patch) {
 /* ---------- 운영자 전용 화면 ('오늘의 브리핑'·'채널 브리핑 자료') ----------
    운영자 키를 한 번 넣으면 이 기기에 토큰이 저장되어 계속 보인다. 다른 사람에겐 진입 버튼이 아예 보이지 않고,
    주소로 직접 들어와도 홈으로 돌아간다. 잠금 해제: 주소 끝에 ?owner 를 붙여 접속 → 운영자 키 입력. */
-var OWNER_TABS = ["brief", "channel", "onecard", "report"];
+var OWNER_TABS = ["brief", "channel", "onecard", "report", "analyst"];
 var OWNER = { token: (function () { try { return localStorage.getItem("sm.owner") || ""; } catch (e) { return ""; } })(), ok: false, want: null };
 /* v10.8 운영자 = 기기에 토큰이 있고 + 이번 접속에서 서버가 그 토큰을 확인한 경우만 (기기 저장소를 고쳐도 열리지 않음) */
 function isOwner() { return typeof OWNER !== "undefined" && !!OWNER.token && OWNER.ok === true; }
@@ -4889,6 +4911,7 @@ window.addEventListener("load", function () {
 <script src="rebal.js?v=12.2"></script>
 <script src="hub.js?v=12.2"></script>
 <script src="report.js?v=12.2"></script>
+<script src="analyst.js?v=12.3"></script>
 <script src="ui.js?v=11.7"></script>
 <script src="snapshot.js?v=12.2"></script>
 </body>

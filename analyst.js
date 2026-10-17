@@ -1,0 +1,343 @@
+/* ============================================================================================
+   StockMind v12.3 — 애널리스트 (운영자 전용)
+   "월가 애널리스트처럼" 6가지 분석 틀: 기업 · 차트 · 실적 · 재무제표 · 포트폴리오 · 매크로
+   모듈마다 ① 제시(앱 데이터 표) → ② 평가(체크리스트 4개 ✓/△/✗ + 이유) → ③ 정리(글) → 프롬프트(데이터 포함 복사) · AI 분석
+   숫자는 앱 데이터(야후 종가 · 네이버 증권 재무 · ECOS/FRED)만 쓰고, 없으면 '데이터 없음'으로 표시한다. 과금 없음 · api 함수 추가 없음.
+   ============================================================================================ */
+var AN = { mod: "biz", sym: null, out: null, ai: null, busy: false, cache: {} };
+var AN_MODS = [
+  { id: "biz", no: "01", t: "기업 분석", sub: "사업모델 · 성장성 · 적정가치", icon: "🏢", need: "stock",
+    ck: ["핵심 사업모델과 수익원", "경쟁력과 성장 동력", "3~5년 실적 전망", "적정 가치와 주요 리스크"],
+    role: "너는 글로벌 주식 애널리스트다.", prompt: "[기업명/티커]의 사업모델, 핵심 수익원, 경쟁력, 3~5년 성장 전망, 적정 가치와 주요 리스크를 최신 공시와 신뢰할 수 있는 자료를 바탕으로 분석해줘. 숫자는 출처와 함께 제시해줘." },
+  { id: "chart", no: "02", t: "차트 분석", sub: "추세 · 지지선 · 저항선 · 기술적 지표", icon: "📈", need: "stock",
+    ck: ["주가 추세와 패턴 분석", "주요 지지선과 저항선", "이동평균선(20·60·120일)", "거래량, RSI, MACD 등 지표 해석"],
+    role: "너는 월가의 기술적 분석 전문가다.", prompt: "[기업명/티커]의 최신 주가 차트를 분석해줘. 주가 추세, 주요 지지선과 저항선, 이동평균선(20·60·120일), 거래량, RSI, MACD 등 핵심 지표를 기반으로 향후 상승/하락 시나리오와 주요 가격대를 제시해줘." },
+  { id: "earn", no: "03", t: "실적 발표 분석", sub: "매출 · 영업이익 · EPS · 가이던스", icon: "📊", need: "stock",
+    ck: ["매출·영업이익·EPS 예상치 비교", "사업 부문별 실적과 핵심 포인트", "향후 가이던스와 주가 영향", "컨퍼런스 콜에서 주목할 내용"],
+    role: "너는 실적 분석 전문가다.", prompt: "[기업명/티커]의 최신 분기 실적을 분석해줘. 매출, 영업이익, EPS의 실제치와 시장 예상치를 비교하고, 사업 부문별 성과와 가이던스, 컨퍼런스 콜의 핵심 내용, 주가에 미칠 영향을 정리해줘." },
+  { id: "fin", no: "04", t: "재무제표 분석", sub: "수익성 · 현금흐름 · 부채비율", icon: "🧾", need: "stock",
+    ck: ["매출·영업이익·순이익 성장률", "ROE·ROIC 등 수익성 지표", "부채비율·유동비율 등 재무 안정성", "영업현금흐름과 잉여현금흐름(FCF)"],
+    role: "너는 기업 재무 분석 전문가다.", prompt: "[기업명/티커]의 최근 3~5년 재무제표를 분석해줘. 매출, 영업이익, 순이익 성장률, ROE, ROIC, 부채비율, 유동비율, 영업현금흐름, 잉여현금흐름을 바탕으로 재무 건전성과 투자 매력도를 평가해줘." },
+  { id: "pf", no: "05", t: "포트폴리오 분석", sub: "종목 비중 · 상관관계 · 리스크", icon: "💼", need: "pf",
+    ck: ["보유 종목 및 비중 진단", "종목 간 상관관계 분석", "수익률과 변동성 평가", "리스크 요인과 비중 조정 제안"],
+    role: "너는 글로벌 자산운용사의 포트폴리오 매니저다.", prompt: "내 포트폴리오(종목명, 투자금, 평균 매수가, 현재가, 현금 비중)를 분석해줘. 종목·섹터 비중, 상관관계, 수익률, 변동성, 주요 리스크를 평가하고, 분산투자 관점에서 비중 조정 방향을 제시해줘." },
+  { id: "macro", no: "06", t: "매크로 분석", sub: "금리 · 물가 · 환율 · 경기 전망", icon: "🌐", need: "macro",
+    ck: ["미국 기준금리와 Fed 정책", "물가·고용·GDP 등 핵심 지표", "달러·원달러 환율과 유동성 흐름", "미·중 갈등 등 지정학적 리스크"],
+    role: "너는 글로벌 거시경제 전문가다.", prompt: "현재 글로벌 경제 상황이 주식시장에 미치는 영향을 분석해줘. 미국 기준금리와 Fed 정책, 물가·고용·GDP, 달러와 원달러 환율, 국채금리, 유동성, 미·중 갈등 등을 바탕으로 향후 6개월 낙관/기준/비관 시나리오와 수혜 업종을 제시해줘." }
+];
+function anMod() { return AN_MODS.filter(function (m) { return m.id === AN.mod; })[0]; }
+function anEsc(s) { return typeof escapeHtml === "function" ? escapeHtml(s) : String(s == null ? "" : s); }
+function anPct(x, d) { return x == null || !isFinite(x) ? "-" : (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 1 : d) + "%"; }
+function anNum(v, d) { return v == null || !isFinite(v) ? "-" : (+v).toLocaleString("ko-KR", { maximumFractionDigits: d == null ? 0 : d }); }
+function anKrw(sym) { return /\.K[SQ]$/.test(sym) || sym === "^KS11"; }
+function anPrice(sym, v) { return v == null ? "-" : anKrw(sym) ? Math.round(v).toLocaleString("ko-KR") + "원" : "$" + (+v).toFixed(2); }
+function anName(s) { return typeof rpName === "function" ? rpName(s) : s; }
+function anEok(v) { if (v == null || !isFinite(v)) return "-"; var a = Math.abs(v); if (a >= 1e12) return (v / 1e12).toFixed(1) + "조"; if (a >= 1e8) return Math.round(v / 1e8).toLocaleString("ko-KR") + "억"; if (a >= 1e6) return (v / 1e6).toFixed(1) + "M"; return anNum(v); }
+/* 네이버 재무 요약 값 = 억원 단위(해외는 ÷100 → 억 달러, company.js 와 동일) */
+function anFinMoney(sym, v) { if (v == null || !isFinite(v)) return "-"; if (!anKrw(sym)) v = v / 100; var sign = v < 0 ? "-" : "", a = Math.abs(v); var t = a >= 10000 ? (a / 10000).toFixed(1) + "조" : a >= 1 ? Math.round(a).toLocaleString("ko-KR") + "억" : a.toFixed(2) + "억"; return sign + t + (anKrw(sym) ? "원" : " USD"); }
+/* 평가 한 줄: ok(✓) · mid(△) · bad(✗) · na(데이터 없음) */
+function anCk(st, t, why) { return { st: st, t: t, why: why || "" }; }
+
+/* ---------- 재무 표 읽기 (company.js findRow/kNum 재사용) ---------- */
+function anFin(F, which) { return F && F.finance && F.finance[which] || null; }
+function anRow(fin, names) { if (!fin) return null; for (var i = 0; i < names.length; i++) { var r = typeof findRow === "function" ? findRow(fin, names[i]) : null; if (r) return r; } return null; }
+function anSeries(fin, names, opt) {   // → [{t:기간명, v:값, f:예상치?}] 확정→예상 순
+  var r = anRow(fin, names); if (!r) return [];
+  return fin.periods.map(function (p) { var v = typeof kNum === "function" ? kNum(r.values[p.key]) : parseFloat(r.values[p.key]); return v == null || isNaN(v) ? null : { t: p.title, v: v, f: !!p.forecast }; }).filter(Boolean);
+}
+function anLastConf(S) { var c = S.filter(function (x) { return !x.f; }); return c.length ? c[c.length - 1] : null; }
+function anGrowth(S) { var c = S.filter(function (x) { return !x.f; }); if (c.length < 2) return null; var a = c[c.length - 2].v, b = c[c.length - 1].v; return a && a > 0 ? b / a - 1 : null; }
+function anCagr(S, n) { var c = S.filter(function (x) { return !x.f; }); if (c.length < 2) return null; var k = Math.min(n, c.length - 1), a = c[c.length - 1 - k].v, b = c[c.length - 1].v; return a > 0 && b > 0 ? Math.pow(b / a, 1 / k) - 1 : null; }
+
+/* ---------- 기술 지표 (차트) ---------- */
+function anTech(rows) {
+  var n = rows.length; if (n < 130) return null; var c = rows.map(function (r) { return r.c; }), v = rows.map(function (r) { return r.v || 0; });
+  function ma(k) { return n >= k ? rpAvg(c.slice(-k)) : null; }
+  function ema(arr, k) { var out = [], m = 2 / (k + 1), e = arr[0]; arr.forEach(function (x, i) { e = i ? x * m + e * (1 - m) : x; out.push(e); }); return out; }
+  var e12 = ema(c, 12), e26 = ema(c, 26), macd = e12.map(function (x, i) { return x - e26[i]; }), sig = ema(macd.slice(-120), 9), hist = macd[n - 1] - sig[sig.length - 1], histPrev = macd[n - 2] - sig[sig.length - 2];
+  var T = typeof rpTech === "function" ? rpTech(rows) : null; if (!T) return null;
+  var w52 = rows.slice(-250), lo52 = Math.min.apply(null, w52.map(function (r) { return r.c; })), hi52 = Math.max.apply(null, w52.map(function (r) { return r.c; }));
+  var w60 = rows.slice(-60), lo60 = Math.min.apply(null, w60.map(function (r) { return r.c; })), hi60 = Math.max.apply(null, w60.map(function (r) { return r.c; }));
+  var vol20 = rpAvg(v.slice(-21, -1)), volX = vol20 ? v[n - 1] / vol20 : null;
+  var slope20 = T.ma20 && n > 30 ? T.ma20 / rpAvg(c.slice(-30, -10)) - 1 : null;
+  return Object.assign(T, { ma120: ma(120), macd: macd[n - 1], sig: sig[sig.length - 1], hist: hist, histPrev: histPrev, lo52: lo52, hi52: hi52, lo60: lo60, hi60: hi60, volX: volX, slope20: slope20, n: n });
+}
+
+/* ============================================================ 데이터 준비 ============================================================ */
+function anPrepStock(sym) {
+  var ps = [typeof rpLoad === "function" ? rpLoad([sym]) : Promise.resolve(), typeof rpFund === "function" ? rpFund(sym) : Promise.resolve(null)];
+  if (typeof fetchNews === "function") ps.push(fetchNews({ type: "raw", q: anName(sym) + " 실적", size: 10 }).catch(function () { return []; }));
+  return Promise.all(ps).then(function (r) { return { rows: typeof rpRows === "function" ? rpRows(sym) : [], F: r[1], news: (r[2] || []).map(function (it) { return { t: typeof cNewsClean === "function" ? cNewsClean(it.title || "") : it.title, press: it.press || "", time: String(it.time || "").slice(0, 10), url: it.url || "", desc: typeof cNewsClean === "function" ? cNewsClean(it.desc || "") : it.desc || "" }; }).filter(function (x) { return x.t; }).slice(0, 6) }; });
+}
+
+/* ============================================================ 01 기업 분석 ============================================================ */
+function anBiz(sym, D) {
+  var F = D.F, info = F && F.info || {}, rows = D.rows, last = rows.length ? rows[rows.length - 1].c : null, name = anName(sym);
+  var V = function (k) { return typeof rpV === "function" ? rpV(info, k) : null; };
+  var mcap = V("marketValue") || V("marketCap"), per = V("per"), cper = V("cnsPer"), pbr = V("pbr"), roe = V("roe"), frn = V("foreignRate"), dy = V("dividendYieldRatio");
+  var indPer = F && F.industry ? (typeof kNum === "function" ? kNum(F.industry.per != null ? F.industry.per : (F.industry.industryPer || null)) : null) : null;
+  var tgt = F && F.consensus ? (rpV(F.consensus, "priceTargetMean") || rpV(F.consensus, "targetPrice")) : null, tgtR = tgt && last && tgt / last > 0.2 && tgt / last < 5 ? tgt / last - 1 : null;
+  var finA = anFin(F, "annual"), rev = anSeries(finA, ["매출액", "매출", "Revenue"]), op = anSeries(finA, ["영업이익", "Operating Income"]), ni = anSeries(finA, ["당기순이익", "순이익", "Net Income"]), opm = anSeries(finA, ["영업이익률"]);
+  var revG = anGrowth(rev), revC = anCagr(rev, 3), opG = anGrowth(op), fc = rev.filter(function (x) { return x.f; }), fcOp = op.filter(function (x) { return x.f; });
+  var hi = rows.length ? Math.max.apply(null, rows.slice(-250).map(function (r) { return r.c; })) : null, dd = hi && last ? last / hi - 1 : null;
+  var T = rows.length >= 130 ? anTech(rows) : null;
+  var cur = anKrw(sym) ? "원" : "$";
+  var rowsOut = [
+    ["시가총액", mcap ? anEok(mcap) + (anKrw(sym) ? "원" : "$") : "-", ""],
+    ["업종 (네이버 분류)", F && F.industry && (F.industry.industryName || F.industry.name) || "-", indPer ? "업종 PER " + indPer.toFixed(1) + "배" : ""],
+    ["매출액 (최근 확정)", rev.length && anLastConf(rev) ? anFinMoney(sym, anLastConf(rev).v) : "-", anLastConf(rev) ? anLastConf(rev).t + " · 전년比 " + anPct(revG, 1) : ""],
+    ["매출 3년 연평균 성장", anPct(revC, 1), ""],
+    ["영업이익 (최근 확정)", op.length && anLastConf(op) ? anFinMoney(sym, anLastConf(op).v) : "-", anLastConf(op) ? "전년比 " + anPct(opG, 1) + (opm.length && anLastConf(opm) ? " · 이익률 " + anLastConf(opm).v.toFixed(1) + "%" : "") : ""],
+    ["매출 전망 (컨센서스)", fc.length ? fc.map(function (x) { return x.t + " " + anFinMoney(sym, x.v); }).join(" · ") : "-", fc.length && anLastConf(rev) ? "최근 확정 대비 " + anPct(fc[fc.length - 1].v / anLastConf(rev).v - 1, 0) : ""],
+    ["영업이익 전망", fcOp.length ? fcOp.map(function (x) { return x.t + " " + anFinMoney(sym, x.v); }).join(" · ") : "-", ""],
+    ["PER (실적 / 예상)", (per ? per.toFixed(1) : "-") + " / " + (cper ? cper.toFixed(1) : "-") + "배", indPer && cper ? (cper < indPer ? "업종보다 낮음" : "업종보다 높음") : ""],
+    ["PBR · ROE", (pbr ? pbr.toFixed(2) + "배" : "-") + " · " + (roe ? roe.toFixed(1) + "%" : "-"), ""],
+    ["목표주가 평균 (컨센서스)", tgt ? anPrice(sym, tgt) : "-", tgtR != null ? "지금보다 " + anPct(tgtR, 0) : ""],
+    ["52주 고점 대비", anPct(dd, 1), T ? "1년 변동성(일평균 " + (T.dayVol * 100).toFixed(1) + "%)" : ""],
+    ["외국인 비율 · 배당수익률", (frn ? frn.toFixed(1) + "%" : "-") + " · " + (dy ? dy.toFixed(2) + "%" : "-"), ""]
+  ];
+  var C = [];
+  C.push(rev.length ? anCk(opm.length && anLastConf(opm) && anLastConf(opm).v >= 10 ? "ok" : opm.length ? "mid" : "mid", "핵심 사업모델과 수익원", (F && F.industry && (F.industry.industryName || F.industry.name) ? "업종 '" + (F.industry.industryName || F.industry.name) + "' · " : "") + "매출 " + anFinMoney(sym, anLastConf(rev).v) + (opm.length && anLastConf(opm) ? " · 영업이익률 " + anLastConf(opm).v.toFixed(1) + "% (" + (anLastConf(opm).v >= 15 ? "높은 편" : anLastConf(opm).v >= 7 ? "보통" : "낮은 편") + ")" : "") + " — 수익원 구성은 공시(사업보고서)에서 확인") : anCk("na", "핵심 사업모델과 수익원", "재무 요약 데이터 없음 — 프롬프트로 AI에 물어보기"));
+  C.push(revC != null ? anCk(revC >= 0.1 && (opG == null || opG >= 0) ? "ok" : revC >= 0.03 ? "mid" : "bad", "경쟁력과 성장 동력", "매출 3년 연평균 " + anPct(revC, 1) + (opG != null ? " · 영업이익 전년比 " + anPct(opG, 1) : "") + (revC >= 0.1 ? " — 두 자릿수 성장" : revC >= 0.03 ? " — 완만한 성장" : " — 성장 정체")) : anCk("na", "경쟁력과 성장 동력", "연간 매출 추이 없음"));
+  C.push(fc.length ? anCk(fc[fc.length - 1].v / anLastConf(rev).v - 1 >= 0.15 ? "ok" : fc[fc.length - 1].v / anLastConf(rev).v - 1 >= 0 ? "mid" : "bad", "3~5년 실적 전망", "컨센서스 매출 " + fc.map(function (x) { return x.t + " " + anFinMoney(sym, x.v); }).join(" → ") + " (확정 대비 " + anPct(fc[fc.length - 1].v / anLastConf(rev).v - 1, 0) + ")" + (fcOp.length ? " · 영업이익 " + anFinMoney(sym, fcOp[fcOp.length - 1].v) : "")) : anCk("na", "3~5년 실적 전망", "컨센서스 전망치 없음 (국내 대형주 위주로 제공)"));
+  var valSt = cper && indPer ? (cper < indPer * 0.8 ? "ok" : cper <= indPer * 1.2 ? "mid" : "bad") : cper ? (cper < 12 ? "ok" : cper < 25 ? "mid" : "bad") : "na";
+  C.push(anCk(valSt, "적정 가치와 주요 리스크", valSt === "na" ? "PER 데이터 없음" : "예상 PER " + cper.toFixed(1) + "배" + (indPer ? " vs 업종 " + indPer.toFixed(1) + "배" : "") + (tgtR != null ? " · 목표주가 괴리 " + anPct(tgtR, 0) : "") + " · 고점 대비 " + anPct(dd, 0) + (T ? " · 일변동 " + (T.dayVol * 100).toFixed(1) + "%" : "") + " — 리스크는 '예상 이익이 지켜지느냐'"));
+  var sum = [];
+  sum.push(nbJosa(name, "은/는") + " " + (mcap ? "시가총액 " + anEok(mcap) + (anKrw(sym) ? "원" : "$") + "의 " : "") + (F && F.industry && (F.industry.industryName || F.industry.name) ? (F.industry.industryName || F.industry.name) + " 업종 기업으로, " : "") + (rev.length && anLastConf(rev) ? "최근 확정 매출 " + anFinMoney(sym, anLastConf(rev).v) + "(전년比 " + anPct(revG, 1) + ")" : "매출 데이터가 없") + (opm.length && anLastConf(opm) ? ", 영업이익률 " + anLastConf(opm).v.toFixed(1) + "%" : "") + "입니다.");
+  if (revC != null) sum.push("성장성은 3년 연평균 매출 " + anPct(revC, 1) + "로 " + (revC >= 0.1 ? "두 자릿수 — 성장주로 분류할 만합니다." : revC >= 0.03 ? "완만한 편 — 이익률과 주주환원이 더 중요한 구간입니다." : "정체 — 밸류에이션이 낮아야 매력이 생깁니다."));
+  if (fc.length) sum.push("시장은 매출이 " + fc[fc.length - 1].t + "에 " + anFinMoney(sym, fc[fc.length - 1].v) + "(확정 대비 " + anPct(fc[fc.length - 1].v / anLastConf(rev).v - 1, 0) + ")까지 갈 것으로 봅니다. 이 전망이 지켜지는지가 주가의 핵심 변수입니다.");
+  if (cper) sum.push("가치 평가: 예상 PER " + cper.toFixed(1) + "배" + (indPer ? "는 업종 평균 " + indPer.toFixed(1) + "배보다 " + (cper < indPer ? "낮아 상대적으로 싼 편" : "높아 프리미엄이 붙은 상태") : "") + (tgtR != null ? ". 증권사 목표주가 평균은 지금보다 " + anPct(tgtR, 0) + "입니다" : "") + ".");
+  sum.push("주요 리스크: " + (dd != null && dd <= -0.2 ? "52주 고점 대비 " + anPct(dd, 0) + "로 이미 조정이 깊고, " : "") + "실적 전망 하향, 업종 경기, " + (anKrw(sym) ? "외국인 수급(현재 " + (frn ? frn.toFixed(1) + "%" : "-") + ")" : "달러·금리 환경") + ". 사업 부문별 수익원과 경쟁 구도는 아래 프롬프트로 AI·공시에서 보완하세요.");
+  return { rows: rowsOut, ck: C, sum: sum, src: "네이버 증권 재무 요약·컨센서스 · 야후 파이낸스 종가 · " + cDate(Date.now()), news: D.news };
+}
+
+/* ============================================================ 02 차트 분석 ============================================================ */
+function anChart(sym, D) {
+  var rows = D.rows, T = anTech(rows), name = anName(sym); if (!T) return { rows: [], ck: [anCk("na", "주가 추세와 패턴 분석", "일봉 130일 이상 필요")], sum: ["차트 데이터가 부족해요."], src: "" };
+  var last = T.last, P = function (v) { return anPrice(sym, v); }, above = [T.ma20, T.ma60, T.ma120].map(function (m) { return m != null && last > m; });
+  var trend = above[0] && above[1] && above[2] && T.ma20 > T.ma60 ? "상승 추세 (정배열)" : !above[0] && !above[1] && !above[2] && T.ma20 < T.ma60 ? "하락 추세 (역배열)" : "횡보·전환 구간 (이평선 엉킴)";
+  var sup = [T.lo60, T.bLo, T.ma60, T.ma120, T.lo52].filter(function (v) { return v != null && v < last; }).sort(function (a, b) { return b - a; }), res = [T.hi60, T.bHi, T.ma20, T.ma60, T.ma120, T.hi52].filter(function (v) { return v != null && v > last; }).sort(function (a, b) { return a - b; });
+  var sup1 = sup[0], sup2 = sup[1], res1 = res[0], res2 = res[1];
+  var rsiT = T.rsi >= 70 ? "과열" : T.rsi <= 30 ? "과매도" : T.rsi >= 55 ? "강세권" : T.rsi <= 45 ? "약세권" : "중립";
+  var macdT = T.hist > 0 && T.histPrev <= 0 ? "골든크로스 직후" : T.hist < 0 && T.histPrev >= 0 ? "데드크로스 직후" : T.hist > 0 ? "상승 신호 유지" : "하락 신호 유지";
+  var rowsOut = [
+    ["현재가 · 1일 · 20일 · 60일", P(last), anPct(T.chg1, 1) + " · " + anPct(T.chg20, 1) + " · " + anPct(T.chg60, 1)],
+    ["추세 판정", trend, "20일선 기울기 " + anPct(T.slope20, 1)],
+    ["20 · 60 · 120일 이동평균", P(T.ma20) + " · " + P(T.ma60) + " · " + (T.ma120 ? P(T.ma120) : "-"), "현재가 위치: " + above.map(function (a, i) { return ["20", "60", "120"][i] + (a ? "↑" : "↓"); }).join(" ")],
+    ["지지선 1 · 2", (sup1 ? P(sup1) : "-") + " · " + (sup2 ? P(sup2) : "-"), sup1 ? "지금보다 " + anPct(sup1 / last - 1, 1) : ""],
+    ["저항선 1 · 2", (res1 ? P(res1) : "-") + " · " + (res2 ? P(res2) : "-"), res1 ? "지금보다 " + anPct(res1 / last - 1, 1) : ""],
+    ["52주 범위", P(T.lo52) + " ~ " + P(T.hi52), "범위 안 위치 " + Math.round((last - T.lo52) / Math.max(1e-9, T.hi52 - T.lo52) * 100) + "%"],
+    ["볼린저 밴드(20,2)", P(T.bLo) + " ~ " + P(T.bHi), "밴드 안 위치 " + (T.bPos != null ? Math.round(T.bPos * 100) + "%" : "-")],
+    ["RSI(14)", T.rsi.toFixed(0), rsiT],
+    ["MACD(12,26,9)", (T.macd >= 0 ? "+" : "") + T.macd.toFixed(2) + " / 시그널 " + T.sig.toFixed(2), macdT],
+    ["거래량 (오늘 / 20일 평균)", T.volX ? T.volX.toFixed(1) + "배" : "-", T.volX >= 2 ? "급증" : T.volX >= 1.2 ? "평소보다 많음" : T.volX ? "평소 수준" : "거래량 데이터 없음"]
+  ];
+  var C = [
+    anCk(trend.indexOf("상승") === 0 ? "ok" : trend.indexOf("하락") === 0 ? "bad" : "mid", "주가 추세와 패턴 분석", trend + " · 20일 " + anPct(T.chg20, 1) + " · 60일 " + anPct(T.chg60, 1)),
+    anCk(sup1 && last / sup1 - 1 <= 0.05 ? "ok" : res1 && res1 / last - 1 <= 0.03 ? "mid" : "mid", "주요 지지선과 저항선", "지지 " + (sup1 ? P(sup1) + "(" + anPct(sup1 / last - 1, 1) + ")" : "-") + " · 저항 " + (res1 ? P(res1) + "(" + anPct(res1 / last - 1, 1) + ")" : "-") + (sup1 && last / sup1 - 1 <= 0.05 ? " — 지지선 바로 위, 손절 기준 잡기 좋은 자리" : res1 && res1 / last - 1 <= 0.03 ? " — 저항 직전, 돌파 확인 필요" : "")),
+    anCk(above.filter(Boolean).length === 3 ? "ok" : above.filter(Boolean).length === 0 ? "bad" : "mid", "이동평균선(20·60·120일)", "현재가가 " + above.filter(Boolean).length + "/3 이평선 위 · " + (T.ma20 > T.ma60 ? "20>60 (단기 우위)" : "20<60 (단기 열위)")),
+    anCk(T.rsi >= 30 && T.rsi <= 70 && T.hist > 0 ? "ok" : T.rsi > 70 || T.rsi < 30 ? "mid" : "mid", "거래량, RSI, MACD 등 지표 해석", "RSI " + T.rsi.toFixed(0) + "(" + rsiT + ") · MACD " + macdT + " · 거래량 " + (T.volX ? T.volX.toFixed(1) + "배" : "-"))
+  ];
+  var sum = [];
+  sum.push(name + " 주가는 " + nbJosa(P(last), "으로/로") + " " + trend + "입니다. 20·60·120일선 중 " + above.filter(Boolean).length + "개 위에 있고, 20일선 기울기는 " + anPct(T.slope20, 1) + "입니다.");
+  sum.push("가격대: 1차 지지 " + (sup1 ? P(sup1) : "-") + ", 2차 " + (sup2 ? P(sup2) : "-") + " / 1차 저항 " + (res1 ? P(res1) : "-") + ", 2차 " + (res2 ? P(res2) : "-") + ". 52주 범위 안에서는 " + Math.round((last - T.lo52) / Math.max(1e-9, T.hi52 - T.lo52) * 100) + "% 위치입니다.");
+  sum.push("지표: RSI " + T.rsi.toFixed(0) + "(" + rsiT + "), MACD " + macdT + ", 거래량은 20일 평균의 " + (T.volX ? T.volX.toFixed(1) + "배" : "-") + ". " + (T.volX >= 1.5 ? "거래가 실린 움직임이라 신뢰도가 높습니다." : "거래가 얇아 방향 확정은 이릅니다."));
+  sum.push("상승 시나리오: " + (res1 ? P(res1) + " 돌파·안착 시 " + (res2 ? P(res2) : "52주 고점 " + P(T.hi52)) + "까지 열립니다." : "52주 고점 " + P(T.hi52) + " 재도전.") + " 하락 시나리오: " + (sup1 ? P(sup1) + " 이탈 시 " + (sup2 ? P(sup2) : "52주 저점 " + P(T.lo52)) + "까지 봐야 합니다." : "52주 저점 " + P(T.lo52) + " 확인.") + " 기술적 분석은 확률이지 예언이 아니니, 손절선을 먼저 정하세요.");
+  return { rows: rowsOut, ck: C, sum: sum, src: "야후 파이낸스 일봉 " + T.n + "일 · StockMind 계산 · " + cDate(Date.now()) };
+}
+
+/* ============================================================ 03 실적 발표 분석 ============================================================ */
+function anEarn(sym, D) {
+  var F = D.F, name = anName(sym), finQ = anFin(F, "quarter"), finA = anFin(F, "annual"), cur = anKrw(sym) ? "원" : "$";
+  var rev = anSeries(finQ, ["매출액", "매출", "Revenue"]), op = anSeries(finQ, ["영업이익", "Operating Income"]), ni = anSeries(finQ, ["당기순이익", "순이익", "Net Income"]), eps = anSeries(finQ, ["EPS"]);
+  function yoy(S) { var c = S.filter(function (x) { return !x.f; }); if (c.length < 5) return null; var a = c[c.length - 5].v, b = c[c.length - 1].v; return a > 0 ? b / a - 1 : null; }
+  function qoq(S) { var c = S.filter(function (x) { return !x.f; }); if (c.length < 2) return null; var a = c[c.length - 2].v, b = c[c.length - 1].v; return a > 0 ? b / a - 1 : null; }
+  var L = anLastConf(rev), nextF = rev.filter(function (x) { return x.f; })[0], nextOp = op.filter(function (x) { return x.f; })[0], nextEps = eps.filter(function (x) { return x.f; })[0];
+  var opm = L && anLastConf(op) ? anLastConf(op).v / L.v : null, opmPrev = (function () { var c = rev.filter(function (x) { return !x.f; }), o = op.filter(function (x) { return !x.f; }); return c.length >= 5 && o.length >= 5 ? o[o.length - 5].v / c[c.length - 5].v : null; })();
+  var rowsOut = L ? [
+    ["최근 확정 분기", L.t, ""],
+    ["매출액", anFinMoney(sym, L.v), "전년 동기比 " + anPct(yoy(rev), 1) + " · 전분기比 " + anPct(qoq(rev), 1)],
+    ["영업이익", anLastConf(op) ? anFinMoney(sym, anLastConf(op).v) : "-", "전년 동기比 " + anPct(yoy(op), 1) + (opm != null ? " · 이익률 " + (opm * 100).toFixed(1) + "%" + (opmPrev != null ? " (1년 전 " + (opmPrev * 100).toFixed(1) + "%)" : "") : "")],
+    ["당기순이익", anLastConf(ni) ? anFinMoney(sym, anLastConf(ni).v) : "-", "전년 동기比 " + anPct(yoy(ni), 1)],
+    ["EPS", anLastConf(eps) ? anNum(anLastConf(eps).v, 2) + cur : "-", "전년 동기比 " + anPct(yoy(eps), 1)],
+    ["다음 분기 컨센서스", nextF ? nextF.t + " 매출 " + anFinMoney(sym, nextF.v) + " · 영업이익 " + (nextOp ? anFinMoney(sym, nextOp.v) : "-") + " · EPS " + (nextEps ? anNum(nextEps.v, 2) : "-") : "-", nextF && L ? "최근 분기 대비 매출 " + anPct(nextF.v / L.v - 1, 0) : ""]
+  ] : [["분기 실적", "데이터 없음", "네이버 증권 분기 재무가 없는 종목"]];
+  D.news.forEach(function (x, i) { if (i < 4) rowsOut.push(["관련 기사 " + (i + 1), x.t, x.press + (x.time ? " · " + x.time : "")]); });
+  var C = [
+    L ? anCk((yoy(rev) != null ? yoy(rev) : qoq(rev)) >= 0.1 && (yoy(op) != null ? yoy(op) : qoq(op)) >= 0.1 ? "ok" : (yoy(rev) != null ? yoy(rev) : qoq(rev)) >= 0 ? "mid" : "bad", "매출·영업이익·EPS 예상치 비교", (yoy(rev) != null ? "매출 YoY " + anPct(yoy(rev), 1) + " · 영업이익 YoY " + anPct(yoy(op), 1) + " · EPS YoY " + anPct(yoy(eps), 1) : "매출 QoQ " + anPct(qoq(rev), 1) + " · 영업이익 QoQ " + anPct(qoq(op), 1) + " (전년 동기 자료 없음)") + " — 발표 당시 예상치와의 비교는 기사·AI로 확인") : anCk("na", "매출·영업이익·EPS 예상치 비교", "분기 실적 데이터 없음"),
+    anCk("na", "사업 부문별 실적과 핵심 포인트", "부문별 데이터는 앱에 없음 — 프롬프트로 AI·IR 자료에서 확인" + (D.news.length ? " · 관련 기사 " + D.news.length + "건 수집" : "")),
+    nextF && L ? anCk(nextF.v / L.v - 1 >= 0.05 ? "ok" : nextF.v / L.v - 1 >= -0.05 ? "mid" : "bad", "향후 가이던스와 주가 영향", "다음 분기 컨센서스 매출 " + anFinMoney(sym, nextF.v) + "(최근 대비 " + anPct(nextF.v / L.v - 1, 0) + ")" + (nextOp && anLastConf(op) ? " · 영업이익 " + anFinMoney(sym, nextOp.v) + "(" + anPct(nextOp.v / anLastConf(op).v - 1, 0) + ")" : "") + " — 회사 가이던스는 컨퍼런스 콜 참고") : anCk("na", "향후 가이던스와 주가 영향", "다음 분기 컨센서스 없음"),
+    anCk(opm != null && opmPrev != null ? (opm >= opmPrev ? "ok" : opm >= opmPrev - 0.03 ? "mid" : "bad") : "na", "컨퍼런스 콜에서 주목할 내용", opm != null && opmPrev != null ? "이익률 " + (opmPrev * 100).toFixed(1) + "% → " + (opm * 100).toFixed(1) + "% (" + (opm >= opmPrev ? "개선" : "악화") + ") — 콜에서는 '이익률 방향·수요·재고·가이던스'를 들으세요" : "콜 요약은 AI·기사로 확인")
+  ];
+  var sum = [];
+  if (L) {
+    sum.push(name + "의 최근 확정 분기(" + L.t + ") 매출은 " + nbJosa(anFinMoney(sym, L.v), "으로/로") + " " + (yoy(rev) != null ? "전년 동기 대비 " + anPct(yoy(rev), 1) : "전분기 대비 " + anPct(qoq(rev), 1)) + (anLastConf(op) ? ", 영업이익은 " + anFinMoney(sym, anLastConf(op).v) + "(" + anPct(yoy(op), 1) + ")" : "") + (anLastConf(eps) ? ", EPS " + anNum(anLastConf(eps).v, 2) + cur + "(" + anPct(yoy(eps), 1) + ")" : "") + "입니다.");
+    if (opm != null && opmPrev != null) sum.push("영업이익률은 1년 전 " + (opmPrev * 100).toFixed(1) + "%에서 " + (opm * 100).toFixed(1) + "%로 " + (opm >= opmPrev ? "좋아졌습니다 — 매출보다 이익이 빨리 느는 구간은 주가에 가장 좋은 조합입니다." : "나빠졌습니다 — 매출이 늘어도 이익률이 꺾이면 시장은 비용·경쟁을 의심합니다."));
+    if (nextF) sum.push("다음 분기(" + nextF.t + ") 시장 예상 매출은 " + nbJosa(anFinMoney(sym, nextF.v), "으로/로") + " 최근 분기 대비 " + anPct(nextF.v / L.v - 1, 0) + "입니다. 실제 발표가 이 숫자를 넘기느냐, 그리고 회사 가이던스가 이보다 높으냐가 발표일 주가를 좌우합니다.");
+  } else sum.push(name + "은(는) 분기 재무 데이터가 앱에 없습니다. 아래 프롬프트를 복사해 AI에 최신 실적을 물어보세요.");
+  if (D.news.length) sum.push("최근 기사: " + D.news.slice(0, 2).map(function (x) { return "'" + x.t + "'(" + x.press + ")"; }).join(", ") + ". 사업 부문별 성과와 컨퍼런스 콜 내용은 앱 데이터에 없으므로 기사·IR에서 보완하세요.");
+  return { rows: rowsOut, ck: C, sum: sum, src: "네이버 증권 분기 재무 · 네이버 뉴스 검색 · " + cDate(Date.now()), news: D.news };
+}
+
+/* ============================================================ 04 재무제표 분석 ============================================================ */
+function anFinancial(sym, D) {
+  var F = D.F, name = anName(sym), finA = anFin(F, "annual"), cur = anKrw(sym) ? "원" : "$";
+  var rev = anSeries(finA, ["매출액", "매출", "Revenue"]), op = anSeries(finA, ["영업이익", "Operating Income"]), ni = anSeries(finA, ["당기순이익", "순이익", "Net Income"]), roe = anSeries(finA, ["ROE"]), roa = anSeries(finA, ["ROA"]), debt = anSeries(finA, ["부채비율"]), curR = anSeries(finA, ["유동비율"]), ocf = anSeries(finA, ["영업활동현금흐름", "영업현금흐름", "Operating Cash Flow"]), fcf = anSeries(finA, ["잉여현금흐름", "FCF", "Free Cash Flow"]), capex = anSeries(finA, ["CAPEX", "자본적지출"]), ebitda = anSeries(finA, ["EBITDA"]);
+  var conf = function (S) { return S.filter(function (x) { return !x.f; }); };
+  var yrs = conf(rev).slice(-5).map(function (x) { return x.t; });
+  function line(label, S, fmt) { var c = conf(S).slice(-5); return c.length ? [label, c.map(function (x) { return x.t.replace(/\.\d+$/, "") + " " + fmt(x.v); }).join(" · "), ""] : [label, "데이터 없음", ""]; }
+  var M = function (v) { return anFinMoney(sym, v); };
+  var rowsOut = [line("매출액", rev, M), line("영업이익", op, M), line("당기순이익", ni, M), line("ROE", roe, function (v) { return v.toFixed(1) + "%"; }), line("ROA", roa, function (v) { return v.toFixed(1) + "%"; }), line("부채비율", debt, function (v) { return v.toFixed(0) + "%"; }), line("유동비율", curR, function (v) { return v.toFixed(0) + "%"; }), line("영업활동현금흐름", ocf, M), line("잉여현금흐름(FCF)", fcf, M)];
+  var rC = anCagr(rev, 3), oC = anCagr(op, 3), nC = anCagr(ni, 3), roeL = anLastConf(roe), roaL = anLastConf(roa), dL = anLastConf(debt), cL = anLastConf(curR), ocfL = anLastConf(ocf), fcfL = anLastConf(fcf), niL = anLastConf(ni);
+  var fcfCalc = !fcfL && ocfL && anLastConf(capex) ? ocfL.v - Math.abs(anLastConf(capex).v) : null;
+  var C = [
+    rC != null ? anCk(rC >= 0.1 && nC >= 0.1 ? "ok" : rC >= 0.03 ? "mid" : "bad", "매출·영업이익·순이익 성장률", "3년 연평균 매출 " + anPct(rC, 1) + " · 영업이익 " + anPct(oC, 1) + " · 순이익 " + anPct(nC, 1) + (oC != null && rC != null ? (oC > rC ? " — 이익이 매출보다 빨리 늘어 레버리지 효과" : " — 이익 증가가 매출에 못 미침") : "")) : anCk("na", "매출·영업이익·순이익 성장률", "연간 재무 데이터 없음"),
+    roeL ? anCk(roeL.v >= 15 ? "ok" : roeL.v >= 8 ? "mid" : "bad", "ROE·ROIC 등 수익성 지표", "ROE " + roeL.v.toFixed(1) + "%(" + roeL.t + ")" + (roaL ? " · ROA " + roaL.v.toFixed(1) + "%" : "") + (roeL.v >= 15 ? " — 우량 기준(15%) 이상" : roeL.v >= 8 ? " — 보통" : " — 자본 효율 낮음") + " · ROIC는 앱에 없음") : anCk("na", "ROE·ROIC 등 수익성 지표", "ROE 데이터 없음"),
+    dL ? anCk(dL.v <= 100 && (!cL || cL.v >= 100) ? "ok" : dL.v <= 200 ? "mid" : "bad", "부채비율·유동비율 등 재무 안정성", "부채비율 " + dL.v.toFixed(0) + "%" + (cL ? " · 유동비율 " + cL.v.toFixed(0) + "%" : "") + (dL.v <= 100 ? " — 안정적" : dL.v <= 200 ? " — 보통 (업종 특성 확인)" : " — 높음, 금리 상승기 부담")) : anCk("na", "부채비율·유동비율 등 재무 안정성", "부채비율 데이터 없음 (해외 종목은 미제공이 많음)"),
+    ocfL || fcfL ? anCk((fcfL ? fcfL.v : fcfCalc != null ? fcfCalc : ocfL.v) > 0 && (!niL || !ocfL || ocfL.v >= niL.v * 0.8) ? "ok" : (fcfL ? fcfL.v : ocfL.v) > 0 ? "mid" : "bad", "영업현금흐름과 잉여현금흐름(FCF)", (ocfL ? "영업현금흐름 " + M(ocfL.v) : "") + (fcfL ? " · FCF " + M(fcfL.v) : fcfCalc != null ? " · FCF(계산) " + M(fcfCalc) : "") + (niL && ocfL ? " · 순이익 대비 " + Math.round(ocfL.v / niL.v * 100) + "%" + (ocfL.v >= niL.v * 0.8 ? " (이익의 질 양호)" : " (이익보다 현금이 적음 — 매출채권·재고 확인)") : "")) : anCk("na", "영업현금흐름과 잉여현금흐름(FCF)", "현금흐름 데이터 없음 — 프롬프트로 확인")
+  ];
+  var sum = [];
+  sum.push(name + "의 최근 " + Math.min(5, conf(rev).length) + "개년 재무: " + (rC != null ? "매출은 연평균 " + anPct(rC, 1) + ", 영업이익 " + anPct(oC, 1) + ", 순이익 " + anPct(nC, 1) + "로 " + (oC > rC ? "이익이 매출보다 빠르게 늘었습니다." : "이익 성장이 매출을 따라가지 못했습니다.") : "연간 추이 데이터가 없습니다."));
+  if (roeL) sum.push("수익성: ROE " + roeL.v.toFixed(1) + "%는 " + (roeL.v >= 15 ? "자기자본을 효율적으로 쓰는 우량 수준입니다." : roeL.v >= 8 ? "평범한 수준으로, 이익률 개선 여부를 봐야 합니다." : "낮은 편이라 PBR이 1배 아래여도 '싸다'고 단정하기 어렵습니다."));
+  if (dL) sum.push("안정성: 부채비율 " + dL.v.toFixed(0) + "%" + (cL ? ", 유동비율 " + cL.v.toFixed(0) + "%" : "") + "로 " + (dL.v <= 100 ? "재무 부담이 작습니다." : dL.v <= 200 ? "업종 평균과 비교가 필요합니다(금융·건설·항공은 원래 높음)." : "부채가 많아 금리와 업황에 민감합니다."));
+  if (ocfL) sum.push("현금흐름: 영업현금흐름 " + nbJosa(M(ocfL.v), "은/는") + (niL ? " 순이익의 " + Math.round(ocfL.v / niL.v * 100) + "%" : "") + (fcfL ? ", FCF " + M(fcfL.v) : fcfCalc != null ? ", FCF(영업CF−CAPEX) " + M(fcfCalc) : "") + ". " + ((fcfL ? fcfL.v : fcfCalc != null ? fcfCalc : ocfL.v) > 0 ? "남는 현금이 있어 배당·자사주·투자 여력이 있습니다." : "현금이 남지 않아 외부 자금 조달 가능성을 봐야 합니다."));
+  sum.push("투자 매력도는 '성장 × 수익성 × 안정성 × 현금'이 모두 ✓일 때 가장 높고, 하나가 ✗면 그 이유가 일시적인지 구조적인지를 프롬프트로 확인하세요.");
+  return { rows: rowsOut, ck: C, sum: sum, src: "네이버 증권 연간 재무(" + (yrs.length ? yrs[0] + "~" + yrs[yrs.length - 1] : "-") + ") · " + cDate(Date.now()) };
+}
+
+/* ============================================================ 05 포트폴리오 분석 ============================================================ */
+function anPfData() {
+  var H = typeof loadHoldings === "function" ? loadHoldings() : { lots: [] }, g = {}; (H.lots || []).forEach(function (L) { (g[L.s] = g[L.s] || []).push(L); });
+  var syms = Object.keys(g); if (!syms.length) return Promise.resolve(null);
+  var fx = (typeof nbStat === "function" && nbStat("KRW=X") || {}).last || 1400;
+  return rpLoad(syms).then(function () {
+    var items = syms.map(function (s) { var rows = rpRows(s), last = rows.length ? rows[rows.length - 1].c : null, q = 0, cost = 0; g[s].forEach(function (L) { q += L.q; cost += L.q * L.p * (L.fx || (anKrw(s) ? 1 : fx)); }); var k = anKrw(s) ? 1 : fx, val = last != null ? last * q * k : cost; return { s: s, name: anName(s), q: q, cost: cost, val: val, last: last, ret: cost ? val / cost - 1 : null, rows: rows, kr: anKrw(s) }; }).filter(function (x) { return x.q > 0; });
+    var tot = items.reduce(function (a, x) { return a + x.val; }, 0); items.forEach(function (x) { x.w = tot ? x.val / tot : 0; });
+    items.sort(function (a, b) { return b.w - a.w; });
+    return { items: items, tot: tot, fx: fx };
+  });
+}
+function anDailyRets(rows, n) { var r = rows.slice(-(n + 1)), out = {}; for (var i = 1; i < r.length; i++) out[Math.floor(r[i].t / 86400e3)] = r[i].c / r[i - 1].c - 1; return out; }
+function anCorr(a, b) { var ks = Object.keys(a).filter(function (k) { return b[k] != null; }); if (ks.length < 60) return null; var xa = ks.map(function (k) { return a[k]; }), xb = ks.map(function (k) { return b[k]; }), ma = rpAvg(xa), mb = rpAvg(xb), sab = 0, sa = 0, sb = 0; ks.forEach(function (k, i) { sab += (xa[i] - ma) * (xb[i] - mb); sa += (xa[i] - ma) * (xa[i] - ma); sb += (xb[i] - mb) * (xb[i] - mb); }); return sa && sb ? sab / Math.sqrt(sa * sb) : null; }
+function anPf(P) {
+  var I = P.items, n = I.length, top = I[0], hhi = I.reduce(function (a, x) { return a + x.w * x.w; }, 0), effN = hhi ? 1 / hhi : 0, krW = I.filter(function (x) { return x.kr; }).reduce(function (a, x) { return a + x.w; }, 0);
+  var rets = {}; I.forEach(function (x) { rets[x.s] = anDailyRets(x.rows, 250); });
+  var pairs = [], cs = []; for (var i = 0; i < n; i++) for (var j = i + 1; j < n; j++) { var c = anCorr(rets[I[i].s], rets[I[j].s]); if (c != null) { pairs.push({ a: I[i].name, b: I[j].name, c: c }); cs.push(c); } }
+  pairs.sort(function (a, b) { return b.c - a.c; }); var avgC = cs.length ? rpAvg(cs) : null;
+  var vols = I.map(function (x) { var r = Object.keys(rets[x.s]).map(function (k) { return rets[x.s][k]; }); if (r.length < 60) return null; var m = rpAvg(r); return Math.sqrt(rpAvg(r.map(function (v) { return (v - m) * (v - m); }))) * Math.sqrt(252); });
+  var pfVol = (function () { var days = {}; I.forEach(function (x) { Object.keys(rets[x.s]).forEach(function (k) { days[k] = (days[k] || 0) + rets[x.s][k] * x.w; }); }); var r = Object.keys(days).map(function (k) { return days[k]; }); if (r.length < 60) return null; var m = rpAvg(r); return Math.sqrt(rpAvg(r.map(function (v) { return (v - m) * (v - m); }))) * Math.sqrt(252); })();
+  var totRet = P.tot && I.reduce(function (a, x) { return a + x.cost; }, 0) ? P.tot / I.reduce(function (a, x) { return a + x.cost; }, 0) - 1 : null;
+  var rowsOut = [["평가액 합계 (원화 환산)", Math.round(P.tot).toLocaleString("ko-KR") + "원", "종목 " + n + "개 · 전체 수익률 " + anPct(totRet, 1) + " · 환율 " + Math.round(P.fx) + "원 적용"]];
+  I.forEach(function (x, i) { rowsOut.push([(i + 1) + ". " + x.name, Math.round(x.w * 100) + "% · " + anPct(x.ret, 1), x.q + "주 · 현재 " + anPrice(x.s, x.last) + (vols[i] != null ? " · 연변동성 " + Math.round(vols[i] * 100) + "%" : "")]); });
+  rowsOut.push(["집중도", "1위 " + Math.round(top.w * 100) + "% · 실질 종목 수 " + effN.toFixed(1) + "개", "국내 " + Math.round(krW * 100) + "% · 해외 " + Math.round((1 - krW) * 100) + "%"]);
+  rowsOut.push(["상관관계 (1년 일간)", avgC != null ? "평균 " + avgC.toFixed(2) : "-", pairs.length ? "가장 비슷: " + pairs[0].a + "·" + pairs[0].b + " " + pairs[0].c.toFixed(2) + " / 가장 다름: " + pairs[pairs.length - 1].a + "·" + pairs[pairs.length - 1].b + " " + pairs[pairs.length - 1].c.toFixed(2) : ""]);
+  rowsOut.push(["포트폴리오 연변동성", pfVol != null ? Math.round(pfVol * 100) + "%" : "-", pfVol != null ? "하루 ±" + (pfVol / Math.sqrt(252) * 100).toFixed(1) + "% · 1년에 한 번쯤 " + anPct(-pfVol * 1.65, 0) + " 겪을 수 있음" : ""]);
+  var C = [
+    anCk(top.w <= 0.3 && effN >= 4 ? "ok" : top.w <= 0.5 ? "mid" : "bad", "보유 종목 및 비중 진단", "1위 " + top.name + " " + Math.round(top.w * 100) + "% · 실질 종목 수 " + effN.toFixed(1) + "개" + (top.w > 0.5 ? " — 한 종목이 절반 이상, 사실상 몰빵" : top.w > 0.3 ? " — 1위 비중이 큰 편" : " — 고르게 분산")),
+    avgC != null ? anCk(avgC <= 0.4 ? "ok" : avgC <= 0.65 ? "mid" : "bad", "종목 간 상관관계 분석", "평균 상관계수 " + avgC.toFixed(2) + (avgC > 0.65 ? " — 같이 움직여 분산 효과가 작음" : avgC > 0.4 ? " — 보통" : " — 서로 다르게 움직여 분산이 잘 됨") + (pairs.length ? " · 최고 " + pairs[0].a + "·" + pairs[0].b + " " + pairs[0].c.toFixed(2) : "")) : anCk("na", "종목 간 상관관계 분석", "1년 일봉이 있는 종목이 2개 이상 필요"),
+    pfVol != null ? anCk(pfVol <= 0.2 ? "ok" : pfVol <= 0.35 ? "mid" : "bad", "수익률과 변동성 평가", "전체 수익률 " + anPct(totRet, 1) + " · 연변동성 " + Math.round(pfVol * 100) + "%" + (pfVol > 0.35 ? " — 코스피(약 20%)보다 훨씬 출렁임" : pfVol > 0.2 ? " — 지수보다 다소 큼" : " — 지수 수준")) : anCk("na", "수익률과 변동성 평가", "일봉 데이터 부족"),
+    anCk(top.w > 0.4 || (avgC != null && avgC > 0.65) || krW === 0 || krW === 1 ? "mid" : "ok", "리스크 요인과 비중 조정 제안", (top.w > 0.4 ? top.name + " 비중을 30% 아래로 줄이는 것부터. " : "") + (avgC != null && avgC > 0.65 ? "비슷하게 움직이는 종목이 많아 채권·금·다른 업종을 섞으면 변동이 줄어요. " : "") + (krW === 1 ? "국내 100% — 환율·해외 분산 고려. " : krW === 0 ? "해외 100% — 환율 변동이 수익률에 그대로 반영. " : "") + "현금 비중은 앱에 없어 프롬프트에서 직접 적어 주세요.")
+  ];
+  var sum = [];
+  sum.push("보유 종목 " + n + "개, 평가액 " + Math.round(P.tot / 1e4).toLocaleString("ko-KR") + "만원(전체 " + anPct(totRet, 1) + "). 1위 " + top.name + " " + Math.round(top.w * 100) + "%, 실질 종목 수는 " + effN.toFixed(1) + "개로 " + (effN >= 5 ? "분산이 되어 있습니다." : effN >= 3 ? "분산이 약한 편입니다." : "사실상 한두 종목에 좌우됩니다."));
+  if (avgC != null) sum.push("종목들은 평균 상관계수 " + avgC.toFixed(2) + "로 " + (avgC > 0.65 ? "거의 같이 움직입니다. 종목 수가 많아도 실제 분산 효과는 작습니다." : avgC > 0.4 ? "어느 정도 같이 움직입니다." : "서로 다르게 움직여 한쪽이 빠질 때 다른 쪽이 받쳐 줍니다.") + (pairs.length ? " 가장 비슷한 짝은 " + pairs[0].a + "·" + pairs[0].b + "(" + pairs[0].c.toFixed(2) + ")입니다." : ""));
+  if (pfVol != null) sum.push("변동성: 연 " + Math.round(pfVol * 100) + "%로 1년에 한 번쯤 " + anPct(-pfVol * 1.65, 0) + " 정도의 하락은 정상 범위입니다. 이 숫자를 견딜 수 없다면 비중이 아니라 '총액'을 줄여야 합니다.");
+  sum.push("조정 방향: " + (top.w > 0.4 ? "① " + top.name + "를 30% 이하로. " : "① 1위 비중은 적정. ") + (avgC != null && avgC > 0.65 ? "② 상관이 낮은 자산(채권·금·다른 업종) 추가. " : "② 상관관계는 양호. ") + (krW === 1 || krW === 0 ? "③ 국내·해외 한쪽에 몰려 있어 환율 분산 고려." : "③ 국내 " + Math.round(krW * 100) + "% · 해외 " + Math.round((1 - krW) * 100) + "% 지역 분산 유지.") + " 새 돈은 '리밸런싱 계산기'로 부족한 쪽에 넣으세요.");
+  return { rows: rowsOut, ck: C, sum: sum, src: "내 자산 보유 기록(브라우저) · 야후 파이낸스 종가 · " + cDate(Date.now()), items: I };
+}
+
+/* ============================================================ 06 매크로 분석 ============================================================ */
+function anMacroPrep() { return typeof macroEnsure === "function" ? macroEnsure().then(function (d) { return d && !d.none ? macPxLoad() : null; }).catch(function () { return null; }) : Promise.resolve(); }
+function anMacro() {
+  var K = typeof macKpis === "function" && typeof MAC !== "undefined" && MAC.doc && !MAC.doc.none ? macKpis() : [], by = {}; K.forEach(function (k) { by[k.id] = k; });
+  function last(id) { var k = by[id]; return k && k.S ? k.S.v[k.S.t.length - 1] : null; }
+  function ago(id, days) { var k = by[id]; if (!k || !k.S) return null; var j = macIdx(k.S.t, k.S.t[k.S.t.length - 1] - days * 86400e3); return k.S.v[j]; }
+  var krw = last("krw"), krw1m = ago("krw", 30), krw1y = ago("krw", 365), fed = last("fed"), fed1y = ago("fed", 365), bok = last("bok"), gap = last("gap"), us10 = last("us10y"), us10y1 = ago("us10y", 365), m2 = last("m2y");
+  var st = function (s) { return typeof nbStat === "function" ? nbStat(s) : null; }, spy = st("SPY"), ks = st("^KS11"), vix = st("^VIX"), tlt = st("TLT"), gld = st("GLD"), oil = st("USO") || st("CL=F"), dxy = st("DX-Y.NYB") || st("UUP");
+  var R = typeof macReady === "function" && macReady() ? macroCompute().filter(function (r) { return r.now && r.now.on; }) : [];
+  var rowsOut = [];
+  if (K.length) K.forEach(function (k) { rowsOut.push([k.l, k.v, k.sub]); }); else rowsOut.push(["매크로 데이터", "아직 수집 전", "관심 → 매크로 탭에서 수집"]);
+  [["S&P500", spy], ["코스피", ks], ["VIX", vix], ["미국 장기채(TLT)", tlt], ["금(GLD)", gld], ["원유(USO)", oil]].forEach(function (p) { if (p[1]) rowsOut.push([p[0], p[0] === "VIX" ? p[1].last.toFixed(0) : anPct(p[1].m1, 1) + " (1개월)", "1년 " + anPct(p[1].y1 != null ? p[1].y1 : p[1].m12, 0) + (p[0] === "VIX" ? "" : " · 고점 대비 " + anPct(p[1].vsHi, 0))]); });
+  if (R.length) rowsOut.push(["지금 해당하는 조건", R.map(function (r) { return r.c.short; }).join(" · "), "과거 사례 기반 — 매크로 탭 참고"]);
+  var fedDir = fed != null && fed1y != null ? (fed < fed1y ? "인하" : fed > fed1y ? "인상" : "동결") : null;
+  var C = [
+    fed != null ? anCk(fedDir === "인하" && (us10 == null || us10y1 == null || us10 <= us10y1) ? "ok" : fedDir === "인상" ? "bad" : "mid", "미국 기준금리와 Fed 정책", "미 기준금리 " + fed.toFixed(2) + "% (1년 전 " + fed1y.toFixed(2) + "% → " + fedDir + " 사이클)" + (us10 != null ? " · 10년물 " + us10.toFixed(2) + "%" + (us10y1 != null ? "(1년 전 " + us10y1.toFixed(2) + "%)" : "") : "") + (fedDir === "인하" ? " — 완화 국면, 주식에 우호적" : fedDir === "인상" ? " — 긴축, 밸류에이션 부담" : "")) : anCk("na", "미국 기준금리와 Fed 정책", "FRED 데이터 없음"),
+    anCk(m2 != null ? (m2 >= 0.03 ? "ok" : m2 >= 0 ? "mid" : "bad") : "na", "물가·고용·GDP 등 핵심 지표", m2 != null ? "미 M2 전년比 " + anPct(m2, 1) + (m2 >= 0.03 ? " — 유동성 확장" : m2 >= 0 ? " — 완만" : " — 유동성 수축") + " · 물가·고용·GDP는 앱 미수집 → 프롬프트로 확인" : "물가·고용·GDP는 앱에 없음 — 프롬프트로 확인"),
+    krw != null ? anCk(krw < 1350 && (krw1m == null || krw / krw1m - 1 < 0.02) ? "ok" : krw < 1420 ? "mid" : "bad", "달러·원달러 환율과 유동성 흐름", "환율 " + Math.round(krw).toLocaleString("ko-KR") + "원 (한 달 " + anPct(krw / krw1m - 1, 1) + " · 1년 " + anPct(krw / krw1y - 1, 1) + ")" + (gap != null ? " · 한미 금리차 " + (gap > 0 ? "+" : "") + gap.toFixed(2) + "%p" : "") + (krw >= 1400 ? " — 원화 약세 심함, 외국인 수급 불리" : krw >= 1350 ? " — 고환율권" : " — 안정권")) : anCk("na", "달러·원달러 환율과 유동성 흐름", "ECOS 환율 데이터 없음"),
+    anCk(vix ? (vix.last < 20 ? "ok" : vix.last < 28 ? "mid" : "bad") : "na", "미·중 갈등 등 지정학적 리스크", vix ? "VIX " + vix.last.toFixed(0) + (vix.last < 20 ? " — 시장이 느끼는 위험 낮음" : vix.last < 28 ? " — 경계" : " — 공포") + (oil ? " · 원유 1개월 " + anPct(oil.m1, 1) : "") + (gld ? " · 금 1개월 " + anPct(gld.m1, 1) : "") + " · 지정학 뉴스는 프롬프트로" : "VIX 데이터 없음")
+  ];
+  var sum = [];
+  sum.push("금리: " + (fed != null ? "미국 기준금리 " + fed.toFixed(2) + "%로 1년 전보다 " + (fedDir === "인하" ? "낮아진 인하 사이클" : fedDir === "인상" ? "높아진 긴축 사이클" : "같은 동결 구간") + (us10 != null ? ", 10년물 " + us10.toFixed(2) + "%" : "") + (bok != null ? ", 한국 " + bok.toFixed(2) + "%" : "") + "입니다. " + (fedDir === "인하" ? "역사적으로 인하기 초반은 주식·채권 모두에 우호적이었지만, 경기 침체를 동반한 인하는 예외였습니다." : "금리가 높게 머무는 동안은 현금·채권의 대안 매력이 커서 고PER 주식이 불리합니다.") : "FRED 데이터가 아직 없습니다."));
+  sum.push("환율·유동성: " + (krw != null ? "원/달러 " + Math.round(krw).toLocaleString("ko-KR") + "원(1년 " + anPct(krw / krw1y - 1, 1) + ")" + (gap != null ? ", 한미 금리차 " + (gap > 0 ? "+" : "") + gap.toFixed(2) + "%p" : "") + (m2 != null ? ", 미 M2 전년比 " + anPct(m2, 1) : "") + ". " + (krw >= 1400 ? "고환율은 외국인에게 한국 주식을 비싸 보이게 해 수급에 불리하고, 수출주엔 유리합니다." : "환율이 안정권이면 외국인 자금 유입에 유리합니다.") : "환율 데이터가 없습니다."));
+  if (spy || ks) sum.push("시장: " + (spy ? "S&P500 1개월 " + anPct(spy.m1, 1) + ", " : "") + (ks ? "코스피 1개월 " + anPct(ks.m1, 1) + ", " : "") + (vix ? "VIX " + vix.last.toFixed(0) : "") + (tlt ? ", 장기채 1개월 " + anPct(tlt.m1, 1) : "") + ". " + (vix && vix.last >= 28 ? "공포 구간 — 과거엔 이런 때 나눠 산 쪽이 1년 뒤 유리했습니다." : vix && vix.last < 20 ? "평온 구간 — 큰 베팅보다 정액 적립이 맞는 때입니다." : "경계 구간입니다."));
+  var opt = fedDir === "인하" && (!vix || vix.last < 25) ? "낙관" : fedDir === "인상" || (vix && vix.last >= 28) || (krw != null && krw >= 1420) ? "비관" : "기준";
+  sum.push("6개월 시나리오(규칙 기반 기울기: " + opt + "): 낙관 = 금리 인하 지속 + 환율 안정 → 성장주·반도체·국내 대형주. 기준 = 금리 동결·환율 횡보 → 실적주·배당주 중심. 비관 = 물가 재상승·지정학 충격 → 금·단기채·현금 비중. " + (R.length ? "지금 해당하는 과거 조건: " + R.map(function (r) { return r.c.short; }).join(", ") + " — 매크로 탭에서 1년 뒤 사례를 확인하세요." : "") + " 물가·고용·GDP와 미·중 이슈는 앱이 수집하지 않으니 프롬프트로 보완하세요.");
+  return { rows: rowsOut, ck: C, sum: sum, src: "한국은행 ECOS · 미국 FRED · 야후 파이낸스 · " + cDate(Date.now()) };
+}
+
+/* ============================================================ 실행 · 프롬프트 · AI ============================================================ */
+function anRun() {
+  var m = anMod(), key = m.id + ":" + (AN.sym || ""); AN.ai = null;
+  if (m.need === "stock" && !AN.sym) { AN.out = null; renderAnalyst(); return; }
+  AN.busy = true; AN.err = null; renderAnalyst();
+  var p;
+  if (m.need === "stock") p = anPrepStock(AN.sym).then(function (D) { return ({ biz: anBiz, chart: anChart, earn: anEarn, fin: anFinancial })[m.id](AN.sym, D); });
+  else if (m.need === "pf") p = anPfData().then(function (P) { if (!P) throw new Error("'내 자산'에 보유 종목을 먼저 기록해 주세요"); return anPf(P); });
+  else p = anMacroPrep().then(anMacro);
+  p.then(function (out) { AN.out = out; AN.outKey = key; }).catch(function (e) { AN.err = e.message; AN.out = null; }).then(function () { AN.busy = false; renderAnalyst(); });
+}
+function anLines(out) { var L = [], id = 0; (out.rows || []).forEach(function (r) { L.push({ id: "D" + (++id), text: r[0] + ": " + r[1] + (r[2] ? " (" + r[2] + ")" : "") }); }); (out.ck || []).forEach(function (c) { L.push({ id: "C" + (++id), text: "[" + ({ ok: "양호", mid: "보통", bad: "주의", na: "데이터 없음" })[c.st] + "] " + c.t + " — " + c.why }); }); return L; }
+function anPromptText(m, out) {
+  var name = m.need === "stock" && AN.sym ? anName(AN.sym) + "(" + AN.sym + ")" : null;
+  var head = m.role + " " + m.prompt.replace(/\[기업명\/티커\]/g, name || "[기업명/티커]");
+  var data = out ? "\n\n아래는 내 앱(StockMind)이 계산한 데이터야. 이 숫자를 근거로 쓰고, 없는 항목은 최신 공시·자료로 보완해줘. 숫자를 지어내지 말고 출처를 붙여줘.\n" + anLines(out).map(function (l) { return "- " + l.text; }).join("\n") : "";
+  return head + data + "\n\n답변 형식: ① 한 줄 결론 ② 제시(핵심 숫자 표) ③ 평가(체크리스트 4개 ✓/△/✗와 이유) ④ 정리(초보도 읽을 수 있는 5문장) ⑤ 리스크와 확인할 것 3개.";
+}
+function anAi(btn) {
+  var m = anMod(), out = AN.out; if (!out) return; var old = btn.innerHTML; btn.textContent = "AI 분석 중…"; btn.disabled = true;
+  fetch("/api/channel?op=ai", { method: "POST", headers: { "x-owner": typeof ocTok === "function" ? ocTok() : "", "Content-Type": "application/json" }, body: JSON.stringify({ mode: "analyst", role: m.role, task: m.prompt.replace(/\[기업명\/티커\]/g, AN.sym ? anName(AN.sym) + "(" + AN.sym + ")" : "[기업명/티커]"), title: m.t + (AN.sym ? " · " + anName(AN.sym) : ""), checks: m.ck, lines: anLines(out) }) }).then(function (r) { return r.json(); }).then(function (j) {
+    if (!j || !j.ok) throw new Error((typeof OC_REASON !== "undefined" && OC_REASON[j && j.reason]) || (j && j.reason) || "AI 실패");
+    AN.ai = j; renderAnalyst();
+  }).catch(function (e) { alert("AI 분석을 받지 못했어요: " + e.message); }).then(function () { btn.innerHTML = old; btn.disabled = false; });
+}
+
+/* ============================================================ 화면 ============================================================ */
+function anRecent() {
+  var out = [], seen = {}; function add(s) { if (s && !seen[s] && !/^\^|=X$/.test(s)) { seen[s] = 1; out.push(s); } }
+  try { (loadHoldings().lots || []).forEach(function (L) { add(L.s); }); } catch (e) {}
+  try { (typeof briefState !== "undefined" && briefState.popular || []).forEach(function (p) { add(p.s || p.symbol || p); }); } catch (e) {}
+  return out.slice(0, 8);
+}
+function renderAnalyst() {
+  var root = document.getElementById("anBody"); if (!root) return; var m = anMod();
+  var h = '<div class="anGrid">' + AN_MODS.map(function (x) { return '<button class="anMod' + (x.id === AN.mod ? ' on' : '') + '" data-anmod="' + x.id + '"><span class="anNo">' + x.no + '</span><span class="anMain"><b>' + x.icon + ' ' + x.t + '</b><small>' + x.sub + '</small></span></button>'; }).join("") + '</div>';
+  h += '<div class="anHead"><div class="anHeadT"><span class="anNo big">' + m.no + '</span><div><b>' + m.t + '</b><small>' + m.sub + '</small></div></div><ul class="anCkList">' + m.ck.map(function (c) { return '<li>' + anEsc(c) + '</li>'; }).join("") + '</ul></div>';
+  if (m.need === "stock") {
+    h += '<div class="anPick"><div class="rpAsk"><input id="anSym" placeholder="종목 검색 (예: 삼성전자, NVDA)" autocomplete="off"><div class="hResults" id="anSymRes"></div></div><div class="anChips">' + (AN.sym ? '<span class="chip on">' + anEsc(anName(AN.sym)) + ' <small>' + AN.sym + '</small></span>' : '') + anRecent().filter(function (s) { return s !== AN.sym; }).map(function (s) { return '<button class="chip" data-ansym="' + s + '">' + anEsc(anName(s)) + '</button>'; }).join("") + '</div></div>';
+  } else if (m.need === "pf") h += '<div class="briefDim" style="margin:8px 0">\'내 자산\'에 기록한 보유 종목으로 계산해요 (브라우저 저장 · 현금 비중은 프롬프트에 직접 적기).</div>';
+  else h += '<div class="briefDim" style="margin:8px 0">한국은행 ECOS · 미국 FRED(일 1회 수집) + 야후 지수·ETF로 계산해요.</div>';
+  if (AN.busy) h += '<div class="briefDim" style="margin:14px 0">데이터를 모으고 계산하는 중…</div>';
+  else if (AN.err) h += '<div class="rbWarn" style="margin:14px 0">' + anEsc(AN.err) + '</div>';
+  else if (!AN.out) h += '<div class="briefDim" style="margin:14px 0">' + (m.need === "stock" ? "종목을 고르면 ① 제시 → ② 평가 → ③ 정리 순서로 보여 드려요." : "") + '</div>';
+  else {
+    var O = AN.out;
+    h += '<div class="anSec"><div class="mkStep"><b>1</b> 제시 <small class="briefDim">앱 데이터 그대로 · ' + anEsc(O.src) + '</small></div><table class="anT">' + O.rows.map(function (r) { return '<tr><th>' + anEsc(r[0]) + '</th><td><b>' + anEsc(r[1]) + '</b>' + (r[2] ? '<small>' + anEsc(r[2]) + '</small>' : '') + '</td></tr>'; }).join("") + '</table></div>';
+    var okN = O.ck.filter(function (c) { return c.st === "ok"; }).length, naN = O.ck.filter(function (c) { return c.st === "na"; }).length;
+    h += '<div class="anSec"><div class="mkStep"><b>2</b> 평가 <small class="briefDim">체크리스트 4개 · 양호 ' + okN + ' · 데이터 없음 ' + naN + ' · 규칙 기준(예: ROE 15%, 부채비율 100%, RSI 30/70)</small></div><div class="anCks">' + O.ck.map(function (c) { return '<div class="anCk ' + c.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗", na: "—" })[c.st] + '</span><div><b>' + anEsc(c.t) + '</b><small>' + anEsc(c.why) + '</small></div></div>'; }).join("") + '</div></div>';
+    h += '<div class="anSec"><div class="mkStep"><b>3</b> 정리 <small class="briefDim">초보가 읽는 글 · 규칙 기반(AI 없음)</small></div><div class="anSum">' + O.sum.map(function (p) { return '<p>' + anEsc(p) + '</p>'; }).join("") + '</div></div>';
+    if (AN.ai && AN.ai.out) { var A = AN.ai.out; h += '<div class="anSec anAi"><div class="mkStep"><b>AI</b> 애널리스트 노트 <small class="briefDim">' + anEsc(AN.ai.model || "") + ' · 숫자는 근거 줄 그대로 · 참고용</small></div><div class="anSum"><p><b>' + anEsc(A.headline) + '</b></p>' + (A.sections || []).map(function (s) { return '<p><b>' + anEsc(s.title) + '</b> ' + anEsc(s.body) + '</p>'; }).join("") + '<p><b>결론</b> ' + anEsc(A.verdict) + '</p>' + (A.risks && A.risks.length ? '<p><b>리스크</b> ' + A.risks.map(anEsc).join(" · ") + '</p>' : '') + (A.watch && A.watch.length ? '<p><b>확인할 것</b> ' + A.watch.map(anEsc).join(" · ") + '</p>' : '') + '</div></div>'; }
+    h += '<div class="anActs"><button class="chip aiBtn" data-anai>✨ AI 애널리스트 노트 (서버 키)</button><button class="chip" data-ancopy>📋 프롬프트 + 데이터 복사 (Claude·ChatGPT에 붙여넣기)</button></div>';
+    h += '<details class="howto anPr"><summary>프롬프트 보기 <small class="briefDim">첨부 자료의 프롬프트 + 앱 데이터 ' + anLines(O).length + '줄</small></summary><div class="body"><textarea class="thrText" rows="12" spellcheck="false">' + anEsc(anPromptText(m, O)) + '</textarea></div></details>';
+  }
+  root.innerHTML = h;
+  Array.prototype.forEach.call(root.querySelectorAll("[data-anmod]"), function (b) { b.onclick = function () { AN.mod = b.getAttribute("data-anmod"); AN.out = null; AN.ai = null; AN.err = null; renderAnalyst(); var mm = anMod(); if (mm.need !== "stock" || AN.sym) anRun(); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-ansym]"), function (b) { b.onclick = function () { AN.sym = b.getAttribute("data-ansym"); anRun(); }; });
+  var inp = document.getElementById("anSym"), res = document.getElementById("anSymRes");
+  if (inp) {
+    inp.addEventListener("input", function () { var hits = typeof searchDict === "function" && typeof TICKER_DICT !== "undefined" ? searchDict(TICKER_DICT, inp.value).filter(function (x) { return !/^\^|=X$/.test(x.symbol); }).slice(0, 6) : []; if (!inp.value.trim() || !hits.length) { res.style.display = "none"; return; } res.innerHTML = hits.map(function (x) { return '<div class="hRes" data-s="' + x.symbol + '"><b>' + anEsc(x.name) + '</b> <small>' + x.symbol + '</small></div>'; }).join(""); res.style.display = "block"; Array.prototype.forEach.call(res.querySelectorAll("[data-s]"), function (d) { d.onmousedown = function (e) { e.preventDefault(); res.style.display = "none"; inp.value = ""; AN.sym = d.getAttribute("data-s"); anRun(); }; }); });
+    inp.addEventListener("blur", function () { setTimeout(function () { res.style.display = "none"; }, 150); });
+  }
+  var ai = root.querySelector("[data-anai]"); if (ai) ai.onclick = function () { anAi(ai); };
+  var cp = root.querySelector("[data-ancopy]"); if (cp) cp.onclick = function () { var t = anPromptText(m, AN.out); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { var o = cp.innerHTML; cp.textContent = "✓ 복사됨"; setTimeout(function () { cp.innerHTML = o; }, 1500); }).catch(function () { var ta = root.querySelector(".anPr textarea"); if (ta) { root.querySelector(".anPr").open = true; ta.select(); } }); };
+}
+function analystGo(mod, sym) { if (mod) AN.mod = mod; if (sym) AN.sym = sym; if (typeof navTo === "function") navTo("analyst"); else switchTab("analyst"); anRun(); }
