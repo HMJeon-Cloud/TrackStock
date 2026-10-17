@@ -87,6 +87,7 @@ async function aiHandler(req, res) {
   if (b.mode === "read") return aiRead(res, key, model, fallback, b);
   if (b.mode === "deck") return aiDeckPlan(res, key, model, fallback, b);   // v11.6 AI 여러 장
   if (b.mode === "insight") return aiInsight(res, key, model, fallback, b);   // v11.7 리포트 서술
+  if (b.mode === "analyst") return aiAnalyst(res, key, model, fallback, b);   // v12.3 애널리스트 노트
   let schema, user;
   // 참고 이미지(선택): data:image/... 최대 3장, 장당 1.5MB 이하 (화면에서 1024px JPEG로 줄여서 보냄)
   const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => typeof u === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(u) && u.length < 1600000).slice(0, 3);
@@ -145,7 +146,7 @@ async function aiResponses(key, model, sys, user, name, schema, ms, imgs) {
 }
 async function aiChat(key, model, sys, user, name, schema, ms, imgs) {
   const { status, j, err } = await aiPost("https://api.openai.com/v1/chat/completions", key, {
-    model, temperature: 0.4, max_tokens: name === "deck_cards" ? 6000 : name === "insight" ? 3500 : 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
+    model, temperature: 0.4, max_tokens: name === "deck_cards" ? 6000 : name === "insight" ? 3500 : name === "analyst" ? 2500 : 1200, messages: [{ role: "system", content: sys }, { role: "user", content: imgs && imgs.length ? [{ type: "text", text: user }].concat(imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))) : user }],
     response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }
   }, ms);
   if (err) return { ok: false, reason: err };
@@ -234,6 +235,31 @@ const AI_SCHEMA_INSIGHT = {
     watch: { type: "array", maxItems: 4, items: { type: "string" }, description: "생각을 바꿀 조건 3~4개, 각 36자 이하" }
   }
 };
+/* ---------- v12.3 애널리스트 노트: 역할 프롬프트(기업·차트·실적·재무·포트폴리오·매크로) + 앱 데이터 줄 → 제시·평가·정리 ---------- */
+const AI_SCHEMA_ANALYST = {
+  type: "object", additionalProperties: false, required: ["headline", "sections", "verdict", "risks", "watch"],
+  properties: {
+    headline: { type: "string", description: "한 줄 결론 30자 이하" },
+    sections: { type: "array", maxItems: 5, items: { type: "object", additionalProperties: false, required: ["title", "body"], properties: { title: { type: "string", description: "소제목 12자 이하 (체크리스트 항목 이름)" }, body: { type: "string", description: "2~3문장 160자 이하. 근거 줄의 숫자만 쓰고 [D3] 같은 id를 붙여. 데이터가 없는 항목은 '앱 데이터 없음 — 확인 방법'을 적어" } } }, description: "체크리스트 4개 항목 각각 + 종합 1개" },
+    verdict: { type: "string", description: "평가 3문장 200자 이하. 초보가 읽게 쉬운 말. 사라/팔라 대신 '검토·관망·나눠서'" },
+    risks: { type: "array", maxItems: 3, items: { type: "string" }, description: "리스크 3개, 각 40자 이하" },
+    watch: { type: "array", maxItems: 3, items: { type: "string" }, description: "다음에 확인할 것 3개, 각 36자 이하" }
+  }
+};
+async function aiAnalyst(res, key, model, fallback, b) {
+  const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 200).map((l) => String(l.id).slice(0, 6) + " | " + String(l.text).slice(0, 300));
+  let txt = lines.join("\n"); if (txt.length > 24000) txt = txt.slice(0, 24000);
+  if (!txt) return res.status(400).json({ ok: false, reason: "NO_LINES" });
+  const sys = String(b.role || "너는 글로벌 주식 애널리스트다.").slice(0, 120) + " 독자는 한국 개인투자자(초보). 해요체, 짧은 문장. " +
+    "근거 줄에 있는 숫자만 쓰고 계산·반올림·새 숫자 생성 금지. 근거에 없는 사실(사업 부문, 가이던스, 물가 등)은 모른다고 쓰고 어디서 확인할지 적어. 종목을 사라/팔라고 직접 권하지 않는다. 출력은 JSON 스키마대로.";
+  const user = "과제: " + String(b.task || "").slice(0, 400) + "\n제목: " + String(b.title || "").slice(0, 80) + "\n체크리스트: " + (Array.isArray(b.checks) ? b.checks.slice(0, 4).join(" / ") : "") + "\n\n근거 줄(id | 내용):\n" + txt;
+  const tries = [];
+  let r = await aiResponses(key, model, sys, user, "analyst", AI_SCHEMA_ANALYST, 90000, []);
+  tries.push(model + ": " + (r.ok ? "성공" : r.reason));
+  if (!r.ok && fallback && fallback !== model && r.reason !== "REFUSED") { r = await aiChat(key, fallback, sys, user, "analyst", AI_SCHEMA_ANALYST, 60000, []); tries.push(fallback + ": " + (r.ok ? "성공" : r.reason)); }
+  if (r.ok) return res.status(200).json({ ok: true, out: r.out, model, tries });
+  return res.status(200).json({ ok: false, reason: r.reason, detail: r.detail, tries });
+}
 async function aiInsight(res, key, model, fallback, b) {
   const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 300).map((l) => String(l.id).slice(0, 6) + " | " + String(l.text).slice(0, 240));
   let txt = lines.join("\n"); if (txt.length > 30000) txt = txt.slice(0, 30000);
