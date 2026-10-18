@@ -34,7 +34,8 @@ export default async function handler(req, res) {
   if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
   if (req.query.op === "ai") return aiHandler(req, res);
   if (req.query.op === "disc") return discHandler(req, res);   // v11.2 공시·구루 수동 수집 (운영자) — 크론과 같은 수집기를 시간 넉넉히
-  if (req.query.op === "lib") return libHandler(req, res);   // v10.7 AI 보관함 (배경·스타일·구성·아이콘) — 서버(Redis) 저장   // v9.5 대표 카드 문구 (OpenAI) — 새 함수 파일을 만들 수 없어(무료 12개 한도) 여기에 붙임
+  if (req.query.op === "lib") return libHandler(req, res);
+  if (req.query.op === "archive") return archiveHandler(req, res);   // v12.5 분석 자산(아카이브) — AI 답변·앱 데이터 스냅샷을 서버(Redis)에 쌓아 다음 분석에 재사용   // v10.7 AI 보관함 (배경·스타일·구성·아이콘) — 서버(Redis) 저장   // v9.5 대표 카드 문구 (OpenAI) — 새 함수 파일을 만들 수 없어(무료 12개 한도) 여기에 붙임
   const proto = req.headers["x-forwarded-proto"] || "https";
   const origin = proto + "://" + req.headers.host;
   const d = await buildDaily(origin);
@@ -304,6 +305,50 @@ async function aiRead(res, key, model, fallback, b) {
    sm:lib:img:<id> 이미지 data URL (JPEG/PNG, 클라이언트가 줄여서 보냄 · 최대 900KB)
    sm:lib:dat:<id> 구성·설명 JSON (최대 20KB)
    한도: 즐겨찾기 아닌 항목 LIB_MAX(기본 300)개 · 이미지 합계 LIB_MB(기본 120MB) — 넘으면 오래되고 덜 쓴 것부터 지운다 */
+/* ---------- v12.5 분석 자산(아카이브): 인덱스(요약) + 기록 본문. 운영자 전용 · gz 저장 · 최대 ARC_MAX건 ---------- */
+const ARC = { idx: "sm:arc:idx", rec: "sm:arc:rec:" };
+async function arcIdx(rc) { const t = await getJsonGzText(rc, ARC.idx); try { return t ? JSON.parse(t) : []; } catch (e) { return []; } }
+async function arcPut(rc, arr) { await setJsonGz(rc, ARC.idx, arr); }
+function arcSlim(r) {   // 인덱스에 두는 요약 (목록·검증·프롬프트 문맥용) — 본문(text)은 따로
+  const p = r.p || {};
+  return { id: r.id, at: r.at, kind: String(r.kind || "analyst").slice(0, 12), mod: String(r.mod || "").slice(0, 12), modName: String(r.modName || "").slice(0, 20), sym: r.sym ? String(r.sym).slice(0, 20) : null, name: String(r.name || "").slice(0, 40), scope: String(r.scope || "").slice(0, 10), title: String(r.title || "").slice(0, 80),
+    p: { one: String(p.one || "").slice(0, 120), verdictSt: String(p.verdictSt || "").slice(0, 4), verdict: String(p.verdict || "").slice(0, 300), change: String(p.change || "").slice(0, 120), items: (Array.isArray(p.items) ? p.items : []).slice(0, 8).map((x) => ({ name: String(x.name || "").slice(0, 30), st: String(x.st || "").slice(0, 4), key: String(x.key || "").slice(0, 80), num: String(x.num || "").slice(0, 80) })), risks: (p.risks || []).slice(0, 4).map((x) => String(x).slice(0, 60)), watch: (p.watch || []).slice(0, 4).map((x) => String(x).slice(0, 60)) },
+    snap: r.snap ? { price: typeof r.snap.price === "number" ? r.snap.price : null, key: r.snap.key && typeof r.snap.key === "object" ? Object.fromEntries(Object.entries(r.snap.key).slice(0, 24).map(([k, v]) => [String(k).slice(0, 24), typeof v === "number" ? v : String(v).slice(0, 40)])) : {}, rows: (Array.isArray(r.snap.rows) ? r.snap.rows : []).slice(0, 40).map((x) => [String(x[0] || "").slice(0, 40), String(x[1] || "").slice(0, 60)]) } : null,
+    tags: (Array.isArray(r.tags) ? r.tags : []).slice(0, 8).map((x) => String(x).slice(0, 20)), note: String(r.note || "").slice(0, 200), size: (r.text ? String(r.text).length : 0) };
+}
+async function archiveHandler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  const rc = redisConf(); if (!rc) return res.status(200).json({ ok: false, reason: "NO_REDIS" });
+  try {
+    if (req.method !== "POST") {
+      if (req.query.id) { const id = String(req.query.id).replace(/[^\w-]/g, "").slice(0, 40); const t = await redisCmd(rc, ["GET", ARC.rec + id]); return res.status(200).json({ ok: true, id, text: t || "" }); }
+      const idx = await arcIdx(rc); return res.status(200).json({ ok: true, items: idx, total: idx.length });
+    }
+    let b = req.body; if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = {}; } } b = b || {};
+    let idx = await arcIdx(rc); const max = +(process.env.ARC_MAX || 500);
+    if (b.act === "save" || b.act === "import") {
+      const recs = b.act === "import" ? (Array.isArray(b.items) ? b.items : []).slice(0, 200) : [b.rec || {}]; const saved = [];
+      for (const r of recs) {
+        if (!r || typeof r !== "object") continue;
+        const id = (r.id && /^[\w-]{4,40}$/.test(String(r.id)) ? String(r.id) : Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+        const text = String(r.text || "").slice(0, 40000); if (!text.trim()) continue;
+        const e = arcSlim(Object.assign({}, r, { id, at: typeof r.at === "number" ? r.at : Date.now() }));
+        await redisCmd(rc, ["SET", ARC.rec + id, text]);
+        idx = idx.filter((x) => x.id !== id); idx.unshift(e); saved.push(e);
+      }
+      idx.sort((a, b2) => b2.at - a.at);
+      const removed = []; while (idx.length > max) { const r = idx.pop(); removed.push(r.id); }
+      for (const r of removed) { await redisCmd(rc, ["DEL", ARC.rec + r]); }
+      await arcPut(rc, idx);
+      return res.status(200).json({ ok: true, items: saved, item: saved[0] || null, total: idx.length, removed: removed.length });
+    }
+    const id = String(b.id || "").replace(/[^\w-]/g, "").slice(0, 40), e = idx.find((x) => x.id === id);
+    if (!e) return res.status(404).json({ ok: false, reason: "NOT_FOUND" });
+    if (b.act === "del") { idx = idx.filter((x) => x.id !== id); await redisCmd(rc, ["DEL", ARC.rec + id]); await arcPut(rc, idx); return res.status(200).json({ ok: true, total: idx.length }); }
+    if (b.act === "upd") { if (typeof b.note === "string") e.note = b.note.slice(0, 200); if (Array.isArray(b.tags)) e.tags = b.tags.slice(0, 8).map((x) => String(x).slice(0, 20)); if (b.p && typeof b.p === "object") e.p = arcSlim({ p: b.p }).p; await arcPut(rc, idx); return res.status(200).json({ ok: true, item: e }); }
+    return res.status(400).json({ ok: false, reason: "BAD_ACT" });
+  } catch (e) { return res.status(200).json({ ok: false, reason: "ERR", detail: String(e && e.message || e).slice(0, 200) }); }
+}
 const LIB = { idx: "sm:lib:idx", img: "sm:lib:img:", dat: "sm:lib:dat:" };
 async function libIdx(rc) { const t = await getJsonGzText(rc, LIB.idx); try { return t ? JSON.parse(t) : []; } catch (e) { return []; } }
 async function libPut(rc, arr) { await setJsonGz(rc, LIB.idx, arr); }
