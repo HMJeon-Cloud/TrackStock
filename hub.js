@@ -835,7 +835,7 @@ function hubSectionsFill(c, secs, after) {
   var g = c.g, P = NB.PAD, W = NB.W - P * 2, afterH = after ? 150 : 0, avail = NB.H - 100 - c.y - afterH - 16, fs = 30;
   function need(f) { var n = 0; secs.forEach(function (s) { n += 34 + cWrapCount(g, s.t, W - 56, f, 600) * f * 1.5 + 22; }); return n + 24; }
   while (need(fs) > avail && fs > 19) fs -= 1;
-  while (need(fs) < avail * 0.8 && fs < 40) fs += 1; if (need(fs) > avail) fs -= 1;
+  while (need(fs) < avail * 0.8 && fs < 46) fs += 1; if (need(fs) > avail) fs -= 1;
   var h = Math.max(140, Math.min(avail, need(fs))); cRound(g, P, c.y, W, h, 16, "#ffffff"); g.strokeStyle = NB_C.line; g.lineWidth = 2; g.stroke();
   var y = c.y + 24 + Math.max(0, (h - need(fs)) / 2);
   secs.forEach(function (s) { cText(g, s.h, P + 28, y + 22, 21, 900, NB_C.gold2); y += 34; var n = cWrapCount(g, s.t, W - 56, fs, 600); cWrap(g, s.t, P + 28, y + fs * 0.9, W - 56, fs, 600, NB_C.txt, fs * 1.5, 12); y += n * fs * 1.5 + 22; });
