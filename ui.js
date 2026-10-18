@@ -5,7 +5,7 @@
    ============================================================ */
 (function () {
   /* ① 운영자 잠금 — 화면 진입(switchTab)뿐 아니라 함수 자체도 막는다 (주소창·콘솔로 불러도 실행 안 됨) */
-  var GUARD = ["aiOpen", "aiOpenCustom", "aiStudio", "makerGo", "makerRender", "cardsOpen", "onePageOpen", "storyOpen", "perOpen", "perOpen2", "reelOpen", "issuesCardOpen", "pubSingleCard", "pubPolicyOpen", "pubRender", "tplPanel", "libTabRender", "libSave", "loadBrief", "renderChannel", "dvDeckOpen", "dsDeckOpen", "discDeckOpen", "guruDeckOpen", "ipoDeckOpen", "macroDeckOpen", "hubOne", "hubAiMulti", "hubOpenList", "renderReport", "rpGo", "renderAnalyst", "anRun", "analystGo"];
+  var GUARD = ["aiOpen", "aiOpenCustom", "aiStudio", "makerGo", "makerRender", "cardsOpen", "onePageOpen", "storyOpen", "perOpen", "perOpen2", "reelOpen", "issuesCardOpen", "pubSingleCard", "pubPolicyOpen", "pubRender", "tplPanel", "libTabRender", "libSave", "loadBrief", "renderChannel", "dvDeckOpen", "dsDeckOpen", "discDeckOpen", "guruDeckOpen", "ipoDeckOpen", "macroDeckOpen", "hubOne", "hubAiMulti", "hubOpenList", "renderReport", "rpGo", "renderAnalyst", "anRun", "analystGo", "arcLoad", "arcSave"];
   GUARD.forEach(function (name) {
     var f = window[name]; if (typeof f !== "function" || f.__guarded) return;
     var g = function () { if (typeof isOwner === "function" && !isOwner()) { console.warn("운영자 전용: " + name); return; } return f.apply(this, arguments); };

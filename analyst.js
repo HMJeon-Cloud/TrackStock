@@ -312,11 +312,13 @@ var AN_FORMAT = [
   "종합: 판정(✓/△/✗) | 3문장 이내 종합 평가",
   "리스크: a / b / c",
   "확인할 것: a / b / c",
+  "변화: (과거 기록이 주어진 경우만) 유지 또는 상향 또는 하향 | 한 줄 이유",
   "출처: 사용한 자료·날짜를 쉼표로"
 ].join("\n");
 function anPromptModule(m, out, opts) {
   opts = opts || {}; var name = m.need === "stock" && AN.sym ? anName(AN.sym) + "(" + AN.sym + ")" : null;
   var L = [];
+  if (opts.ctx) { L.push(opts.ctx); L.push(""); }
   L.push(m.role + " " + m.prompt.replace(/\[기업명\/티커\]/g, name || "[기업명/티커]"));
   L.push(""); L.push("아래 체크리스트 " + m.ck.length + "개를 항목마다 따로 답한 뒤, 마지막에 전체를 종합해 최종 판단을 내려줘."); m.ck.forEach(function (c, i) { L.push((i + 1) + ". " + c); });
   if (out) { L.push(""); L.push("[내 앱(StockMind)이 계산한 데이터 — 이 숫자를 근거로 쓰고, '데이터 없음' 항목은 최신 공시·자료로 보완해줘. 숫자를 지어내지 말고 출처를 붙여줘.]"); anLines(out).forEach(function (l) { L.push("- " + l.text); }); }
@@ -328,7 +330,8 @@ function anPromptFull(outs) {
   var mods = AN_MODS.filter(function (m) { return m.need === "stock"; }), name = AN.sym ? anName(AN.sym) + "(" + AN.sym + ")" : "[기업명/티커]", L = [];
   L.push("너는 글로벌 증권사의 리서치 팀장이다. " + name + "을(를) 네 가지 틀(기업 · 차트 · 실적 · 재무제표)로 차례로 분석하고, 마지막에 네 분석을 종합해 최종 투자 판단을 내려줘. 독자는 한국 개인투자자 초보. 숫자는 출처와 함께, 지어내지 말 것.");
   mods.forEach(function (m, i) { L.push(""); L.push("### " + m.no + " " + m.t + " — " + m.sub); L.push(m.prompt.replace(/\[기업명\/티커\]/g, name)); m.ck.forEach(function (c, k) { L.push("  " + (k + 1) + ") " + c); }); var o = outs && outs[m.id]; if (o) { L.push("  [앱 데이터]"); anLines(o).forEach(function (l) { L.push("  - " + l.text); }); } });
-  L.push(""); L.push("### 최종 종합"); L.push("네 틀의 결과를 겹쳐서: 서로 같은 방향을 가리키는 것 / 엇갈리는 것 / 그래서 지금 어떤 행동(검토·관망·나눠서 등)이 맞는지 / 생각을 바꿀 조건 3개.");
+  if (outs && outs._ctx) { L.push(""); L.push(outs._ctx); }
+  L.push(""); L.push("### 최종 종합"); L.push("네 틀의 결과를 겹쳐서: 서로 같은 방향을 가리키는 것 / 엇갈리는 것 / 그래서 지금 어떤 행동(검토·관망·나눠서 등)이 맞는지 / 생각을 바꿀 조건 3개." + (outs && outs._ctx ? " 과거 기록이 있으면 '그때 대비 무엇이 달라졌고 판단을 어떻게 조정하는지'도." : ""));
   L.push(AN_FORMAT.replace("(항목 줄은 체크리스트 수만큼 반복)", "(항목 줄은 네 틀 각각 1줄 = 4줄: 이름은 '기업' '차트' '실적' '재무')"));
   return L.join("\n");
 }
@@ -345,10 +348,8 @@ function anCopy(text, btn) {
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(done).catch(function () { var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch (e) { alert("복사가 막혔어요. 아래 '프롬프트 보기'에서 직접 복사해 주세요."); } document.body.removeChild(ta); });
 }
 
-/* ============================================================ 답변 붙여넣기 → 파싱 → 저장 ============================================================ */
-var AN_KEY = "sm.analyst.answers";
-function anAnsLoad() { try { return JSON.parse(localStorage.getItem(AN_KEY) || "[]"); } catch (e) { return []; } }
-function anAnsSave(list) { try { localStorage.setItem(AN_KEY, JSON.stringify(list.slice(-60))); } catch (e) { alert("저장 공간이 부족해요. 오래된 답변을 지워 주세요."); } }
+/* ============================================================ 답변 붙여넣기 → 파싱 → 저장(아카이브 = 분석 자산) ============================================================ */
+function anAnsLoad() { return typeof arcItems === "function" ? arcItems() : []; }
 /* 카드형 블록 파싱 — 느슨하게: 줄 머리 키워드로 읽음 */
 function anParse(text) {
   var t = String(text || "").replace(/\r/g, ""), P = { items: [], risks: [], watch: [], paras: [], srcs: "" };
@@ -366,20 +367,26 @@ function anParse(text) {
     else if ((m = l.match(/^리스크\s*[:：]\s*(.+)/))) P.risks = m[1].split(/\s*\/\s*/).filter(Boolean);
     else if ((m = l.match(/^확인(할\s*것)?\s*[:：]\s*(.+)/))) P.watch = m[2].split(/\s*\/\s*/).filter(Boolean);
     else if ((m = l.match(/^출처\s*[:：]\s*(.+)/))) P.srcs = m[1].trim();
+    else if ((m = l.match(/^변화\s*[:：]\s*(.+)/))) P.change = m[1].trim();
   });
   P.ok = !!(P.items.length || P.verdict || P.paras.length);
   return P;
 }
 function anStOf(s) { s = String(s || ""); return /✓|양호|좋|긍정|OK|O\b/i.test(s) ? "ok" : /✗|X|주의|나쁨|부정|위험/i.test(s) ? "bad" : /△|보통|중립|혼재/.test(s) ? "mid" : "mid"; }
+function anSnap(out) {   // 저장 시점의 앱 데이터 스냅샷 — 나중에 '그때 vs 지금' 비교·검증에 쓴다
+  var m = anMod(), price = null;
+  if (m.need === "stock" && AN.sym) { var rows = typeof rpRows === "function" ? rpRows(AN.sym) : []; if (rows.length) price = rows[rows.length - 1].c; }
+  return { price: price, key: typeof arcSnapKey === "function" ? arcSnapKey(out) : {}, rows: out ? out.rows.slice(0, 40).map(function (r) { return [r[0], r[1]]; }) : [], ck: out ? out.ck.map(function (c) { return c.st; }) : [] };
+}
 function anAnsAdd(text) {
-  var m = anMod(), P = anParse(text); if (!String(text).trim()) return null;
-  var it = { id: Date.now().toString(36), at: new Date().toISOString(), mod: m.id, modName: m.t, sym: m.need === "stock" ? AN.sym : null, name: m.need === "stock" && AN.sym ? anName(AN.sym) : m.t, title: P.title || (m.t + (AN.sym ? " · " + anName(AN.sym) : "")), text: String(text), scope: AN.pScope || "module" };
-  var L = anAnsLoad(); L.push(it); anAnsSave(L); AN.ansId = it.id; return it;
+  var m = anMod(), P = anParse(text); if (!String(text).trim()) return Promise.resolve(null);
+  var rec = { kind: "analyst", mod: m.id, modName: m.t, sym: m.need === "stock" ? AN.sym : null, name: m.need === "stock" && AN.sym ? anName(AN.sym) : m.t, title: P.title || (m.t + (AN.sym && m.need === "stock" ? " · " + anName(AN.sym) : "")), text: String(text), scope: AN.pScope || "module", p: P, snap: anSnap(AN.outKey === m.id + ":" + (m.need === "stock" ? AN.sym || "" : "") ? AN.out : null), tags: [] };
+  return arcSave(rec).then(function (it) { AN.ansId = it.id; return it; });
 }
 
 /* ============================================================ 답변 → 카드 (서술형 · 카드형) ============================================================ */
 function anCardsFrom(it, kind) {
-  var P = anParse(it.text), m = AN_MODS.filter(function (x) { return x.id === it.mod; })[0] || anMod(), title = P.title || it.title, day = cDate(Date.now()), foot = "AI 분석(" + day + ") · " + (P.srcs || "출처는 답변 참고") + " · 투자 권유 아님", list = [];
+  var P = anParse(it.text || ""), m = AN_MODS.filter(function (x) { return x.id === it.mod; })[0] || anMod(), title = P.title || it.title, day = cDate(Date.now()), foot = "AI 분석(" + day + ") · " + (P.srcs || "출처는 답변 참고") + " · 투자 권유 아님", list = [];
   var stTxt = { ok: "양호 ✓", mid: "보통 △", bad: "주의 ✗" };
   list.push({ name: "표지", cv: nbCover(m.no + " " + m.t + " · " + day, [title], P.one || "", "월가 애널리스트 6틀 중 " + m.t + " · " + (it.name || "") + " · 투자 권유 아님") });
   if (kind === "card") {
@@ -398,7 +405,7 @@ function anCardsFrom(it, kind) {
 }
 function anMakeCards(it, kind, btn) {
   var old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "만드는 중…"; btn.disabled = true; }
-  hubFonts(function () { return anCardsFrom(it, kind); }).then(function (list) { hubShow(it.title + " · " + (kind === "card" ? "카드형" : "서술형"), list, { modal: true, note: "AI 답변을 " + (kind === "card" ? "항목 카드 + 종합" : "읽는 글 카드") + "로 만들었어요. 숫자·출처는 답변에 적힌 그대로이니 올리기 전에 확인하세요." }); }).catch(function (e) { alert("카드를 만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } });
+  arcText(it.id).then(function (t) { it.text = t || it.text || ""; return hubFonts(function () { return anCardsFrom(it, kind); }); }).then(function (list) { hubShow(it.title + " · " + (kind === "card" ? "카드형" : "서술형"), list, { modal: true, note: "AI 답변을 " + (kind === "card" ? "항목 카드 + 종합" : "읽는 글 카드") + "로 만들었어요. 숫자·출처는 답변에 적힌 그대로이니 올리기 전에 확인하세요." }); }).catch(function (e) { alert("카드를 만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 
 /* ============================================================ 화면 — 단계: ① 틀·종목 ② 앱 데이터 ③ 프롬프트 ④ 답변 ⑤ 카드 ============================================================ */
@@ -411,10 +418,12 @@ function anRecent() {
 }
 function anStepHtml(n, title, sub, state) { return '<div class="anStep ' + state + '"><span class="anStepNo">' + (state === "done" ? "✓" : n) + '</span><div class="anStepT"><b>' + title + '</b><small>' + sub + '</small></div></div>'; }
 function renderAnalyst() {
-  var root = document.getElementById("anBody"); if (!root) return; var m = anMod(), O = AN.out, ans = anAnsLoad(), mine = ans.filter(function (a) { return a.mod === m.id && (!a.sym || a.sym === AN.sym); }).reverse(), cur = ans.filter(function (a) { return a.id === AN.ansId; })[0] || mine[0] || null;
+  var root = document.getElementById("anBody"); if (!root) return; var m = anMod(), O = AN.out, ans = anAnsLoad(), mine = ans.filter(function (a) { return a.mod === m.id && (m.need !== "stock" || a.sym === AN.sym); }).sort(function (a, b) { return b.at - a.at; }), cur = ans.filter(function (a) { return a.id === AN.ansId; })[0] || mine[0] || null;
+  if (ARC_ST.items === null && !ARC_ST.loading) arcLoad().then(function () { renderAnalyst(); });
+  var past = m.need === "stock" ? (AN.sym ? arcFor(AN.sym, null, 50) : []) : arcFor(null, m.id, 50), pastSame = past.filter(function (x) { return x.mod === m.id; }), lastRec = pastSame[0] || null;
   if (O && AN.outKey !== m.id + ":" + (m.need === "stock" ? AN.sym || "" : "")) O = null;
   var ready = !!O, st = function (k) { return k < AN.step ? "done" : k === AN.step ? "on" : ""; };
-  var h = '<div class="anSteps">' + anStepHtml(1, "틀·종목", m.no + " " + m.t + (AN.sym && m.need === "stock" ? " · " + anName(AN.sym) : ""), st(1)) + anStepHtml(2, "데이터", ready ? "제시 · 평가 · 정리" : "계산 전", ready ? (AN.step === 2 ? "on" : "done") : st(2)) + anStepHtml(3, "프롬프트", "한 번에 · 항목별 → 종합", AN.step === 3 ? "on" : AN.step > 3 ? "done" : "") + anStepHtml(4, "답변", cur ? "저장 " + mine.length + "건" : "저장 0건", AN.step === 4 ? "on" : cur ? "done" : "") + anStepHtml(5, "카드", "서술형 · 카드형", AN.step === 5 ? "on" : "") + '</div>';
+  var h = '<div class="anSteps">' + anStepHtml(1, "틀·종목", m.no + " " + m.t + (AN.sym && m.need === "stock" ? " · " + anName(AN.sym) : ""), st(1)) + anStepHtml(2, "데이터", ready ? "제시 · 평가 · 정리" : "계산 전", ready ? (AN.step === 2 ? "on" : "done") : st(2)) + anStepHtml(3, "프롬프트", "한 번에 · 항목별 → 종합", AN.step === 3 ? "on" : AN.step > 3 ? "done" : "") + anStepHtml(4, "답변", mine.length ? "이 틀 " + mine.length + "건" : "저장 0건", AN.step === 4 ? "on" : cur ? "done" : "") + anStepHtml(5, "카드", "서술형 · 카드형", AN.step === 5 ? "on" : "") + anStepHtml(6, "자산", ans.length ? ans.length + "건 쌓임" : "0건", "") + '</div>';
   // ① 틀 · 종목
   h += '<section class="anSec"><div class="mkStep"><b>1</b> 분석 틀 고르기 <small class="briefDim">월가 애널리스트 6틀 · 체크리스트 4개씩</small></div>';
   h += '<div class="anGrid">' + AN_MODS.map(function (x) { var n = ans.filter(function (a) { return a.mod === x.id; }).length; return '<button class="anMod' + (x.id === AN.mod ? ' on' : '') + '" data-anmod="' + x.id + '"><span class="anNo">' + x.no + '</span><span class="anMain"><b>' + x.icon + ' ' + x.t + (n ? ' <em class="anCnt">' + n + '</em>' : '') + '</b><small>' + x.sub + '</small></span></button>'; }).join("") + '</div>';
@@ -432,22 +441,29 @@ function renderAnalyst() {
     h += '<div class="anDataGrid"><div><div class="anSubH">제시 <small>앱 숫자 그대로</small></div><table class="anT">' + O.rows.map(function (r) { return '<tr><th>' + anEsc(r[0]) + '</th><td><b>' + anEsc(r[1]) + '</b>' + (r[2] ? '<small>' + anEsc(r[2]) + '</small>' : '') + '</td></tr>'; }).join("") + '</table></div>';
     h += '<div><div class="anSubH">평가 <small>양호 ' + okN + ' · 데이터 없음 ' + naN + ' · 규칙 기준</small></div><div class="anCks one">' + O.ck.map(function (c) { return '<div class="anCk ' + c.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗", na: "—" })[c.st] + '</span><div><b>' + anEsc(c.t) + '</b><small>' + anEsc(c.why) + '</small></div></div>'; }).join("") + '</div>';
     h += '<div class="anSubH" style="margin-top:12px">정리 <small>규칙 기반 글</small></div><div class="anSum">' + O.sum.map(function (p) { return '<p>' + anEsc(p) + '</p>'; }).join("") + '</div></div></div>';
+    if (lastRec && lastRec.snap && lastRec.snap.rows && lastRec.snap.rows.length) {
+      var D = arcDiff(lastRec.snap.rows, O.rows), stT = { ok: "✓", mid: "△", bad: "✗" };
+      h += '<div class="anDiff"><div class="anSubH">그때 vs 지금 <small>' + arcD(lastRec.at) + ' 기록(' + anEsc(lastRec.title) + ' · 종합 ' + (stT[lastRec.p && lastRec.p.verdictSt] || "-") + ') 대비 바뀐 숫자 ' + D.length + '개' + (lastRec.snap.price != null && m.need === "stock" && O && typeof rpRows === "function" && rpRows(AN.sym).length ? ' · 가격 ' + anPrice(AN.sym, lastRec.snap.price) + ' → ' + anPrice(AN.sym, rpRows(AN.sym)[rpRows(AN.sym).length - 1].c) + ' (' + anPct(rpRows(AN.sym)[rpRows(AN.sym).length - 1].c / lastRec.snap.price - 1, 1) + ')' : '') + '</small></div>' + (D.length ? '<table class="anT anTd">' + D.slice(0, 12).map(function (d) { return '<tr><th>' + anEsc(d.label) + '</th><td><small>' + anEsc(d.from) + '</small><b class="' + (d.dir > 0 ? "pos" : d.dir < 0 ? "neg" : "") + '">→ ' + anEsc(d.to) + '</b></td></tr>'; }).join("") + '</table>' : '<div class="briefDim">같은 항목의 숫자가 그대로예요.</div>') + '</div>';
+    }
   }
   h += '</section>';
   // ③ 프롬프트
   h += '<section class="anSec' + (ready ? '' : ' dim') + '"><div class="mkStep"><b>3</b> 프롬프트 한 번에 복사 <small class="briefDim">Claude·ChatGPT에 붙여넣기 → 항목별 답 → 종합 → 서술형 + 카드형으로 돌아와요</small></div>';
   h += '<div class="anPrOpts">' + [["module", "이 틀만", m.no + " " + m.t + " · 체크리스트 " + m.ck.length + "개 + 앱 데이터"], ["full", "종목 풀세트", "01~04 네 틀 한 번에 → 틀별 종합 → 최종 투자 판단" + (m.need === "stock" ? "" : " (종목 선택 필요)")], ["all", "전체 6틀", "종목 4 + 포트폴리오 + 매크로 → 최종 판단·비중 제안"]].map(function (o) { return '<label class="anPrOpt' + (AN.pScope === o[0] ? ' on' : '') + '"><input type="radio" name="anScope" value="' + o[0] + '"' + (AN.pScope === o[0] ? ' checked' : '') + '><b>' + o[1] + '</b><small>' + o[2] + '</small></label>'; }).join("") + '</div>';
+  h += '<label class="anCtxOpt"><input type="checkbox" data-anctx' + (AN.useCtx !== false ? ' checked' : '') + '> 과거 분석 기록 넣기 <small class="briefDim">' + (past.length ? "이 " + (m.need === "stock" ? "종목" : "틀") + " 기록 " + past.length + "건 중 최근 3건 → '그때 vs 지금 · 판단 조정' 문단을 요청" : "아직 기록 없음 — 저장이 쌓이면 자동으로 들어가요") + '</small></label>';
   h += '<div class="anActs"><button class="primary" data-ancopy' + (ready || AN.pScope !== "module" ? '' : ' disabled') + '>📋 프롬프트 복사</button><button class="chip" data-anprev>프롬프트 보기</button><span class="briefDim anPrMsg"></span></div><div class="anPrBox" hidden><textarea class="thrText" rows="14" spellcheck="false" readonly></textarea></div></section>';
   // ④ 답변
-  h += '<section class="anSec"><div class="mkStep"><b>4</b> 받은 답변 붙여넣기 · 저장 <small class="briefDim">브라우저에 저장(최대 60건) · 카드형 블록을 자동으로 읽어요</small></div>';
+  h += '<section class="anSec"><div class="mkStep"><b>4</b> 받은 답변 붙여넣기 · 저장 <small class="briefDim">서버(Redis)에 쌓여 자산이 돼요 · 그때 가격·숫자도 같이 저장 · 카드형 블록 자동 읽기</small></div>';
   h += '<textarea class="anAnsIn" rows="7" placeholder="AI 답변 전체를 여기에 붙여넣고 [저장]을 누르세요. (## 서술형 / ## 카드형 블록이 있으면 항목·판정·리스크를 자동으로 읽어요)"></textarea><div class="anActs"><button class="primary" data-ansave>💾 저장</button><button class="chip" data-anclear>비우기</button></div>';
-  if (mine.length) h += '<div class="anAnsList">' + mine.slice(0, 8).map(function (a) { var P = anParse(a.text); return '<div class="anAns' + (cur && cur.id === a.id ? ' on' : '') + '" data-anpick="' + a.id + '"><div class="anAnsMain"><b>' + anEsc(a.title) + '</b><small>' + anEsc(a.at.slice(0, 16).replace("T", " ")) + ' · ' + (P.items.length ? "항목 " + P.items.length + "개 · " : "") + (P.paras.length ? "문단 " + P.paras.length + "개" : "서술 없음") + (P.verdict ? ' · 종합 ' + ({ ok: "✓", mid: "△", bad: "✗" })[P.verdictSt || "mid"] : "") + '</small></div><div class="anAnsActs"><button class="chip" data-ancp="' + a.id + '">복사</button><button class="chip" data-andel="' + a.id + '">삭제</button></div></div>'; }).join("") + '</div>';
+  if (mine.length) h += '<div class="anAnsList">' + mine.slice(0, 8).map(function (a) { var P = a.text ? anParse(a.text) : Object.assign({ items: [], risks: [], watch: [], paras: [] }, a.p || {}); return '<div class="anAns' + (cur && cur.id === a.id ? ' on' : '') + '" data-anpick="' + a.id + '"><div class="anAnsMain"><b>' + anEsc(a.title) + '</b><small>' + arcD(a.at) + ' · ' + (P.items.length ? "항목 " + P.items.length + "개 · " : "") + (P.paras.length ? "문단 " + P.paras.length + "개" : "서술 없음") + (P.verdict ? ' · 종합 ' + ({ ok: "✓", mid: "△", bad: "✗" })[P.verdictSt || "mid"] : "") + '</small></div><div class="anAnsActs"><button class="chip" data-ancp="' + a.id + '">복사</button><button class="chip" data-andel="' + a.id + '">삭제</button></div></div>'; }).join("") + '</div>';
   h += '</section>';
   // ⑤ 카드
   h += '<section class="anSec' + (cur ? '' : ' dim') + '"><div class="mkStep"><b>5</b> 카드 만들기 <small class="briefDim">' + (cur ? '선택한 답변: ' + anEsc(cur.title) : '저장된 답변을 고르면 만들 수 있어요') + '</small></div>';
-  if (cur) { var PP = anParse(cur.text); h += '<div class="anPrev">' + (PP.one ? '<div class="anPrevOne">' + anEsc(PP.one) + '</div>' : '') + (PP.items.length ? '<div class="anCks">' + PP.items.map(function (x) { return '<div class="anCk ' + x.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗" })[x.st] + '</span><div><b>' + anEsc(x.name) + '</b><small>' + anEsc(x.key) + (x.num ? ' · ' + anEsc(x.num) : '') + '</small></div></div>'; }).join("") + '</div>' : '<div class="briefDim">카드형 블록을 찾지 못했어요 — 서술형 카드만 만들 수 있어요. (답변에 "## 카드형" 블록이 있는지 확인)</div>') + (PP.verdict ? '<div class="anSum" style="margin-top:8px"><p><b>종합</b> ' + anEsc(PP.verdict) + '</p>' + (PP.risks.length ? '<p><b>리스크</b> ' + PP.risks.map(anEsc).join(" · ") + '</p>' : '') + (PP.watch.length ? '<p><b>확인할 것</b> ' + PP.watch.map(anEsc).join(" · ") + '</p>' : '') + '</div>' : '') + '</div>';
+  if (cur) { var PP = cur.text ? anParse(cur.text) : Object.assign({ items: [], risks: [], watch: [], paras: [] }, cur.p || {}); if (!cur.text) arcText(cur.id).then(function (t) { if (t) renderAnalyst(); }); h += '<div class="anPrev">' + (PP.one ? '<div class="anPrevOne">' + anEsc(PP.one) + '</div>' : '') + (PP.items.length ? '<div class="anCks">' + PP.items.map(function (x) { return '<div class="anCk ' + x.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗" })[x.st] + '</span><div><b>' + anEsc(x.name) + '</b><small>' + anEsc(x.key) + (x.num ? ' · ' + anEsc(x.num) : '') + '</small></div></div>'; }).join("") + '</div>' : '<div class="briefDim">카드형 블록을 찾지 못했어요 — 서술형 카드만 만들 수 있어요. (답변에 "## 카드형" 블록이 있는지 확인)</div>') + (PP.verdict ? '<div class="anSum" style="margin-top:8px"><p><b>종합</b> ' + anEsc(PP.verdict) + '</p>' + (PP.risks.length ? '<p><b>리스크</b> ' + PP.risks.map(anEsc).join(" · ") + '</p>' : '') + (PP.watch.length ? '<p><b>확인할 것</b> ' + PP.watch.map(anEsc).join(" · ") + '</p>' : '') + '</div>' : '') + '</div>';
     h += '<div class="anActs"><button class="wbAct" data-ancard="narr"><b>서술형 카드</b><small>표지 + 읽는 글 ' + Math.max(1, Math.ceil(PP.paras.join("").length / 420)) + '장 + 마무리</small></button><button class="wbAct" data-ancard="card"' + (PP.items.length ? '' : ' disabled') + '><b>카드형</b><small>표지 + 항목 ' + PP.items.length + '장 + 종합 + 마무리</small></button></div>'; }
   h += '</section>';
+  // ⑥ 분석 자산
+  h += '<section class="anSec" id="anArc"><div class="mkStep"><b>6</b> 분석 자산 <small class="briefDim">저장한 답변 + 그때의 숫자 — 다음 프롬프트의 문맥 · 종목별 기록 · 판단 적중률 · 백업</small></div>' + (typeof arcHtml === "function" ? arcHtml(ans, AN.arcPairs || [], AN.ansId) : '') + '</section>';
   root.innerHTML = h;
   // bind
   Array.prototype.forEach.call(root.querySelectorAll("[data-anmod]"), function (b) { b.onclick = function () { AN.mod = b.getAttribute("data-anmod"); AN.out = null; AN.err = null; AN.ansId = null; AN.step = 1; renderAnalyst(); var mm = anMod(); if (mm.need !== "stock" || AN.sym) anRun(); }; });
@@ -460,19 +476,23 @@ function renderAnalyst() {
   var tg = root.querySelector("[data-antg]"); if (tg) tg.onclick = function () { AN.showData = AN.showData === false ? true : false; renderAnalyst(); };
   Array.prototype.forEach.call(root.querySelectorAll('input[name="anScope"]'), function (r) { r.onchange = function () { AN.pScope = r.value; renderAnalyst(); }; });
   function buildPrompt(cb) {
-    var msg = root.querySelector(".anPrMsg");
-    if (AN.pScope === "module") { cb(anPromptModule(m, O)); return; }
+    var msg = root.querySelector(".anPrMsg"), ctxP = AN.useCtx !== false && typeof arcContext === "function" ? arcContext(m.need === "stock" ? AN.sym : null, m.need === "stock" ? null : m.id, 3) : Promise.resolve("");
+    if (AN.pScope === "module") { ctxP.then(function (ctx) { cb(anPromptModule(m, O, { ctx: ctx })); }); return; }
     if (!AN.sym) { alert("종목 풀세트는 먼저 종목을 골라 주세요(01~04 틀 중 하나에서)."); return; }
     if (msg) msg.textContent = "여러 틀 데이터를 모으는 중…";
-    anAllOuts(AN_MODS.filter(function (x) { return AN.pScope === "all" || x.need === "stock"; })).then(function (outs) { if (msg) msg.textContent = ""; cb(AN.pScope === "all" ? anPromptAll(outs) : anPromptFull(outs)); }).catch(function (e) { if (msg) msg.textContent = ""; alert("데이터를 모으지 못했어요: " + e.message); });
+    Promise.all([anAllOuts(AN_MODS.filter(function (x) { return AN.pScope === "all" || x.need === "stock"; })), AN.useCtx !== false ? arcContext(AN.sym, null, 4) : ""]).then(function (r) { var outs = r[0]; outs._ctx = r[1] || ""; if (msg) msg.textContent = ""; cb(AN.pScope === "all" ? anPromptAll(outs) : anPromptFull(outs)); }).catch(function (e) { if (msg) msg.textContent = ""; alert("데이터를 모으지 못했어요: " + e.message); });
   }
+  var cx = root.querySelector("[data-anctx]"); if (cx) cx.onchange = function () { AN.useCtx = cx.checked; };
   var cp = root.querySelector("[data-ancopy]"); if (cp) cp.onclick = function () { buildPrompt(function (t) { anCopy(t, cp); AN.step = Math.max(AN.step, 4); var box = root.querySelector(".anPrBox"); if (box && !box.hidden) box.querySelector("textarea").value = t; }); };
   var pv = root.querySelector("[data-anprev]"); if (pv) pv.onclick = function () { var box = root.querySelector(".anPrBox"); if (!box.hidden) { box.hidden = true; return; } buildPrompt(function (t) { box.hidden = false; box.querySelector("textarea").value = t; }); };
-  var sv = root.querySelector("[data-ansave]"); if (sv) sv.onclick = function () { var ta = root.querySelector(".anAnsIn"), it = anAnsAdd(ta.value); if (!it) { alert("붙여넣은 답변이 비어 있어요."); return; } AN.step = 5; renderAnalyst(); var sec = document.querySelectorAll("#anBody .anSec")[4]; if (sec) try { sec.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} };
+  var sv = root.querySelector("[data-ansave]"); if (sv) sv.onclick = function () { var ta = root.querySelector(".anAnsIn"); if (!ta.value.trim()) { alert("붙여넣은 답변이 비어 있어요."); return; } sv.textContent = "저장 중…"; sv.disabled = true; anAnsAdd(ta.value).then(function () { AN.step = 5; AN.arcPairs = null; renderAnalyst(); var sec = document.querySelectorAll("#anBody .anSec")[4]; if (sec) try { sec.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }); };
   var cl = root.querySelector("[data-anclear]"); if (cl) cl.onclick = function () { root.querySelector(".anAnsIn").value = ""; };
   Array.prototype.forEach.call(root.querySelectorAll("[data-anpick]"), function (b) { b.onclick = function (e) { if (e.target.closest("button")) return; AN.ansId = b.getAttribute("data-anpick"); AN.step = 5; renderAnalyst(); }; });
-  Array.prototype.forEach.call(root.querySelectorAll("[data-ancp]"), function (b) { b.onclick = function () { var a = anAnsLoad().filter(function (x) { return x.id === b.getAttribute("data-ancp"); })[0]; if (a) anCopy(a.text, b); }; });
-  Array.prototype.forEach.call(root.querySelectorAll("[data-andel]"), function (b) { b.onclick = function () { if (!confirm("이 답변을 지울까요?")) return; var id = b.getAttribute("data-andel"); anAnsSave(anAnsLoad().filter(function (x) { return x.id !== id; })); if (AN.ansId === id) AN.ansId = null; renderAnalyst(); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-ancp]"), function (b) { b.onclick = function () { arcText(b.getAttribute("data-ancp")).then(function (t) { anCopy(t, b); }); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-andel]"), function (b) { b.onclick = function () { if (!confirm("이 기록을 지울까요? (서버에서도 지워져요)")) return; var id = b.getAttribute("data-andel"); arcDel(id); if (AN.ansId === id) AN.ansId = null; AN.arcPairs = null; renderAnalyst(); }; });
+  if (typeof arcBind === "function") arcBind(root, function () { renderAnalyst(); });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-arcpick]"), function (b) { b.onclick = function (e) { if (e.target.closest("button,select,label")) return; var id = b.getAttribute("data-arcpick"), it = anAnsLoad().filter(function (x) { return x.id === id; })[0]; if (!it) return; AN.ansId = id; if (it.mod && it.mod !== AN.mod) { AN.mod = it.mod; AN.out = null; } if (it.sym) AN.sym = it.sym; AN.step = 5; renderAnalyst(); var mm = anMod(); if (!AN.out && (mm.need !== "stock" || AN.sym)) anRun(); }; });
+  if (AN.arcPairs == null && ans.length && typeof arcVerifyAll === "function") { AN.arcPairs = []; arcVerifyAll(ans.filter(function (x) { return x.sym && x.snap && x.snap.price != null; }).slice(0, 60)).then(function (P) { AN.arcPairs = P; renderAnalyst(); }); }
   Array.prototype.forEach.call(root.querySelectorAll("[data-ancard]"), function (b) { b.onclick = function () { if (cur) anMakeCards(cur, b.getAttribute("data-ancard"), b); }; });
 }
 function analystGo(mod, sym) { if (mod) AN.mod = mod; if (sym) AN.sym = sym; if (typeof navTo === "function") navTo("analyst"); else switchTab("analyst"); anRun(); }
