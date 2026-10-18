@@ -1254,7 +1254,7 @@
   .anCks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .anCk { display: flex; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; } .anCk .anSt { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; background: #eef0f3; color: var(--sub); } .anCk.ok .anSt { background: #e3f3e8; color: #2e7d4f; } .anCk.mid .anSt { background: #fbf5e6; color: #8a6a24; } .anCk.bad .anSt { background: #fde8e6; color: #c0392b; } .anCk > div { min-width: 0; } .anCk b { display: block; font-size: 13.5px; } .anCk small { display: block; color: var(--sub); font-size: 12px; line-height: 1.5; margin-top: 2px; word-break: keep-all; }
   .anSum { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 14px; padding: 12px 16px; } .anSum p { margin: 0 0 8px; font-size: 14px; line-height: 1.75; word-break: keep-all; } .anSum p:last-child { margin-bottom: 0; } .anAi .anSum { background: #f7f9ff; border-color: #c9d6f2; }
   .anActs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
-  .anSteps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin: 4px 0 6px; } .anStep { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; min-width: 0; background: #fff; } .anStep.on { border-color: #c9a24f; background: #fff8e6; } .anStep.done { background: #f3f8f4; border-color: #cfe5d6; }
+  .anSteps { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 4px 0 6px; } .anStep { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; min-width: 0; background: #fff; } .anStep.on { border-color: #c9a24f; background: #fff8e6; } .anStep.done { background: #f3f8f4; border-color: #cfe5d6; }
   .anStepNo { flex: 0 0 24px; width: 24px; height: 24px; border-radius: 50%; background: #eef0f3; color: var(--sub); font-weight: 900; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; } .anStep.on .anStepNo { background: #14161c; color: #e6c57a; } .anStep.done .anStepNo { background: #2e7d4f; color: #fff; }
   .anStepT { min-width: 0; } .anStepT b { display: block; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .anStepT small { display: block; font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .anSec { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--line); } .anSec.dim { opacity: .55; } .anSec .mkStep .anTg { margin-left: auto; } .anCnt { font-style: normal; font-size: 10.5px; background: #2e7d4f; color: #fff; border-radius: 8px; padding: 0 6px; margin-left: 4px; vertical-align: 1px; }
@@ -1275,7 +1275,13 @@
   label.chip { display: inline-flex; align-items: center; font-size: 12px; } .arcList + .anActs .briefDim { font-size: 11.5px; }
   .arcSym { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; background: #fff; }
   @media (max-width: 760px) { .arcKpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .arcRow { grid-template-columns: 60px minmax(0, 1fr) 76px; } .arcRow .anAnsActs { grid-column: 2 / 4; justify-content: flex-end; } }
-  @media (max-width: 760px) { .anSteps { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; } .anStep { flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 7px; } .anStepT small { display: none; } .anStepT b { font-size: 11.5px; } .anDataGrid { grid-template-columns: 1fr; } .anPrOpts { grid-template-columns: 1fr; } }
+  .anRuleV { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; background: #f6f7f9; font-size: 13px; } .anRuleV b { font-size: 14px; } .anRuleV.ok { background: #e3f3e8; } .anRuleV.bad { background: #fde8e6; } .anRuleV.mid { background: #fbf5e6; } .anRuleV small { color: var(--sub); font-size: 11.5px; }
+  .anTrust { font-style: normal; font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 0 5px; margin-left: 4px; background: #eef0f3; color: var(--sub); vertical-align: 1px; } .anTrust.low { background: #fde8e6; color: #c0392b; } .anTrust.high { background: #e3f3e8; color: #2e7d4f; }
+  .arcCalHead { font-size: 13px; margin: 4px 0 8px; } .arcCalGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; } .arcCal { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; margin-bottom: 6px; min-width: 0; } .arcCal > div { min-width: 0; } .arcCal b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .arcCal small { display: block; color: var(--sub); font-size: 11.5px; word-break: keep-all; }
+  .arcCalG { flex: 0 0 52px; width: 52px; text-align: center; font-weight: 900; font-size: 12.5px; border-radius: 8px; padding: 4px 0; background: #eef0f3; color: var(--sub); } .arcCal.low .arcCalG { background: #fde8e6; color: #c0392b; } .arcCal.high .arcCalG { background: #e3f3e8; color: #2e7d4f; } .arcCal.mid .arcCalG { background: #fbf5e6; color: #8a6a24; }
+  .anSec .mkStep label.anTg input { margin-right: 4px; }
+  @media (max-width: 760px) { .arcCalGrid { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .anSteps { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; } .anStep { flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 7px; } .anStepT small { display: none; } .anStepT b { font-size: 11.5px; } .anDataGrid { grid-template-columns: 1fr; } .anPrOpts { grid-template-columns: 1fr; } }
   @media (max-width: 760px) { .anGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .anCkList { grid-template-columns: 1fr; } .anCks { grid-template-columns: 1fr; } .anT th { width: 40%; } }
   @media (max-width: 420px) { .anGrid { gap: 6px; } .anMod { padding: 8px 9px; gap: 7px; } .anMain small { display: none; } .anNo { width: 28px; height: 28px; font-size: 13px; border-radius: 7px; } }
   /* v12.1 카드 작업대 */
@@ -2520,7 +2526,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.5<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4933,8 +4939,8 @@ window.addEventListener("load", function () {
 <script src="rebal.js?v=12.2"></script>
 <script src="hub.js?v=12.2"></script>
 <script src="report.js?v=12.2"></script>
-<script src="archive.js?v=12.5"></script>
-<script src="analyst.js?v=12.5"></script>
+<script src="archive.js?v=12.6"></script>
+<script src="analyst.js?v=12.6"></script>
 <script src="ui.js?v=11.7"></script>
 <script src="snapshot.js?v=12.2"></script>
 </body>

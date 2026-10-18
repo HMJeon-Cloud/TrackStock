@@ -125,3 +125,46 @@ function arcBind(root, rerender) {
   var ex = root.querySelector("[data-arcexp]"); if (ex) ex.onclick = function () { Promise.all(arcItems().map(function (x) { return arcText(x.id).then(function (t) { return Object.assign({}, x, { text: t }); }); })).then(function (all) { var blob = new Blob([JSON.stringify({ v: 1, exported: new Date().toISOString(), items: all }, null, 1)], { type: "application/json" }), a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "StockMind_분석자산_" + new Date().toISOString().slice(0, 10) + ".json"; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }); };
   var im = root.querySelector("[data-arcimp]"); if (im) im.onchange = function () { var f = im.files && im.files[0]; if (!f) return; var fr = new FileReader(); fr.onload = function () { try { var j = JSON.parse(fr.result), items = Array.isArray(j) ? j : j.items || []; if (!items.length) throw new Error("기록이 없어요"); arcApi({ act: "import", items: items }).then(function (r) { if (!r || !r.ok) throw new Error(r && r.reason || "가져오기 실패"); alert(r.items.length + "건을 가져왔어요."); arcLoad(true).then(rerender); }).catch(function (e) { alert(e.message); }); } catch (e) { alert("파일을 읽지 못했어요: " + e.message); } }; fr.readAsText(f); };
 }
+
+/* ============================================================ 재사용 ③ 보정: 적중률이 낮은 체크리스트 항목 찾기 → 규칙 가중치·프롬프트에 반영 ============================================================ */
+var ARC_CAL = { min: 5, low: 0.45, high: 0.65, data: null, at: 0 };
+function arcHitOf(st, v) { var ex = arcExpect(st); if (!v || v.hit == null) return null; return ex > 0 ? v.since > 0.03 : ex < 0 ? v.since < -0.03 : Math.abs(v.since) <= 0.1; }
+function arcCalib(pairs) {   // pairs = [{it, v}] (검증 가능한 것만 의미 있음)
+  var rule = {}, ai = {}, mods = typeof AN_MODS !== "undefined" ? AN_MODS : [];
+  pairs.forEach(function (x) {
+    var it = x.it, v = x.v; if (!v || v.hit == null || !it.mod) return; var m = mods.filter(function (z) { return z.id === it.mod; })[0];
+    // 앱 규칙 체크(저장 시점 판정)
+    if (it.snap && Array.isArray(it.snap.ck)) it.snap.ck.forEach(function (st, i) { if (st === "na") return; var h = arcHitOf(st, v); if (h == null) return; var k = it.mod + ":" + i, o = rule[k] = rule[k] || { mod: it.mod, idx: i, name: m && m.ck[i] || ("항목 " + (i + 1)), n: 0, hit: 0, okN: 0, okHit: 0, badN: 0, badHit: 0 }; o.n++; if (h) o.hit++; if (st === "ok") { o.okN++; if (h) o.okHit++; } if (st === "bad") { o.badN++; if (h) o.badHit++; } });
+    // AI 항목 판정
+    ((it.p && it.p.items) || []).forEach(function (z) { var h = arcHitOf(z.st, v); if (h == null) return; var k = it.mod + ":" + z.name, o = ai[k] = ai[k] || { mod: it.mod, name: z.name, n: 0, hit: 0 }; o.n++; if (h) o.hit++; });
+  });
+  function fin(o) { o.acc = o.n ? o.hit / o.n : null; o.grade = o.n < ARC_CAL.min ? "few" : o.acc < ARC_CAL.low ? "low" : o.acc >= ARC_CAL.high ? "high" : "mid"; o.w = o.grade === "low" ? 0.5 : o.grade === "high" ? 1.25 : 1; return o; }
+  var R = { rule: Object.keys(rule).map(function (k) { return fin(rule[k]); }), ai: Object.keys(ai).map(function (k) { return fin(ai[k]); }), n: pairs.filter(function (x) { return x.v && x.v.hit != null; }).length };
+  R.rule.sort(function (a, b) { return (a.acc == null) - (b.acc == null) || a.acc - b.acc || b.n - a.n; }); R.ai.sort(function (a, b) { return (a.acc == null) - (b.acc == null) || a.acc - b.acc || b.n - a.n; });
+  ARC_CAL.data = R; ARC_CAL.at = Date.now(); return R;
+}
+function arcTrust(mod, idx) { var R = ARC_CAL.data; if (!R) return null; return R.rule.filter(function (o) { return o.mod === mod && o.idx === idx; })[0] || null; }
+/* 보정 적용: 신뢰 낮은 항목의 ✓/✗ 판정을 △로 낮추고(보수적), 가중 종합 점수 */
+function arcApplyCalib(mod, cks) {
+  var score = 0, wsum = 0, notes = [];
+  var out = cks.map(function (c, i) { var t = arcTrust(mod, i), st = c.st, w = t ? t.w : 1; if (t && t.grade === "low" && (st === "ok" || st === "bad")) { st = "mid"; notes.push(c.t + " — 기록상 적중률 " + Math.round(t.acc * 100) + "%(" + t.n + "건)라 △로 낮춤"); } if (st !== "na") { score += (st === "ok" ? 1 : st === "bad" ? -1 : 0) * w; wsum += w; } return Object.assign({}, c, { st: st, raw: c.st, trust: t }); });
+  var v = wsum ? score / wsum : 0, verdict = v >= 0.34 ? "ok" : v <= -0.34 ? "bad" : "mid";
+  return { ck: out, verdict: verdict, v: v, notes: notes };
+}
+function arcCalibLines(mod) {   // 프롬프트에 붙일 보정 메모
+  var R = ARC_CAL.data; if (!R) return [];
+  var L = [];
+  R.rule.filter(function (o) { return o.mod === mod && o.grade !== "few"; }).forEach(function (o) { L.push("- 앱 규칙 '" + o.name + "' 판정은 내 기록상 적중률 " + Math.round(o.acc * 100) + "%(" + o.n + "건) — " + (o.grade === "low" ? "신뢰 낮음: 이 항목은 더 깐깐하게 다른 근거로 재검토해줘" : o.grade === "high" ? "신뢰 높음" : "보통")); });
+  R.ai.filter(function (o) { return o.mod === mod && o.grade !== "few"; }).forEach(function (o) { L.push("- AI 항목 '" + o.name + "' 판정의 과거 적중률 " + Math.round(o.acc * 100) + "%(" + o.n + "건)" + (o.grade === "low" ? " — 이 항목에서 과신했던 적이 많아. 반대 근거를 먼저 찾아줘" : "")); });
+  return L.length ? ["[보정 메모 — 내 기록으로 계산한 항목별 적중률]"].concat(L) : [];
+}
+function arcCalibHtml() {
+  var R = ARC_CAL.data, mods = typeof AN_MODS !== "undefined" ? AN_MODS : [];
+  if (!R || !R.n) return '<div class="briefDim">검증된 기록이 아직 없어요. 종목 기록이 20일 이상 지나면 자동으로 계산돼요.</div>';
+  var mn = function (id) { var m = mods.filter(function (z) { return z.id === id; })[0]; return m ? m.t : id; }, g = { low: "낮음", mid: "보통", high: "높음", few: "표본 부족" };
+  function row(o, kind) { return '<div class="arcCal ' + o.grade + '"><span class="arcCalG">' + (o.grade === "few" ? (ARC_CAL.min - o.n) + "건 더" : Math.round(o.acc * 100) + "%") + '</span><div><b>' + arcEsc(o.name) + '</b><small>' + arcEsc(mn(o.mod)) + ' · ' + kind + ' · ' + o.hit + '/' + o.n + ' 적중 · 신뢰 ' + g[o.grade] + (kind === "앱 규칙" && o.grade !== "few" ? ' · 가중치 ×' + o.w + (o.grade === "low" ? " · ✓/✗ → △로 낮춤" : "") : "") + '</small></div></div>'; }
+  var low = R.rule.filter(function (o) { return o.grade === "low"; }).concat(R.ai.filter(function (o) { return o.grade === "low"; }));
+  var h = '<div class="arcCalHead">' + (low.length ? '<b class="rbWarn">⚠ 적중률 낮은 항목 ' + low.length + '개</b> — 앱 평가에서 △로 낮추고 가중치 ½, 프롬프트에 "더 깐깐하게" 메모가 들어가요.' : '<b style="color:#2e7d4f">적중률 낮은 항목 없음</b> (검증 ' + R.n + '건 · 기준: ' + ARC_CAL.min + '건 이상, ' + Math.round(ARC_CAL.low * 100) + '% 미만)') + '</div>';
+  h += '<div class="arcCalGrid"><div><div class="anSubH">앱 규칙 체크 <small>저장 시점 ✓/△/✗ vs 이후 가격</small></div>' + (R.rule.length ? R.rule.map(function (o) { return row(o, "앱 규칙"); }).join("") : '<div class="briefDim">없음</div>') + '</div><div><div class="anSubH">AI 항목 판정 <small>카드형 항목 ✓/△/✗ vs 이후 가격</small></div>' + (R.ai.length ? R.ai.map(function (o) { return row(o, "AI 판정"); }).join("") : '<div class="briefDim">없음</div>') + '</div></div>';
+  return h;
+}

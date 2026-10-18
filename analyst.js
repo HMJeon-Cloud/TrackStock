@@ -322,6 +322,7 @@ function anPromptModule(m, out, opts) {
   L.push(m.role + " " + m.prompt.replace(/\[기업명\/티커\]/g, name || "[기업명/티커]"));
   L.push(""); L.push("아래 체크리스트 " + m.ck.length + "개를 항목마다 따로 답한 뒤, 마지막에 전체를 종합해 최종 판단을 내려줘."); m.ck.forEach(function (c, i) { L.push((i + 1) + ". " + c); });
   if (out) { L.push(""); L.push("[내 앱(StockMind)이 계산한 데이터 — 이 숫자를 근거로 쓰고, '데이터 없음' 항목은 최신 공시·자료로 보완해줘. 숫자를 지어내지 말고 출처를 붙여줘.]"); anLines(out).forEach(function (l) { L.push("- " + l.text); }); }
+  if (typeof arcCalibLines === "function" && AN.calib !== false) { var CL = arcCalibLines(m.id); if (CL.length) { L.push(""); CL.forEach(function (x) { L.push(x); }); } }
   if (!opts.noFormat) L.push(AN_FORMAT);
   return L.join("\n");
 }
@@ -329,7 +330,7 @@ function anPromptModule(m, out, opts) {
 function anPromptFull(outs) {
   var mods = AN_MODS.filter(function (m) { return m.need === "stock"; }), name = AN.sym ? anName(AN.sym) + "(" + AN.sym + ")" : "[기업명/티커]", L = [];
   L.push("너는 글로벌 증권사의 리서치 팀장이다. " + name + "을(를) 네 가지 틀(기업 · 차트 · 실적 · 재무제표)로 차례로 분석하고, 마지막에 네 분석을 종합해 최종 투자 판단을 내려줘. 독자는 한국 개인투자자 초보. 숫자는 출처와 함께, 지어내지 말 것.");
-  mods.forEach(function (m, i) { L.push(""); L.push("### " + m.no + " " + m.t + " — " + m.sub); L.push(m.prompt.replace(/\[기업명\/티커\]/g, name)); m.ck.forEach(function (c, k) { L.push("  " + (k + 1) + ") " + c); }); var o = outs && outs[m.id]; if (o) { L.push("  [앱 데이터]"); anLines(o).forEach(function (l) { L.push("  - " + l.text); }); } });
+  mods.forEach(function (m, i) { L.push(""); L.push("### " + m.no + " " + m.t + " — " + m.sub); L.push(m.prompt.replace(/\[기업명\/티커\]/g, name)); m.ck.forEach(function (c, k) { L.push("  " + (k + 1) + ") " + c); }); var o = outs && outs[m.id]; if (o) { L.push("  [앱 데이터]"); anLines(o).forEach(function (l) { L.push("  - " + l.text); }); } if (typeof arcCalibLines === "function" && AN.calib !== false) arcCalibLines(m.id).forEach(function (x) { L.push("  " + x); }); });
   if (outs && outs._ctx) { L.push(""); L.push(outs._ctx); }
   L.push(""); L.push("### 최종 종합"); L.push("네 틀의 결과를 겹쳐서: 서로 같은 방향을 가리키는 것 / 엇갈리는 것 / 그래서 지금 어떤 행동(검토·관망·나눠서 등)이 맞는지 / 생각을 바꿀 조건 3개." + (outs && outs._ctx ? " 과거 기록이 있으면 '그때 대비 무엇이 달라졌고 판단을 어떻게 조정하는지'도." : ""));
   L.push(AN_FORMAT.replace("(항목 줄은 체크리스트 수만큼 반복)", "(항목 줄은 네 틀 각각 1줄 = 4줄: 이름은 '기업' '차트' '실적' '재무')"));
@@ -423,7 +424,7 @@ function renderAnalyst() {
   var past = m.need === "stock" ? (AN.sym ? arcFor(AN.sym, null, 50) : []) : arcFor(null, m.id, 50), pastSame = past.filter(function (x) { return x.mod === m.id; }), lastRec = pastSame[0] || null;
   if (O && AN.outKey !== m.id + ":" + (m.need === "stock" ? AN.sym || "" : "")) O = null;
   var ready = !!O, st = function (k) { return k < AN.step ? "done" : k === AN.step ? "on" : ""; };
-  var h = '<div class="anSteps">' + anStepHtml(1, "틀·종목", m.no + " " + m.t + (AN.sym && m.need === "stock" ? " · " + anName(AN.sym) : ""), st(1)) + anStepHtml(2, "데이터", ready ? "제시 · 평가 · 정리" : "계산 전", ready ? (AN.step === 2 ? "on" : "done") : st(2)) + anStepHtml(3, "프롬프트", "한 번에 · 항목별 → 종합", AN.step === 3 ? "on" : AN.step > 3 ? "done" : "") + anStepHtml(4, "답변", mine.length ? "이 틀 " + mine.length + "건" : "저장 0건", AN.step === 4 ? "on" : cur ? "done" : "") + anStepHtml(5, "카드", "서술형 · 카드형", AN.step === 5 ? "on" : "") + anStepHtml(6, "자산", ans.length ? ans.length + "건 쌓임" : "0건", "") + '</div>';
+  var h = '<div class="anSteps">' + anStepHtml(1, "틀·종목", m.no + " " + m.t + (AN.sym && m.need === "stock" ? " · " + anName(AN.sym) : ""), st(1)) + anStepHtml(2, "데이터", ready ? "제시 · 평가 · 정리" : "계산 전", ready ? (AN.step === 2 ? "on" : "done") : st(2)) + anStepHtml(3, "프롬프트", "한 번에 · 항목별 → 종합", AN.step === 3 ? "on" : AN.step > 3 ? "done" : "") + anStepHtml(4, "답변", mine.length ? "이 틀 " + mine.length + "건" : "저장 0건", AN.step === 4 ? "on" : cur ? "done" : "") + anStepHtml(5, "카드", "서술형 · 카드형", AN.step === 5 ? "on" : "") + anStepHtml(6, "자산", ans.length ? ans.length + "건 쌓임" : "0건", "") + anStepHtml(7, "보정", ARC_CAL.data && ARC_CAL.data.n ? "검증 " + ARC_CAL.data.n + "건" : "검증 전", "") + '</div>';
   // ① 틀 · 종목
   h += '<section class="anSec"><div class="mkStep"><b>1</b> 분석 틀 고르기 <small class="briefDim">월가 애널리스트 6틀 · 체크리스트 4개씩</small></div>';
   h += '<div class="anGrid">' + AN_MODS.map(function (x) { var n = ans.filter(function (a) { return a.mod === x.id; }).length; return '<button class="anMod' + (x.id === AN.mod ? ' on' : '') + '" data-anmod="' + x.id + '"><span class="anNo">' + x.no + '</span><span class="anMain"><b>' + x.icon + ' ' + x.t + (n ? ' <em class="anCnt">' + n + '</em>' : '') + '</b><small>' + x.sub + '</small></span></button>'; }).join("") + '</div>';
@@ -439,7 +440,8 @@ function renderAnalyst() {
   else if (ready && AN.showData !== false) {
     var okN = O.ck.filter(function (c) { return c.st === "ok"; }).length, naN = O.ck.filter(function (c) { return c.st === "na"; }).length;
     h += '<div class="anDataGrid"><div><div class="anSubH">제시 <small>앱 숫자 그대로</small></div><table class="anT">' + O.rows.map(function (r) { return '<tr><th>' + anEsc(r[0]) + '</th><td><b>' + anEsc(r[1]) + '</b>' + (r[2] ? '<small>' + anEsc(r[2]) + '</small>' : '') + '</td></tr>'; }).join("") + '</table></div>';
-    h += '<div><div class="anSubH">평가 <small>양호 ' + okN + ' · 데이터 없음 ' + naN + ' · 규칙 기준</small></div><div class="anCks one">' + O.ck.map(function (c) { return '<div class="anCk ' + c.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗", na: "—" })[c.st] + '</span><div><b>' + anEsc(c.t) + '</b><small>' + anEsc(c.why) + '</small></div></div>'; }).join("") + '</div>';
+    var CAL = typeof arcApplyCalib === "function" && AN.calib !== false ? arcApplyCalib(m.id, O.ck) : { ck: O.ck.map(function (c) { return Object.assign({}, c, { raw: c.st }); }), verdict: null, notes: [] }, vTxt = { ok: "양호 ✓", mid: "보통 △", bad: "주의 ✗" };
+    h += '<div><div class="anSubH">평가 <small>양호 ' + okN + ' · 데이터 없음 ' + naN + ' · 규칙 기준' + (ARC_CAL.data && ARC_CAL.data.n ? ' · 보정 적용(검증 ' + ARC_CAL.data.n + '건)' : '') + '</small></div>' + (CAL.verdict ? '<div class="anRuleV ' + CAL.verdict + '">규칙 종합 <b>' + vTxt[CAL.verdict] + '</b><small>항목 가중 평균 ' + (CAL.v >= 0 ? "+" : "") + CAL.v.toFixed(2) + (CAL.notes.length ? ' · ' + anEsc(CAL.notes.join(" / ")) : '') + '</small></div>' : '') + '<div class="anCks one">' + CAL.ck.map(function (c) { var t = c.trust; return '<div class="anCk ' + c.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗", na: "—" })[c.st] + '</span><div><b>' + anEsc(c.t) + (t && t.grade !== "few" ? ' <em class="anTrust ' + t.grade + '">적중 ' + Math.round(t.acc * 100) + '% · ' + t.n + '건</em>' : '') + (c.raw !== c.st ? ' <em class="anTrust low">원래 ' + ({ ok: "✓", bad: "✗" })[c.raw] + '</em>' : '') + '</b><small>' + anEsc(c.why) + '</small></div></div>'; }).join("") + '</div>';
     h += '<div class="anSubH" style="margin-top:12px">정리 <small>규칙 기반 글</small></div><div class="anSum">' + O.sum.map(function (p) { return '<p>' + anEsc(p) + '</p>'; }).join("") + '</div></div></div>';
     if (lastRec && lastRec.snap && lastRec.snap.rows && lastRec.snap.rows.length) {
       var D = arcDiff(lastRec.snap.rows, O.rows), stT = { ok: "✓", mid: "△", bad: "✗" };
@@ -464,6 +466,7 @@ function renderAnalyst() {
   h += '</section>';
   // ⑥ 분석 자산
   h += '<section class="anSec" id="anArc"><div class="mkStep"><b>6</b> 분석 자산 <small class="briefDim">저장한 답변 + 그때의 숫자 — 다음 프롬프트의 문맥 · 종목별 기록 · 판단 적중률 · 백업</small></div>' + (typeof arcHtml === "function" ? arcHtml(ans, AN.arcPairs || [], AN.ansId) : '') + '</section>';
+  h += '<section class="anSec" id="anCal"><div class="mkStep"><b>7</b> 보정 <small class="briefDim">적중률이 낮은 체크리스트 항목을 찾아 규칙 가중치를 낮추고(✓/✗→△, ×½) 프롬프트에 메모 — 기록이 쌓일수록 정확해져요</small><label class="chip anTg" style="margin-left:auto"><input type="checkbox" data-ancal' + (AN.calib !== false ? ' checked' : '') + '> 보정 적용</label></div>' + (typeof arcCalibHtml === "function" ? arcCalibHtml() : '') + '</section>';
   root.innerHTML = h;
   // bind
   Array.prototype.forEach.call(root.querySelectorAll("[data-anmod]"), function (b) { b.onclick = function () { AN.mod = b.getAttribute("data-anmod"); AN.out = null; AN.err = null; AN.ansId = null; AN.step = 1; renderAnalyst(); var mm = anMod(); if (mm.need !== "stock" || AN.sym) anRun(); }; });
@@ -483,6 +486,7 @@ function renderAnalyst() {
     Promise.all([anAllOuts(AN_MODS.filter(function (x) { return AN.pScope === "all" || x.need === "stock"; })), AN.useCtx !== false ? arcContext(AN.sym, null, 4) : ""]).then(function (r) { var outs = r[0]; outs._ctx = r[1] || ""; if (msg) msg.textContent = ""; cb(AN.pScope === "all" ? anPromptAll(outs) : anPromptFull(outs)); }).catch(function (e) { if (msg) msg.textContent = ""; alert("데이터를 모으지 못했어요: " + e.message); });
   }
   var cx = root.querySelector("[data-anctx]"); if (cx) cx.onchange = function () { AN.useCtx = cx.checked; };
+  var cal = root.querySelector("[data-ancal]"); if (cal) cal.onchange = function () { AN.calib = cal.checked; renderAnalyst(); };
   var cp = root.querySelector("[data-ancopy]"); if (cp) cp.onclick = function () { buildPrompt(function (t) { anCopy(t, cp); AN.step = Math.max(AN.step, 4); var box = root.querySelector(".anPrBox"); if (box && !box.hidden) box.querySelector("textarea").value = t; }); };
   var pv = root.querySelector("[data-anprev]"); if (pv) pv.onclick = function () { var box = root.querySelector(".anPrBox"); if (!box.hidden) { box.hidden = true; return; } buildPrompt(function (t) { box.hidden = false; box.querySelector("textarea").value = t; }); };
   var sv = root.querySelector("[data-ansave]"); if (sv) sv.onclick = function () { var ta = root.querySelector(".anAnsIn"); if (!ta.value.trim()) { alert("붙여넣은 답변이 비어 있어요."); return; } sv.textContent = "저장 중…"; sv.disabled = true; anAnsAdd(ta.value).then(function () { AN.step = 5; AN.arcPairs = null; renderAnalyst(); var sec = document.querySelectorAll("#anBody .anSec")[4]; if (sec) try { sec.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }); };
@@ -492,7 +496,7 @@ function renderAnalyst() {
   Array.prototype.forEach.call(root.querySelectorAll("[data-andel]"), function (b) { b.onclick = function () { if (!confirm("이 기록을 지울까요? (서버에서도 지워져요)")) return; var id = b.getAttribute("data-andel"); arcDel(id); if (AN.ansId === id) AN.ansId = null; AN.arcPairs = null; renderAnalyst(); }; });
   if (typeof arcBind === "function") arcBind(root, function () { renderAnalyst(); });
   Array.prototype.forEach.call(root.querySelectorAll("[data-arcpick]"), function (b) { b.onclick = function (e) { if (e.target.closest("button,select,label")) return; var id = b.getAttribute("data-arcpick"), it = anAnsLoad().filter(function (x) { return x.id === id; })[0]; if (!it) return; AN.ansId = id; if (it.mod && it.mod !== AN.mod) { AN.mod = it.mod; AN.out = null; } if (it.sym) AN.sym = it.sym; AN.step = 5; renderAnalyst(); var mm = anMod(); if (!AN.out && (mm.need !== "stock" || AN.sym)) anRun(); }; });
-  if (AN.arcPairs == null && ans.length && typeof arcVerifyAll === "function") { AN.arcPairs = []; arcVerifyAll(ans.filter(function (x) { return x.sym && x.snap && x.snap.price != null; }).slice(0, 60)).then(function (P) { AN.arcPairs = P; renderAnalyst(); }); }
+  if (AN.arcPairs == null && ans.length && typeof arcVerifyAll === "function") { AN.arcPairs = []; arcVerifyAll(ans.filter(function (x) { return x.sym && x.snap && x.snap.price != null; }).slice(0, 120)).then(function (P) { AN.arcPairs = P; try { arcCalib(P); } catch (e) {} renderAnalyst(); }); }
   Array.prototype.forEach.call(root.querySelectorAll("[data-ancard]"), function (b) { b.onclick = function () { if (cur) anMakeCards(cur, b.getAttribute("data-ancard"), b); }; });
 }
 function analystGo(mod, sym) { if (mod) AN.mod = mod; if (sym) AN.sym = sym; if (typeof navTo === "function") navTo("analyst"); else switchTab("analyst"); anRun(); }
