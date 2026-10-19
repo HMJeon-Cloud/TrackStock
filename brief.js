@@ -416,7 +416,7 @@ function briefRenderHealth(R) {
     briefBarHtml("20일선 위", "단기 추세", t.abovePct, 50, "절반 50%") +
     (t.n50 ? briefBarHtml("50일선 위", "중기 추세", t.above50Pct, 50, "절반 50%") : "") +
     (t.n200 ? briefBarHtml("200일선 위", "장기 추세", t.above200Pct, 50, "절반 50%") : '<div class="briefDim" style="font-size:12px">200일선은 1년치 데이터가 쌓인 뒤(수집 후 다음 날) 표시돼요.</div>') +
-    '<div class="fdHow"><b>읽는 법</b> — 20·50·200일 평균 가격보다 위에 있는 종목의 비율이에요(' + t.total + '개 집계). 50% 선은 종목의 절반을 나타내는 비교선이며 매수·매도 기준이 아니에요. 막대는 시장 참여 정도일 뿐 신호가 아니에요.</div>';
+    '<div class="fdHow"><b>읽는 법</b> — 20·50·200일 평균 가격보다 위에 있는 종목의 비율이에요(' + (t.uni ? t.uni + ' · ' : '') + t.total + '개 집계). 50% 선은 종목의 절반을 나타내는 비교선이며 매수·매도 기준이 아니에요. 막대는 시장 참여 정도일 뿐 신호가 아니에요.</div>';
   box.innerHTML = h;
   if (!hl) return;
   if (!t.n200) { hl.innerHTML = '<div class="fdHead"><span class="fdNo">06 · 신고가·신저가</span><span class="fdDate">' + briefDateLine(R) + '</span></div><div class="briefDim" style="font-size:12px">52주 신고가·신저가는 1년치 데이터가 쌓인 뒤 표시돼요.</div>'; return; }
@@ -459,9 +459,9 @@ function renderBrief() {
   $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs) : R.market === "coin" ? briefCoinAsOf() : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +
     " · " + (R.market !== "all" ? R.mktName + " " : "") + R.count + "개 자산" + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "");
   var ML = R.market !== "all" ? R.mktName + " " : "";
-
-  /* ① 한눈에 — KPI 띠 + 온도 한 줄 + 지표 칩 (v9.1) */
-  var t = R.temp;
+  /* v12.11 전체 시장(S&P 500 · 코스피 200) 요약이 있으면 오늘 탭의 온도·체력·신고가도 그 기준으로 — 카드(데일리 9장)와 같은 숫자 */
+  if (typeof dlUniLoad === "function" && (R.market === "us" || R.market === "kr") && !R._uniTried) { R._uniTried = 1; dlUniLoad(R.market).then(function (U) { if (U && briefState.result === R) { R.uni = U; R.uniTemp = dlUniTemp(U); R.tempApp = R.tempApp || R.temp; R.temp = R.uniTemp; renderBrief(); } }).catch(function () {}); }   // 3초 요약·핵심 이슈·카드·작업대가 읽는 R.temp 도 전체 시장 기준으로 바꿔 모든 화면의 숫자를 맞춘다
+  var t = R.uniTemp || R.temp, uniLab = R.uniTemp ? R.uniTemp.uni + " 기준" : "앱 관심 종목 " + R.temp.total + "개 기준";
   if ($("briefKpi")) {
     var vixN = (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], nh = (t.newHigh || []).length, nl = (t.newLow || []).length;
     var idx0 = R.indexRow[0];
@@ -475,13 +475,13 @@ function renderBrief() {
   if ($("briefTempBox")) $("briefTempBox").innerHTML = '<div class="briefTemp">' +
     '<div class="briefTempMain"><div class="briefTempWord">' + L + ' ' + ML + '시장은 <b>' + t.word + '</b></div>' +
     '<div class="briefTempBar"><div style="width:' + Math.round(t.upPct * 100) + '%"></div></div>' +
-    '<div class="briefTempDesc">' + t.desc + '</div></div>' +
+    '<div class="briefTempDesc">' + t.desc + ' <span class="briefDim">(' + uniLab + (R.uniTemp && R.tempApp ? ' · 앱 관심 종목 ' + R.tempApp.total + '개 기준 ' + Math.round(R.tempApp.upPct * 100) + '%' : '') + ')</span></div></div>' +
     '<div class="briefIdxRow">' + R.indexRow.map(function (x) {
       return '<div class="briefIdx"><span>' + x.name + '</span><b style="color:' + briefColor(x.ret) + '">' + briefPct(x.ret) + '</b></div>';
     }).join("") + '</div></div>';
 
   /* ①-2 시장 체력 · 신고가·신저가 (v8.9 — 한눈에 보는 판) */
-  try { briefRenderHealth(R); } catch (e) { console.warn(e); }
+  try { briefRenderHealth(R.uniTemp ? Object.assign({}, R, { temp: R.uniTemp }) : R); } catch (e) { console.warn(e); }
 
   /* ② 테마 — 상위·하위 위주, 나머지는 더보기 */
   var maxAbs = Math.max(0.005, Math.max.apply(null, R.themes.map(function (x) { return Math.abs(x.ret); })));

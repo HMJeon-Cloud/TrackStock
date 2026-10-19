@@ -86,12 +86,21 @@ function dlRets(sym, n) { var r = typeof nbRecent === "function" ? nbRecent() : 
 function dlCorr(a, b) { if (!a || !b) return null; var n = Math.min(a.length, b.length); a = a.slice(-n); b = b.slice(-n); var ma = 0, mb = 0; for (var i = 0; i < n; i++) { ma += a[i]; mb += b[i]; } ma /= n; mb /= n; var sab = 0, sa = 0, sb = 0; for (i = 0; i < n; i++) { sab += (a[i] - ma) * (b[i] - mb); sa += (a[i] - ma) * (a[i] - ma); sb += (b[i] - mb) * (b[i] - mb); } return sa && sb ? sab / Math.sqrt(sa * sb) : null; }
 function dlRows(sym) { return typeof hubRows === "function" ? hubRows(sym) : []; }
 function dlRetsHist(sym, n) { var r = dlRows(sym); if (r.length < n + 1) return null; var out = []; for (var i = r.length - n; i < r.length; i++) out.push(r[i].c / r[i - 1].c - 1); return out; }
-function dlYearStats(sym) {   // 연초 대비 · 연도별 (연초 대비 최고/최저) 평균
-  var r = dlRows(sym); if (r.length < 250) return null; var by = {}; r.forEach(function (x) { var y = new Date(x.t + 9 * 3600e3).getUTCFullYear(); (by[y] = by[y] || []).push(x); });
-  var ys = Object.keys(by).map(Number).sort(), cur = ys[ys.length - 1], ups = [], dns = [];
-  ys.forEach(function (y) { var L = by[y]; if (y === cur || L.length < 60) return; var f = L[0].c, hi = -Infinity, lo = Infinity; L.forEach(function (x) { hi = Math.max(hi, x.c); lo = Math.min(lo, x.c); }); ups.push(hi / f - 1); dns.push(lo / f - 1); });
-  var C = by[cur]; return { ytd: C && C.length ? C[C.length - 1].c / C[0].c - 1 : null, up: ups.length ? rpAvg(ups) : null, dn: dns.length ? rpAvg(dns) : null, years: ups.length };
+function dlYearStats(sym) {   // 연초 대비 · 연도별 (연초 대비 최고/최저) 평균 — 수정주가(배당·분할 반영) 기준 · 상장 첫해 60거래일 미만 제외 · 올해 제외
+  var r = dlRows(sym); if (r.length < 120) return null; var A = function (x) { return x.a > 0 ? x.a : x.c; }, by = {}; r.forEach(function (x) { var y = new Date(x.t + 9 * 3600e3).getUTCFullYear(); (by[y] = by[y] || []).push(x); });
+  var ys = Object.keys(by).map(Number).sort(), cur = new Date(Date.now() + 9 * 3600e3).getUTCFullYear(), ups = [], dns = [];
+  ys.forEach(function (y) { var L = by[y]; if (y >= cur || L.length < 60) return; var f = A(L[0]), hi = -Infinity, lo = Infinity; L.forEach(function (x) { hi = Math.max(hi, A(x)); lo = Math.min(lo, A(x)); }); ups.push(hi / f - 1); dns.push(lo / f - 1); });
+  var C = by[cur], ytd = C && C.length ? A(C[C.length - 1]) / A(C[0]) - 1 : null, d1 = r.length > 1 ? A(r[r.length - 1]) / A(r[r.length - 2]) - 1 : null;
+  return { ytd: ytd, up: ups.length ? rpAvg(ups) : null, dn: dns.length ? rpAvg(dns) : null, years: ups.length, d1: d1, lastT: r[r.length - 1].t };
 }
+/* 성적표 자산 목록 (시장별) — 긴 역사는 dlPrep 에서 미리 받는다 */
+var DL_SCORE = {
+  us: [["주식·지수", [["SPY", "S&P 500"], ["QQQ", "나스닥100"], ["NVDA", "엔비디아"], ["AAPL", "애플"], ["GOOGL", "구글"], ["MSFT", "마이크로소프트"], ["AMZN", "아마존"], ["META", "메타"], ["AVGO", "브로드컴"], ["PLTR", "팔란티어"], ["TSLA", "테슬라"], ["HOOD", "로빈후드"]]], ["채권·원자재", [["TLT", "미국 장기채"], ["IEF", "미국 중기채"], ["GLD", "금"], ["SLV", "은"], ["PDBC", "원자재"]]], ["코인", [["BTC-USD", "비트코인"]]]],
+  kr: [["주식·지수", [["^KS11", "코스피"], ["^KQ11", "코스닥"], ["005930.KS", "삼성전자"], ["000660.KS", "SK하이닉스"], ["373220.KS", "LG에너지솔루션"], ["005380.KS", "현대차"], ["000270.KS", "기아"], ["035420.KS", "NAVER"], ["068270.KS", "셀트리온"], ["105560.KS", "KB금융"], ["012450.KS", "한화에어로스페이스"]]], ["해외·채권·귀금속", [["SPY", "S&P 500"], ["TLT", "미국 장기채"], ["GLD", "금"], ["KRW=X", "달러/원"]]], ["코인", [["BTC-USD", "비트코인"]]]],
+  coin: [["코인", [["BTC-USD", "비트코인"], ["ETH-USD", "이더리움"], ["SOL-USD", "솔라나"], ["XRP-USD", "리플"]]], ["비교", [["SPY", "S&P 500"], ["QQQ", "나스닥100"], ["GLD", "금"]]]]
+};
+DL_SCORE.all = DL_SCORE.kr;
+function dlScoreSyms(R) { var out = []; (DL_SCORE[R && R.market] || DL_SCORE.us).forEach(function (g) { g[1].forEach(function (w) { out.push(w[0]); }); }); return out; }
 
 /* ============================================================ 카드 ============================================================ */
 function dlCard1(R) {
@@ -192,15 +201,15 @@ function dlCard7(R) {
   return c.cv;
 }
 function dlCard8(R) {
-  var groups = R.market === "kr" ? [["주식·지수", [["^KS11", "코스피"], ["005930.KS", "삼성전자"], ["000660.KS", "SK하이닉스"], ["SPY", "S&P 500"], ["QQQ", "나스닥100"]]], ["채권·귀금속·환율", [["TLT", "미국 장기채"], ["GLD", "금"], ["KRW=X", "달러/원"]]], ["코인", [["BTC-USD", "비트코인"]]]] : [["주식·지수", [["SPY", "S&P 500"], ["QQQ", "나스닥100"], ["NVDA", "엔비디아"], ["AAPL", "애플"], ["MSFT", "마이크로소프트"], ["TSLA", "테슬라"], ["^KS11", "코스피"]]], ["채권·귀금속", [["TLT", "미국 장기채"], ["GLD", "금"]]], ["코인", [["BTC-USD", "비트코인"]]]];
+  var groups = DL_SCORE[R.market] || DL_SCORE.us;
   var by = {}; (R.stocks || []).forEach(function (s) { by[s.sym] = s; }); var rows = [], upN = 0, tot = 0, best = null, worst = null;
-  groups.forEach(function (gp) { var L = gp[1].map(function (w) { var st = dlYearStats(w[0]), s = by[w[0]]; if (!st && !s) return null; var r = { sym: w[0], name: w[1], d1: s ? s.ret1 : null, ytd: st ? st.ytd : null, up: st ? st.up : null, dn: st ? st.dn : null, years: st ? st.years : 0 }; if (r.ytd != null) { tot++; if (r.ytd > 0) upN++; if (!best || r.ytd > best.ytd) best = r; if (!worst || r.ytd < worst.ytd) worst = r; } return r; }).filter(Boolean); if (L.length) rows.push({ g: gp[0], L: L }); });
+  groups.forEach(function (gp) { var L = gp[1].map(function (w) { var st = dlYearStats(w[0]), s = by[w[0]]; if (!st && !s) return null; var r = { sym: w[0], name: w[1], d1: s && s.ret1 != null ? s.ret1 : st ? st.d1 : null, ytd: st ? st.ytd : null, up: st ? st.up : null, dn: st ? st.dn : null, years: st ? st.years : 0 }; if (r.ytd != null) { tot++; if (r.ytd > 0) upN++; if (!best || r.ytd > best.ytd) best = r; if (!worst || r.ytd < worst.ytd) worst = r; } return r; }).filter(Boolean); if (L.length) rows.push({ g: gp[0], L: L }); });
   if (!tot) return null; var c = dlNew(8, "주요 자산 성적표", R), g = c.g, W = DL.W - DL.P * 2;
-  dlHead(c, tot + "개 자산 중 " + upN + "개가 연초보다 올랐습니다", "연초 대비 최고 " + best.name + " " + dlPct(best.ytd) + " · 최저 " + worst.name + " " + dlPct(worst.ytd));
+  dlHead(c, tot + "개 자산 중 " + upN + "개 연초 대비 상승", "연초 대비 최고 " + best.name + " " + dlPct(best.ytd) + " · 최저 " + worst.name + " " + dlPct(worst.ytd));
   var X = [DL.P, DL.P + 440, DL.P + 610, DL.P + 790, DL.P + W]; cText(g, "자산 · 표본", X[0], c.y + 20, 20, 700, DL_C.sub); cText(g, "전일 대비", X[1], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연초 대비", X[2], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "평균 상승폭", X[3], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "평균 낙폭", X[4], c.y + 20, 20, 700, DL_C.sub, "right"); c.y += 30; g.fillStyle = DL_C.ink; g.fillRect(DL.P, c.y, W, 2); c.y += 4;
-  var rowH = 50;
-  rows.forEach(function (gp) { cRound(g, DL.P, c.y + 4, W, 30, 6, DL_C.tile); cText(g, gp.g, DL.P + 10, c.y + 26, 20, 800, DL_C.ink); c.y += 38; gp.L.forEach(function (r) { cText(g, r.name, X[0], c.y + 34, 27, 800, DL_C.ink); cText(g, r.sym.replace(/^\^/, "") + (r.years ? " · " + r.years + "년" : ""), X[0] + cW(g, r.name, 27, 800) + 10, c.y + 34, 19, 600, DL_C.sub); cText(g, dlPct(r.d1), X[1], c.y + 34, 27, 800, dlCol(r.d1), "right"); cText(g, dlPct(r.ytd), X[2], c.y + 34, 27, 900, dlCol(r.ytd), "right"); cText(g, r.up != null ? "+" + (r.up * 100).toFixed(1) + "%" : "-", X[3], c.y + 34, 24, 600, "#3b4256", "right"); cText(g, r.dn != null ? (r.dn * 100).toFixed(1) + "%" : "-", X[4], c.y + 34, 24, 600, "#3b4256", "right"); g.strokeStyle = DL_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(DL.P, c.y + rowH); g.lineTo(DL.P + W, c.y + rowH); g.stroke(); c.y += rowH; }); });
-  dlFoot(c, "연초 대비 = 올해 첫 거래일 종가 대비 · 평균 상승폭·낙폭 = 각 연도 첫 거래일 종가 대비 그해 최고·최저 종가 수익률의 평균(표본 연수 표시, 올해 제외) · 과거 통계이며 매수·매도 신호가 아닙니다", "지수·ETF·종목: 야후 파이낸스 · 수정주가 기준");
+  var nAll = rows.reduce(function (a, gp) { return a + gp.L.length; }, 0), gH = 32, bottom = DL.H - 64 - 112 - 6, rowH = Math.max(34, Math.min(50, Math.floor((bottom - c.y - rows.length * gH) / Math.max(1, nAll)))), fs = rowH >= 44 ? 27 : rowH >= 38 ? 24 : 22, fs2 = rowH >= 44 ? 24 : 21, ty = Math.round(rowH * 0.72);
+  rows.forEach(function (gp) { cRound(g, DL.P, c.y + 3, W, gH - 6, 6, DL_C.tile); cText(g, gp.g, DL.P + 10, c.y + gH - 10, 19, 800, DL_C.ink); c.y += gH; gp.L.forEach(function (r) { cText(g, r.name, X[0], c.y + ty, fs, 800, DL_C.ink); cText(g, r.sym.replace(/^\^/, "") + (r.years ? " · " + r.years + "년" : ""), X[0] + cW(g, r.name, fs, 800) + 10, c.y + ty, 18, 600, DL_C.sub); cText(g, dlPct(r.d1), X[1], c.y + ty, fs, 800, dlCol(r.d1), "right"); cText(g, dlPct(r.ytd), X[2], c.y + ty, fs, 900, dlCol(r.ytd), "right"); cText(g, r.up != null ? "+" + (r.up * 100).toFixed(1) + "%" : "-", X[3], c.y + ty, fs2, 600, "#3b4256", "right"); cText(g, r.dn != null ? (r.dn * 100).toFixed(1) + "%" : "-", X[4], c.y + ty, fs2, 600, "#3b4256", "right"); g.strokeStyle = DL_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(DL.P, c.y + rowH); g.lineTo(DL.P + W, c.y + rowH); g.stroke(); c.y += rowH; }); });
+  dlFoot(c, "연초 대비 = 올해 첫 거래일 수정종가 대비 · 평균 상승폭·낙폭 = 각 연도 첫 거래일 수정종가 대비 그해 최고·최저 수정종가 수익률의 평균 · 상장 첫해 거래일 60일 미만이면 그해 제외 · 올해는 평균에서 제외 · 과거 통계이며 매수·매도 신호가 아닙니다", "지수·ETF·종목: 야후 파이낸스 · 수정주가(배당·분할 반영) 기준");
   return c.cv;
 }
 function dlCard9(R) {
@@ -211,7 +220,17 @@ function dlCard9(R) {
   dlFoot(c, "기사 제목·요약을 문장 그대로 옮겼습니다(수정·요약 없음) · 해설과 인과 설명은 언론사 판단이며 앱이 원인을 추론하지 않습니다 · 투자 권유가 아닙니다", "기사: 네이버 뉴스 검색 · 원문은 각 언론사");
   return c.cv;
 }
-function dlPrep(R) { return dlUniLoad(R && R.market); }
+function dlPrep(R) { return Promise.all([dlUniLoad(R && R.market), typeof hubLoad === "function" ? hubLoad(dlScoreSyms(R).concat(["IEF", "^KQ11", "ETH-USD"])) : Promise.resolve()]); }
+/* 기존 화면(오늘 탭)과 같은 숫자를 쓰도록 — 유니버스 요약 → temp 모양 */
+function dlUniTemp(U) {
+  var S = dlUniStocks(U), up = 0, above = 0, n50 = 0, a50 = 0, n200 = 0, a200 = 0, nh = [], nl = [], nearH = [], nearL = [];
+  S.forEach(function (s) { if (s.ret1 > 0) up++; if (s.above20) above++; if (s.above50 != null) { n50++; if (s.above50) a50++; } if (s.above200 != null) { n200++; if (s.above200) a200++; } if (s.newHigh) nh.push(s); else if (s.vsHi != null && s.longEnough && s.vsHi >= -0.03) nearH.push(s); if (s.newLow) nl.push(s); else if (s.vsLo != null && s.longEnough && s.vsLo <= 0.03) nearL.push(s); });
+  var byAmt = function (a, b) { return (b.amt || 0) - (a.amt || 0); }; nh.sort(byAmt); nl.sort(byAmt); nearH.sort(byAmt); nearL.sort(byAmt);
+  var t = { total: S.length, up: up, upPct: S.length ? up / S.length : 0, above20: above, abovePct: S.length ? above / S.length : 0, above50: a50, n50: n50, above50Pct: n50 ? a50 / n50 : null, above200: a200, n200: n200, above200Pct: n200 ? a200 / n200 : null, newHigh: nh, newLow: nl, nearHigh: nearH, nearLow: nearL, uni: dlUniName(U), asOf: U.asOf };
+  t.word = t.upPct >= 0.65 ? "훈풍" : t.upPct >= 0.5 ? "미지근" : t.upPct >= 0.35 ? "쌀쌀" : "한파";
+  t.desc = t.upPct >= 0.65 ? "대부분이 올랐어요. 이런 날엔 '나만 못 번 것 같은' 조급함을 조심하세요." : t.upPct >= 0.5 ? "오른 종목과 내린 종목이 반반이에요. 종목별 이유가 갈리는 장이에요." : t.upPct >= 0.35 ? "내린 종목이 더 많아요. 개별 악재보다 시장 전체 분위기일 가능성이 커요." : "거의 다 내렸어요. 이런 날은 내 종목만의 문제가 아니에요. 과거 기록을 보고 판단하세요.";
+  return t;
+}
 function dlDeck() {
   var R = typeof hubR === "function" ? hubR() : null; if (!R) return [];
   var list = [], defs = [["오늘시장", dlCard1], ["시장체력", dlCard2], ["업종성과", dlCard3], ["거래집중", dlCard4], ["업종거래", dlCard5], ["신고신저", dlCard6], ["자산군", dlCard7], ["성적표", dlCard8], ["시장해설", dlCard9]];
