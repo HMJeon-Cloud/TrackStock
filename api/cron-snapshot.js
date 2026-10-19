@@ -214,13 +214,20 @@ async function runAudit(redis, res) {
 
 export default async function handler(req, res) {
   const started = Date.now();
-  const ownerOk = req.query.audit === "1" && reqIsOwner(req);   // 데이터 점검은 운영자 토큰으로도 실행 가능 (수집은 CRON_SECRET만)
+  const uniOnly = (req.query.universe === "us" || req.query.universe === "kr") && req.query.only === "1";   // v12.9 유니버스만 지금 받기 — 운영자 토큰으로도 가능
+  const ownerOk = (req.query.audit === "1" || uniOnly) && reqIsOwner(req);   // 데이터 점검·유니버스는 운영자 토큰으로도 실행 가능 (전체 수집은 CRON_SECRET만)
   if (process.env.CRON_SECRET && !ownerOk) {
     const auth = req.headers.authorization || "";
     const key = req.query.key || "";
     if (auth !== "Bearer " + process.env.CRON_SECRET && key !== process.env.CRON_SECRET) {
       return res.status(401).json({ error: "unauthorized" });
     }
+  }
+  if (uniOnly) {   // v12.9 전체 수집 없이 유니버스 요약만 (앱 운영자 화면 '지금 받기' 버튼)
+    res.setHeader("Cache-Control", "no-store");
+    const rc0 = redisConf(); if (!rc0) return res.status(500).json({ error: "Redis 미연결" });
+    try { const u = await collectUniverse(rc0, req.query.universe, 270000); return res.status(200).json({ ok: true, universe: u, at: kst(new Date().toISOString()), elapsedMs: Date.now() - started }); }
+    catch (e) { return res.status(200).json({ ok: false, universe: { ok: false, error: String(e.message).slice(0, 200) } }); }
   }
   if (req.query.audit === "1") { const rc = redisConf(); if (!rc) return res.status(500).json({ error: "Redis 없음" }); return runAudit(rc, res); }
 

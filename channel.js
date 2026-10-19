@@ -68,12 +68,32 @@ function chRenderQuality() {
     (n ? '<div class="briefDim" style="margin-top:4px">' +
       (q.stale.length ? '오래된 데이터(수집 실패로 지난 값): ' + q.stale.map(function (s) { return briefName(s) + " " + kstFmt(new Date(s.lastT).toISOString(), false).slice(5); }).join(", ") + '<br>' : '') +
       (q.spike.length ? '하루 ±40% 넘는 급변(오류 의심): ' + q.spike.map(function (s) { return briefName(s) + " " + chPct(s.ret1); }).join(", ") : '') + '</div>' : '') +
-    '<div class="row" style="gap:6px;margin-top:6px"><button class="chip" id="chAuditBtn">과거 데이터까지 전체 점검</button><span class="briefDim" style="font-size:11.5px">25년치 · 9가지 방법으로 교차 확인 · 30~50초</span></div><div id="chAuditOut"></div>';
+    '<div class="row" style="gap:6px;margin-top:6px"><button class="chip" id="chAuditBtn">과거 데이터까지 전체 점검</button><span class="briefDim" style="font-size:11.5px">25년치 · 9가지 방법으로 교차 확인 · 30~50초</span></div><div id="chAuditOut"></div>' +
+    '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><b style="font-size:13px">전체 시장 요약</b><button class="chip" data-uni="us">🇺🇸 S&P 500 지금 받기</button><button class="chip" data-uni="kr">🇰🇷 코스피 200 지금 받기</button><span class="briefDim" style="font-size:11.5px">크론이 매일 07시(미국)·09시(국내)에 자동으로 받아요 · 수동은 1~4분</span></div><div id="chUniOut" class="briefDim" style="font-size:12px;margin-top:4px"></div>';
   var ab = $("chAuditBtn"); if (ab) ab.onclick = chRunAudit;
+  Array.prototype.forEach.call(document.querySelectorAll("[data-uni]"), function (b) { b.onclick = function () { chRunUniverse(b.getAttribute("data-uni"), b); }; });
+  chUniStatus();
 }
 /* v9.4 — 과거 데이터 전체 점검: 서버(/api/cron-snapshot?audit=1)가 저장된 모든 종목을 순서·중복·0/음수·자릿수·튀었다 돌아온 값·유지된 급변·
    수정주가 비율·과거파일↔최근값 불일치·52주 최고가 교차확인·갱신 지연으로 검사한다. 운영자 토큰으로 실행(CRON_SECRET 불필요) */
 var CH_AUDIT_WORD = { order: "날짜 순서", dup: "중복 날짜", value: "0·음수 값", gap: "긴 공백", precision: "자릿수 손실", spike: "튀었다 돌아온 값", jump: "유지된 급변", "split-ok": "액면분할(정상)", adj: "수정주가 비율 이상", mismatch: "과거↔최근 값 불일치", nooverlap: "겹치는 날 없음", hi52: "52주 최고가 차이", stale: "갱신 지연", short: "데이터 짧음" };
+/* v12.9 전체 시장 요약(S&P 500 · 코스피 200) — 상태 표시 + 지금 받기 (운영자 토큰) */
+function chUniStatus() {
+  var out = $("chUniOut"); if (!out) return;
+  Promise.all(["us", "kr"].map(function (m) { return fetch("/api/snap?universe=" + m, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); })).then(function (D) {
+    out.innerHTML = D.map(function (d, i) { var m = i ? "코스피 200" : "S&P 500"; if (!d || !d.rows) return m + ": 아직 없음"; var st = d.rows.filter(function (r) { return r.stale; }).length, dt = new Date(d.asOf + 9 * 3600e3); return m + ": " + d.n + "종목 · 거래일 " + dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0") + (st ? " · 전일 값 " + st : "") + " · 목록 " + escapeHtml(String(d.listSource || "")); }).join(" &nbsp;|&nbsp; ");
+  });
+}
+function chRunUniverse(mkt, btn) {
+  var out = $("chUniOut"), tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
+  var old = btn.innerHTML; btn.disabled = true; btn.textContent = "받는 중… (1~4분)";
+  fetch("/api/cron-snapshot?universe=" + mkt + "&only=1", { headers: { "x-owner": tok }, cache: "no-store" }).then(function (r) { return r.json().then(function (j) { j._st = r.status; return j; }); }).then(function (j) {
+    btn.disabled = false; btn.innerHTML = old; var u = j.universe || {};
+    if (j._st !== 200 || !u.ok) { out.innerHTML = '<span style="color:#b45309">실패: ' + escapeHtml(u.error || u.reason || j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + (u.stats ? ' (야후 429 ' + (u.stats.h429 || 0) + '회)' : '') + '</span>'; return; }
+    out.innerHTML = '<span style="color:var(--good)"><b>' + (mkt === "us" ? "S&P 500" : "코스피 200") + " " + u.fresh + "/" + u.n + "종목 받음</b></span> · 전일 값 유지 " + (u.kept || 0) + " · 실패 " + (u.failed || 0) + " · 목록 " + escapeHtml(String(u.list || "")) + "(" + u.listN + ") · 야후 429 " + ((u.stats && u.stats.h429) || 0) + "회 · " + Math.round((u.elapsedMs || 0) / 1000) + "초" + (u.stopped ? " · 시간 제한으로 중단(다음 실행에 이어서)" : "");
+    setTimeout(chUniStatus, 1500);
+  }).catch(function (e) { btn.disabled = false; btn.innerHTML = old; out.innerHTML = '실패: ' + escapeHtml(e.message); });
+}
 function chRunAudit() {
   var out = $("chAuditOut"), btn = $("chAuditBtn"); if (!out) return;
   var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
