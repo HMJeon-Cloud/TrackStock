@@ -88,9 +88,18 @@ async function fetchOne(sym, stats) {
 }
 
 /* ---------- 수집 본체: budgetMs 안에서 받을 수 있는 만큼, 나머지는 지난 요약 유지 ---------- */
+/* v12.13 생존 편향 대비 — 그달의 구성 목록을 월별로 한 번 보관(sm:uni:hist:<mkt>:<YYYY-MM>, 400일). 나중에 "그때 구성"으로 다시 계산할 수 있게. 함수·크론 추가 없음 */
+async function keepListHistory(rc, mkt, list) {
+  try {
+    const ym = new Date().toISOString().slice(0, 7), key = "sm:uni:hist:" + mkt + ":" + ym;
+    if (await redisCmd(rc, ["EXISTS", key])) return;
+    await redisCmd(rc, ["SET", key, JSON.stringify({ at: Date.now(), source: list.source, syms: list.items.map((x) => x.s) }), "EX", String(400 * 86400)]);
+  } catch (e) {}
+}
 export async function collectUniverse(rc, mkt, budgetMs) {
   const t0 = Date.now(), stats = { ok: 0, http: {}, h429: 0, timeout: 0, error: 0 };
   const list = mkt === "kr" ? await listKR(rc) : await listUS(rc);
+  await keepListHistory(rc, mkt, list);
   let prev = null; try { const t = await getJsonGzText(rc, KEYS.data(mkt)); if (t) prev = JSON.parse(t); } catch (e) {}
   const prevBy = {}; ((prev && prev.rows) || []).forEach((r) => { prevBy[r.s] = r; });
   // 오래된 것부터 (시간이 모자라도 매번 같은 종목만 빠지지 않게)
