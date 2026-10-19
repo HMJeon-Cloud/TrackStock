@@ -1,3 +1,5 @@
+/* v12.14 지도 표의 가격은 행의 통화로 자릿수를 맞춘다 — 원화는 정수, 달러는 소수 2자리(1달러 미만은 유효숫자 4) */
+function mapPrice(v, cur) { if (v == null || !isFinite(v)) return "-"; var av = Math.abs(v); if (cur === "KRW") return av < 100 ? v.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : Math.round(v).toLocaleString("ko-KR"); if (av < 1) return v.toLocaleString("en-US", { maximumSignificantDigits: 4 }); return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 "use strict";
 /* ============================================================
    StockMind — 관심 종목 & 뉴스 탭
@@ -135,9 +137,11 @@ function renderWatchList() {
   if (!list.length) {
     box.innerHTML = '<div class="mentalNote" style="margin-top:0">관심 종목이 없습니다. <b>종목</b> 탭에서 종목을 조회한 뒤 ' +
       '<b>☆</b> 버튼을 누르면 여기에 쌓입니다. 최대 20개.</div>';
-    $("watchNews").innerHTML = "";
+    $("watchNews").innerHTML = '<div class="briefDim" style="font-size:12.5px">관심 종목을 등록하면 그 종목 기사가 여기에 모여요.</div>';
+    if ($("watchActs")) $("watchActs").hidden = !(typeof cmpState !== "undefined" && cmpState.cart && cmpState.cart.length);   // 관심도 장바구니도 비면 숨김(옮길 게 없음)
     return;
   }
+  if ($("watchActs")) $("watchActs").hidden = false;
   var html = "<thead><tr><th>종목</th><th>최근 종가</th><th>전일 대비</th><th>1개월</th><th>1년</th>" +
     "<th>52주 최고 대비</th><th>1년 최대낙폭</th><th></th></tr></thead><tbody>";
   list.forEach(function (w) {
@@ -364,7 +368,7 @@ function renderMarketMap() {
     var u = r.cur === "KRW" ? "원" : (r.cur ? " " + r.cur : "");
     var rsiCls = r.rsi == null ? "" : r.rsi <= 30 ? "down" : r.rsi >= 70 ? "up" : "";
     html += '<tr><td style="text-align:left"><b>' + cmpLabel(r.sym) + "</b><br><small style='color:var(--sub)'>" + r.sym + "</small></td>" +
-      "<td>" + fmtPrice(r.last) + u + "</td>" +
+      "<td>" + mapPrice(r.last, r.cur) + u + "</td>" +
       '<td class="' + (r.vsHi == null ? "" : pctCls(r.vsHi)) + '"><b>' + (r.vsHi == null ? "-" : fmtPct(r.vsHi)) + "</b></td>" +
       '<td class="' + pctCls(r.m1) + '">' + fmtPct(r.m1) + "</td>" +
       '<td class="' + pctCls(r.m3) + '">' + fmtPct(r.m3) + "</td>" +

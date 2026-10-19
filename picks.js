@@ -186,11 +186,11 @@ function pkRender(R) {
     return h + '</div>';
   }
   var status = res.enriched ? "1차 " + res.total + "개 " + unit + " 기술 점수 → 상위 후보 재무(PER·PBR·ROE·배당·목표가·수급)·기사까지 확인 완료" : "1차 " + res.total + "개 " + unit + " 기술 점수 완료 → 상위 후보 재무·기사 확인 중…";
-  box.innerHTML = '<div class="briefPickIntro">' + status + ' · 하루 등락은 점수에 넣지 않아요</div>' +
+  box.innerHTML = '<div class="briefPickIntro">' + (res.enriched ? res.total + "개 중 점수 상위 후보 · 재무·기사까지 확인" : res.total + "개 점수 계산 → 재무·기사 확인 중…") + '</div>' +
     '<div class="briefTwoCol pkCols"><div><div class="briefColTitle" style="color:var(--up)">매수 후보 <small>' + res.buy.length + '</small></div>' + (res.buy.length ? res.buy.slice(0, PK.more ? 5 : 3).map(function (x) { return item(x, "buy"); }).join("") : '<div class="briefDim">조건(플러스 4점 이상·마이너스 2점 이하)에 드는 ' + unit + '이 없어요</div>') + '</div>' +
     '<div><div class="briefColTitle" style="color:var(--down)">주의 ' + unit + ' <small>' + res.warn.length + '</small></div>' + (res.warn.length ? res.warn.slice(0, PK.more ? 5 : 3).map(function (x) { return item(x, "warn"); }).join("") : '<div class="briefDim">마이너스 4점 이상인 ' + unit + '이 없어요</div>') + '</div></div>' +
     (res.buy.length > 3 || res.warn.length > 3 ? '<button class="linkBtn pkMoreAll" data-pkall>' + (PK.more ? "3개씩만 보기 ▴" : "5개씩 모두 보기 ▾") + '</button>' : '') +
-    '<div class="briefDim" style="margin-top:8px">점수표: 추세(20·50·200일선) · 위치(고점 대비·52주) · RSI · 1·3개월 흐름 · 20일선 이격 · 거래대금 · 변동성 + PER·PBR·ROE·배당·증권사 목표가·외국인/기관 수급(국내) · 최근 기사 키워드 — 데이터로 고른 후보이며 투자 판단과 책임은 본인에게 있어요</div>';
+    '<details class="fdHow"><summary>점수 읽는 법</summary><div>배지 +N / -N = 플러스 점수·마이너스 점수. 추세(20·50·200일선) · 위치(고점 대비·52주) · RSI · 1·3개월 흐름 · 거래대금 · 변동성 + PER·PBR·ROE·배당·목표가·수급(국내) · 최근 기사 키워드로 매기며 하루 등락은 넣지 않아요. 데이터로 고른 후보일 뿐 추천이 아니에요.</div></details>';
   var pa = box.querySelector("[data-pkall]"); if (pa) pa.onclick = function () { PK.more = !PK.more; pkRender(R); };
   Array.prototype.forEach.call(box.querySelectorAll("[data-pk-more]"), function (b) { b.onclick = function () { var k = b.getAttribute("data-pk-more"); PK.open = PK.open === k ? null : k; pkRender(R); }; });
   Array.prototype.forEach.call(box.querySelectorAll(".briefSym"), function (b) { b.onclick = function () { document.getElementById("searchInput").value = b.getAttribute("data-sym"); if (typeof navTo === "function") navTo("single", "chart"); else switchTab("single", "chart"); if (typeof load === "function") load(); }; });

@@ -149,7 +149,7 @@ function libTabRender(pane) {
         '<div class="libMeta"><b>' + escapeHtml(x.name) + '</b><small>' + (LIB_KIND[x.kind] || x.kind) + (t.tpl && TPL_CAT[t.tpl] ? " · " + TPL_CAT[t.tpl].name : "") + (t.mk ? " · " + t.mk : "") + (x.uses ? " · " + x.uses + "회 사용" : "") + '</small>' +
         '<small>' + new Date(x.at).toLocaleDateString("ko-KR") + (x.def ? ' · <b style="color:#b8913f">양식 기본 아이콘</b>' : '') + '</small></div>' +
         '<div class="libBtns"><button class="chip" data-lfav="' + x.id + '">' + (x.fav ? "★" : "☆") + '</button><button class="chip" data-lren="' + x.id + '">이름</button>' + (x.kind === "icon" ? '<button class="chip" data-ldef="' + x.id + '">' + (x.def ? "기본 해제" : "기본으로") + '</button>' : '') + '<button class="chip" data-ldel="' + x.id + '">🗑</button></div></div>';
-    }).join("") + '</div>' : '<div class="briefDim" style="padding:12px 0">아직 없어요. AI 작업창 ③의 💾 보관으로 저장하거나, 위에서 아이콘을 만들어 보세요.</div>';
+    }).join("") + '</div>' : '<div class="briefDim" style="padding:12px 0">아직 없어요. AI 카드 창의 💾 보관으로 저장하거나, 위에서 아이콘을 만들어 보세요.</div>';
     pane.innerHTML = h;
     Array.prototype.forEach.call(pane.querySelectorAll("[data-lk]"), function (b) { b.onclick = function () { LIBUI.kind = b.getAttribute("data-lk"); libTabRender(pane); }; });
     Array.prototype.forEach.call(pane.querySelectorAll("[data-lfav]"), function (b) { b.onclick = function () { var id = b.getAttribute("data-lfav"), x = LIBS.items.filter(function (i) { return i.id === id; })[0]; libUpd(id, { fav: !x.fav }).then(function () { libTabRender(pane); }); }; });

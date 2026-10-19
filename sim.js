@@ -133,7 +133,7 @@ function syncSimAssets() {
   if (!cart.length) {
     box.innerHTML = '<span style="color:var(--sub);font-size:12px">' +
       '장바구니가 비어 있어요. <b>종목</b> 탭에서 담기를 누르거나 <b>비교</b> 탭에서 담아 주세요.</span>';
-    $("simWeightSum").textContent = "";
+    $("simWeightSum").textContent = ""; $("simWeightSum").hidden = true;
     return;
   }
   $("simAmtMode").checked = !!simState.amountMode;
@@ -218,7 +218,7 @@ function syncAmountsToWeights() {
   var hint = $("simInitHint");
   if (hint) hint.textContent = total >= 10000 ? "(" + koAmount(total) + ")" : "";
   var el = $("simWeightSum");
-  el.innerHTML = "총액<b>" + (total ? total.toLocaleString("ko-KR") + "원" : "0원") + "</b>";
+  el.innerHTML = "총액<b>" + (total ? total.toLocaleString("ko-KR") + "원" : "0원") + "</b>"; el.hidden = !cmpState.cart.length;
   el.title = "";
   if (typeof saveSession === "function") saveSession();
 }
@@ -239,7 +239,7 @@ function updateWeightSum() {
   var sum = 0;
   cmpState.cart.forEach(function (s) { sum += simState.weights[s] || 0; });
   var el = $("simWeightSum");
-  el.innerHTML = "비중 합계<b class='" + (sum === 100 ? "" : "neg") + "'>" + sum + "%</b>";
+  el.innerHTML = "비중 합계<b class='" + (sum === 100 ? "" : "neg") + "'>" + sum + "%</b>"; el.hidden = !cmpState.cart.length;
   el.title = sum === 100 ? "" : "합이 100%가 아니면 비율대로 자동 환산됩니다.";
 }
 

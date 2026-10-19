@@ -70,7 +70,7 @@ function makerRender() {
   mkChannelReady();
   MK.mk = MK.mk || briefState.market || "all";
   var top = '<div class="mkTop"><div class="pills seg mkMkt" title="모든 탭에 적용">' + TPL_MKS.map(function (m) { return '<button data-mmk="' + m[0] + '"' + (m[0] === MK.mk ? ' class="active"' : '') + '>' + m[1] + '</button>'; }).join("") + '</div>' +
-    '<button class="chip aiBtn" data-ai-open="custom" title="내가 쓴 글·데이터로 AI가 한 장 카드를">내 글로 AI 카드</button></div>' +
+    (MK.tab === "work" ? '' : '<button class="chip aiBtn" data-ai-open="custom" title="내가 쓴 글·데이터로 AI가 한 장 카드를">내 글로 AI 카드</button>') + '</div>' +
     '<div class="mkTabs">' + MK_TABS.map(function (t) { return '<button data-mtab="' + t[0] + '"' + (t[0] === MK.tab ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div><div class="mkPane"></div>';
   root.innerHTML = top;
   Array.prototype.forEach.call(root.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); if (typeof switchBriefMarket === "function" && briefState.market !== MK.mk) switchBriefMarket(MK.mk); makerRender(); }; });

@@ -307,9 +307,9 @@ function briefCompute(recent, opts) {
     { v: saleN + "개", l: "52주 최고 대비 -20% 이상 '세일 중'", n: stocks.length + "개 중", list: saleList, col: "52주 최고 대비", key: "vsHi", title: "세일 중인 종목 (52주 최고 대비 -20% 이상)" },
     { v: athN + "개", l: "52주 최고가 근처(-2% 이내)", n: "신고가 부근", list: athList, col: "52주 최고 대비", key: "vsHi", title: "신고가 부근 종목 (52주 최고 대비 -2% 이내)" },
     { v: Math.round(temp.abovePct * 100) + "%", l: "20일 평균선 위에 있는 종목 비율", n: temp.abovePct >= 0.6 ? "상승 추세 우세" : temp.abovePct <= 0.4 ? "하락 추세 우세" : "혼조",
-      list: aboveList, col: "20일 평균 대비", key: "vsMa20", title: "20일 평균선 위 " + aboveList.length + "개 · 아래 " + belowList.length + "개", list2: belowList, title2: "20일 평균선 아래" }
+      list: aboveList, col: "20일 평균 대비", key: "vsMa20", title: "20일 평균선 위 " + aboveList.length + "개 · 아래 " + belowList.length + "개", list2: belowList, title2: "20일 평균선 아래", dup: true }   // v12.14 KPI와 중복 → 화면엔 숨기고(dup) 종목 목록 열기용으로만 유지
   ];
-  if (vix && (market === "all" || market === "us")) numbers.push({ v: vix.last.toFixed(1), l: "VIX 공포지수", n: vix.last >= 30 ? "공포 구간 — 과거엔 이런 때가 저점 근처였던 적이 많음" : vix.last >= 20 ? "불안 구간" : "평온 구간 — 방심하기 쉬운 때", sym: "^VIX" });
+  if (vix && (market === "all" || market === "us")) numbers.push({ v: vix.last.toFixed(1), l: "VIX 공포지수", n: vix.last >= 30 ? "공포 구간" : vix.last >= 20 ? "불안 구간" : "평온 구간", sym: "^VIX", dup: true });
   if (bigMove) numbers.push({ v: briefPct(bigMove.ret1), l: briefName(bigMove) + " — 최근 90일 중 가장 큰 하루 변동", n: "상위 2% 안", sym: bigMove.sym });
 
   /* 6. 역사 속 이맘때 (±14일, 연도 무관) */
@@ -393,15 +393,16 @@ function briefDateLine(R) {
   var us = R.asOfUs ? new Date(R.asOfUs + 9 * 3600e3).toISOString().slice(0, 10) : "", kr = R.asOfKr ? new Date(R.asOfKr + 9 * 3600e3).toISOString().slice(0, 10) : "", today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   return (R.market === "kr" ? "한국 거래일 " + kr : R.market === "us" ? "미국 거래일 " + us : "미국 " + us + " · 한국 " + kr) + " · 발행 " + today;
 }
+function briefHow(txt) { return '<details class="fdHow"><summary>읽는 법</summary><div>' + txt + '</div></details>'; }
 function briefBarHtml(label, sub, pct, refPct, refLabel) {
-  var p = Math.round(pct * 1000) / 10;
-  return '<div class="fdBar"><div class="fdBarTop"><div><b>' + label + '</b><small>' + sub + '</small></div><div class="fdVal">' + p.toFixed(1) + '%</div></div>' +
+  var p = Math.round(pct * 100);   // v12.14 KPI와 같은 정수 % (47.6 vs 48 불일치 제거)
+  return '<div class="fdBar"><div class="fdBarTop"><div><b>' + label + '</b><small>' + sub + '</small></div><div class="fdVal">' + p + '%</div></div>' +
     '<div class="fdTrack"><div class="fdFill" style="width:' + Math.min(100, p) + '%"></div>' + (refPct != null ? '<div class="fdRef" style="left:' + refPct + '%"><span>' + refLabel + '</span></div>' : '') + '</div></div>';
 }
 function briefHealthFinding(t) {
-  var p = t.abovePct, s = Math.round(p * 1000) / 10;
+  var p = t.abovePct, s = Math.round(p * 100);
   if (t.n200 && t.above200Pct != null) {
-    var l = Math.round(t.above200Pct * 1000) / 10;
+    var l = Math.round(t.above200Pct * 100);
     if (p >= 0.6 && t.above200Pct >= 0.6) return "단기·장기 추세 모두 <b>절반을 넘습니다</b> — 20일선 위 " + s + "% · 200일선 위 " + l + "%";
     if (p < 0.4 && t.above200Pct >= 0.5) return "장기 추세는 살아 있는데(200일선 위 " + l + "%) <b>단기는 눌렸습니다</b> — 20일선 위 " + s + "%";
     if (p >= 0.5 && t.above200Pct < 0.4) return "단기 반등은 넓지만(20일선 위 " + s + "%) <b>장기 추세는 아직 아래</b> — 200일선 위 " + l + "%";
@@ -410,29 +411,30 @@ function briefHealthFinding(t) {
 }
 function briefRenderHealth(R) {
   var t = R.temp, box = $("briefHealth"), hl = $("briefHiLo"); if (!box || !t) return;
-  var h = '<div class="fdHead"><span class="fdNo">02 · 시장 체력</span><span class="fdDate">' + briefDateLine(R) + '</span></div>' +
+  var h = '<h3>시장 체력 <small>이동평균선 위 종목 비율</small></h3>' +
     '<div class="fdTitle">' + briefHealthFinding(t) + '</div>' +
-    '<div class="fdDef">여기서 \'추세 위\'는 주가가 20일·50일·200일 이동평균선 위에 있다는 뜻이에요. 비율이 높을수록 많은 종목이 같이 오르고 있다는 뜻이고, 지수만 오르고 비율이 낮으면 몇 개 큰 종목의 날이에요.</div>' +
-    briefBarHtml("20일선 위", "단기 추세", t.abovePct, 50, "절반 50%") +
-    (t.n50 ? briefBarHtml("50일선 위", "중기 추세", t.above50Pct, 50, "절반 50%") : "") +
-    (t.n200 ? briefBarHtml("200일선 위", "장기 추세", t.above200Pct, 50, "절반 50%") : '<div class="briefDim" style="font-size:12px">200일선은 1년치 데이터가 쌓인 뒤(수집 후 다음 날) 표시돼요.</div>') +
-    '<div class="fdHow"><b>읽는 법</b> — 20·50·200일 평균 가격보다 위에 있는 종목의 비율이에요(' + (t.uni ? t.uni + ' · ' : '') + t.total + '개 집계). 50% 선은 종목의 절반을 나타내는 비교선이며 매수·매도 기준이 아니에요. 막대는 시장 참여 정도일 뿐 신호가 아니에요.</div>';
+    '<div class="fdBars">' + briefBarHtml("20일선 위", "단기", t.abovePct, 50, "50%") +
+    (t.n50 ? briefBarHtml("50일선 위", "중기", t.above50Pct, 50, "50%") : "") +
+    (t.n200 ? briefBarHtml("200일선 위", "장기", t.above200Pct, 50, "50%") : '<div class="briefDim" style="font-size:12px;align-self:center">200일선은 1년치가 쌓인 뒤 표시</div>') + '</div>' +
+    '<div style="margin:-6px 0 4px"><button class="linkBtn" data-ma20list>20일선 위 · 아래 종목 보기 ›</button></div>' +
+    briefHow('주가가 20·50·200일 평균선보다 위에 있는 종목의 비율(' + (t.uni ? t.uni + ' · ' : '') + t.total + '개 집계). 높을수록 많은 종목이 같이 오르는 중이고, 지수만 오르고 비율이 낮으면 몇 개 큰 종목의 날이에요. 50%는 비교선일 뿐 매수·매도 기준이 아니에요.');
   box.innerHTML = h;
+  var lb = box.querySelector("[data-ma20list]"); if (lb) lb.onclick = function () { var n = (briefState.result && briefState.result.numbers || []).filter(function (x) { return x.key === "vsMa20"; })[0]; if (n && typeof openBriefList === "function") openBriefList(n, briefState.result); };
   if (!hl) return;
-  if (!t.n200) { hl.innerHTML = '<div class="fdHead"><span class="fdNo">06 · 신고가·신저가</span><span class="fdDate">' + briefDateLine(R) + '</span></div><div class="briefDim" style="font-size:12px">52주 신고가·신저가는 1년치 데이터가 쌓인 뒤 표시돼요.</div>'; return; }
+  if (!t.n200) { hl.innerHTML = '<h3>신고가·신저가 <small>52주 종가 기준</small></h3><div class="briefDim" style="font-size:12px">52주 신고가·신저가는 1년치 데이터가 쌓인 뒤 표시돼요.</div>'; return; }
   var nh = t.newHigh.length, nl = t.newLow.length;
   var find = nh === 0 && nl === 0 ? "오늘 52주 신고가·신저가 종목이 <b>없습니다</b>" : nh >= nl ? "신고가 종목이 신저가 종목보다 <b>" + (nl ? (nh / nl).toFixed(1) + "배 많아요" : nh + "개 많아요") + "</b>" : "신저가 종목이 신고가 종목보다 <b>" + (nh ? (nl / nh).toFixed(1) + "배 많아요" : nl + "개 많아요") + "</b>";
   var tot = Math.max(1, nh + nl), p = nh + nl ? Math.round(nh / tot * 100) : 50;
   function col(list, near, hi) { return list.slice(0, 5).map(function (s) { var ref = hi ? s.hi250 : s.lo250, d = ref ? s.last / ref - 1 : null; return '<div class="hlRow"><b>' + escapeHtml(briefName(s)) + '</b><span>' + briefPriceTxt(s.sym, s.last) + (near && d != null ? ' · 1년 ' + (hi ? '최고' : '최저') + '比 ' + briefPct(d) : '') + ' · 오늘 ' + briefPct(s.ret1) + ' · ' + briefAmtTxt(s) + '</span></div>'; }).join("") || '<div class="briefDim" style="font-size:12px">해당 없음</div>'; }
   var hiList = nh ? t.newHigh : t.nearHigh, loList = nl ? t.newLow : t.nearLow;
-  hl.innerHTML = '<div class="fdHead"><span class="fdNo">06 · 신고가·신저가</span><span class="fdDate">' + briefDateLine(R) + '</span></div>' +
+  hl.innerHTML = '<h3>신고가·신저가 <small>52주 종가 기준 · 거래대금 순</small></h3>' +
     '<div class="fdTitle">' + find + '</div>' +
-    '<div class="fdDef">52주 종가 기준 · 오늘 종가가 지난 1년 종가 중 최고/최저인 종목을 세요.</div>' +
+
     '<div class="hlScale"><div class="hn up">' + nh + '<small>▲ 신고가</small></div><div class="hlBar" style="--p:' + p + '%"></div><div class="hn down" style="text-align:right">' + nl + '<small>▼ 신저가</small></div></div>' +
     '<div class="hlNear">근접(3% 이내) — 신고가 ' + t.nearHigh.length + '개 · 신저가 ' + t.nearLow.length + '개' + (!nh && t.nearHigh.length ? ' · 왼쪽 목록은 신고가 <b>근접</b> 종목' : '') + (!nl && t.nearLow.length ? ' · 오른쪽 목록은 신저가 <b>근접</b> 종목' : '') + '</div>' +
     '<div class="hlCols"><div class="hlCol up"><h5>▲ ' + (nh ? '신고가' : '신고가 근접') + ' · 거래대금 순</h5>' + col(hiList, !nh, true) + '</div>' +
     '<div class="hlCol down"><h5>▼ ' + (nl ? '신저가' : '신저가 근접') + ' · 거래대금 순</h5>' + col(loList, !nl, false) + '</div></div>' +
-    '<div class="fdHow"><b>읽는 법</b> — 신고가가 많다고 "비싸다"가 아니고, 신저가가 많다고 "싸다"가 아니에요. 어느 쪽이 넓게 늘어나는지를 봐요.</div>';
+    briefHow('52주 종가 기준 — 오늘 종가가 지난 1년 종가 중 최고/최저인 종목을 세요. 신고가가 많다고 "비싸다"가 아니고, 신저가가 많다고 "싸다"가 아니에요. 어느 쪽이 넓게 늘어나는지를 봐요.');
 }
 function briefPriceTxt(sym, v) { return typeof cPrice === "function" ? cPrice(sym, v) : String(v); }
 function briefAmtTxt(s) { var a = s.amt || 0; if (!a) return "-"; if (/\.K[SQ]$/.test(s.sym)) return a >= 1e12 ? (a / 1e12).toFixed(2) + "조" : (a / 1e8).toFixed(0) + "억"; return a >= 1e9 ? "$" + (a / 1e9).toFixed(2) + "B" : "$" + (a / 1e6).toFixed(0) + "M"; }
@@ -480,9 +482,7 @@ function renderBrief() {
     ].map(function (k) { return '<div class="kpi ' + k.cls + '"><div class="kl">' + k.l + '</div><div class="kv">' + k.v + '<small>' + k.s + '</small></div><div class="kb"><i style="width:' + Math.round(k.p * 100) + '%"></i></div></div>'; }).join("");
   }
   if ($("briefTempBox")) $("briefTempBox").innerHTML = '<div class="briefTemp">' +
-    '<div class="briefTempMain"><div class="briefTempWord">' + L + ' ' + ML + '시장은 <b>' + t.word + '</b></div>' +
-    '<div class="briefTempBar"><div style="width:' + Math.round(t.upPct * 100) + '%"></div></div>' +
-    '<div class="briefTempDesc">' + t.desc + ' <span class="briefDim">(' + uniLab + (R.uniTemp && R.tempApp ? ' · 앱 관심 종목 ' + R.tempApp.total + '개 기준 ' + Math.round(R.tempApp.upPct * 100) + '%' : '') + ')</span></div></div>' +
+    '<div class="briefTempMain"><div class="briefTempDesc"><b style="color:var(--accent)">' + L + ' ' + ML + '시장은 ' + t.word + '</b> — ' + t.desc + ' <span class="briefDim">(' + uniLab + (R.uniTemp && R.tempApp ? ' · 앱 관심 종목 ' + R.tempApp.total + '개 기준 ' + Math.round(R.tempApp.upPct * 100) + '%' : '') + ')</span></div></div>' +
     '<div class="briefIdxRow">' + R.indexRow.map(function (x) {
       return '<div class="briefIdx"><span>' + x.name + '</span><b style="color:' + briefColor(x.ret) + '">' + briefPct(x.ret) + '</b></div>';
     }).join("") + '</div></div>';
@@ -571,6 +571,7 @@ function renderBrief() {
 
   /* ⑥ 숫자 + 역사 속 이맘때(한 줄) */
   $("briefNumbers").innerHTML = R.numbers.map(function (n, i) {
+    if (n.dup) return "";   // KPI 띠에 이미 있는 숫자는 여기서 반복하지 않는다
     var hint = n.list ? "종목 보기 ›" : n.sym ? "차트 보기 ›" : "";
     return '<div class="briefNum' + (hint ? " briefNumBtn" : "") + '" data-num="' + i + '"><b>' + n.v + '</b><span>' + escapeHtml(n.l) + '</span><small>' + escapeHtml(n.n) + '</small>' +
       (hint ? '<em>' + hint + '</em>' : '') + '</div>';

@@ -420,7 +420,7 @@ function hubTopics() {
   // 정기 발행
   if (typeof PER_SETS !== "undefined") { var td = typeof perToday === "function" ? perToday() : []; Object.keys(PER_SETS).forEach(function (k) { add({ ctx: "per:" + k, g: "정기 발행", t: PER_SETS[k].t, d: PER_SETS[k].when + " 발행", multi: function () { perOpen(k); }, score: function () { return td.indexOf(k) >= 0 ? { s: 10, why: "오늘이 '" + cPlain(PER_SETS[k].t).replace(/^\S+\s/, "") + "' 발행일 (" + PER_SETS[k].when + ")" } : { s: 0, why: PER_SETS[k].when + " 발행" }; } }); }); }
   // 연구노트 (국면 · 낙폭 · 적립 · 오늘의 관찰 · 기사 vs 숫자)
-  if (typeof storyDecks === "function") { var dk = []; try { dk = storyDecks(); } catch (e) {} dk.filter(function (x) { return x.key !== "news"; }).forEach(function (x) { add({ ctx: "story:" + x.key, g: "국면 · 연구노트", t: x.t, d: x.d, multi: function () { storyOpen(x.key); }, score: function () { var KW = { "scene:rateUp": /장기채/, "scene:rateDown": /장기채/, "scene:panic": /VIX|고점/, "scene:oilUp": /원유/, "scene:dollarUp": /달러/, drawdown: /고점|VIX/ }, w = now.why.filter(function (z) { return !KW[x.key] || KW[x.key].test(z); }); return x.now ? { s: x.key === "today" ? 7 : 9, why: x.key === "today" ? "매일 구성이 바뀌는 관찰 덱 — 오늘 가장 이례적인 것부터" : "지금 신호: " + (w.length ? w.join(" / ") : now.why.join(" / ") || "해당") } : { s: x.key === "dca" ? (dow === 5 ? 7 : 3) : 2, why: x.key === "dca" ? (dow === 5 ? "금요일 — 주말에 천천히 보는 '적금처럼' 시리즈" : "적립식 상시 콘텐츠") : "신호가 오면 추천돼요" }; } }); }); }
+  if (typeof storyDecks === "function") { var dk = []; try { dk = storyDecks(); } catch (e) {} dk.filter(function (x) { return x.key !== "news"; }).forEach(function (x) { add({ ctx: "story:" + x.key, g: "국면 · 연구노트", t: x.t, d: x.d, multi: function () { storyOpen(x.key); }, score: function () { var KW = { "scene:rateUp": /장기채/, "scene:rateDown": /장기채/, "scene:panic": /VIX|고점/, "scene:oilUp": /원유/, "scene:dollarUp": /달러/, drawdown: /고점|VIX/ }, w = now.why.filter(function (z) { return !KW[x.key] || KW[x.key].test(z); }); return x.now ? { s: x.key === "today" ? 7 : 9, why: x.key === "today" ? "매일 구성이 바뀌는 관찰 덱 — 오늘 가장 이례적인 것부터" : "지금 신호와 맞는 국면" + (w.length ? " — " + w.map(function (z) { return String(z).split(" → ").pop(); }).join(" · ") : "") } : { s: x.key === "dca" ? (dow === 5 ? 7 : 3) : 2, why: x.key === "dca" ? (dow === 5 ? "금요일 — 주말에 천천히 보는 '적금처럼' 시리즈" : "적립식 상시 콘텐츠") : "신호가 오면 추천돼요" }; } }); }); }
   // 매크로
   if (typeof macDeckList === "function" && typeof MAC !== "undefined" && MAC.doc && !MAC.doc.none) { var R2 = MAC.px && MAC.px.ks ? macroCompute() : []; (MAC.px && MAC.px.ks ? macDeckList() : []).forEach(function (x) { add({ ctx: "macro:" + x.id, g: "매크로 · 환율·금리", t: x.t, d: x.d, multi: function () { macroDeckOpen(x.id); }, score: function () { var r = R2.filter(function (z) { return z.c.id === x.id; })[0], l = r && r.ev[r.ev.length - 1]; if (r && r.now.on && l && Date.now() - l.t < 30 * 86400e3) return { s: 9, why: r.c.tag + " — 최근 30일 안에 새로 나온 조건 (" + r.now.txt + ")" }; if (r && r.now.on) return { s: 6, why: "지금 해당: " + r.now.txt }; return { s: x.id === "all" ? 3 : 1, why: x.id === "all" ? "조건 11개를 한 장에 — 상시 저장용" : "조건이 나오면 추천돼요" }; } }); }); }
   // 배당 · 공시 · 구루 · 공모주
@@ -473,8 +473,10 @@ function hubShow(title, list, opts) {
   if (opts.ctx) hubDoneAdd(opts.ctx, title);
   var host = document.getElementById("mkResult");
   if (host && typeof currentTab !== "undefined" && currentTab === "onecard" && !opts.modal) {   // v12.1 작업대 안에 바로 보여 준다
-    host.innerHTML = '<div class="wbStep"><b>4</b> 결과 · 업로드 <small>' + hubEsc(title) + ' · ' + list.length + '장</small><button class="chip wbClose" title="결과 닫기">✕</button></div>';
-    host.appendChild(box); host.hidden = false; host.querySelector(".wbClose").onclick = function () { host.hidden = true; host.innerHTML = ""; };
+    // v12.14 결과가 생기면 ①②③은 접고 결과를 맨 위에 — '다른 주제 만들기'로 다시 펼친다
+    var pane = host.parentElement; if (pane) pane.classList.add("wbCollapsed");
+    host.innerHTML = '<div class="wbStep"><b>4</b> 결과 · 업로드 <small>' + hubEsc(title) + ' · ' + list.length + '장</small><button class="chip wbClose" title="①②③ 펼치기">← 다른 주제 만들기</button></div>';
+    host.appendChild(box); host.hidden = false; host.querySelector(".wbClose").onclick = function () { host.hidden = true; host.innerHTML = ""; if (pane) pane.classList.remove("wbCollapsed"); try { pane.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} };
     if (opts.brief) { var bb = document.createElement("div"); bb.className = "wbBrief"; bb.innerHTML = hubBriefHtml(opts.brief); box.insertBefore(bb, box.firstChild); }
     try { host.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
     return;
@@ -861,12 +863,11 @@ function hubBriefHtml(B) {
   if (!B) return '<div class="briefDim">읽는 요약을 만들 데이터가 아직 없어요.</div>';
   function li(x) { return '<li>' + (x.url ? '<a href="' + hubEsc(x.url) + '" target="_blank" rel="noopener">' + hubEsc(x.t) + '</a>' : hubEsc(x.t)) + ' <small>' + hubEsc(x.press) + (x.time ? " · " + hubEsc(x.time) : "") + '</small></li>'; }
   var h = '<div class="wbBrH">읽는 요약 <small>카드·업로드 글에 같이 들어가요 · 숫자(앱) + 기사(네이버 검색' + (B.q ? ': ' + hubEsc(B.q) : '') + ') + 전문가 의견(제목 키워드 분류)</small></div>';
-  h += '<div class="wbBrRow"><span>한 줄로</span><b>' + hubEsc(B.head || "-") + '</b></div>';
   if (B.nums.length) h += '<div class="wbBrRow"><span>숫자</span><div class="wbNums">' + B.nums.slice(0, 6).map(function (f) { return '<i>' + hubEsc(f.label) + ' <b>' + hubEsc(f.value) + '</b></i>'; }).join("") + '</div></div>';
-  h += '<div class="wbBrRow"><span>요즘 이슈</span>' + (B.issue.length ? '<ul>' + B.issue.map(li).join("") + '</ul>' : '<i class="briefDim">관련 기사 없음</i>') + '</div>';
-  h += '<div class="wbBrRow"><span>전문가는</span>' + (B.exp ? '<div><b class="pos">▲ 상승 ' + B.exp.bull.length + '</b> · <b class="neg">▼ 조심 ' + B.exp.bear.length + '</b> <small class="briefDim">(기사 ' + B.exp.n + '건)</small><ul>' + B.exp.bull.slice(0, 2).map(li).join("") + B.exp.bear.slice(0, 2).map(li).join("") + '</ul></div>' : '<i class="briefDim">의견 기사 없음</i>') + '</div>';
+  if (B.issue.length) h += '<div class="wbBrRow"><span>요즘 이슈</span><ul>' + B.issue.map(li).join("") + '</ul></div>';
+  if (B.exp) h += '<div class="wbBrRow"><span>전문가는</span>' + (B.exp ? '<div><b class="pos">▲ 상승 ' + B.exp.bull.length + '</b> · <b class="neg">▼ 조심 ' + B.exp.bear.length + '</b> <small class="briefDim">(기사 ' + B.exp.n + '건)</small><ul>' + B.exp.bull.slice(0, 2).map(li).join("") + B.exp.bear.slice(0, 2).map(li).join("") + '</ul></div>' : '<i class="briefDim">의견 기사 없음</i>') + '</div>';
   if (B.gapLine) h += '<div class="wbBrRow"><span>빠진 시각</span><em>' + hubEsc(B.gapLine) + '</em></div>';
-  h += '<div class="wbBrRow"><span>그래서</span><em>' + hubEsc(B.so) + '</em></div>';
+  if (!B.issue.length && !B.exp) h += '<div class="wbBrRow"><span>기사</span><i class="briefDim">관련 기사·의견 기사 없음 — 숫자만으로 만들어요</i></div>';
   return h;
 }
 /* 오늘 만든 기록 (브라우저) */

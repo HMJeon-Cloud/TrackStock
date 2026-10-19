@@ -339,7 +339,7 @@ function renderFinderResult() {
   var box = $("finderResult");
   var answered = FINDER_Q.filter(function (q) { return finderAns[q.id]; }).length;
   if (answered < FINDER_Q.length) {
-    box.innerHTML = '<small style="color:var(--sub)">' + answered + "/" + FINDER_Q.length + " 답변 — 모두 고르면 먼저 읽어볼 방법을 표시합니다.</small>";
+    box.innerHTML = '<small style="color:var(--sub)">' + answered + "/" + FINDER_Q.length + " 답변</small>";
     Array.prototype.forEach.call(document.querySelectorAll(".guideItem .gFirst"), function (el) { el.remove(); });
     return;
   }

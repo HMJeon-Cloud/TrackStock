@@ -210,10 +210,12 @@ function renderHoldings() {
       '<button class="primary" onclick="openHoldForm()">＋ 첫 기록 추가하기</button></div>';
     $("hSummary").innerHTML = "";
     $("hChartWrap").classList.add("hidden");
+    if ($("hActs")) $("hActs").hidden = true;   // v12.14 기록이 없으면 '기록 추가·시뮬' 줄은 숨김(빈 상태 카드의 버튼 하나로)
     $("hInsight").innerHTML = "";
     $("hTable").innerHTML = "";
     return;
   }
+  if ($("hActs")) $("hActs").hidden = false;
   var groups = groupLots(H.lots);
   var syms = Object.keys(groups);
   ensureHoldData(syms).then(function () { renderHoldingsBody(H, groups, syms); });

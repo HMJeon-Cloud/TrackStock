@@ -60,14 +60,8 @@ function slBrief() {
     nav: [["업종", "테마 흐름"], ["급등락", "급등·급락"], ["돈 몰린 곳", "돈이 몰린 곳"], ["숫자", "오늘의 숫자"]] });
   slBindHero(el, []);
   var kp = document.getElementById("briefKpi"); if (kp) kp.style.display = "none";   // 3초 요약과 겹치는 숫자 띠는 숨김
-  // 섹션 핵심 한 줄
-  var hv = (R.hotVol || [])[0], nums = R.numbers || [];
-  slSection(slSec("시장 체력"), t.n200 && t.above200Pct != null ? "20일선 위 " + Math.round(t.abovePct * 100) + "% · 200일선 위 " + Math.round(t.above200Pct * 100) + "% — " + (t.abovePct >= 0.5 && t.above200Pct >= 0.5 ? "단기·장기 모두 위" : t.abovePct < 0.5 && t.above200Pct >= 0.5 ? "단기는 눌렸지만 장기는 위" : t.abovePct >= 0.5 ? "단기 반등, 장기는 아직 아래" : "단기·장기 모두 아래") : "", false);
-  slSection(slSec("신고가·신저가"), t.n200 ? "52주 신고가 " + t.newHigh.length + " : 신저가 " + t.newLow.length : "", false);
-  slSection(slSec("테마 흐름"), th.length >= 2 ? "1등 " + th[0].name + " " + briefPct(th[0].ret) + "  ·  꼴찌 " + th[th.length - 1].name + " " + briefPct(th[th.length - 1].ret) : "", true);
-  slSection(slSec("급등·급락"), mUp && mDn ? "▲ " + briefName(mUp) + " " + briefPct(mUp.ret1 != null ? mUp.ret1 : mUp.ret) + "  ·  ▼ " + briefName(mDn) + " " + briefPct(mDn.ret1 != null ? mDn.ret1 : mDn.ret) : "", true);
-  slSection(slSec("돈이 몰린 곳"), hv ? briefName(hv) + " 거래대금이 평소의 " + hv.amtX.toFixed(1) + "배" : "", true);
-  slSection(slSec("오늘의 숫자"), nums.slice(0, 2).map(function (n) { return String(n.l).split(" — ")[0] + " " + n.v; }).join("  ·  "), true);
+  // v12.14 섹션 위 '핵심 한 줄' 배너 제거 — 바로 아래 본문(막대·큰 숫자·첫 행)을 그대로 되풀이해 중복이었다. 요약은 위 3초 요약 한 곳에만.
+  Array.prototype.forEach.call(document.querySelectorAll('#tab-brief .slKey, #tab-brief .slToggle'), function (e) { e.remove(); });
 }
 
 /* ---------- 채널 (운영자) ---------- */

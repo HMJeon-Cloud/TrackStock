@@ -158,12 +158,12 @@ function chPickMdd() {
 }
 function chMddTable(rs, withWhy, id) {
   var ok = rs.filter(function (r) { return !r.err; });
-  return '<div class="tableWrap"><table class="chMddT"' + (id ? ' id="' + id + '"' : '') + '><tr><th>종목</th><th>고점比</th><th>역대</th><th>최악/회복</th></tr>' +
+  return '<div class="tableWrap"><table class="chMddT"' + (id ? ' id="' + id + '"' : '') + '><tr><th>종목</th><th>고점 대비</th><th>역대 순위</th><th>최악/회복</th></tr>' +
     ok.map(function (r, i) {
       return '<tr' + (r.group ? ' class="chGroupRow"' : '') + '><td><b>' + r.name + '</b>' + (r.why ? ' <button class="chInfo" data-why="' + escapeHtml(r.why) + '" title="선정 이유">ⓘ</button>' : '') +
         '<div class="briefDim">' + r.sym + (r.cur > -0.005 ? " · 신고가 부근" : " · 고점 후 " + r.days + "일") + '</div></td>' +
         '<td style="color:' + (r.cur < -0.1 ? "var(--down)" : "var(--txt)") + ';font-weight:700">' + chPct(r.cur) + '</td>' +
-        '<td>' + (r.cur <= -0.1 ? (r.deeper + 1) + "위 / " + r.eps + "회" : '<span class="briefDim">10% 미만</span>') + '</td>' +
+        '<td>' + (r.cur <= -0.1 ? (r.deeper + 1) + "위 / " + r.eps + "회" : '<span class="briefDim">–</span>') + '</td>' +
         '<td>' + chPct(r.worst, 0) + (r.medRec != null ? ' <span class="briefDim">/ ' + r.medRec + '일</span>' : '') + '</td></tr>';
     }).join("") + '</table></div>' +
     (rs.length > ok.length ? '<div class="briefDim" style="margin-top:6px">데이터 부족: ' + rs.filter(function (r) { return r.err; }).map(function (r) { return r.sym; }).join(", ") + '</div>' : "");
@@ -186,7 +186,7 @@ function chLoadMdd() {
     arr[0].forEach(function (r) { if (!seen[r.sym]) { seen[r.sym] = 1; rows.push(r); } });
     var picks = arr[1].filter(function (r) { if (seen[r.sym]) return false; seen[r.sym] = 1; return true; });
     if (picks.length) { picks[0] = Object.assign({ group: true }, picks[0]); rows = rows.concat(picks); }
-    box.innerHTML = '<div class="briefDim" style="margin-bottom:6px">위 ' + arr[0].length + '개는 대표 자산, 아래 ' + picks.length + '개는 오늘 데이터로 고른 종목(ⓘ 이유) · 역대 순위 = 10%+ 하락 중 지금이 몇 번째로 깊은지 · 최악/회복 = 역대 최대 낙폭 / 회복까지 걸린 날(중앙값)</div>' +
+    box.innerHTML = '<details class="fdHow" style="margin:0 0 8px"><summary>표 읽는 법</summary><div>위 ' + arr[0].length + '개는 대표 자산, 아래 ' + picks.length + '개는 오늘 데이터로 고른 종목(ⓘ 이유). 역대 순위 = 10% 넘게 빠진 적 중 지금이 몇 번째로 깊은지 · 최악/회복 = 역대 최대 낙폭 / 회복까지 걸린 날(중앙값)</div></details>' +
       chMddTable(rows, true, "chMddTable");
     chBindInfo(box);
     if (typeof snapAttach === "function") snapAttach();
@@ -378,7 +378,7 @@ function chRenderAlloc() {
   chState.cmpLines = lines.map(function (l) { return l.replace(/<[^>]+>/g, ""); });
   $("chAlloc").innerHTML =
     '<h4 class="chSub">🎯 지금 상황 맞춤 구성 <small>' + plan.title + '</small></h4>' +
-    '<div class="chWhyBox">판단 근거: ' + why + '</div>' +
+    '<details class="fdHow" style="margin:4px 0 8px"><summary>판단 근거</summary><div>' + why + '</div></details>' +
     '<div class="chPlanList">' + plan.rows.map(function (it) {
       return '<div class="chPlanItem"><div class="chPlanTop"><b>' + it.name + '</b> <span class="briefDim">' + it.sym + '</span><b class="chPlanW">' + it.w + '%</b></div><div class="chPlanWhy">' + it.why + '</div></div>';
     }).join("") + '</div>' +
@@ -518,7 +518,7 @@ function chCells(list) {
 }
 function chRenderScenarios() {
   var scen = chState.scen || [], now = chState.now || { why: [] };
-  var html = '<div class="chNowBox"><b>지금 시장</b> ' + (now.why.length ? now.why.map(function (w) { return '<span class="chNowTag">' + w + '</span>'; }).join("") : '<span class="briefDim">특별히 두드러진 신호 없음 — 평소 구간</span>') + '</div>';
+  var html = now.why.length ? '' : '<div class="chNowBox"><span class="briefDim">특별히 두드러진 신호 없음 — 평소 구간</span></div>';   // v12.14 신호 문장은 맨 위 요약에 이미 있어 여기선 반복하지 않는다
   // 지금과 비슷한 상황만 펼치고 나머지는 접음. 에피소드는 한 줄 요약(버틴/빠진) + '자세히'
   html += scen.map(function (sc, si) {
     var open = sc.now || (si === 0 && !scen.some(function (x) { return x.now; }));
