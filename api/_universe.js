@@ -39,12 +39,13 @@ async function listUS(rc) {
 async function listKR(rc) {
   let prev = null; try { const t = await redisCmd(rc, ["GET", KEYS.list("kr")]); prev = t ? JSON.parse(t) : null; } catch (e) {}
   try {
-    const items = [];
-    for (let page = 1; page <= 2; page++) {
+    const items = [], seen = {};
+    for (let page = 1; page <= 4 && items.length < 200; page++) {   // 네이버가 한 페이지에 100개를 다 주지 않을 때가 있어 200개가 찰 때까지 (최대 4페이지)
       const r = await fetchT("https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=" + page + "&pageSize=100", { headers: { "User-Agent": UA, Accept: "application/json", Referer: "https://m.stock.naver.com/" } }, 10000);
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = await r.json(), L = (j && (j.stocks || j.items || j.result || j)) || [];
-      (Array.isArray(L) ? L : []).forEach((x) => { const code = String(x.itemCode || x.code || x.reutersCode || "").replace(/\D/g, ""); if (code.length === 6) items.push({ s: code + ".KS", n: String(x.stockName || x.name || code).slice(0, 30), sec: "" }); });
+      (Array.isArray(L) ? L : []).forEach((x) => { const code = String(x.itemCode || x.code || x.reutersCode || "").replace(/\D/g, ""); if (code.length === 6 && !seen[code]) { seen[code] = 1; items.push({ s: code + ".KS", n: String(x.stockName || x.name || code).slice(0, 30), sec: "" }); } });
+      if (!(Array.isArray(L) && L.length)) break;
     }
     if (items.length < 150) throw new Error("종목 " + items.length + "개뿐");
     const doc = { at: Date.now(), items: items.slice(0, 200), source: "naver" };
