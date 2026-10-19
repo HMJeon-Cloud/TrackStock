@@ -339,7 +339,7 @@ if (typeof reelImages === "function") { reelImages = function (r) { CARD_TXT = "
 
 /* ============================================================ 주제 등록부 ============================================================ */
 var HUB_NEW = [
-  { id: "daily", t: "🗞️ 오늘 시장 데일리 9장", d: "미국 = S&P 500 전 종목 · 국내 = 코스피 상위 200 기준 — 한눈에 · 시장 체력 · 업종 · 거래 집중 · 업종 거래활동 · 신고가/신저가 · 자산군·상관 · 성적표 · 기사", g: "오늘 시장", need: "daily", fn: function () { return typeof dlDeck === "function" ? dlDeck() : []; } },
+  { id: "daily", t: "🗞️ 오늘 시장 데일리 9장", d: "미국 = S&P 500 전 종목 · 국내 = 코스피 시총상위 200 기준(KOSPI200 지수와 다름) — 한눈에 · 시장 체력 · 업종 · 거래 집중 · 업종 거래활동 · 신고가/신저가 · 자산군·상관 · 성적표 · 기사", g: "오늘 시장", need: "daily", fn: function () { return typeof dlDeck === "function" ? dlDeck() : []; } },
   { id: "news", t: "📰 오늘의 기사 — 1건 = 1장", d: "제목 · 본문 요약 · 관련 자산 실제 등락 · 기사 속 단어 풀이", g: "오늘 시장", need: "news", fn: hubNewsDeck },
   { id: "hi52", t: "🏔️ 52주 신고가 · 신저가", d: "오늘 1년 최고·최저로 끝난 종목 + 1개월 수익률", g: "오늘 시장", need: "brief", fn: function () { return hubTodayDeck("hi52"); } },
   { id: "sector", t: "🧭 업종 성적표 — 강한 곳 · 약한 곳", d: "업종 평균 등락 TOP6 · 하위 6 · 가장 센/약한 종목", g: "오늘 시장", need: "brief", fn: function () { return hubTodayDeck("sector"); } },

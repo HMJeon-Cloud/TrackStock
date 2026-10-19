@@ -63,8 +63,8 @@ function dlUniLoad(mkt) {
 }
 function dlUni(R) { var c = DL_UNI[R && R.market]; return c && c.doc ? c.doc : null; }
 function dlUniStocks(U) { return U.rows.filter(function (r) { return r && isFinite(r.r1) && r.c > 0; }).map(function (r) { return { sym: r.s, name: r.n || r.s, sec: r.sec || "", last: r.c, ret1: r.r1, ret: r.r1, m1: r.m1, above20: r.a20, above50: r.a50, above200: r.a200, newHigh: !!r.nh, newLow: !!r.nl, vsHi: r.vh, vsLo: r.vl, hi250: r.hi, lo250: r.lo, longEnough: r.hi != null, amt: r.amt, amtX: r.ax, stale: !!r.stale, uni: true }; }); }
-function dlUniName(U) { return U.mkt === "us" ? "S&P 500 구성 " + U.n + "종목" : "코스피 시가총액 상위 " + U.n + "종목"; }
-function dlUniNote(R) { var U = dlUni(R); if (!U) return "앱 관심 종목 집계(전체 시장이 아님)"; var st = U.rows.filter(function (r) { return r.stale; }).length; return dlUniName(U) + " 집계(" + (U.mkt === "us" ? "위키피디아 구성표" : "네이버 시가총액 순") + ")" + (st ? " · " + st + "종목은 전일 값" : "") + " · 현재 구성 종목의 과거 단면(생존 편향 가능)"; }
+function dlUniName(U) { return U.mkt === "us" ? "S&P 500 구성 " + U.n + "종목" : "코스피 시총상위 " + U.n + "종목"; }
+function dlUniNote(R) { var U = dlUni(R); if (!U) return "앱 관심 종목 집계(전체 시장이 아님)"; var st = U.rows.filter(function (r) { return r.stale; }).length; return dlUniName(U) + " 집계(" + (U.mkt === "us" ? "위키피디아 구성표" : "네이버 시가총액 순 · KOSPI200 지수 구성과 다름") + ")" + (st ? " · " + st + "종목은 전일 값" : "") + " · 현재 구성 종목의 과거 단면(생존 편향 가능)"; }
 function dlStocks(R) { var U = dlUni(R); if (U) return dlUniStocks(U); return (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$|-USD$/.test(s.sym) && isFinite(s.ret1); }); }
 /* 거래대금은 통화가 같은 묶음 안에서만 비교한다 (국내 원 · 해외 달러) */
 function dlAmtGroup(R) { var S = dlStocks(R).filter(function (s) { return s.amt > 0; }), kr = S.filter(function (s) { return /\.K[SQ]$/.test(s.sym); }), us = S.filter(function (s) { return !/\.K[SQ]$/.test(s.sym); }); var useKr = R.market === "kr" || (R.market !== "us" && kr.length >= us.length); if (dlUni(R)) { useKr = dlUni(R).mkt === "kr"; } return { list: useKr ? kr : us, kr: useKr, label: useKr ? "국내 " : "해외 " }; }
@@ -89,9 +89,11 @@ function dlRetsHist(sym, n) { var r = dlRows(sym); if (r.length < n + 1) return 
 function dlYearStats(sym) {   // 연초 대비 · 연도별 (연초 대비 최고/최저) 평균 — 수정주가(배당·분할 반영) 기준 · 상장 첫해 60거래일 미만 제외 · 올해 제외
   var r = dlRows(sym); if (r.length < 120) return null; var A = function (x) { return x.a > 0 ? x.a : x.c; }, by = {}; r.forEach(function (x) { var y = new Date(x.t + 9 * 3600e3).getUTCFullYear(); (by[y] = by[y] || []).push(x); });
   var ys = Object.keys(by).map(Number).sort(), cur = new Date(Date.now() + 9 * 3600e3).getUTCFullYear(), ups = [], dns = [];
-  ys.forEach(function (y) { var L = by[y]; if (y >= cur || L.length < 60) return; var f = A(L[0]), hi = -Infinity, lo = Infinity; L.forEach(function (x) { hi = Math.max(hi, A(x)); lo = Math.min(lo, A(x)); }); ups.push(hi / f - 1); dns.push(lo / f - 1); });
-  var C = by[cur], ytd = C && C.length ? A(C[C.length - 1]) / A(C[0]) - 1 : null, d1 = r.length > 1 ? A(r[r.length - 1]) / A(r[r.length - 2]) - 1 : null;
-  return { ytd: ytd, up: ups.length ? rpAvg(ups) : null, dn: dns.length ? rpAvg(dns) : null, years: ups.length, d1: d1, lastT: r[r.length - 1].t };
+  // v12.12 기준값 = 전년 마지막 거래일 수정종가(증권사·언론의 YTD 정의). 전년 자료가 없으면(상장 첫해) 그해 첫 거래일로 대신하고 base='first'로 표시
+  var base = function (y) { var P = by[y - 1]; return P && P.length ? { v: A(P[P.length - 1]), k: "prev" } : { v: A(by[y][0]), k: "first" }; };
+  ys.forEach(function (y) { var L = by[y]; if (y >= cur || L.length < 60) return; var f = base(y).v, hi = -Infinity, lo = Infinity; L.forEach(function (x) { hi = Math.max(hi, A(x)); lo = Math.min(lo, A(x)); }); ups.push(hi / f - 1); dns.push(lo / f - 1); });
+  var C = by[cur], b0 = C && C.length ? base(cur) : null, ytd = b0 ? A(C[C.length - 1]) / b0.v - 1 : null, d1 = r.length > 1 ? A(r[r.length - 1]) / A(r[r.length - 2]) - 1 : null;
+  return { ytd: ytd, ytdBase: b0 ? b0.k : null, up: ups.length ? rpAvg(ups) : null, dn: dns.length ? rpAvg(dns) : null, years: ups.length, d1: d1, lastT: r[r.length - 1].t, adj: r.some(function (x) { return x.a > 0; }) };
 }
 /* 성적표 자산 목록 (시장별) — 긴 역사는 dlPrep 에서 미리 받는다 */
 var DL_SCORE = {
@@ -206,10 +208,10 @@ function dlCard8(R) {
   groups.forEach(function (gp) { var L = gp[1].map(function (w) { var st = dlYearStats(w[0]), s = by[w[0]]; if (!st && !s) return null; var r = { sym: w[0], name: w[1], d1: s && s.ret1 != null ? s.ret1 : st ? st.d1 : null, ytd: st ? st.ytd : null, up: st ? st.up : null, dn: st ? st.dn : null, years: st ? st.years : 0 }; if (r.ytd != null) { tot++; if (r.ytd > 0) upN++; if (!best || r.ytd > best.ytd) best = r; if (!worst || r.ytd < worst.ytd) worst = r; } return r; }).filter(Boolean); if (L.length) rows.push({ g: gp[0], L: L }); });
   if (!tot) return null; var c = dlNew(8, "주요 자산 성적표", R), g = c.g, W = DL.W - DL.P * 2;
   dlHead(c, tot + "개 자산 중 " + upN + "개 연초 대비 상승", "연초 대비 최고 " + best.name + " " + dlPct(best.ytd) + " · 최저 " + worst.name + " " + dlPct(worst.ytd));
-  var X = [DL.P, DL.P + 440, DL.P + 610, DL.P + 790, DL.P + W]; cText(g, "자산 · 표본", X[0], c.y + 20, 20, 700, DL_C.sub); cText(g, "전일 대비", X[1], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연초 대비", X[2], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "평균 상승폭", X[3], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "평균 낙폭", X[4], c.y + 20, 20, 700, DL_C.sub, "right"); c.y += 30; g.fillStyle = DL_C.ink; g.fillRect(DL.P, c.y, W, 2); c.y += 4;
+  var X = [DL.P, DL.P + 440, DL.P + 610, DL.P + 790, DL.P + W]; cText(g, "자산 · 표본", X[0], c.y + 20, 20, 700, DL_C.sub); cText(g, "전일 대비", X[1], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연초 대비", X[2], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연중 최고(평균)", X[3], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연중 최저(평균)", X[4], c.y + 20, 20, 700, DL_C.sub, "right"); c.y += 30; g.fillStyle = DL_C.ink; g.fillRect(DL.P, c.y, W, 2); c.y += 4;
   var nAll = rows.reduce(function (a, gp) { return a + gp.L.length; }, 0), gH = 32, bottom = DL.H - 64 - 112 - 6, rowH = Math.max(34, Math.min(50, Math.floor((bottom - c.y - rows.length * gH) / Math.max(1, nAll)))), fs = rowH >= 44 ? 27 : rowH >= 38 ? 24 : 22, fs2 = rowH >= 44 ? 24 : 21, ty = Math.round(rowH * 0.72);
   rows.forEach(function (gp) { cRound(g, DL.P, c.y + 3, W, gH - 6, 6, DL_C.tile); cText(g, gp.g, DL.P + 10, c.y + gH - 10, 19, 800, DL_C.ink); c.y += gH; gp.L.forEach(function (r) { cText(g, r.name, X[0], c.y + ty, fs, 800, DL_C.ink); cText(g, r.sym.replace(/^\^/, "") + (r.years ? " · " + r.years + "년" : ""), X[0] + cW(g, r.name, fs, 800) + 10, c.y + ty, 18, 600, DL_C.sub); cText(g, dlPct(r.d1), X[1], c.y + ty, fs, 800, dlCol(r.d1), "right"); cText(g, dlPct(r.ytd), X[2], c.y + ty, fs, 900, dlCol(r.ytd), "right"); cText(g, r.up != null ? "+" + (r.up * 100).toFixed(1) + "%" : "-", X[3], c.y + ty, fs2, 600, "#3b4256", "right"); cText(g, r.dn != null ? (r.dn * 100).toFixed(1) + "%" : "-", X[4], c.y + ty, fs2, 600, "#3b4256", "right"); g.strokeStyle = DL_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(DL.P, c.y + rowH); g.lineTo(DL.P + W, c.y + rowH); g.stroke(); c.y += rowH; }); });
-  dlFoot(c, "연초 대비 = 올해 첫 거래일 수정종가 대비 · 평균 상승폭·낙폭 = 각 연도 첫 거래일 수정종가 대비 그해 최고·최저 수정종가 수익률의 평균 · 상장 첫해 거래일 60일 미만이면 그해 제외 · 올해는 평균에서 제외 · 과거 통계이며 매수·매도 신호가 아닙니다", "지수·ETF·종목: 야후 파이낸스 · 수정주가(배당·분할 반영) 기준");
+  dlFoot(c, "연초 대비 = 전년 마지막 거래일 수정종가 대비(YTD) · 연중 최고·최저(평균) = 각 연도 전년 말 수정종가 대비 그해 최고·최저 종가 수익률의 평균(장중 고저 아님) · 상장 첫해 거래일 60일 미만이면 그해 제외 · 올해는 평균에서 제외 · 과거 통계이며 매수·매도 신호가 아닙니다", "지수·ETF·종목: 야후 파이낸스 · 수정주가(배당·분할 반영) 기준");
   return c.cv;
 }
 function dlCard9(R) {
@@ -226,7 +228,7 @@ function dlUniTemp(U) {
   var S = dlUniStocks(U), up = 0, above = 0, n50 = 0, a50 = 0, n200 = 0, a200 = 0, nh = [], nl = [], nearH = [], nearL = [];
   S.forEach(function (s) { if (s.ret1 > 0) up++; if (s.above20) above++; if (s.above50 != null) { n50++; if (s.above50) a50++; } if (s.above200 != null) { n200++; if (s.above200) a200++; } if (s.newHigh) nh.push(s); else if (s.vsHi != null && s.longEnough && s.vsHi >= -0.03) nearH.push(s); if (s.newLow) nl.push(s); else if (s.vsLo != null && s.longEnough && s.vsLo <= 0.03) nearL.push(s); });
   var byAmt = function (a, b) { return (b.amt || 0) - (a.amt || 0); }; nh.sort(byAmt); nl.sort(byAmt); nearH.sort(byAmt); nearL.sort(byAmt);
-  var t = { total: S.length, up: up, upPct: S.length ? up / S.length : 0, above20: above, abovePct: S.length ? above / S.length : 0, above50: a50, n50: n50, above50Pct: n50 ? a50 / n50 : null, above200: a200, n200: n200, above200Pct: n200 ? a200 / n200 : null, newHigh: nh, newLow: nl, nearHigh: nearH, nearLow: nearL, uni: dlUniName(U), asOf: U.asOf };
+  var t = { total: S.length, stale: S.filter(function (s) { return s.stale; }).length, up: up, upPct: S.length ? up / S.length : 0, above20: above, abovePct: S.length ? above / S.length : 0, above50: a50, n50: n50, above50Pct: n50 ? a50 / n50 : null, above200: a200, n200: n200, above200Pct: n200 ? a200 / n200 : null, newHigh: nh, newLow: nl, nearHigh: nearH, nearLow: nearL, uni: dlUniName(U), asOf: U.asOf };
   t.word = t.upPct >= 0.65 ? "훈풍" : t.upPct >= 0.5 ? "미지근" : t.upPct >= 0.35 ? "쌀쌀" : "한파";
   t.desc = t.upPct >= 0.65 ? "대부분이 올랐어요. 이런 날엔 '나만 못 번 것 같은' 조급함을 조심하세요." : t.upPct >= 0.5 ? "오른 종목과 내린 종목이 반반이에요. 종목별 이유가 갈리는 장이에요." : t.upPct >= 0.35 ? "내린 종목이 더 많아요. 개별 악재보다 시장 전체 분위기일 가능성이 커요." : "거의 다 내렸어요. 이런 날은 내 종목만의 문제가 아니에요. 과거 기록을 보고 판단하세요.";
   return t;

@@ -448,6 +448,13 @@ function briefCoinAsOf() {
   if (closeMs < expect) txt += " · ⚠️ 최신 마감분이 아직 안 들어왔어요(수동 수집 필요)";
   return txt;
 }
+/* v12.12 전체 시장 요약을 결과 객체에 붙이는 단 하나의 자리 — R.temp(앱 관심 종목 집계)를 R.uniTemp(전체 시장)로 바꾸고 원본은 R.tempApp 에 보관.
+   모든 화면(3초 요약·핵심 이슈·카드·작업대·리포트)이 R.temp 를 읽으므로 여기서 한 번만 바꾸면 숫자가 통일된다. 한 결과 객체당 한 번만 시도. */
+function briefApplyUniverse(R) {
+  if (!R || typeof dlUniLoad !== "function" || !(R.market === "us" || R.market === "kr") || R._uniTried) return;
+  R._uniTried = 1;
+  dlUniLoad(R.market).then(function (U) { if (U && U.rows && U.rows.length >= 100 && briefState.result === R) { R.uni = U; R.uniTemp = dlUniTemp(U); R.tempApp = R.tempApp || R.temp; R.temp = R.uniTemp; renderBrief(); } }).catch(function () {});
+}
 function renderBrief() {
   var R = briefState.result, box = $("briefBody");
   if (!R || !box) return;
@@ -460,15 +467,15 @@ function renderBrief() {
     " · " + (R.market !== "all" ? R.mktName + " " : "") + R.count + "개 자산" + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "");
   var ML = R.market !== "all" ? R.mktName + " " : "";
   /* v12.11 전체 시장(S&P 500 · 코스피 200) 요약이 있으면 오늘 탭의 온도·체력·신고가도 그 기준으로 — 카드(데일리 9장)와 같은 숫자 */
-  if (typeof dlUniLoad === "function" && (R.market === "us" || R.market === "kr") && !R._uniTried) { R._uniTried = 1; dlUniLoad(R.market).then(function (U) { if (U && briefState.result === R) { R.uni = U; R.uniTemp = dlUniTemp(U); R.tempApp = R.tempApp || R.temp; R.temp = R.uniTemp; renderBrief(); } }).catch(function () {}); }   // 3초 요약·핵심 이슈·카드·작업대가 읽는 R.temp 도 전체 시장 기준으로 바꿔 모든 화면의 숫자를 맞춘다
-  var t = R.uniTemp || R.temp, uniLab = R.uniTemp ? R.uniTemp.uni + " 기준" : "앱 관심 종목 " + R.temp.total + "개 기준";
+  briefApplyUniverse(R);   // 3초 요약·핵심 이슈·카드·작업대가 읽는 R.temp 도 전체 시장 기준으로 바꿔 모든 화면의 숫자를 맞춘다
+  var t = R.uniTemp || R.temp, uniLab = R.uniTemp ? R.uniTemp.uni + (R.uniTemp.asOf ? " · " + new Date(R.uniTemp.asOf + 9 * 3600e3).toISOString().slice(5, 10).replace("-", "/") + " 마감" : "") + " 기준" : "앱 관심 종목 " + R.temp.total + "개 기준";
   if ($("briefKpi")) {
     var vixN = (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], nh = (t.newHigh || []).length, nl = (t.newLow || []).length;
     var idx0 = R.indexRow[0];
     $("briefKpi").innerHTML = [
       { l: "오른 종목", v: Math.round(t.upPct * 100) + "%", s: t.up + "/" + t.total, p: t.upPct, cls: t.upPct >= 0.5 ? "up" : "down" },
-      { l: "20일선 위", v: Math.round(t.abovePct * 100) + "%", s: "추세", p: t.abovePct, cls: t.abovePct >= 0.5 ? "up" : "down" },
-      { l: "신고가 : 신저가", v: t.n200 ? nh + " : " + nl : "–", s: t.n200 ? "52주" : "1년치 후", p: t.n200 ? nh / Math.max(1, nh + nl) : 0, cls: nh > nl ? "up" : nl > nh ? "down" : "" },
+      { l: "20일선 위", v: Math.round(t.abovePct * 100) + "%", s: t.abovePct >= 0.6 ? "상승 우세" : t.abovePct <= 0.4 ? "하락 우세" : "반반", p: t.abovePct, cls: t.abovePct >= 0.5 ? "up" : "down" },
+      { l: "신고가 : 신저가", v: t.n200 ? nh + " : " + nl : "–", s: t.n200 ? "52주 종가 기준" + (t.stale ? " · " + t.stale + "개 전일값" : "") : "1년치 후", p: t.n200 ? nh / Math.max(1, nh + nl) : 0, cls: nh > nl ? "up" : nl > nh ? "down" : "" },
       { l: vixN ? "공포지수" : (idx0 ? idx0.name : "지수"), v: vixN ? vixN.v : (idx0 ? briefPct(idx0.ret) : "–"), s: vixN ? (parseFloat(vixN.v) >= 25 ? "공포" : parseFloat(vixN.v) >= 20 ? "불안" : "평온") : "", p: vixN ? Math.min(1, parseFloat(vixN.v) / 40) : 0.5, cls: vixN ? (parseFloat(vixN.v) >= 25 ? "down" : "") : (idx0 && idx0.ret < 0 ? "down" : "up") }
     ].map(function (k) { return '<div class="kpi ' + k.cls + '"><div class="kl">' + k.l + '</div><div class="kv">' + k.v + '<small>' + k.s + '</small></div><div class="kb"><i style="width:' + Math.round(k.p * 100) + '%"></i></div></div>'; }).join("");
   }
