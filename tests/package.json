@@ -1,0 +1,18 @@
+{
+  "name": "stockmind-tests",
+  "private": true,
+  "scripts": {
+    "sweep": "node sw_run.js",
+    "daily": "node dl3_run.js",
+    "report": "node rp_run.js",
+    "analyst": "node an5_run.js",
+    "all": "node sw_run.js && node dl3_run.js && node rp_run.js && node an5_run.js"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.3",
+    "chartjs-plugin-zoom": "^2.0.1",
+    "hammerjs": "^2.0.8",
+    "html2canvas": "^1.4.1",
+    "playwright": "^1.48.0"
+  }
+}
