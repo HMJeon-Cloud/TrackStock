@@ -20,6 +20,7 @@ export default async function handler(req, res) {
   else if (req.query.disc === "1") { key = "sm:disc"; cache = "s-maxage=3600, stale-while-revalidate=7200"; }
   else if (req.query.ipo === "1") { key = "sm:ipo"; cache = "s-maxage=3600, stale-while-revalidate=7200"; }
   else if (req.query.macro === "1") { key = "sm:macro"; cache = "s-maxage=10800, stale-while-revalidate=21600"; }
+  else if (req.query.universe === "us" || req.query.universe === "kr") { key = "sm:uni:" + req.query.universe; cache = "s-maxage=1800, stale-while-revalidate=7200"; }   // v12.9 S&P 500 · 코스피 200 요약 (CDN 30분)
   else if (req.query.guru === "1") { key = "sm:guru"; cache = "s-maxage=21600, stale-while-revalidate=43200"; }
   else if (symbol) { key = KEY.chart(symbol); cache = "s-maxage=86400, stale-while-revalidate=172800"; }
   if (!key && req.query.popular !== "1") return res.status(400).json({ error: "symbol required" });

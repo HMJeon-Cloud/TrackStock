@@ -339,6 +339,7 @@ if (typeof reelImages === "function") { reelImages = function (r) { CARD_TXT = "
 
 /* ============================================================ 주제 등록부 ============================================================ */
 var HUB_NEW = [
+  { id: "daily", t: "🗞️ 오늘 시장 데일리 9장", d: "미국 = S&P 500 전 종목 · 국내 = 코스피 상위 200 기준 — 한눈에 · 시장 체력 · 업종 · 거래 집중 · 업종 거래활동 · 신고가/신저가 · 자산군·상관 · 성적표 · 기사", g: "오늘 시장", need: "daily", fn: function () { return typeof dlDeck === "function" ? dlDeck() : []; } },
   { id: "news", t: "📰 오늘의 기사 — 1건 = 1장", d: "제목 · 본문 요약 · 관련 자산 실제 등락 · 기사 속 단어 풀이", g: "오늘 시장", need: "news", fn: hubNewsDeck },
   { id: "hi52", t: "🏔️ 52주 신고가 · 신저가", d: "오늘 1년 최고·최저로 끝난 종목 + 1개월 수익률", g: "오늘 시장", need: "brief", fn: function () { return hubTodayDeck("hi52"); } },
   { id: "sector", t: "🧭 업종 성적표 — 강한 곳 · 약한 곳", d: "업종 평균 등락 TOP6 · 하위 6 · 가장 센/약한 종목", g: "오늘 시장", need: "brief", fn: function () { return hubTodayDeck("sector"); } },
@@ -353,6 +354,7 @@ var HUB_NEW = [
 ];
 function hubPrep(need) {
   if (need === "hist") return hubLoad(HUB_HIST);
+  if (need === "daily") return Promise.all([hubLoad(HUB_HIST.concat(["IEF", "^KQ11", "ETH-USD"])), hubR() && typeof cardsNewsFetch === "function" ? cardsNewsFetch(hubR()).catch(function () { return []; }) : Promise.resolve(), typeof dlPrep === "function" ? dlPrep(hubR()).catch(function () { return null; }) : Promise.resolve()]);
   if (need === "news") return (hubR() && typeof cardsNewsFetch === "function" ? cardsNewsFetch(hubR()).catch(function () { return []; }) : Promise.resolve()).then(function () { return Promise.all(hubNewsItems().slice(0, 6).map(function (x) { return hubBodyFetch(x.it); })); });
   return Promise.resolve();
 }
@@ -400,6 +402,7 @@ function hubTopics() {
   add({ ctx: "channel", g: "오늘 시장", t: "📺 채널 전일 정리 (국내+미국)", d: "주식 전일 정리 · 낙폭 · 자산배분 · 과거 사례", multi: function () { cardsOpen("channel"); }, score: function () { return { s: vixV >= 25 ? 8 : 5, why: vixV >= 25 ? "VIX " + vixV.toFixed(0) + " — 불안한 날엔 '과거 사례·낙폭'이 들어 있는 채널 세트가 저장돼요" : "국내·미국을 같이 보는 정리" }; } });
   HUB_NEW.forEach(function (h) {
     add({ ctx: "hub:" + h.id, g: h.g, t: h.t, d: h.d, multi: function (b) { hubOpenList("hub:" + h.id, b); }, score: function () {
+      if (h.id === "daily") return { s: dow >= 1 && dow <= 5 ? 9.5 : 5, why: dow >= 1 && dow <= 5 ? "평일 아침 고정 — 9장 한 세트로 '오늘 시장'을 결론 문장 + 큰 숫자로 (한 장 = 01 한눈에)" : "주말엔 금요일 마감 기준으로" };
       if (h.id === "news") { var n = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).length; return { s: n ? 8 : 6, why: n ? "오늘 기사 " + n + "건 수집 — 기사 1건을 한 장에 풀어 주는 형식이 '저장'이 많아요" : "아침 기사로 하루를 여는 고정 형식 (기사는 만들 때 받아 와요)" }; }
       if (h.id === "hi52") return { s: hiN + loN >= 15 ? 8 : hiN + loN >= 6 ? 6 : 3, why: "오늘 52주 신고가 " + hiN + "개 · 신저가 " + loN + "개" + (hiN > loN * 2 ? " — 신고가가 압도적, 시장 힘이 센 날" : loN > hiN * 2 ? " — 신저가가 많아 약한 날" : "") };
       if (h.id === "sector") { var sp = th.length >= 2 ? th[0].ret - th[th.length - 1].ret : 0; return { s: sp >= 0.04 ? 8 : sp >= 0.02 ? 6 : 3, why: th.length ? "업종 1등 " + th[0].name + " " + cPct(th[0].ret, 1) + " vs 꼴찌 " + th[th.length - 1].name + " " + cPct(th[th.length - 1].ret, 1) + " — 차이 " + cPct(sp, 1).replace("+", "") + "p" : "업종 데이터 준비 중" }; }
@@ -551,6 +554,7 @@ function hubOneMake(ctx) {
   var kind = ctx.split(":")[0], arg = ctx.split(":").slice(1).join(":"), title = hubTitleOf(ctx);
   function one(cv) { return [{ name: "한장요약", cv: cv }]; }
   function viaSpec(prep, draw) { return Promise.resolve(prep()).then(function () { HUB.lastSpec = null; CARD_TXT = ""; var l = draw() || []; if (!HUB.lastSpec || !l.length) throw new Error("데이터가 아직 없어요"); var f = hubSpecFacts(HUB.lastSpec); return function () { return hubOneCard({ title: title, sub: f.head2 ? "" : f.head, head2: f.head2, facts: f.facts, src: f.src, n: l.length }); }; }); }
+  if (kind === "hub" && arg === "daily") return hubPrep("daily").then(function () { return function () { var R = hubR(); return R ? dlCard1(R) : null; }; });
   if (kind === "hub") { var x = HUB_NEW.filter(function (h) { return h.id === arg; })[0]; return viaSpec(function () { return hubPrep(x.need); }, x.fn); }
   if (kind === "reel") return (typeof nbLoad === "function" && REEL_DATA[arg] && arg !== "loss" ? nbLoad(REEL_HIST) : Promise.resolve()).then(function () {
     if (TPL_SOURCES.lines.some(function (z) { return z.id === "hxReel_" + arg; })) return function () { return tplBuild("lines", "hxReel_" + arg); };

@@ -11,7 +11,7 @@
   ],
   "functions": {
     "api/cron-snapshot.js": {
-      "maxDuration": 60,
+      "maxDuration": 300,
       "includeFiles": "tickers.js"
     },
     "api/channel.js": {

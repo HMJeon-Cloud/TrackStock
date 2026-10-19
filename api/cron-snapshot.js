@@ -13,13 +13,15 @@
 import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
 import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY, kst } from "./_redis.js";
+import { collectUniverse } from "./_universe.js";   // v12.9 S&P 500 · 코스피 200 요약
 import { collectAll } from "./_disc.js";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const CONCURRENCY = 6;
 const RECENT_CONCURRENCY = 10;   // v9.3: 코인 76개 추가로 종목이 ~310개 → 최근 구간은 10개씩 동시에
-const TIME_BUDGET_MS = 52000;     // 함수 최대 60초 안에서 저장까지 끝나도록 여유를 둔다
+const TIME_BUDGET_MS = 52000;     // 기존 작업(최근 구간·과거·공시)은 그대로 52초 안에
+const UNIVERSE_BUDGET_MS = 270000; // v12.9 함수 제한 300초 — 유니버스(S&P 500 · 코스피 200)는 그 뒤 남는 시간에 (저장 여유 포함)
 const RECENT_BUDGET_MS = 38000;   // ① 최근 구간(가장 중요)에 먼저 쓰는 시간
 const FETCH_TIMEOUT_MS = 8000;    // 야후 한 건이 멈춰 있어도 8초면 포기
 const HISTORY_PER_RUN = 20;       // 남은 시간에 과거 전체를 받을 종목 수 (하루 2회 → 약 6일이면 전 종목 한 바퀴)
@@ -352,6 +354,18 @@ export default async function handler(req, res) {
 
   if (discP) await discP;
 
+  /* ②-2 전체 시장 유니버스 (v12.9) — 07시 KST(22 UTC) 실행은 S&P 500, 09시 KST(0 UTC) 실행은 코스피 200. ?universe=us|kr|0 로 지정·생략 가능.
+     기존 작업(52초) 뒤에 남는 시간을 쓴다 (함수 제한 300초). 야후가 막히면 받은 만큼만 갱신하고 나머지는 지난 요약 유지. */
+  let universe = null;
+  {
+    const q = String(req.query.universe || ""), h = new Date().getUTCHours();
+    const mkt = q === "0" ? null : (q === "us" || q === "kr") ? q : h >= 12 ? "us" : "kr";   // 22 UTC(07시 KST) → 미국 · 0 UTC(09시 KST) → 한국
+    const uniBudget = UNIVERSE_BUDGET_MS - (Date.now() - started);
+    if (!mkt) universe = { skipped: "universe=0" };
+    else if (uniBudget < 30000) universe = { skipped: "시간 부족 (" + Math.round(uniBudget / 1000) + "초 남음)" };
+    else { try { universe = await collectUniverse(redis, mkt, uniBudget); } catch (e) { universe = { ok: false, mkt, error: String(e.message).slice(0, 160) }; } }
+  }
+
   /* ③ 목록 */
   const withHistory = symbols.filter((s) => entries[s] && entries[s].history).length;
   let manifestOk = true;
@@ -370,6 +384,7 @@ export default async function handler(req, res) {
     at: new Date().toISOString(), elapsedMs: Date.now() - started,
     symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, historyUpdated: done.length,
     historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
+    universe: universe && { ok: universe.ok, mkt: universe.mkt, n: universe.n, fresh: universe.fresh, kept: universe.kept, failed: universe.failed, list: universe.list, h429: universe.stats && universe.stats.h429, skipped: universe.skipped, error: universe.error || universe.reason, elapsedMs: universe.elapsedMs },
     failedSample: failed.slice(0, 5), disc: disc && { dart: disc.dart && { ok: disc.dart.ok, added: disc.dart.added, reason: disc.dart.reason }, sec: disc.sec && { ok: disc.sec.ok, updated: disc.sec.updated }, skipped: disc.skipped }
   };
   try { await redisCmd(redis, ["SET", "sm:cronlog", JSON.stringify(log), "EX", String(14 * 86400)]); } catch (e) {}
@@ -385,7 +400,7 @@ export default async function handler(req, res) {
     recentSymbols: recentOk, recentKept: kept,
     recentSaved, manifestOk, yahoo: yahooStats,
     failed: failed.slice(0, 10),
-    disc,
+    disc, universe,
     elapsedMs: Date.now() - started,
     note: "과거 전체는 순환 갱신, 최근 " + RECENT_DAYS + "일은 매 실행 전 종목 갱신",
   });
