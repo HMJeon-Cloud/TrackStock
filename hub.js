@@ -648,7 +648,7 @@ function hubThreads(ctx, list, B) {
     if (kind === "story" && typeof thrStory === "function") return thrOr(thrStory(arg, list.map(function (x) { return x.name; })), storyCaption(arg));
   } catch (e) {}
   var t = hubTopic(ctx), name = t ? cPlain(t.t).replace(/^\S+\s/, "") : "오늘의 카드", lines = [];
-  var base = { summary: B ? [B.head].concat(B.nums.slice(0, 3).map(function (f) { return f.label + " " + f.value; })) : [t ? t.d : ""], insights: B ? [B.issueLine, B.expLine, B.so].filter(Boolean) : [], cardList: list.map(function (x, i) { return (i + 1) + " " + x.name; }), question: "이 중에 가장 의외였던 건 뭐였나요?", tags: ["우상향연구소", "주식초보", "재테크", "투자공부"], foot: "과거·오늘 종가 자동 집계" + (B && B.issue.length ? " · 기사: " + B.issue.map(function (x) { return x.press; }).filter(Boolean).join(", ") : "") + " · 투자 권유 아님", data: B ? B.nums.slice(0, 6).map(function (f) { return f.label + " " + f.value; }) : [t ? t.d : name], sort: false, thFoot: "종가 자동 집계 · 투자 권유 아님", limit: ["한계도 적어둘게요.", "과거 숫자예요. 같은 상황에서 같은 결과가 나온다는 보장은 없습니다."], reply: "다음엔 어떤 숫자가 궁금하세요?" };
+  var base = { summary: B ? [B.head].concat(B.nums.slice(0, 3).map(function (f) { return f.label + " " + f.value; })) : [t ? t.d : ""], insights: B ? [B.issueLine, B.expLine, B.gapLine, B.so].filter(Boolean) : [], cardList: list.map(function (x, i) { return (i + 1) + " " + x.name; }), question: "이 중에 가장 의외였던 건 뭐였나요?", tags: ["우상향연구소", "주식초보", "재테크", "투자공부"], foot: "과거·오늘 종가 자동 집계" + (B && B.issue.length ? " · 기사: " + B.issue.map(function (x) { return x.press; }).filter(Boolean).join(", ") : "") + " · 투자 권유 아님", data: B ? B.nums.slice(0, 6).map(function (f) { return f.label + " " + f.value; }) : [t ? t.d : name], sort: false, thFoot: "종가 자동 집계 · 투자 권유 아님", limit: ["한계도 적어둘게요.", "과거 숫자예요. 같은 상황에서 같은 결과가 나온다는 보장은 없습니다."], reply: "다음엔 어떤 숫자가 궁금하세요?" };
   var out = []; function add(label, hook) { var c = thrCompose(Object.assign({}, base, { hook: hook })); out.push({ label: label, th: c.th, r1: c.r1, r2: c.r2, ig: c.ig }); }
   add("초보 질문형", name + ",\n숫자로 보면 어떨까요?"); add("반전형", name + ".\n생각과 다른 숫자가 있었어요.");
   return thrSafe(out);
@@ -800,7 +800,9 @@ function hubBrief(ctx) {
     var head = hubHead(ctx, nums, t);
     var issueLine = issue.length ? "요즘 기사에선 " + issue.map(function (x) { return "'" + x.t.replace(/[\.…]+$/, "") + "'(" + (x.press || "기사") + ")"; }).join(", ") + (issue.length > 1 ? " 같은 이야기가 나와요." : " 이야기가 나와요.") : "";
     var expLine = exp ? (exp.bull.length + exp.bear.length === 0 ? "최근 기사 " + exp.n + "건에서 뚜렷한 상승·하락 의견은 아직 없어요." : "전문가 의견은 상승 쪽 " + exp.bull.length + ", 조심 쪽 " + exp.bear.length + (exp.bull.length > exp.bear.length ? " — 기대가 앞서요. " : exp.bull.length < exp.bear.length ? " — 경계가 앞서요. " : " — 팽팽해요. ") + [exp.bull[0] ? "'" + exp.bull[0].t + "'(" + exp.bull[0].press + ")" : "", exp.bear[0] ? "'" + exp.bear[0].t + "'(" + exp.bear[0].press + ")" : ""].filter(Boolean).join(" vs ")) : "";
-    var B = { ctx: ctx, title: title, head: head, nums: nums, issue: issue, exp: exp, issueLine: issueLine, expLine: expLine, so: hubSo(ctx), q: q, srcs: issue.concat(exp ? exp.bull.concat(exp.bear) : []).map(function (x) { return x.press + (x.time ? " " + x.time : ""); }).filter(function (x, i, a) { return x.trim() && a.indexOf(x) === i; }) };
+    var ours = [head, issueLine].concat(nums.map(function (f) { return f.label + " " + f.value; })).join(" "), gapW = exp ? hubGap(exp.bull.concat(exp.bear), ours, 4) : [];
+    var gapLine = gapW.length ? "이 카드가 안 다룬 시각: " + gapW.map(function (g) { return g.w; }).join(" · ") + " — 기사 쪽 주제예요. 숫자와 같이 보세요." : "";
+    var B = { ctx: ctx, title: title, head: head, nums: nums, issue: issue, exp: exp, issueLine: issueLine, expLine: expLine, gap: gapW, gapLine: gapLine, so: hubSo(ctx), q: q, srcs: issue.concat(exp ? exp.bull.concat(exp.bear) : []).map(function (x) { return x.press + (x.time ? " " + x.time : ""); }).filter(function (x, i, a) { return x.trim() && a.indexOf(x) === i; }) };
     HUB.briefCache[ctx] = { at: Date.now(), B: B }; return B;
   });
 }
@@ -816,7 +818,7 @@ function hubHead(ctx, nums, t) {
   if (nums.length) return nums.slice(0, 2).map(function (f) { return f.value; }).join(", ") + ".";
   return t ? hubStrip(t.d) : "";
 }
-function hubBriefLines(B) { var L = []; if (B.head) L.push("한 줄 결론: " + B.head); B.issue.forEach(function (x) { L.push("요즘 기사: " + x.t + " (" + x.press + (x.time ? " " + x.time : "") + ")"); }); if (B.exp) { B.exp.bull.forEach(function (x) { L.push("상승 쪽 의견 기사: " + x.t + " (" + x.press + ")"); }); B.exp.bear.forEach(function (x) { L.push("조심 쪽 의견 기사: " + x.t + " (" + x.press + ")"); }); } L.push("그래서: " + B.so); return L; }
+function hubBriefLines(B) { var L = []; if (B.head) L.push("한 줄 결론: " + B.head); if (B.gapLine) L.push("빠진 시각: " + B.gapLine); B.issue.forEach(function (x) { L.push("요즘 기사: " + x.t + " (" + x.press + (x.time ? " " + x.time : "") + ")"); }); if (B.exp) { B.exp.bull.forEach(function (x) { L.push("상승 쪽 의견 기사: " + x.t + " (" + x.press + ")"); }); B.exp.bear.forEach(function (x) { L.push("조심 쪽 의견 기사: " + x.t + " (" + x.press + ")"); }); } L.push("그래서: " + B.so); return L; }
 /* 카드: 연구노트 양식 한 장 — 위 검정 '한 줄로', 아래 숫자 / 요즘 이슈 / 전문가는 / 그래서 */
 function hubBriefCard(B, title, total) {
   if (!B || (!B.nums.length && !B.issue.length && !B.exp)) return null;
@@ -826,6 +828,7 @@ function hubBriefCard(B, title, total) {
   if (B.nums.length) secs.push({ h: "숫자가 말하는 것", t: B.nums.slice(0, 4).map(function (f) { return f.label + " " + f.value + (f.note ? "(" + f.note + ")" : ""); }).join(" · ") + "." });
   if (B.issueLine) secs.push({ h: "요즘 이슈", t: B.issueLine });
   if (B.expLine) secs.push({ h: "전문가는", t: B.expLine });
+  if (B.gapLine) secs.push({ h: "빠진 시각", t: B.gapLine });
   hubSectionsFill(c, secs, ["그래서", B.so]);
   nbFoot(c, "앱 데이터 + 네이버 뉴스 검색(" + (B.srcs.slice(0, 3).join(", ") || "기사 없음") + ") · 투자 권유 아님");
   return c.cv;
@@ -858,9 +861,44 @@ function hubBriefHtml(B) {
   if (B.nums.length) h += '<div class="wbBrRow"><span>숫자</span><div class="wbNums">' + B.nums.slice(0, 6).map(function (f) { return '<i>' + hubEsc(f.label) + ' <b>' + hubEsc(f.value) + '</b></i>'; }).join("") + '</div></div>';
   h += '<div class="wbBrRow"><span>요즘 이슈</span>' + (B.issue.length ? '<ul>' + B.issue.map(li).join("") + '</ul>' : '<i class="briefDim">관련 기사 없음</i>') + '</div>';
   h += '<div class="wbBrRow"><span>전문가는</span>' + (B.exp ? '<div><b class="pos">▲ 상승 ' + B.exp.bull.length + '</b> · <b class="neg">▼ 조심 ' + B.exp.bear.length + '</b> <small class="briefDim">(기사 ' + B.exp.n + '건)</small><ul>' + B.exp.bull.slice(0, 2).map(li).join("") + B.exp.bear.slice(0, 2).map(li).join("") + '</ul></div>' : '<i class="briefDim">의견 기사 없음</i>') + '</div>';
+  if (B.gapLine) h += '<div class="wbBrRow"><span>빠진 시각</span><em>' + hubEsc(B.gapLine) + '</em></div>';
   h += '<div class="wbBrRow"><span>그래서</span><em>' + hubEsc(B.so) + '</em></div>';
   return h;
 }
 /* 오늘 만든 기록 (브라우저) */
 function hubDoneLoad() { try { var j = JSON.parse(localStorage.getItem("sm.mkdone") || "null"); var d = typeof pubToday === "function" ? pubToday() : ""; return j && j.d === d ? j.items : []; } catch (e) { return []; } }
 function hubDoneAdd(ctx, title) { try { var d = typeof pubToday === "function" ? pubToday() : "", items = hubDoneLoad(); items.push({ ctx: ctx, t: title, at: Date.now() }); localStorage.setItem("sm.mkdone", JSON.stringify({ d: d, items: items.slice(-60) })); if (typeof mkMarkDone === "function") mkMarkDone(ctx); } catch (e) {} }
+
+/* ============================================================ v12.7 반론 검토 — 반대편 기사에서 '우리가 다루지 않은 주제'를 찾는다 ============================================================ */
+var HUB_STOP = /^(기사|증권|증권사|증권가|전망|주가|종목|투자|시장|분석|관련|대한|위해|지난|오늘|올해|내년|이번|최근|기대|우려|상향|하향|목표|목표가|목표주가|의견|매수|매도|유지|리스크|중립|조정|경고|둔화|호재|악재|수혜|부담|변수|영향|우위|전환|흐름|추세|반등|회복|압력|불안|긴장|가능성|전문가|애널리스트|보고서|리포트|발표|기업|회사|국내|해외|미국|한국|코스피|코스닥|나스닥|지수|상승|하락|급등|급락|강세|약세|마감|거래|개장|장중|대비|이상|이하|정도|수준|경우|때문|통해|따라|대해|위한|있다|없다|한다|된다|이다|것이|것으로|이라고|라고|했다|한다고|그리고|하지만|그러나|또한|등의|등을|등이|있는|없는|하는|되는|되고|있어|대상|규모|가운데|이날|지난해|전년|분기|실적|매출|영업이익|순이익|주식|증시|시황|외국인|기관|개인|물량|비중|평가|판단|가격|주당|달러|원화|환율|금리|연준|한은|물가|고용|경기|경제|정책|정부|의장|총재|대통령|이후|이전|현재|당시|사실|상황|결과|이유|방향|전체|일부|주요|핵심|중심|최대|최소|최고|최저|평균|기준|전망치|예상치|컨센서스)$/;
+var HUB_NOUN = /^(대형주|중형주|소형주|성장주|가치주|배당주|수출주|내수주|경기주|방어주|테마주|우량주|관련주|수혜주|기술주|반도체주|은행주|증권주|보험주|바이오주|자동차주|건설주|조선주|철강주|화학주|정유주|항공주|여행주|게임주|엔터주|미디어주|통신주|유틸리티주|리츠|채권|달러|원화|엔화|유로|위안)$/;
+var HUB_JOSA2 = /(에서는|으로는|에게는|까지는|부터는|이라는|이라고|에서|으로|에게|까지|부터|보다|처럼|만큼|이며|이고)$/, HUB_JOSA1 = /[은는이가을를의에로도과와만]$/, HUB_PRED = /(다|려|며|해|돼|했|됐|졌|렸|니|까|네|요|어|아|하고|되고|하며|되며|하면|되면|하는|되는|하여|되어|해서|돼서|면서|하자|하니|하던|하기|되기|하게|되게|할수|될수)$/;
+function hubTokens(text) {
+  var raw = {}; String(text || "").split(/[^가-힣A-Za-z0-9]+/).forEach(function (w) { if (!w) return; if (/^[가-힣]+$/.test(w)) { if (w.length >= 4) w = w.replace(HUB_JOSA2, ""); raw[w] = (raw[w] || 0) + 1; } else if (/^[A-Z][A-Za-z0-9]+$/.test(w)) raw[w] = (raw[w] || 0) + 1; });
+  var out = {};
+  Object.keys(raw).forEach(function (w) {
+    var t = w;
+    if (/^[가-힣]+$/.test(t)) {
+      if (t.length >= 3 && HUB_JOSA1.test(t)) { var stem = t.slice(0, -1); if (raw[stem] || HUB_STOP.test(stem) || HUB_NOUN.test(stem) || t.length >= 5 || /[은는을를]$/.test(t) || (/로$/.test(t) && /(확대|축소|증가|감소|상승|하락|개선|악화|둔화|회복)$/.test(stem))) t = stem; }   // '목표주가'는 그대로, '반도체가'는 '반도체'가 따로 있을 때만 줄임
+      if (t.length < 2 || t.length > 8 || HUB_STOP.test(t) || (t.length >= 3 && HUB_PRED.test(t))) return;   // 서술어(…다/…려/…했) 제외
+    }
+    out[t] = (out[t] || 0) + raw[w];
+  });
+  return out;
+}
+/* theirs: [{t, desc}] 반대편 기사 · ours: 우리 글 전체 → 우리 글에 없는 주제어 (많이 나온 순) */
+function hubGap(theirs, ours, n) {
+  var cnt = {}, oursN = String(ours || "").replace(/\s+/g, ""), doc = {};
+  theirs.forEach(function (x, i) { var T = hubTokens(x.t + " " + (x.desc || "").slice(0, 200)); Object.keys(T).forEach(function (k) { cnt[k] = (cnt[k] || 0) + T[k]; (doc[k] = doc[k] || {})[i] = 1; }); });
+  return Object.keys(cnt).filter(function (k) { return oursN.indexOf(k) < 0; }).sort(function (a, b) { return Object.keys(doc[b]).length - Object.keys(doc[a]).length || cnt[b] - cnt[a] || b.length - a.length; }).slice(0, n || 6).map(function (k) { return { w: k, n: Object.keys(doc[k]).length }; });
+}
+/* 반론 묶음: 우리 결론(stance: "up"|"down"|"flat")과 반대인 기사 + 빠진 주제 + 보완 문장 */
+function hubCounter(stance, exp, oursText) {
+  if (!exp) return null;
+  var opp = stance === "up" ? exp.bear : stance === "down" ? exp.bull : exp.bear.concat(exp.bull), same = stance === "up" ? exp.bull : stance === "down" ? exp.bear : [];
+  if (!opp.length) return { n: 0, items: [], gap: [], txt: "반대편 근거 기사를 찾지 못했어요 — 반론이 없다는 뜻이 아니라, 아직 기사로 나오지 않았거나 검색어에 안 잡힌 것일 수 있어요.", fix: "" };
+  var gap = hubGap(opp, oursText, 6), covered = opp.length - opp.filter(function (x) { return hubGap([x], oursText, 1).length; }).length;
+  var txt = "우리 결론과 반대쪽 근거 " + opp.length + "건" + (same.length ? " (같은 쪽 " + same.length + "건)" : "") + ". " + (gap.length ? "그중 우리 글이 다루지 않은 주제: " + gap.map(function (g) { return "'" + g.w + "'" + (g.n > 1 ? "(" + g.n + "건)" : ""); }).join(", ") + "." : "반대편 근거의 주제는 우리 글에도 들어 있어요 — 해석의 차이예요.");
+  var fix = gap.length >= 2 ? "보완: 결론을 한 단계 보수적으로 보고(" + (stance === "up" ? "검토 → 나눠서·작게" : stance === "down" ? "관망 → 조건부 관심" : "양쪽 모두 열어 두기") + "), " + gap.slice(0, 3).map(function (g) { return g.w; }).join("·") + "에 대한 숫자를 먼저 확인한 뒤 판단을 확정하세요." : gap.length === 1 ? "보완: '" + gap[0].w + "' 한 가지만 확인하면 결론을 유지해도 돼요." : "보완: 반대편 주장을 숫자로 반박할 수 있는지(우리 Exhibit과 대조) 한 번만 더 보세요.";
+  return { n: opp.length, items: opp.slice(0, 5), gap: gap, txt: txt, fix: fix, covered: covered };
+}

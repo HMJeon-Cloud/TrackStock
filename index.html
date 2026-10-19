@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StockMind — 하락장 멘탈 방어 대시보드</title>
+<!-- v12.7 첫 그림을 막는다: 저장된 화면(탭·종목)을 되살리기 전에는 본문을 그리지 않아 '예전 화면이 잠깐 보였다가 바뀌는' 깜빡임이 없다 -->
+<script>document.documentElement.className += " smBoot";</script>
+<style>html.smBoot body > *:not(script) { visibility: hidden; } html.smBoot body { background: #f4f5f7; }</style>
 <!-- Microsoft Clarity: 익명 사용 통계·히트맵 (개인정보 수집 없음) -->
 <script type="text/javascript">
   (function (c, l, a, r, i, t, y) {
@@ -1243,6 +1246,9 @@
   .rpScen { display: grid; gap: 8px; margin-bottom: 12px; } .rpScR { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; position: relative; overflow: hidden; } .rpScP { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; } .rpScR b small { font-weight: 500; color: var(--sub); margin-left: 4px; } .rpScBar { position: absolute; left: 0; bottom: 0; right: 0; height: 4px; background: #f0ece2; } .rpScBar i { display: block; height: 100%; background: #b8913f; }
   .rpPlan { margin: 0 0 12px; padding-left: 22px; font-size: 13.5px; line-height: 1.7; } .rpWatch { margin: 0 0 12px; padding-left: 20px; font-size: 13px; line-height: 1.7; color: var(--txt); } .rpVer { font-size: 12.5px; margin-top: 6px; line-height: 1.6; }
   @media (max-width: 559px) { .rpTiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rpTile b { font-size: 16px; } .rpBarR { grid-template-columns: 84px minmax(0, 1fr) 58px; } .rpRow { grid-template-columns: minmax(70px, 32%) minmax(0, 1fr) auto; font-size: 12px; } .rpStance { grid-template-columns: 1fr; gap: 4px; } }
+  /* v12.7 반론 검토 */
+  .rpCounter, .anCounter { border: 1px solid #f1c9c4; background: #fff7f6; border-radius: 14px; padding: 10px 14px; margin: 8px 0 12px; font-size: 13.5px; } .rpCounter p, .anCounter p { margin: 0 0 6px; line-height: 1.65; word-break: keep-all; } .rpCounter ul, .anCounter ul { margin: 4px 0 6px; padding-left: 18px; } .rpCounter li, .anCounter li { font-size: 12.5px; line-height: 1.5; } .rpCounter li small, .anCounter li small { color: var(--sub); margin-left: 4px; } .rpCounter a, .anCounter a { color: var(--txt); }
+  .rpGap { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; } .rpGap span { background: #fde8e6; color: #a93226; font-weight: 800; border-radius: 999px; padding: 3px 10px; font-size: 12.5px; } .rpGap span small { font-weight: 600; opacity: .75; } .rpFix { font-weight: 700; color: #7a4a1e; background: #fff3dd; border-radius: 8px; padding: 6px 10px; }
   /* v12.3 애널리스트 */
   .anGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } .anMod { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 10px 12px; text-align: left; cursor: pointer; min-width: 0; } .anMod.on { border-color: #c9a24f; background: #fff8e6; box-shadow: inset 0 0 0 1px #c9a24f; }
   .anNo { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; background: #5a3b16; color: #fff; font-weight: 900; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; } .anNo.big { width: 44px; height: 44px; font-size: 19px; }
@@ -2526,7 +2532,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.6<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · v12.7<div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -4200,6 +4206,7 @@ function pushPaneState(patch) {
    주소로 직접 들어와도 홈으로 돌아간다. 잠금 해제: 주소 끝에 ?owner 를 붙여 접속 → 운영자 키 입력. */
 var OWNER_TABS = ["brief", "channel", "onecard", "report", "analyst"];
 var OWNER = { token: (function () { try { return localStorage.getItem("sm.owner") || ""; } catch (e) { return ""; } })(), ok: false, want: null };
+OWNER.ok = !!OWNER.token;   // v12.7 저장된 토큰은 일단 믿고 운영자 화면을 바로 그린다(서버 확인이 끝나면 틀린 토큰은 즉시 해제). 홈이 먼저 보였다가 바뀌는 깜빡임 방지 — 데이터 자체는 서버가 토큰으로 다시 검사한다
 /* v10.8 운영자 = 기기에 토큰이 있고 + 이번 접속에서 서버가 그 토큰을 확인한 경우만 (기기 저장소를 고쳐도 열리지 않음) */
 function isOwner() { return typeof OWNER !== "undefined" && !!OWNER.token && OWNER.ok === true; }
 function ownerHeaders() { return OWNER.token ? { "x-owner": OWNER.token } : {}; }
@@ -4238,7 +4245,7 @@ applyOwnerUI();
   if (OWNER.token) fetch("/api/owner?t=" + encodeURIComponent(OWNER.token)).then(function (r) { return r.json(); }).then(function (j) {
     OWNER.checked = true;
     if (j && j.ok === true) { OWNER.ok = true; applyOwnerUI(); if (OWNER.want) { var w = OWNER.want; OWNER.want = null; switchTab(w); } }
-    else ownerSet("");
+    else { OWNER.ok = false; ownerSet(""); if (typeof currentTab !== "undefined" && OWNER_TABS.indexOf(currentTab) >= 0) switchTab("home"); }
   }).catch(function () { OWNER.checked = true; });
   // ?owner 로 들어오면 잠금 해제 창
   if (/[?&]owner\b/.test(location.search)) {
@@ -4896,12 +4903,28 @@ $("shareBtn").onclick = function () {
 
 // 다른 스크립트(compare.js/sim.js)가 전역을 정의한 뒤 해시를 적용해야 한다.
 // URL에 공유 해시가 있으면 그걸 쓰고, 없으면 이 기기에 저장된 세션을 되살린다.
-window.addEventListener("load", function () {
-  var urlHash = location.hash.replace(/^#/, "");
-  if (urlHash) { applyShareHash(); return; }
-  var saved = loadSession();
-  if (saved) applyShareHash(saved);
-});
+function smBootDone() { document.documentElement.classList.remove("smBoot"); }
+function smRestore() {
+  try {
+    var urlHash = location.hash.replace(/^#/, "");
+    if (urlHash) applyShareHash();
+    else { var saved = loadSession(); if (saved) applyShareHash(saved); }
+  } catch (e) { console.warn(e); }
+  smBootDone();
+}
+// 스크립트가 다 실행된 직후(DOMContentLoaded)에 되살린다 — 이미지·폰트·CDN을 기다리는 load 보다 훨씬 이르다. 실패해도 3초 뒤엔 반드시 보여 준다.
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", smRestore); else smRestore();
+setTimeout(smBootDone, 3000);
+// v12.7 돌아왔을 때 옛 화면이 남지 않게: 뒤로가기 캐시(bfcache)에서 되살아나거나, 30분 넘게 숨겨져 있던 뒤 다시 보이면 새로 연다(시세·기사가 그 사이 바뀌었을 수 있다)
+(function () {
+  var hiddenAt = 0;
+  window.addEventListener("pageshow", function (e) { if (e.persisted) location.reload(); });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 30 * 60e3 && !document.querySelector(".modalWrap:not(.hidden)") && !(typeof AN !== "undefined" && AN.busy)) { location.reload(); }
+    hiddenAt = 0;
+  });
+})();
 </script>
 <script src="metrics.js?v=9.5"></script>
 <script src="technical.js?v=9.5"></script>
@@ -4937,10 +4960,10 @@ window.addEventListener("load", function () {
 <script src="ipo.js?v=11.3.4"></script>
 <script src="macro.js?v=11.4"></script>
 <script src="rebal.js?v=12.2"></script>
-<script src="hub.js?v=12.2"></script>
-<script src="report.js?v=12.2"></script>
+<script src="hub.js?v=12.7"></script>
+<script src="report.js?v=12.7"></script>
 <script src="archive.js?v=12.6"></script>
-<script src="analyst.js?v=12.6"></script>
+<script src="analyst.js?v=12.7"></script>
 <script src="ui.js?v=11.7"></script>
 <script src="snapshot.js?v=12.2"></script>
 </body>

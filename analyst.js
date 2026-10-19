@@ -64,10 +64,11 @@ function anTech(rows) {
 }
 
 /* ============================================================ 데이터 준비 ============================================================ */
+function anNewsMap(L) { return (L || []).map(function (it) { return { t: typeof cNewsClean === "function" ? cNewsClean(it.title || "") : it.title, press: it.press || "", time: String(it.time || "").slice(0, 10), url: it.url || "", desc: typeof cNewsClean === "function" ? cNewsClean(it.desc || "") : it.desc || "" }; }).filter(function (x) { return x.t; }); }
 function anPrepStock(sym) {
   var ps = [typeof rpLoad === "function" ? rpLoad([sym]) : Promise.resolve(), typeof rpFund === "function" ? rpFund(sym) : Promise.resolve(null)];
-  if (typeof fetchNews === "function") ps.push(fetchNews({ type: "raw", q: anName(sym) + " 실적", size: 10 }).catch(function () { return []; }));
-  return Promise.all(ps).then(function (r) { return { rows: typeof rpRows === "function" ? rpRows(sym) : [], F: r[1], news: (r[2] || []).map(function (it) { return { t: typeof cNewsClean === "function" ? cNewsClean(it.title || "") : it.title, press: it.press || "", time: String(it.time || "").slice(0, 10), url: it.url || "", desc: typeof cNewsClean === "function" ? cNewsClean(it.desc || "") : it.desc || "" }; }).filter(function (x) { return x.t; }).slice(0, 6) }; });
+  if (typeof fetchNews === "function") { ps.push(fetchNews({ type: "raw", q: anName(sym) + " 실적", size: 10 }).catch(function () { return []; })); ps.push(Promise.all([fetchNews({ type: "raw", q: anName(sym) + " 우려 리스크 하향", size: 12 }).catch(function () { return []; }), fetchNews({ type: "raw", q: anName(sym) + " 상향 기대 호재", size: 12 }).catch(function () { return []; })]).then(function (a) { var seen = {}; return anNewsMap(a[0].concat(a[1])).filter(function (x) { var k = x.t.slice(0, 18); if (seen[k]) return false; seen[k] = 1; return true; }); })); }
+  return Promise.all(ps).then(function (r) { return { rows: typeof rpRows === "function" ? rpRows(sym) : [], F: r[1], opp: r[3] || [], news: (r[2] || []).map(function (it) { return { t: typeof cNewsClean === "function" ? cNewsClean(it.title || "") : it.title, press: it.press || "", time: String(it.time || "").slice(0, 10), url: it.url || "", desc: typeof cNewsClean === "function" ? cNewsClean(it.desc || "") : it.desc || "" }; }).filter(function (x) { return x.t; }).slice(0, 6) }; });
 }
 
 /* ============================================================ 01 기업 분석 ============================================================ */
@@ -284,10 +285,17 @@ function anRun() {
   if (m.need === "stock" && !AN.sym) { AN.out = null; renderAnalyst(); return; }
   AN.busy = true; AN.err = null; renderAnalyst();
   var p;
-  if (m.need === "stock") p = anPrepStock(AN.sym).then(function (D) { return ({ biz: anBiz, chart: anChart, earn: anEarn, fin: anFinancial })[m.id](AN.sym, D); });
+  if (m.need === "stock") p = anPrepStock(AN.sym).then(function (D) { var out = ({ biz: anBiz, chart: anChart, earn: anEarn, fin: anFinancial })[m.id](AN.sym, D); out.counter = anCounter(m, out, D.opp); return out; });
   else if (m.need === "pf") p = anPfData().then(function (P) { if (!P) throw new Error("'내 자산'에 보유 종목을 먼저 기록해 주세요"); return anPf(P); });
   else p = anMacroPrep().then(anMacro);
   p.then(function (out) { AN.out = out; AN.outKey = key; AN.step = 2; }).catch(function (e) { AN.err = e.message; AN.out = null; }).then(function () { AN.busy = false; renderAnalyst(); });
+}
+/* v12.7 반론 검토: 규칙 종합(또는 ✓/✗ 개수)으로 우리 결론을 정하고, 반대편 기사에서 빠진 주제를 찾는다 */
+function anCounter(m, out, opp) {
+  if (!opp || !opp.length || typeof hubClassify !== "function" || typeof hubCounter !== "function") return null;
+  var okN = out.ck.filter(function (c) { return c.st === "ok"; }).length, badN = out.ck.filter(function (c) { return c.st === "bad"; }).length, stance = okN > badN ? "up" : badN > okN ? "down" : "flat";
+  var cls = hubClassify(opp), exp = { bull: cls.bull, bear: cls.bear }, ours = out.rows.map(function (r) { return r.join(" "); }).concat(out.ck.map(function (c) { return c.t + " " + c.why; }), out.sum).join(" ");
+  var C = hubCounter(stance, exp, ours); if (C) C.stance = stance; return C;
 }
 function anLines(out) { var L = [], id = 0; (out.rows || []).forEach(function (r) { L.push({ id: "D" + (++id), text: r[0] + ": " + r[1] + (r[2] ? " (" + r[2] + ")" : "") }); }); (out.ck || []).forEach(function (c) { L.push({ id: "C" + (++id), text: "[" + ({ ok: "양호", mid: "보통", bad: "주의", na: "데이터 없음" })[c.st] + "] " + c.t + " — " + c.why }); }); return L; }
 /* 모든 모듈 데이터 한 번에 (종목 풀세트 · 전체) */
@@ -310,6 +318,8 @@ var AN_FORMAT = [
   "항목: 항목 이름 | 판정(✓ 또는 △ 또는 ✗) | 핵심 한 문장(50자 이하) | 근거 숫자(출처 포함, 60자 이하) | 초보용 의미(50자 이하)",
   "(항목 줄은 체크리스트 수만큼 반복)",
   "종합: 판정(✓/△/✗) | 3문장 이내 종합 평가",
+  "반론: 가장 강한 반대 근거 3개를 / 로 구분 (출처 포함)",
+  "보완: 반론을 반영해 고친 것 또는 추가로 확인한 것 한 줄",
   "리스크: a / b / c",
   "확인할 것: a / b / c",
   "변화: (과거 기록이 주어진 경우만) 유지 또는 상향 또는 하향 | 한 줄 이유",
@@ -320,7 +330,7 @@ function anPromptModule(m, out, opts) {
   var L = [];
   if (opts.ctx) { L.push(opts.ctx); L.push(""); }
   L.push(m.role + " " + m.prompt.replace(/\[기업명\/티커\]/g, name || "[기업명/티커]"));
-  L.push(""); L.push("아래 체크리스트 " + m.ck.length + "개를 항목마다 따로 답한 뒤, 마지막에 전체를 종합해 최종 판단을 내려줘."); m.ck.forEach(function (c, i) { L.push((i + 1) + ". " + c); });
+  L.push(""); L.push("아래 체크리스트 " + m.ck.length + "개를 항목마다 따로 답한 뒤, 내 결론에 반박하는 근거를 최소 3개 찾아 '반론' 문단을 쓰고(반대편 애널리스트·기사·숫자), 그 반론을 반영해 빠진 부분을 보완한 다음 최종 판단을 내려줘. 반론이 더 강하면 판단을 바꿔도 돼."); m.ck.forEach(function (c, i) { L.push((i + 1) + ". " + c); });
   if (out) { L.push(""); L.push("[내 앱(StockMind)이 계산한 데이터 — 이 숫자를 근거로 쓰고, '데이터 없음' 항목은 최신 공시·자료로 보완해줘. 숫자를 지어내지 말고 출처를 붙여줘.]"); anLines(out).forEach(function (l) { L.push("- " + l.text); }); }
   if (typeof arcCalibLines === "function" && AN.calib !== false) { var CL = arcCalibLines(m.id); if (CL.length) { L.push(""); CL.forEach(function (x) { L.push(x); }); } }
   if (!opts.noFormat) L.push(AN_FORMAT);
@@ -332,7 +342,7 @@ function anPromptFull(outs) {
   L.push("너는 글로벌 증권사의 리서치 팀장이다. " + name + "을(를) 네 가지 틀(기업 · 차트 · 실적 · 재무제표)로 차례로 분석하고, 마지막에 네 분석을 종합해 최종 투자 판단을 내려줘. 독자는 한국 개인투자자 초보. 숫자는 출처와 함께, 지어내지 말 것.");
   mods.forEach(function (m, i) { L.push(""); L.push("### " + m.no + " " + m.t + " — " + m.sub); L.push(m.prompt.replace(/\[기업명\/티커\]/g, name)); m.ck.forEach(function (c, k) { L.push("  " + (k + 1) + ") " + c); }); var o = outs && outs[m.id]; if (o) { L.push("  [앱 데이터]"); anLines(o).forEach(function (l) { L.push("  - " + l.text); }); } if (typeof arcCalibLines === "function" && AN.calib !== false) arcCalibLines(m.id).forEach(function (x) { L.push("  " + x); }); });
   if (outs && outs._ctx) { L.push(""); L.push(outs._ctx); }
-  L.push(""); L.push("### 최종 종합"); L.push("네 틀의 결과를 겹쳐서: 서로 같은 방향을 가리키는 것 / 엇갈리는 것 / 그래서 지금 어떤 행동(검토·관망·나눠서 등)이 맞는지 / 생각을 바꿀 조건 3개." + (outs && outs._ctx ? " 과거 기록이 있으면 '그때 대비 무엇이 달라졌고 판단을 어떻게 조정하는지'도." : ""));
+  L.push(""); L.push("### 최종 종합"); L.push("네 틀의 결과를 겹쳐서: 서로 같은 방향을 가리키는 것 / 엇갈리는 것 / 내 결론에 반박하는 가장 강한 근거 3개와 그에 대한 답 / 그래서 지금 어떤 행동(검토·관망·나눠서 등)이 맞는지 / 생각을 바꿀 조건 3개." + (outs && outs._ctx ? " 과거 기록이 있으면 '그때 대비 무엇이 달라졌고 판단을 어떻게 조정하는지'도." : ""));
   L.push(AN_FORMAT.replace("(항목 줄은 체크리스트 수만큼 반복)", "(항목 줄은 네 틀 각각 1줄 = 4줄: 이름은 '기업' '차트' '실적' '재무')"));
   return L.join("\n");
 }
@@ -353,7 +363,7 @@ function anCopy(text, btn) {
 function anAnsLoad() { return typeof arcItems === "function" ? arcItems() : []; }
 /* 카드형 블록 파싱 — 느슨하게: 줄 머리 키워드로 읽음 */
 function anParse(text) {
-  var t = String(text || "").replace(/\r/g, ""), P = { items: [], risks: [], watch: [], paras: [], srcs: "" };
+  var t = String(text || "").replace(/\r/g, ""), P = { items: [], risks: [], watch: [], paras: [], srcs: "", counter: [] };
   var cardIdx = t.search(/^\s*#{1,4}\s*카드형/m), narIdx = t.search(/^\s*#{1,4}\s*서술형/m);
   var nar = narIdx >= 0 ? t.slice(narIdx, cardIdx > narIdx ? cardIdx : undefined).replace(/^\s*#{1,4}\s*서술형\s*/m, "") : cardIdx > 0 ? t.slice(0, cardIdx) : t;
   var card = cardIdx >= 0 ? t.slice(cardIdx) : t;
@@ -369,6 +379,8 @@ function anParse(text) {
     else if ((m = l.match(/^확인(할\s*것)?\s*[:：]\s*(.+)/))) P.watch = m[2].split(/\s*\/\s*/).filter(Boolean);
     else if ((m = l.match(/^출처\s*[:：]\s*(.+)/))) P.srcs = m[1].trim();
     else if ((m = l.match(/^변화\s*[:：]\s*(.+)/))) P.change = m[1].trim();
+    else if ((m = l.match(/^반론\s*[:：]\s*(.+)/))) P.counter = m[1].split(/\s*\/\s*/).filter(Boolean);
+    else if ((m = l.match(/^보완\s*[:：]\s*(.+)/))) P.fix = m[1].trim();
   });
   P.ok = !!(P.items.length || P.verdict || P.paras.length);
   return P;
@@ -394,7 +406,7 @@ function anCardsFrom(it, kind) {
     var total = P.items.length + 3, pg = 1;
     P.items.forEach(function (x, i) { var c = nbNew(); pg++; nbTop(c, i + 1, [x.name + ":", "[[" + stTxt[x.st] + "]]", "", x.key], pg, total); nbBody(c, x.name, m.t + " 체크리스트 " + (i + 1) + "/" + P.items.length); hubSectionsFill(c, [x.key ? { h: "핵심", t: x.key } : null, x.num ? { h: "근거 숫자", t: x.num } : null, x.mean ? { h: "초보용 의미", t: x.mean } : null].filter(Boolean).length ? [x.key ? { h: "핵심", t: x.key } : null, x.num ? { h: "근거 숫자", t: x.num } : null, x.mean ? { h: "초보용 의미", t: x.mean } : null].filter(Boolean) : [{ h: "핵심", t: "-" }], null); nbFoot(c, foot); list.push({ name: String(x.name).replace(/\s/g, "").slice(0, 8), cv: c.cv }); });
     var c2 = nbNew(); pg++; nbTop(c2, P.items.length + 1, ["종합:", "[[" + (stTxt[P.verdictSt] || "판단") + "]]", "", P.one || ""], pg, total); nbBody(c2, "종합 평가", "항목 " + P.items.length + "개를 겹쳐 보면");
-    hubSectionsFill(c2, [{ h: "종합", t: P.verdict || "-" }, P.risks.length ? { h: "리스크", t: P.risks.join(" · ") } : null, P.watch.length ? { h: "확인할 것", t: P.watch.join(" · ") } : null].filter(Boolean), null); nbFoot(c2, foot); list.push({ name: "종합", cv: c2.cv });
+    hubSectionsFill(c2, [{ h: "종합", t: P.verdict || "-" }, P.counter && P.counter.length ? { h: "반론", t: P.counter.join(" · ") } : null, P.fix ? { h: "보완", t: P.fix } : null, P.risks.length ? { h: "리스크", t: P.risks.join(" · ") } : null, P.watch.length ? { h: "확인할 것", t: P.watch.join(" · ") } : null].filter(Boolean), null); nbFoot(c2, foot); list.push({ name: "종합", cv: c2.cv });
   } else {
     var paras = P.paras.length ? P.paras : [P.verdict || it.text.slice(0, 600)], pages = [], cur = [], len = 0;
     paras.forEach(function (p) { if (len + p.length > 420 && cur.length) { pages.push(cur); cur = []; len = 0; } cur.push(p); len += p.length; }); if (cur.length) pages.push(cur);
@@ -443,6 +455,7 @@ function renderAnalyst() {
     var CAL = typeof arcApplyCalib === "function" && AN.calib !== false ? arcApplyCalib(m.id, O.ck) : { ck: O.ck.map(function (c) { return Object.assign({}, c, { raw: c.st }); }), verdict: null, notes: [] }, vTxt = { ok: "양호 ✓", mid: "보통 △", bad: "주의 ✗" };
     h += '<div><div class="anSubH">평가 <small>양호 ' + okN + ' · 데이터 없음 ' + naN + ' · 규칙 기준' + (ARC_CAL.data && ARC_CAL.data.n ? ' · 보정 적용(검증 ' + ARC_CAL.data.n + '건)' : '') + '</small></div>' + (CAL.verdict ? '<div class="anRuleV ' + CAL.verdict + '">규칙 종합 <b>' + vTxt[CAL.verdict] + '</b><small>항목 가중 평균 ' + (CAL.v >= 0 ? "+" : "") + CAL.v.toFixed(2) + (CAL.notes.length ? ' · ' + anEsc(CAL.notes.join(" / ")) : '') + '</small></div>' : '') + '<div class="anCks one">' + CAL.ck.map(function (c) { var t = c.trust; return '<div class="anCk ' + c.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗", na: "—" })[c.st] + '</span><div><b>' + anEsc(c.t) + (t && t.grade !== "few" ? ' <em class="anTrust ' + t.grade + '">적중 ' + Math.round(t.acc * 100) + '% · ' + t.n + '건</em>' : '') + (c.raw !== c.st ? ' <em class="anTrust low">원래 ' + ({ ok: "✓", bad: "✗" })[c.raw] + '</em>' : '') + '</b><small>' + anEsc(c.why) + '</small></div></div>'; }).join("") + '</div>';
     h += '<div class="anSubH" style="margin-top:12px">정리 <small>규칙 기반 글</small></div><div class="anSum">' + O.sum.map(function (p) { return '<p>' + anEsc(p) + '</p>'; }).join("") + '</div></div></div>';
+    if (O.counter) { var CT = O.counter; h += '<div class="anCounter"><div class="anSubH">반론 검토 <small>우리 결론(' + ({ up: "긍정", down: "부정", flat: "중립" })[CT.stance] + ')과 반대쪽 기사 ' + CT.n + '건 · 우리가 안 다룬 주제 찾기</small></div><p>' + anEsc(CT.txt) + '</p>' + (CT.items.length ? '<ul>' + CT.items.map(function (x) { return '<li><a href="' + anEsc(x.url) + '" target="_blank" rel="noopener">' + anEsc(x.t) + '</a> <small>' + anEsc(x.press) + (x.time ? " · " + anEsc(x.time) : "") + '</small></li>'; }).join("") + '</ul>' : '') + (CT.gap.length ? '<div class="rpGap">' + CT.gap.map(function (g) { return '<span>' + anEsc(g.w) + (g.n > 1 ? ' <small>' + g.n + '건</small>' : '') + '</span>'; }).join("") + '</div>' : '') + (CT.fix ? '<p class="rpFix">' + anEsc(CT.fix) + '</p>' : '') + '</div>'; }
     if (lastRec && lastRec.snap && lastRec.snap.rows && lastRec.snap.rows.length) {
       var D = arcDiff(lastRec.snap.rows, O.rows), stT = { ok: "✓", mid: "△", bad: "✗" };
       h += '<div class="anDiff"><div class="anSubH">그때 vs 지금 <small>' + arcD(lastRec.at) + ' 기록(' + anEsc(lastRec.title) + ' · 종합 ' + (stT[lastRec.p && lastRec.p.verdictSt] || "-") + ') 대비 바뀐 숫자 ' + D.length + '개' + (lastRec.snap.price != null && m.need === "stock" && O && typeof rpRows === "function" && rpRows(AN.sym).length ? ' · 가격 ' + anPrice(AN.sym, lastRec.snap.price) + ' → ' + anPrice(AN.sym, rpRows(AN.sym)[rpRows(AN.sym).length - 1].c) + ' (' + anPct(rpRows(AN.sym)[rpRows(AN.sym).length - 1].c / lastRec.snap.price - 1, 1) + ')' : '') + '</small></div>' + (D.length ? '<table class="anT anTd">' + D.slice(0, 12).map(function (d) { return '<tr><th>' + anEsc(d.label) + '</th><td><small>' + anEsc(d.from) + '</small><b class="' + (d.dir > 0 ? "pos" : d.dir < 0 ? "neg" : "") + '">→ ' + anEsc(d.to) + '</b></td></tr>'; }).join("") + '</table>' : '<div class="briefDim">같은 항목의 숫자가 그대로예요.</div>') + '</div>';
@@ -461,7 +474,7 @@ function renderAnalyst() {
   h += '</section>';
   // ⑤ 카드
   h += '<section class="anSec' + (cur ? '' : ' dim') + '"><div class="mkStep"><b>5</b> 카드 만들기 <small class="briefDim">' + (cur ? '선택한 답변: ' + anEsc(cur.title) : '저장된 답변을 고르면 만들 수 있어요') + '</small></div>';
-  if (cur) { var PP = cur.text ? anParse(cur.text) : Object.assign({ items: [], risks: [], watch: [], paras: [] }, cur.p || {}); if (!cur.text) arcText(cur.id).then(function (t) { if (t) renderAnalyst(); }); h += '<div class="anPrev">' + (PP.one ? '<div class="anPrevOne">' + anEsc(PP.one) + '</div>' : '') + (PP.items.length ? '<div class="anCks">' + PP.items.map(function (x) { return '<div class="anCk ' + x.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗" })[x.st] + '</span><div><b>' + anEsc(x.name) + '</b><small>' + anEsc(x.key) + (x.num ? ' · ' + anEsc(x.num) : '') + '</small></div></div>'; }).join("") + '</div>' : '<div class="briefDim">카드형 블록을 찾지 못했어요 — 서술형 카드만 만들 수 있어요. (답변에 "## 카드형" 블록이 있는지 확인)</div>') + (PP.verdict ? '<div class="anSum" style="margin-top:8px"><p><b>종합</b> ' + anEsc(PP.verdict) + '</p>' + (PP.risks.length ? '<p><b>리스크</b> ' + PP.risks.map(anEsc).join(" · ") + '</p>' : '') + (PP.watch.length ? '<p><b>확인할 것</b> ' + PP.watch.map(anEsc).join(" · ") + '</p>' : '') + '</div>' : '') + '</div>';
+  if (cur) { var PP = cur.text ? anParse(cur.text) : Object.assign({ items: [], risks: [], watch: [], paras: [] }, cur.p || {}); if (!cur.text) arcText(cur.id).then(function (t) { if (t) renderAnalyst(); }); h += '<div class="anPrev">' + (PP.one ? '<div class="anPrevOne">' + anEsc(PP.one) + '</div>' : '') + (PP.items.length ? '<div class="anCks">' + PP.items.map(function (x) { return '<div class="anCk ' + x.st + '"><span class="anSt">' + ({ ok: "✓", mid: "△", bad: "✗" })[x.st] + '</span><div><b>' + anEsc(x.name) + '</b><small>' + anEsc(x.key) + (x.num ? ' · ' + anEsc(x.num) : '') + '</small></div></div>'; }).join("") + '</div>' : '<div class="briefDim">카드형 블록을 찾지 못했어요 — 서술형 카드만 만들 수 있어요. (답변에 "## 카드형" 블록이 있는지 확인)</div>') + (PP.verdict ? '<div class="anSum" style="margin-top:8px"><p><b>종합</b> ' + anEsc(PP.verdict) + '</p>' + (PP.counter && PP.counter.length ? '<p><b>반론</b> ' + PP.counter.map(anEsc).join(" · ") + '</p>' : '') + (PP.fix ? '<p><b>보완</b> ' + anEsc(PP.fix) + '</p>' : '') + (PP.risks.length ? '<p><b>리스크</b> ' + PP.risks.map(anEsc).join(" · ") + '</p>' : '') + (PP.watch.length ? '<p><b>확인할 것</b> ' + PP.watch.map(anEsc).join(" · ") + '</p>' : '') + '</div>' : '') + '</div>';
     h += '<div class="anActs"><button class="wbAct" data-ancard="narr"><b>서술형 카드</b><small>표지 + 읽는 글 ' + Math.max(1, Math.ceil(PP.paras.join("").length / 420)) + '장 + 마무리</small></button><button class="wbAct" data-ancard="card"' + (PP.items.length ? '' : ' disabled') + '><b>카드형</b><small>표지 + 항목 ' + PP.items.length + '장 + 종합 + 마무리</small></button></div>'; }
   h += '</section>';
   // ⑥ 분석 자산

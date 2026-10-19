@@ -216,6 +216,22 @@ function rpExpertFetch(rp) {
     return { n: items.length, bull: bull.slice(0, 6), bear: bear.slice(0, 6), mixed: mixed.slice(0, 4), tp: tp.length ? { n: tp.length, med: rpMed(tp), lo: Math.min.apply(null, tp), hi: Math.max.apply(null, tp) } : null, src: "네이버 뉴스 검색 · 최근 기사 " + items.length + "건", at: new Date().toISOString() };
   });
 }
+/* v12.7 반론 검토: 우리 결론과 반대편 기사 → 우리가 다루지 않은 주제 → 보완 */
+function rpCounter(rp) {
+  if (!rp.exp || typeof hubCounter !== "function") return null;
+  var stance = rp.view.score >= 2 ? "up" : rp.view.score <= 0 ? "down" : "flat";
+  var ours = [rp.title].concat(rp.situation, rp.exhibits.map(function (e) { return e.title + " " + e.sub + " " + e.read; }), [rp.view.txt], rp.view.plan, rp.watch, rp.hz ? [rp.hz.s.txt, rp.hz.l.txt] : []).join(" ");
+  var C = hubCounter(stance, rp.exp, ours); if (C) C.stance = stance; return C;
+}
+function rpCounterHtml(C) {
+  if (!C) return "";
+  var h = '<div class="mkStep"><b>R</b>반론 검토 <small class="briefDim">우리 결론(' + ({ up: "긍정", down: "부정", flat: "중립" })[C.stance] + ')과 반대쪽 기사를 먼저 읽고, 우리 글이 빠뜨린 주제를 찾아요</small></div><div class="rpCounter">';
+  h += '<p>' + rpEsc(C.txt) + '</p>';
+  if (C.items.length) h += '<ul>' + C.items.map(function (x) { var g = typeof hubGap === "function" ? hubGap([x], "", 3) : []; return '<li><a href="' + rpEsc(x.url) + '" target="_blank" rel="noopener">' + rpEsc(x.t) + '</a><small>' + rpEsc(x.press) + (x.time ? " · " + rpEsc(String(x.time).slice(0, 10)) : "") + '</small></li>'; }).join("") + '</ul>';
+  if (C.gap.length) h += '<div class="rpGap">' + C.gap.map(function (g) { return '<span>' + rpEsc(g.w) + (g.n > 1 ? ' <small>' + g.n + '건</small>' : '') + '</span>'; }).join("") + '</div>';
+  if (C.fix) h += '<p class="rpFix">' + rpEsc(C.fix) + '</p>';
+  return h + '</div>';
+}
 function rpExpertHtml(E) {
   var tot = E.bull.length + E.bear.length, bp = tot ? Math.round(E.bull.length / tot * 100) : 50;
   function li(x, cls) { return '<li class="' + cls + '"><a href="' + rpEsc(x.url) + '" target="_blank" rel="noopener">' + rpEsc(x.t) + '</a><small>' + rpEsc(x.press) + (x.time ? " · " + rpEsc(String(x.time).slice(0, 10)) : "") + '</small></li>'; }
@@ -357,7 +373,7 @@ function rpThreadSeries(rp) {
   var L = [], n = 0, NR = null; try { NR = rpNarrative(rp); } catch (e) {}
   var plain = function (t) { return String(t || "").replace(/\s?\[E\d+\]/g, ""); };
   L.push(rp.title + "\n\n" + (NR ? plain(NR.one) : rp.situation.join("\n")) + "\n\n아래에 번호로 이어 씁니다.");
-  if (NR) { L.push((++n) + ". 숫자가 말하는 것\n" + plain(NR.numbers)); L.push((++n) + ". 숫자 뒤의 속사정\n" + plain(NR.story)); L.push((++n) + ". 양쪽 의견을 겹쳐 보면\n" + plain(NR.both)); L.push((++n) + ". 그래서\n" + plain(NR.so)); L.push((++n) + ". 아래는 근거 하나씩."); }
+  if (NR) { L.push((++n) + ". 숫자가 말하는 것\n" + plain(NR.numbers)); L.push((++n) + ". 숫자 뒤의 속사정\n" + plain(NR.story)); L.push((++n) + ". 양쪽 의견을 겹쳐 보면\n" + plain(NR.both)); if (rp.counter && rp.counter.n) L.push((++n) + ". 반론 검토\n" + rp.counter.txt + (rp.counter.fix ? "\n" + rp.counter.fix : "")); L.push((++n) + ". 그래서\n" + plain(NR.so)); L.push((++n) + ". 아래는 근거 하나씩."); }
   rp.exhibits.forEach(function (e) { L.push((++n) + ". " + e.title + "\n" + e.read.replace(/\s+/g, " ")); });
   if (rp.scen.length) L.push((++n) + ". 앞으로 1년, 과거 빈도로 보면\n" + rp.scen.map(function (s) { return s.name + " " + Math.round(s.p * 100) + "% (" + s.range + ")"; }).join("\n"));
   if (rp.hz) { L.push((++n) + ". 짧게 보면 — " + rp.hz.s.stance + "\n" + rp.hz.s.txt); L.push((++n) + ". 길게 보면 — " + rp.hz.l.stance + "\n" + rp.hz.l.txt); }
@@ -378,6 +394,7 @@ function rpCaption(rp) {
 function rpAiLines(rp) {
   var L = [], id = 0; function add(t) { L.push({ id: "F" + (++id), text: t }); }
   rp.situation.forEach(add); rp.exhibits.forEach(function (e) { add("Exhibit " + e.no + " " + e.title + " · " + e.sub); add("핵심값 " + e.big); add(e.read); (e.kind === "rows" ? e.data.map(function (r) { return r.slice(0, 3).join(" · "); }) : e.kind === "tiles" ? e.data.map(function (t) { return t.l + " " + t.v; }) : e.data.map(function (b) { return b.l + " " + (b.txt || rpPct(b.v, 1)); })).forEach(add); });
+  if (rp.counter) { add("반론 검토: " + rp.counter.txt); if (rp.counter.fix) add(rp.counter.fix); }
   if (rp.exp) { rp.exp.bull.forEach(function (x) { add("상승 근거 기사: " + x.t + " (" + x.press + ")"); }); rp.exp.bear.forEach(function (x) { add("하락 근거 기사: " + x.t + " (" + x.press + ")"); }); if (rp.exp.tp) add("기사 목표주가 중앙값 " + rpNum(rp.exp.tp.med) + "원 (" + rp.exp.tp.n + "건)"); }
   if (rp.hz) { add("단기 해석: " + rp.hz.s.stance + " — " + rp.hz.s.txt); add("장기 해석: " + rp.hz.l.stance + " — " + rp.hz.l.txt); }
   rp.scen.forEach(function (s) { add("시나리오 " + s.name + " " + Math.round(s.p * 100) + "% " + s.range + " " + s.txt); }); add("규칙 의견: " + rp.view.stance + " — " + rp.view.txt); rp.view.why.forEach(function (w) { add("근거 " + w); });
@@ -444,7 +461,7 @@ function rpShow(pane, rp) {
   else if (NR) h += rpNarrativeHtml(NR, rp);
   h += '<div class="rpStance ' + (rp.view.score >= 3 ? "good" : rp.view.score >= 1 ? "mid" : "low") + '"><div class="rpStL">내 생각</div><div><b>' + rpEsc(rp.view.stance) + '</b><div class="rpStT">' + rpEsc(V && V.opinion || rp.view.txt) + '</div><div class="rpWhy">근거: ' + rpEsc(rp.view.why.join(" · ")) + '</div></div></div>';
   if (rp.hz) h += '<div class="rpHz">' + [rp.hz.s, rp.hz.l].map(function (z) { return '<div class="rpHzC"><div class="rpHzL">' + rpEsc(z.label) + '</div><b>' + rpEsc(z.stance) + '</b><div class="rpHzT">' + rpEsc(z.txt) + '</div><ul>' + z.pts.map(function (x) { return '<li>' + rpEsc(x) + '</li>'; }).join("") + '</ul></div>'; }).join("") + '</div>';
-  if (rp.exp) h += rpExpertHtml(rp.exp);
+  if (rp.exp) { h += rpExpertHtml(rp.exp); var CT = rpCounter(rp); if (CT) { rp.counter = CT; h += rpCounterHtml(CT); } }
   h += '<div class="mkStep"><b>1</b>증거 <small class="briefDim">Exhibit ' + rp.exhibits.length + '개 · 모두 앱 데이터 계산값</small></div>' + rp.exhibits.map(rpExhibitHtml).join("");
   if (V && V.interpretation && V.interpretation.length) h += '<div class="rpAiBox"><b>AI 해석</b><ul>' + V.interpretation.map(function (x) { return '<li>' + rpEsc(x) + '</li>'; }).join("") + '</ul></div>';
   if (rp.scen.length) h += '<div class="mkStep"><b>2</b>앞으로 1년 <small class="briefDim">과거 비슷한 상황의 결과 분포 — 예측이 아니라 빈도</small></div><div class="rpScen">' + rp.scen.map(function (s) { return '<div class="rpScR"><span class="rpScP">' + Math.round(s.p * 100) + '%</span><div><b>' + rpEsc(s.name) + ' <small>' + rpEsc(s.range) + '</small></b><div class="briefDim">' + rpEsc(V && V.forecast && V.forecast[s.name] || s.txt) + '</div></div><span class="rpScBar"><i style="width:' + Math.round(s.p * 100) + '%"></i></span></div>'; }).join("") + '</div>';
