@@ -695,11 +695,14 @@ function hubSpecFacts(spec) {
 function hubOneCard(sp) {
   if (HUB.oneBrief && !sp.brief) { sp.brief = HUB.oneBrief; if (HUB.oneBrief.head && !sp.head2) sp.head2 = HUB.oneBrief.head; }
   var meta = { title: sp.title, sub: sp.sub || "", source: sp.src || (cDate(Date.now()) + " 기준 · StockMind 자동 집계"), catName: "한 장 요약", cat: "table" };
-  var c = tplNew(meta), g = c.g, P = TPL.P, W = TPL.W - P * 2, F = (sp.facts || []).slice(0, 14), y = c.y;
+  var reel = TPL.H > 1500, c = tplNew(meta), g = c.g, P = TPL.P, W = TPL.W - P * 2, F = (sp.facts || []).slice(0, reel ? 22 : 14), y = c.y;   // v12.23 릴스형: 숫자를 더 담는다
   if (sp.head2) { var hs = 30, nl = Math.min(2, cWrapCount(g, sp.head2, W - 40, hs, 800)), hh = nl * 40 + 34; cRound(g, P, y, W, hh, 12, TPL_C.black); cWrap(g, sp.head2, P + 20, y + 48, W - 40, hs, 800, TPL_C.gold, 40, 2); y += hh + 14; }
   var longV = F.some(function (f) { return String(f.value).length > 12; }), two = F.length > 6 && !longV, cols = two ? 2 : 1, rowsN = Math.ceil(F.length / cols) || 1;
-  var B = sp.brief && (sp.brief.issue.length || sp.brief.exp) ? sp.brief : null, bh = B ? 150 : 0;   // v12.1 아래 '요즘 이슈 · 전문가' 띠
-  var avail = TPL.H - TPL.FOOT - 22 - y - bh, rh = Math.max(56, Math.min(Math.round((two ? 230 : 200) * TPL.H / 1350), Math.floor(avail / rowsN))), cw = (W - (cols - 1) * 14) / cols;
+  var B = sp.brief && (sp.brief.issue.length || sp.brief.exp) ? sp.brief : null, bh = B ? (reel ? 260 : 150) : 0;   // v12.1 아래 '요즘 이슈 · 전문가' 띠 (릴스형은 기사·의견을 더)
+  // v12.23 먼저 게시형 칸 높이로 담고, 숫자가 모자라 자리가 남을 때만 칸을 키운다
+  var avail = TPL.H - TPL.FOOT - 22 - y - bh, capPost = two ? 230 : 200, rh = Math.max(56, Math.min(capPost, Math.floor(avail / rowsN)));
+  if (rh * rowsN < avail - 20) rh = Math.max(56, Math.min(Math.round(capPost * TPL.H / 1350), Math.floor(avail / rowsN)));
+  var cw = (W - (cols - 1) * 14) / cols;
   if (rh * rowsN > avail) { F = F.slice(0, Math.floor(avail / rh) * cols); rowsN = Math.ceil(F.length / cols); }
   F.forEach(function (f, i) {
     var col = i % cols, row = Math.floor(i / cols), x = P + col * (cw + 14), yy = y + row * rh, h = rh - 10, v = String(f.value);
@@ -1027,7 +1030,7 @@ function hubSectionsFill(c, secs, after) {
 /* 한 장(종이 양식) 아래 띠: 요즘 이슈 한 줄 + 전문가 한 줄 */
 function hubBriefStrip(c, B, y, h) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2; cRound(g, P, y, W, h, 12, TPL_C.black);
-  var lines = []; if (B.issue.length) lines.push(["요즘 이슈", B.issue[0].t + " (" + (B.issue[0].press || "기사") + ")"]); if (B.expLine) lines.push(["전문가는", B.expLine.split(" — ")[0] + (B.expLine.indexOf(" — ") > 0 ? " — " + B.expLine.split(" — ")[1].split(". ")[0] : "")]); if (!lines.length) lines.push(["그래서", B.so]);
+  var lines = []; if (B.issue.length) lines.push(["요즘 이슈", B.issue[0].t + " (" + (B.issue[0].press || "기사") + ")"]); if (h > 200 && B.issue[1]) lines.push(["", B.issue[1].t + " (" + (B.issue[1].press || "기사") + ")"]); if (B.expLine) lines.push(["전문가는", B.expLine.split(" — ")[0] + (B.expLine.indexOf(" — ") > 0 ? " — " + B.expLine.split(" — ")[1].split(". ")[0] : "")]); if (h > 200 && B.gapLine) lines.push(["빠진 시각", B.gapLine]); if (!lines.length) lines.push(["그래서", B.so]);
   var yy = y + 20, lh = (h - 24) / lines.length;
   lines.forEach(function (l) { cText(g, l[0], P + 22, yy + 26, 18, 800, TPL_C.gold); var fs = 22; while (fs > 15 && cWrapCount(g, l[1], W - 170, fs, 600) > (lh > 70 ? 2 : 1)) fs -= 1; cWrap(g, l[1], P + 126, yy + 27, W - 150, fs, 600, "#f3efe6", fs * 1.3, lh > 70 ? 2 : 1); yy += lh; });
 }

@@ -72,6 +72,7 @@ function tplFoot(c, note) {
   cText(g, brand, TPL.W - P, y0 + F / 2 + 9, 22, 900, TPL_C.gold, "right");
   return c.cv;
 }
+function tplN(a, b) { return TPL.H > 1500 ? b : a; }   // v12.23 릴스형이면 더 많은 항목(내용 추가 우선)
 function tplK() { return TPL.H / 1350; }   // v12.22 릴스형(1920)이면 1.42 — 고정 높이 칸을 이 배율로 늘린다
 function tplBox(g, x, y, w, h, r, fill, lw, stroke) { cRound(g, x, y, w, h, r, fill || "#ffffff"); g.strokeStyle = stroke || TPL_C.ink; g.lineWidth = lw || 3; g.stroke(); }
 function tplCol(v) { return /^[-▼]/.test(String(v)) ? TPL_C.blue : /^[+▲]/.test(String(v)) ? TPL_C.red : TPL_C.ink; }
@@ -83,7 +84,9 @@ function tplMarket(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y;
   var pv = function (t) { var m = String(t || "").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) * (/^[-▼]/.test(String(t)) ? -1 : 1) : 0; };
   // ① 지수 2줄
-  var K = 1 + (tplK() - 1) * 1.4, ix = (s.indexes || []).slice(0, 2), rh = Math.round(104 * K);
+  var nIx = Math.min(2, (s.indexes || []).length), nFt = Math.min(tplN(3, 5), (s.features || []).length), nCh = Math.min(tplN(8, 12), (s.chips || []).length);
+  var used = nIx * 104 + 24 + 40 + nFt * 96 + 26 + 40 + Math.ceil(nCh / 4) * 100 + 10 + (s.foot ? 90 : 0), room = TPL.H - TPL.FOOT - 20 - y;
+  var K = Math.max(1, Math.min(1.6, room / Math.max(1, used))), ix = (s.indexes || []).slice(0, 2), rh = Math.round(104 * K);
   ix.forEach(function (it, i) {
     var yy = y + i * rh + (rh - 104) / 2, col = tplCol(it.pct);
     cText(g, it.name, P, yy + 62, 34, 900, TPL_C.ink);
@@ -95,7 +98,7 @@ function tplMarket(c, s) {
   });
   y += ix.length * rh + Math.round(24 * K);
   // ② 주요 움직임 3개 — 가로 막대 (길이 = |등락|, 색 = 방향)
-  var ft = (s.features || []).slice(0, 3), mx = Math.max.apply(null, ft.map(function (f) { return Math.abs(pv(f.pct)); }).concat([0.01]));
+  var ft = (s.features || []).slice(0, tplN(3, 5)), mx = Math.max.apply(null, ft.map(function (f) { return Math.abs(pv(f.pct)); }).concat([0.01]));
   cText(g, "오늘 가장 크게 움직인 종목", P, y + 24, 22, 800, TPL_C.sub); y += 40;
   var fh = Math.round(96 * K), lw = 260, bwMax = W - lw - 170;
   ft.forEach(function (f, i) {
@@ -106,7 +109,7 @@ function tplMarket(c, s) {
   });
   y += ft.length * fh + Math.round(26 * K);
   // ③ 관심 8개 — 2×4 타일 (이름 왼쪽 · 등락 오른쪽)
-  var ch = (s.chips || []).slice(0, 8), cols = 4, gap = 12, tw = (W - gap * (cols - 1)) / cols, th = Math.round(88 * K);
+  var ch = (s.chips || []).slice(0, tplN(8, 12)), cols = 4, gap = 12, tw = (W - gap * (cols - 1)) / cols, th = Math.round(88 * K);
   cText(g, "그 밖의 관심 종목", P, y + 24, 22, 800, TPL_C.sub); y += 40;
   ch.forEach(function (k, i) {
     var x = P + (i % cols) * (tw + gap), yy = y + Math.floor(i / cols) * (th + gap), col = tplCol(k.pct);
@@ -119,8 +122,8 @@ function tplMarket(c, s) {
 }
 /* ---------- ② 순위 12칸: {items:[{rank,tag,name,value,sub}]} ---------- */
 function tplRank(c, s) {
-  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, items = (s.items || []).slice(0, 12), n = items.length;
-  var cols = n <= 3 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = (TPL.H - 74 - y - gap * (rows - 1)) / rows;   // v12.22 3개 이하는 가로로 긴 칸, 높이는 남은 만큼(빈 칸 없이)
+  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, items = (s.items || []).slice(0, tplN(12, 16)), n = items.length;
+  var cols = n <= 3 ? 1 : n <= 4 ? 2 : (n % 3 === 0 && n <= 9) ? 3 : n <= 8 ? 2 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = (TPL.H - 74 - y - gap * (rows - 1)) / rows;   // v12.22 3개 이하는 가로로 긴 칸, 높이는 남은 만큼(빈 칸 없이)
   if (cols === 1) {   // v12.22 3개 이하: 가로 한 줄 — 왼쪽 큰 순위 · 가운데 이름(+부가) · 오른쪽 큰 값
     var y0 = y + Math.max(0, ((TPL.H - 74 - y) - (bh * n + gap * (n - 1))) / 2);
     items.forEach(function (it, i) {
@@ -148,8 +151,8 @@ function tplRank(c, s) {
 }
 /* ---------- ③ 표: {cols:[..], rows:[[..]], badges:[문자열] (왼쪽 세로 파란 칸·선택), hlCols:[열 index] } ---------- */
 function tplTable(c, s) {
-  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, cols = s.cols || [], rows = (s.rows || []).slice(0, 10), n = cols.length;
-  var bx = s.badges && s.badges.length ? 120 : 0, tw = W - bx, ws = s.widths || cols.map(function (_, i) { return i === 0 ? 0.34 : 0.66 / Math.max(1, n - 1); }), hh = 60, rh = Math.min(rows.length <= 3 ? 240 : 170, (TPL.H - 84 - y - hh - (s.note ? 50 : 0)) / Math.max(1, rows.length));   // v11.6 행이 적으면 키워서 빈 곳 없이
+  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, cols = s.cols || [], rows = (s.rows || []).slice(0, tplN(10, 14)), n = cols.length;
+  var bx = s.badges && s.badges.length ? 120 : 0, tw = W - bx, ws = s.widths || cols.map(function (_, i) { return i === 0 ? 0.34 : 0.66 / Math.max(1, n - 1); }), hh = 60, rh = Math.min((rows.length <= 3 ? 240 : 170) * (rows.length < tplN(10, 14) ? tplK() : 1), (TPL.H - 84 - y - hh - (s.note ? 50 : 0)) / Math.max(1, rows.length));   // v11.6 행이 적으면 키워서 빈 곳 없이
   var xs = [P + bx]; ws.forEach(function (w) { xs.push(xs[xs.length - 1] + w * tw); });
   cRound(g, P + bx, y, tw, hh, 0, TPL_C.black);
   cols.forEach(function (h, i) { cText(g, cFit(g, h, xs[i + 1] - xs[i] - 12, 28, 900), (xs[i] + xs[i + 1]) / 2, y + hh / 2 + 10, 28, 900, TPL_C.gold, "center"); });
@@ -173,12 +176,12 @@ function tplTable(c, s) {
 /* ---------- ④ 그때·지금 v12.19 (고유 배치): 행마다 '기울기 선' — 왼쪽 점(그때 값) → 오른쪽 점(지금 값), 오르면 선이 올라가고 내리면 내려간다. 변화율은 선 위 알약
    {aLabel,bLabel,aSub,bSub, rows:[{badge,name,sub,a,aDate,b,bDate,pct}] ≤4} ---------- */
 function tplCompare(c, s) {
-  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, rows = (s.rows || []).slice(0, 4);
+  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, rows = (s.rows || []).slice(0, tplN(4, 6));
   var lw = 290, x1 = P + lw + 40, x2 = P + W - 40;
   // 머리: 그때 · 지금 (선 양 끝 위)
   cText(g, s.aLabel || "그때", x1, y + 36, 30, 900, TPL_C.sub, "center"); cText(g, s.bLabel || "지금", x2, y + 36, 30, 900, TPL_C.gold2, "center");
   if (s.aSub) cText(g, s.aSub, x1, y + 62, 18, 600, TPL_C.sub, "center"); if (s.bSub) cText(g, s.bSub, x2, y + 62, 18, 600, TPL_C.sub, "center");
-  y += 84; var rh = Math.min(290, (TPL.H - 84 - y) / Math.max(1, rows.length));
+  y += 84; var rh = Math.min(290 * (rows.length < tplN(4, 6) ? tplK() : 1), (TPL.H - 84 - y) / Math.max(1, rows.length));
   rows.forEach(function (r, i) {
     var yy = y + i * rh, up = !/^-/.test(String(r.pct || "")), col = r.pct ? (up ? TPL_C.red : TPL_C.blue) : TPL_C.ink;
     if (i % 2 === 0) { g.fillStyle = "rgba(20,22,28,0.035)"; g.fillRect(P - 10, yy, W + 20, rh); }
@@ -213,7 +216,7 @@ function tplQuote(c, s) {
   var facts = (s.person && s.person.facts || []).slice(0, 6), fy = py + 250, fw = (lw - 14) / 2, fh = Math.round(120 * tplK());
   facts.forEach(function (f, i) { var x = P + (i % 2) * (fw + 14), yy = fy + Math.floor(i / 2) * (fh + 14); tplBox(g, x, yy, fw, fh, 10); var vs = 36; while (vs > 20 && cW(g, f[1], vs, 900) > fw - 20) vs -= 2; cText(g, f[1], x + fw / 2, yy + 58, vs, 900, TPL_C.ink, "center"); cText(g, cFit(g, f[0], fw - 16, 19, 700), x + fw / 2, yy + 96, 19, 700, TPL_C.sub, "center"); });
   // 오른쪽 요지
-  var rx = P + lw + 40, rw = W - lw - 40, ry = py + 10, paras = (s.paras || []).slice(0, 3), avail = TPL.H - 94 - ry;
+  var rx = P + lw + 40, rw = W - lw - 40, ry = py + 10, paras = (s.paras || []).slice(0, tplN(3, 5)), avail = TPL.H - 94 - ry;
   var fs = 34, lh = 50;
   function total() { var n = 0; paras.forEach(function (p) { n += cWrapCount(g, p, rw, fs, 700); }); return n * lh + (paras.length - 1) * 40; }
   while (total() > avail && fs > 22) { fs -= 2; lh = Math.round(fs * 1.5); }
@@ -224,11 +227,11 @@ function tplQuote(c, s) {
 }
 /* ---------- ⑥ 날짜별 정리: {blocks:[{date:"2026\n6.27", title, items:[문장 with [[형광]]]}] ≤4} ---------- */
 function tplTimeline(c, s) {
-  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, blocks = (s.blocks || []).slice(0, 4), gap = 14;
+  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, blocks = (s.blocks || []).slice(0, tplN(4, 5)), gap = 14;
   var totalItems = blocks.reduce(function (a, b) { return a + Math.min(6, (b.items || []).length); }, 0);
   var avail = TPL.H - 84 - y - gap * (blocks.length - 1), headH = 60, ih = Math.max(34, Math.min(110, (avail - blocks.length * (headH + 24)) / Math.max(1, totalItems)));
   blocks.forEach(function (b) {
-    var items = (b.items || []).slice(0, 6), h = headH + 24 + items.length * ih, dw = 140;
+    var items = (b.items || []).slice(0, tplN(6, 8)), h = headH + 24 + items.length * ih, dw = 140;
     tplBox(g, P, y, W, h, 10, "#ffffff", 3); cRound(g, P, y, dw, h, 10, TPL_C.black); g.fillStyle = TPL_C.gold2; g.fillRect(P + dw - 4, y, 4, h);
     var dl = String(b.date || "").split("\n"); dl.forEach(function (d, i) { cText(g, d, P + dw / 2, y + h / 2 - (dl.length - 1) * 20 + i * 40 + 12, dl.length > 1 && i === 0 ? 26 : 34, 900, i === dl.length - 1 ? TPL_C.gold : "#ffffff", "center"); });
     tplBand(g, P + dw + 16, y + 10, W - dw - 32, headH - 16, b.title || "", 28, TPL_C.box, TPL_C.ink); g.strokeStyle = TPL_C.ink; g.lineWidth = 3; g.strokeRect(P + dw + 16, y + 10, W - dw - 32, headH - 16);
@@ -245,8 +248,8 @@ function tplTimeline(c, s) {
 }
 /* ---------- ⑦ 숫자 12칸: {boxes:[{label, value, unit}] ≤12, note} ---------- */
 function tplGrid(c, s) {
-  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, boxes = (s.boxes || []).slice(0, 12), n = boxes.length;
-  var cols = n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(330 * tplK(), (TPL.H - 104 - y - gap * (rows - 1)) / rows);
+  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, boxes = (s.boxes || []).slice(0, tplN(12, 16)), n = boxes.length;
+  var cols = n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(330 * (n < tplN(12, 16) ? tplK() : 1), (TPL.H - 104 - y - gap * (rows - 1)) / rows);
   if (s.lead) { cWrap(g, s.lead, P, y + 30, W, 28, 800, TPL_C.ink, 36, 2); y += 76; bh = Math.min(bh, (TPL.H - 104 - y - gap * (rows - 1)) / rows); }
   boxes.forEach(function (b, i) {
     var x = P + (i % cols) * (bw + gap), yy = y + Math.floor(i / cols) * (bh + gap);
@@ -261,8 +264,8 @@ function tplGrid(c, s) {
 }
 /* ---------- ⑧ 한 줄 상식: {rows:[{icon,left,right,sub}] ≤7, punch:{left,right}, closing} ---------- */
 function tplLines(c, s) {
-  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, rows = (s.rows || []).slice(0, 7);
-  var punchH = s.punch ? 110 : 0, closeH = s.closing ? 90 : 0, rh = Math.min(170, (TPL.H - 94 - y - punchH - closeH - 30) / Math.max(1, rows.length));
+  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, rows = (s.rows || []).slice(0, tplN(7, 10));
+  var punchH = s.punch ? 110 : 0, closeH = s.closing ? 90 : 0, rh = Math.min(170 * (rows.length < tplN(7, 10) ? tplK() : 1), (TPL.H - 94 - y - punchH - closeH - 30) / Math.max(1, rows.length));
   tplBox(g, P, y, W, rows.length * rh + 20, 18);
   rows.forEach(function (r, i) {
     var yy = y + 10 + i * rh, mid = yy + rh / 2;
@@ -347,9 +350,9 @@ function tplSpec(cat, srcId, mkSel) {
   function r1(s) { return s.ret1 != null ? s.ret1 : s.ret; }
   if (cat === "market") {
     var ix = R.indexRow.slice(0, 2).map(function (i) { var st = tplStat(i.sym); var chg = st ? st.last - st.last / (1 + st.ret1) : null; return { name: i.name, val: tplFmt(i.sym, i.last).replace(/원$|\$/g, function (m) { return m; }), chg: chg != null ? (chg >= 0 ? "▲ " : "▼ ") + Math.abs(chg).toFixed(2) : "", pct: tplPct(i.ret) }; });
-    var mv = R.movers.up.slice(0, 2).concat(R.movers.down.slice(0, 1)).sort(function (a, b) { return Math.abs(r1(b)) - Math.abs(r1(a)); });
-    var ft = mv.slice(0, 3).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
-    var pop = (R.popular || []).filter(function (s) { return mv.indexOf(s) < 0; }).slice(0, 8).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
+    var mv = R.movers.up.slice(0, tplN(2, 3)).concat(R.movers.down.slice(0, tplN(1, 2))).sort(function (a, b) { return Math.abs(r1(b)) - Math.abs(r1(a)); });
+    var ft = mv.slice(0, tplN(3, 5)).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
+    var pop = (R.popular || []).filter(function (s) { return mv.indexOf(s) < 0; }).slice(0, tplN(8, 12)).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
     var hiN0 = S.filter(function (s) { return s.newHigh; }).length;
     return { meta: { title: mkName === "미국" ? "새벽의 미장" : mkName === "코인" ? "오늘의 코인" : mkName === "국내" ? "오늘의 국장" : "오늘의 시장", sub: date + " · 전일 대비", source: src, catName: mkName + " 마감" }, spec: { indexes: ix, features: ft, chips: pop, foot: "오른 " + unit + " " + Math.round(R.temp.upPct * 100) + "%  ·  20일선 위 " + Math.round(R.temp.abovePct * 100) + "%  ·  52주 신고가 " + hiN0 + "개" } };
   }
@@ -359,16 +362,16 @@ function tplSpec(cat, srcId, mkSel) {
     else if (srcId === "pop") { list = R.popular || []; title = "지금 인기 " + unit + " 순위"; val = function (s) { return tplPct(r1(s), 1); }; tag = function (s) { return "고점 " + tplPct(s.vsHi, 0); }; }
     else if (srcId === "sale") { list = S.filter(function (s) { return s.vsHi != null; }).sort(function (a, b) { return a.vsHi - b.vsHi; }); title = "고점 대비 할인 순위"; val = function (s) { return tplPct(s.vsHi, 0); }; tag = function (s) { return "1개월 " + tplPct(s.m1, 0); }; }
     else { list = S.filter(function (s) { return s.m1 != null; }).sort(function (a, b) { return b.m1 - a.m1; }); title = "1개월 수익률 순위"; val = function (s) { return tplPct(s.m1, 1); }; tag = function (s) { return "하루 " + tplPct(r1(s), 1); }; }
-    return { meta: { title: title, sub: mkName + " " + unit + " · " + date + " 종가 기준", source: src, catName: mkName + " 순위" }, spec: { items: list.slice(0, 12).map(function (s, i) { return { rank: i + 1, tag: tag(s), name: briefName(s), value: val(s) }; }) } };
+    return { meta: { title: title, sub: mkName + " " + unit + " · " + date + " 종가 기준", source: src, catName: mkName + " 순위" }, spec: { items: list.slice(0, tplN(12, 16)).map(function (s, i) { return { rank: i + 1, tag: tag(s), name: briefName(s), value: val(s) }; }) } };
   }
   if (cat === "table") {
-    if (srcId === "themes") return { meta: { title: (R.market === "coin" ? "테마" : "업종") + " 성적표", sub: mkName + " · " + date + " · 평균 등락 · 가장 센 " + unit, source: src, catName: mkName + " 업종" }, spec: { cols: [R.market === "coin" ? "테마" : "업종", "평균", "오른 " + unit, "1등", "꼴찌"], widths: [0.26, 0.16, 0.16, 0.21, 0.21], hlCols: [1], rows: R.themes.slice(0, 10).map(function (t) { return [t.name, tplPct(t.ret, 1), t.up + "/" + t.n, briefName(t.best), briefName(t.worst)]; }) } };
+    if (srcId === "themes") return { meta: { title: (R.market === "coin" ? "테마" : "업종") + " 성적표", sub: mkName + " · " + date + " · 평균 등락 · 가장 센 " + unit, source: src, catName: mkName + " 업종" }, spec: { cols: [R.market === "coin" ? "테마" : "업종", "평균", "오른 " + unit, "1등", "꼴찌"], widths: [0.26, 0.16, 0.16, 0.21, 0.21], hlCols: [1], rows: R.themes.slice(0, tplN(10, 14)).map(function (t) { return [t.name, tplPct(t.ret, 1), t.up + "/" + t.n, briefName(t.best), briefName(t.worst)]; }) } };
     if (srcId === "idx") { var SY = [["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["^KS11", "코스피"], ["^KQ11", "코스닥"], ["BTC-USD", "비트코인"], ["ETH-USD", "이더리움"], ["GLD", "금"], ["TLT", "미국 장기채"], ["KRW=X", "달러/원"], ["^VIX", "VIX"]]; return { meta: { title: "오늘의 숫자 한눈에", sub: date + " 종가 · 하루 · 1개월 · 고점 대비", source: src, catName: "시장 숫자" }, spec: { cols: ["자산", "종가", "하루", "1개월", "고점 대비"], widths: [0.26, 0.24, 0.16, 0.16, 0.18], hlCols: [2], rows: SY.map(function (a) { var s = tplStat(a[0]); return s ? [a[1], a[0] === "^VIX" ? s.last.toFixed(1) : tplFmt(a[0], s.last), tplPct(s.ret1, 1), tplPct(s.m1, 0), tplPct(s.vsHi, 0)] : null; }).filter(Boolean) } }; }
     var pk = typeof pkReady === "function" ? pkReady(R) : null, side = srcId === "picksWarn" ? "warn" : "buy", L = pk ? pk[side] : [];
     return { meta: { title: side === "buy" ? "매수 후보 판정표" : "주의 " + unit + " 판정표", sub: mkName + " · " + date + " · 추세·RSI·대금·재무·기사 복합 점수", source: src, catName: "선별 " + unit }, spec: { cols: [unit, "점수", "추세", "RSI", "고점 대비", "핵심 이유"], widths: [0.21, 0.13, 0.17, 0.09, 0.13, 0.27], hlCols: [1], rows: L.map(function (x) { var s = x.s; return [briefName(s), (side === "buy" ? "+" + x.bs + " / -" + x.ws : "-" + x.ws + " / +" + x.bs), (s.above20 ? "20↑" : "20↓") + (s.above200 == null ? "" : s.above200 ? " 200↑" : " 200↓"), s.rsi != null ? Math.round(s.rsi) : "-", tplPct(s.vsHi, 0), tplReasonShort((typeof pkTopReason === "function" ? pkTopReason(x, side) : "").split(" · ").slice(1).join(" ")) || "-"]; }), note: L.length ? "점수 = 플러스 항목 합 / 마이너스 항목 합 · 데이터로 고른 후보이며 판단은 본인에게" : "선별 종목이 아직 계산되지 않았어요 — 오늘의 브리핑 화면을 먼저 열어 주세요" } };
   }
   if (cat === "compare") {
-    if (srcId === "hi") { var dd = S.filter(function (s) { return s.vsHi != null && s.hi250; }).sort(function (a, b) { return a.vsHi - b.vsHi; }).slice(0, 4); return { meta: { title: "고점 vs 지금", sub: mkName + " · 52주 최고가 대비 가장 많이 빠진 " + unit + " 4", source: src, catName: mkName + " 낙폭" }, spec: { aLabel: "고점", aSub: "52주 최고가", bLabel: "지금", bSub: date + " 종가", rows: dd.map(function (s) { return { badge: briefName(s), name: "고점 대비 " + tplPct(s.vsHi, 0), a: tplFmt(s.sym, s.hi250), b: tplFmt(s.sym, s.last), pct: tplPct(s.vsHi, 0) }; }) } }; }
+    if (srcId === "hi") { var dd = S.filter(function (s) { return s.vsHi != null && s.hi250; }).sort(function (a, b) { return a.vsHi - b.vsHi; }).slice(0, tplN(4, 6)); return { meta: { title: "고점 vs 지금", sub: mkName + " · 52주 최고가 대비 가장 많이 빠진 " + unit + " 4", source: src, catName: mkName + " 낙폭" }, spec: { aLabel: "고점", aSub: "52주 최고가", bLabel: "지금", bSub: date + " 종가", rows: dd.map(function (s) { return { badge: briefName(s), name: "고점 대비 " + tplPct(s.vsHi, 0), a: tplFmt(s.sym, s.hi250), b: tplFmt(s.sym, s.last), pct: tplPct(s.vsHi, 0) }; }) } }; }
     var SY2 = R.market === "coin" ? ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD"] : R.market === "kr" ? ["^KS11", "005930.KS", "000660.KS", "GLD"] : ["^GSPC", "^IXIC", "BTC-USD", "GLD"];
     return { meta: { title: "1년 전 · 지금", sub: date + " 기준 · 대표 자산 4개 · 1년 수익률", source: src, catName: "그때·지금" }, spec: { aLabel: "1년 전", aSub: "작년 이맘때 종가", bLabel: "지금", bSub: date + " 종가", rows: SY2.map(function (sym) { var s = tplStat(sym); if (!s || s.y1 == null) return null; return { badge: briefName(s), name: "1년 수익률 " + tplPct(s.y1, 0), a: tplFmt(sym, s.last / (1 + s.y1)), b: tplFmt(sym, s.last), pct: tplPct(s.y1, 0) }; }).filter(Boolean) } };
   }
@@ -415,13 +418,13 @@ function tplFromPlan(cat, plan, st) {
   var p = plan || {}, items = (p.items || []).filter(function (x) { return x.label || x.value; }), mk = st && st.mk, src = st && st.src || "", title = cPlain(String(p.title || "").replace(/\n/g, " "));
   var meta = { title: title, sub: p.subtitle || "", source: src, catName: p.kicker || (mk ? mk.name : "") };
   var spec;
-  if (cat === "rank") spec = { items: items.slice(0, 12).map(function (it, i) { return { rank: i + 1, name: it.label, value: it.value || "", tag: it.sub ? String(it.sub).slice(0, 10) : "" }; }) };
-  else if (cat === "table") spec = { cols: ["항목", "값", "메모"], widths: [0.34, 0.26, 0.4], hlCols: [1], rows: items.slice(0, 10).map(function (it) { return [it.label, it.value || "", it.sub || ""]; }), note: p.cta || "" };
-  else if (cat === "compare") spec = { aLabel: "그때", bLabel: "지금", rows: items.slice(0, 4).map(function (it) { var ab = String(it.value || "").split(/→|->|⇒/); return { badge: it.label, name: it.sub || "", a: ab.length > 1 ? ab[0].trim() : (it.sub || ""), b: ab.length > 1 ? ab[1].trim() : (it.value || ""), pct: "" }; }) };
+  if (cat === "rank") spec = { items: items.slice(0, tplN(12, 16)).map(function (it, i) { return { rank: i + 1, name: it.label, value: it.value || "", tag: it.sub ? String(it.sub).slice(0, 10) : "" }; }) };
+  else if (cat === "table") spec = { cols: ["항목", "값", "메모"], widths: [0.34, 0.26, 0.4], hlCols: [1], rows: items.slice(0, tplN(10, 14)).map(function (it) { return [it.label, it.value || "", it.sub || ""]; }), note: p.cta || "" };
+  else if (cat === "compare") spec = { aLabel: "그때", bLabel: "지금", rows: items.slice(0, tplN(4, 6)).map(function (it) { var ab = String(it.value || "").split(/→|->|⇒/); return { badge: it.label, name: it.sub || "", a: ab.length > 1 ? ab[0].trim() : (it.sub || ""), b: ab.length > 1 ? ab[1].trim() : (it.value || ""), pct: "" }; }) };
   else if (cat === "quote") { meta.title = /^["“]/.test(title) ? title : "\"" + title + "\""; spec = { tag: p.kicker || "", person: { name: p.hero && p.hero.label || (mk ? mk.name : "오늘"), role: p.hero && p.hero.value || "", facts: items.slice(0, 4).map(function (it) { return [it.label, it.value || ""]; }) }, paras: [p.subtitle, items.slice(4, 6).map(function (it) { return it.label + " " + (it.value || ""); }).join(" · "), p.cta].filter(Boolean).slice(0, 3) }; }
-  else if (cat === "timeline") spec = { blocks: items.slice(0, 4).map(function (it) { return { date: String(it.value || "").replace(/\s+/, "\n"), title: it.label, items: String(it.sub || "").split(/\s*[·,]\s*/).filter(Boolean).slice(0, 4).map(function (t) { return t.replace(/(\d[\d.,]*%?)/g, "[[$1]]"); }) }; }) };
-  else if (cat === "grid") spec = { lead: p.subtitle, boxes: items.slice(0, 12).map(function (it) { var m = String(it.value || "").match(/^([+\-]?[\d.,]+)(.*)$/); return { label: it.label, value: m ? m[1] : (it.value || ""), unit: m ? m[2].trim() : "" }; }), note: p.cta || "" };
-  else if (cat === "lines") spec = { rows: items.slice(0, 7).map(function (it) { return { icon: "📌", left: it.label, right: it.value || "", sub: it.sub || "" }; }), punch: p.hero && p.hero.value ? { left: p.hero.label || "", right: p.hero.value } : null, closing: p.cta || "" };
+  else if (cat === "timeline") spec = { blocks: items.slice(0, tplN(4, 5)).map(function (it) { return { date: String(it.value || "").replace(/\s+/, "\n"), title: it.label, items: String(it.sub || "").split(/\s*[·,]\s*/).filter(Boolean).slice(0, 4).map(function (t) { return t.replace(/(\d[\d.,]*%?)/g, "[[$1]]"); }) }; }) };
+  else if (cat === "grid") spec = { lead: p.subtitle, boxes: items.slice(0, tplN(12, 16)).map(function (it) { var m = String(it.value || "").match(/^([+\-]?[\d.,]+)(.*)$/); return { label: it.label, value: m ? m[1] : (it.value || ""), unit: m ? m[2].trim() : "" }; }), note: p.cta || "" };
+  else if (cat === "lines") spec = { rows: items.slice(0, tplN(7, 10)).map(function (it) { return { icon: "📌", left: it.label, right: it.value || "", sub: it.sub || "" }; }), punch: p.hero && p.hero.value ? { left: p.hero.label || "", right: p.hero.value } : null, closing: p.cta || "" };
   else if (cat === "market") spec = { indexes: items.slice(0, 2).map(function (it) { return { name: it.label, val: it.value || "", chg: "", pct: it.sub || "" }; }), features: items.slice(2, 5).map(function (it) { return { name: it.label, pct: it.value || "" }; }), chips: items.slice(5, 13).map(function (it) { return { name: it.label, pct: it.value || "" }; }) };
   else return null;
   if (cat === "quote" || cat === "rank" || cat === "grid") meta.sub = cat === "grid" ? "" : p.subtitle || "";

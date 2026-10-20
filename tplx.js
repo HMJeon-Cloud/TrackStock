@@ -40,21 +40,21 @@ tplSpec = function (cat, srcId, mkSel) {
   function rsi(s) { return s.rsi != null ? String(Math.round(s.rsi)) : "-"; }
   function head(title, sub, cn) { return { title: title, sub: sub, source: src, catName: cn }; }
   /* ---------- rank ---------- */
-  if (cat === "rank" && srcId === "y1") { var l = SX.filter(function (s) { return s.y1 != null; }).sort(function (a, b) { return b.y1 - a.y1; }); return { meta: head("1년 수익률 순위", mkName + " " + unit + " · " + date + " · 1년 전 같은 날 대비", mkName + " 순위"), spec: { items: l.slice(0, 12).map(function (s, i) { return { rank: i + 1, name: briefName(s), value: P(s.y1, 0), tag: "고점 " + P(s.vsHi, 0) }; }) } }; }
-  if (cat === "rank" && srcId === "rsiLow") { var l2 = SX.filter(function (s) { return s.rsi != null; }).sort(function (a, b) { return a.rsi - b.rsi; }); return { meta: head("RSI 과매도 순위", mkName + " " + unit + " · " + date + " · RSI 30 아래면 많이 눌린 구간", mkName + " 순위"), spec: { items: l2.slice(0, 12).map(function (s, i) { return { rank: i + 1, name: briefName(s), value: "RSI " + rsi(s), tag: s.above200 ? "200일선 위" : "200일선 아래" }; }) } }; }
-  if (cat === "rank" && srcId === "quiet") { var l3 = SX.filter(function (s) { return s.m3 > 0 && s.sd > 0; }).sort(function (a, b) { return b.m3 / b.sd - a.m3 / a.sd; }); return { meta: head("조용히 오르는 순위", mkName + " · 3개월 수익률 ÷ 하루 변동 — 덜 흔들리고 꾸준히 오른 순", mkName + " 순위"), spec: { items: l3.slice(0, 12).map(function (s, i) { return { rank: i + 1, name: briefName(s), value: P(s.m3, 0), tag: "변동 " + (s.sd * 100).toFixed(1) + "%" }; }) } }; }
-  if (cat === "rank" && srcId === "tech" && typeof pkTech === "function") { var l4 = SX.map(pkTech).sort(function (a, b) { return b.score - a.score || b.bs - a.bs; }); return { meta: head("기술 점수 순위", mkName + " · 추세·위치·RSI·흐름·이격·거래대금·변동성 합산 (하루 등락 제외)", "선별 " + unit), spec: { items: l4.slice(0, 12).map(function (x, i) { return { rank: i + 1, name: briefName(x.s), value: "+" + x.bs + " / -" + x.ws, tag: P(x.s.m1, 0) + " 1개월" }; }) } }; }
+  if (cat === "rank" && srcId === "y1") { var l = SX.filter(function (s) { return s.y1 != null; }).sort(function (a, b) { return b.y1 - a.y1; }); return { meta: head("1년 수익률 순위", mkName + " " + unit + " · " + date + " · 1년 전 같은 날 대비", mkName + " 순위"), spec: { items: l.slice(0, tplN(12, 16)).map(function (s, i) { return { rank: i + 1, name: briefName(s), value: P(s.y1, 0), tag: "고점 " + P(s.vsHi, 0) }; }) } }; }
+  if (cat === "rank" && srcId === "rsiLow") { var l2 = SX.filter(function (s) { return s.rsi != null; }).sort(function (a, b) { return a.rsi - b.rsi; }); return { meta: head("RSI 과매도 순위", mkName + " " + unit + " · " + date + " · RSI 30 아래면 많이 눌린 구간", mkName + " 순위"), spec: { items: l2.slice(0, tplN(12, 16)).map(function (s, i) { return { rank: i + 1, name: briefName(s), value: "RSI " + rsi(s), tag: s.above200 ? "200일선 위" : "200일선 아래" }; }) } }; }
+  if (cat === "rank" && srcId === "quiet") { var l3 = SX.filter(function (s) { return s.m3 > 0 && s.sd > 0; }).sort(function (a, b) { return b.m3 / b.sd - a.m3 / a.sd; }); return { meta: head("조용히 오르는 순위", mkName + " · 3개월 수익률 ÷ 하루 변동 — 덜 흔들리고 꾸준히 오른 순", mkName + " 순위"), spec: { items: l3.slice(0, tplN(12, 16)).map(function (s, i) { return { rank: i + 1, name: briefName(s), value: P(s.m3, 0), tag: "변동 " + (s.sd * 100).toFixed(1) + "%" }; }) } }; }
+  if (cat === "rank" && srcId === "tech" && typeof pkTech === "function") { var l4 = SX.map(pkTech).sort(function (a, b) { return b.score - a.score || b.bs - a.bs; }); return { meta: head("기술 점수 순위", mkName + " · 추세·위치·RSI·흐름·이격·거래대금·변동성 합산 (하루 등락 제외)", "선별 " + unit), spec: { items: l4.slice(0, tplN(12, 16)).map(function (x, i) { return { rank: i + 1, name: briefName(x.s), value: "+" + x.bs + " / -" + x.ws, tag: P(x.s.m1, 0) + " 1개월" }; }) } }; }
   /* ---------- table ---------- */
   if (cat === "table" && srcId === "movers") {
-    var up = R.movers.up.slice(0, 5), dn = R.movers.down.slice(0, 5);
+    var up = R.movers.up.slice(0, tplN(5, 7)), dn = R.movers.down.slice(0, tplN(5, 7));
     return { meta: head("급등·급락 상세", mkName + " · " + date + " · 위 5 오른 / 아래 5 내린 " + unit, mkName + " 급등락"), spec: { cols: [unit, "하루", "1주", "1개월", "RSI", "대금"], widths: [0.3, 0.14, 0.14, 0.14, 0.12, 0.16], hlCols: [1], rows: up.concat(dn).map(function (s) { return [briefName(s), P(r1(s)), P(s.ret5), P(s.m1, 0), rsi(s), s.amtX != null ? s.amtX.toFixed(1) + "배" : "-"]; }), note: "대금 = 거래대금이 평소(20일 평균)의 몇 배인지" } };
   }
   if (cat === "table" && srcId === "popular") {
-    var pl = (R.popular || []).slice(0, 10);
+    var pl = (R.popular || []).slice(0, tplN(10, 14));
     return { meta: head("인기 " + unit + " 상세", mkName + " · " + date + " · 사람들이 가장 많이 찾는 " + unit, mkName + " 인기"), spec: { cols: [unit, "종가", "하루", "1개월", "고점比", "RSI"], widths: [0.26, 0.2, 0.13, 0.13, 0.15, 0.13], hlCols: [2], rows: pl.map(function (s) { return [briefName(s), tplFmt(s.sym, s.last), P(r1(s)), P(s.m1, 0), P(s.vsHi, 0), rsi(s)]; }) } };
   }
   if (cat === "table" && srcId === "hilo") {
-    var hi = SX.filter(function (s) { return s.newHigh; }).sort(function (a, b) { return (b.amtX || 0) - (a.amtX || 0); }).slice(0, 10);
+    var hi = SX.filter(function (s) { return s.newHigh; }).sort(function (a, b) { return (b.amtX || 0) - (a.amtX || 0); }).slice(0, tplN(10, 14));
     return { meta: head("52주 신고가 명단", mkName + " · " + date + " · " + SX.filter(function (s) { return s.newHigh; }).length + "개 중 거래대금 많은 순", mkName + " 신고가"), spec: { cols: [unit, "종가", "하루", "1개월", "1년", "대금"], widths: [0.26, 0.2, 0.13, 0.13, 0.14, 0.14], hlCols: [4], rows: hi.map(function (s) { return [briefName(s), tplFmt(s.sym, s.last), P(r1(s)), P(s.m1, 0), P(s.y1, 0), s.amtX != null ? s.amtX.toFixed(1) + "배" : "-"]; }), note: hi.length ? "신고가 = 오늘 종가가 지난 1년 중 가장 높음 · '비싸다'보다 '파는 사람이 적다'에 가까워요" : "오늘은 52주 신고가 " + unit + "이 없어요" } };
   }
   if (cat === "table" && srcId === "cond" && typeof dpCondStats === "function") {
@@ -70,7 +70,7 @@ tplSpec = function (cat, srcId, mkSel) {
     return { meta: head(y0 + "년 연초 vs 지금", date + " 기준 · 작년 마지막 거래일 종가 → 지금", "그때·지금"), spec: { aLabel: "연초", aSub: (y0 - 1) + "년 마지막 종가", bLabel: "지금", bSub: date + " 종가", rows: SY.map(function (sym) { var y = tplYtd(sym), s = tplStat(sym); if (!y || !s) return null; return { badge: briefName(s), name: "올해 " + P(y.r, 0), a: tplFmt(sym, y.a), b: tplFmt(sym, y.b), pct: P(y.r, 0) }; }).filter(Boolean) } };
   }
   if (cat === "compare" && srcId === "m1pop") {
-    var pp = (R.popular || []).filter(function (s) { return s.m1 != null; }).slice(0, 4);
+    var pp = (R.popular || []).filter(function (s) { return s.m1 != null; }).slice(0, tplN(4, 6));
     return { meta: head("한 달 전 · 지금", mkName + " 인기 " + unit + " 4개 · " + date, "그때·지금"), spec: { aLabel: "1개월 전", aSub: "21거래일 전 종가", bLabel: "지금", bSub: date + " 종가", rows: pp.map(function (s) { return { badge: briefName(s), name: "고점 대비 " + P(s.vsHi, 0), a: tplFmt(s.sym, s.last / (1 + s.m1)), b: tplFmt(s.sym, s.last), pct: P(s.m1, 0) }; }) } };
   }
   /* ---------- grid ---------- */
@@ -88,21 +88,21 @@ tplSpec = function (cat, srcId, mkSel) {
     var rows = [i0 ? { icon: "📊", left: i0.name, right: P(i0.ret), sub: "대표 지수 하루 등락" } : null, { icon: "🌡️", left: "오른 " + unit, right: Math.round(t.upPct * 100) + "%", sub: t.upPct >= 0.6 ? "넓게 오른 날" : t.upPct <= 0.4 ? "넓게 내린 날" : "반반 — 종목별로 갈린 날" },
       { icon: "📈", left: "20일선 위", right: Math.round(t.abovePct * 100) + "%", sub: "단기 추세가 살아 있는 비율" }, th[0] ? { icon: "🏆", left: "1등 업종", right: th[0].name + " " + P(th[0].ret), sub: "꼴찌 " + th[th.length - 1].name + " " + P(th[th.length - 1].ret) } : null,
       mv ? { icon: "🚀", left: "최대 상승", right: briefName(mv) + " " + P(r1(mv)), sub: md ? "최대 하락 " + briefName(md) + " " + P(r1(md)) : "" } : null, hv ? { icon: "💰", left: "돈 쏠림", right: briefName(hv) + " " + hv.amtX.toFixed(1) + "배", sub: "거래대금이 평소의 몇 배인지" } : null,
-      vix ? { icon: "😨", left: "공포지수", right: vix.last.toFixed(1), sub: vix.last < 20 ? "20 아래 — 평온" : vix.last < 30 ? "20~30 — 불안" : "30 이상 — 공포" } : null].filter(Boolean).slice(0, 7);
+      vix ? { icon: "😨", left: "공포지수", right: vix.last.toFixed(1), sub: vix.last < 20 ? "20 아래 — 평온" : vix.last < 30 ? "20~30 — 불안" : "30 이상 — 공포" } : null].filter(Boolean).slice(0, tplN(7, 10));
     return { meta: head("숫자로 보는 오늘", mkName + " · " + date + " · 7줄 요약", "오늘 숫자"), spec: { rows: rows, punch: { left: "오늘의 한 줄", right: t.upPct >= 0.6 ? "넓게 오른 날" : t.upPct <= 0.4 ? "넓게 내린 날" : "고르는 장" }, closing: "숫자는 매일 바뀌어요 — 저장해 두고 내일과 비교해 보세요" } };
   }
   /* ---------- timeline ---------- */
   if (cat === "timeline" && srcId === "month" && typeof pubUpcoming === "function") {
     var ev = pubUpcoming(31).filter(function (e) { return e.k !== "hol"; }), wk = {};
     ev.forEach(function (e) { var p = e.d.split("-"), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])), mon = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400e3), k = mon.toISOString().slice(0, 10); (wk[k] = wk[k] || []).push(e); });
-    var bl = Object.keys(wk).sort().slice(0, 4).map(function (k) { var a = new Date(k + "T00:00:00Z"); return { date: (a.getUTCMonth() + 1) + "/" + a.getUTCDate() + "\n주", title: wk[k].length + "개 일정", items: wk[k].slice(0, 5).map(function (e) { return e.d.slice(5).replace("-", "/") + " " + String(e.t).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").trim() + (e.sure === false ? " (예정)" : "") + (e.n ? " — [[" + e.n.split(" · ")[0] + "]]" : ""); }) }; });
+    var bl = Object.keys(wk).sort().slice(0, 4).map(function (k) { var a = new Date(k + "T00:00:00Z"); return { date: (a.getUTCMonth() + 1) + "/" + a.getUTCDate() + "\n주", title: wk[k].length + "개 일정", items: wk[k].slice(0, tplN(5, 7)).map(function (e) { return e.d.slice(5).replace("-", "/") + " " + String(e.t).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").trim() + (e.sure === false ? " (예정)" : "") + (e.n ? " — [[" + e.n.split(" · ")[0] + "]]" : ""); }) }; });
     return { meta: head("이번 달 남은 일정", pubToday().slice(5).replace("-", "/") + "부터 한 달 · 주별 · 발표·실적", "일정"), spec: { blocks: bl.length ? bl : [{ date: "-", title: "큰 일정 없음", items: ["예정된 주요 발표가 없어요"] }] } };
   }
   /* ---------- quote ---------- */
   if (cat === "quote" && srcId === "second") {
     var items = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items) || [], l1 = typeof cNewsLead === "function" ? cNewsLead(items, R) : null, rest = l1 ? items.filter(function (x) { return x !== l1.it; }) : items, l2b = rest.length >= 3 && typeof cNewsLead === "function" ? cNewsLead(rest, R) : (rest[0] ? { it: rest[0], facts: [] } : null);
-    if (l2b) { var it = l2b.it, tt = cNewsClean(it.title), desc = cNewsClean(it.desc || ""), facts = []; (l2b.facts || []).slice(0, 4).forEach(function (f) { var m = String(f).match(/^(.*)\s(\S+)$/); facts.push(m ? [m[1], m[2]] : [String(f), ""]); }); if (!facts.length) R.indexRow.slice(0, 4).forEach(function (i) { facts.push([i.name, P(i.ret)]); });
-      return { meta: { title: "\"" + tt + "\"", source: "네이버 뉴스 · " + (it.press || "") + " · " + date, source2: "숫자는 야후 파이낸스 종가", catName: "오늘의 기사 2" }, spec: { tag: "두 번째 기사", person: { name: it.press || "언론", role: "오늘 두 번째로 관심 가는 기사", facts: facts }, paras: desc ? desc.split(/(?<=다\.)\s+/).filter(Boolean).slice(0, 3) : ["기사 요약이 없어요 — 제목과 숫자를 함께 보세요."] } }; }
+    if (l2b) { var it = l2b.it, tt = cNewsClean(it.title), desc = cNewsClean(it.desc || ""), facts = []; (l2b.facts || []).slice(0, tplN(4, 6)).forEach(function (f) { var m = String(f).match(/^(.*)\s(\S+)$/); facts.push(m ? [m[1], m[2]] : [String(f), ""]); }); if (!facts.length) R.indexRow.slice(0, 4).forEach(function (i) { facts.push([i.name, P(i.ret)]); });
+      return { meta: { title: "\"" + tt + "\"", source: "네이버 뉴스 · " + (it.press || "") + " · " + date, source2: "숫자는 야후 파이낸스 종가", catName: "오늘의 기사 2" }, spec: { tag: "두 번째 기사", person: { name: it.press || "언론", role: "오늘 두 번째로 관심 가는 기사", facts: facts }, paras: desc ? desc.split(/(?<=다\.)\s+/).filter(Boolean).slice(0, tplN(3, 5)) : ["기사 요약이 없어요 — 제목과 숫자를 함께 보세요."] } }; }
   }
   /* ---------- calendar ---------- */
   if (cat === "calendar" && srcId === "next") {

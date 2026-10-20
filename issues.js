@@ -200,15 +200,20 @@ function issuesCard(list, page, total) {
     if (hl && hl.hook) { hook = hl.hook; if (cW(g, cPlain(hook), 44, 800) > (CARD.W - P * 2) * 1.9) hook = "[[" + cPlain(hook).replace(/\[\[|\]\]/g, "").split(/ — | vs |, /)[0] + "]]"; if (hl.sub) sub = hl.sub; }
   } catch (e) { console.warn(e); }
   cHead(c, tag + " · " + mk + cDate(list.asOf), hook, sub, page || 0, total || 0);
-  var per = Math.min(Math.round(150 * CARD.H / 1350), Math.floor((CARD.H - 110 - c.y) / list.length));   // v12.22 릴스형이면 칸도 키움
+  // v12.23 릴스형(세로가 긴 한 장): 칸을 늘리기 전에 이슈마다 관련 기사 제목 한 줄을 더 담는다(있을 때만)
+  var reel = CARD.H > 1500, newsAll = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items) || [];
+  function newsFor(it) { var key = String(it.title || "").replace(/^[^가-힣A-Za-z0-9]+/, "").split(/[ +\-—(]/)[0]; if (!key || key.length < 1) return null; var hit = newsAll.filter(function (n) { return String(n.title || "").indexOf(key) >= 0; })[0]; return hit ? (typeof cNewsClean === "function" ? cNewsClean(hit.title) : String(hit.title)) + (hit.press ? " · " + hit.press : "") : null; }
+  var extra = reel ? list.map(newsFor) : list.map(function () { return null; }), anyExtra = extra.some(Boolean);
+  var per = reel && anyExtra ? Math.floor((CARD.H - 110 - c.y) / list.length) : Math.min(Math.round(150 * (reel ? CARD.H / 1350 : 1)), Math.floor((CARD.H - 110 - c.y) / list.length));
   list.forEach(function (it, i) {
-    var y = c.y, bh = per - 12, mid = y + bh / 2;
+    var y = c.y, bh = per - 12, ex = extra[i], mid = y + bh / 2 - (ex ? 22 : 0);
     cBox(g, P, y, W, bh, 16);
-    cText(g, String(i + 1), P + 44, mid + 18, 50, 800, CARD_C.gold, "center");
+    cText(g, String(i + 1), P + 44, y + bh / 2 + 18, 50, 800, CARD_C.gold, "center");
     var tx = P + 92, tw = W - 116;
-    var ts = 31; while (ts > 23 && cW(g, it.emoji + " " + it.title, ts, 800) > tw) ts -= 1;
+    var ts = reel ? 34 : 31; while (ts > 23 && cW(g, it.emoji + " " + it.title, ts, 800) > tw) ts -= 1;
     cText(g, cFit(g, it.emoji + " " + it.title, tw, ts, 800), tx, mid - 4, ts, 800, CARD_C.txt);
     cText(g, cFit(g, it.sub, tw, 22, 500), tx, mid + 30, 22, 500, CARD_C.sub);
+    if (ex) { g.fillStyle = CARD_C.gold; g.fillRect(tx, mid + 52, 4, 30); cText(g, cFit(g, ex, tw - 16, 21, 600), tx + 14, mid + 75, 21, 600, CARD_C.txt); }
     c.y += per;
   });
   cFoot(c, "종가 기준 자동 집계 · 투자 조언 아님");

@@ -138,17 +138,17 @@ function aiRulePlan(st) {
     var hf = ocFact(sp, sp.hero), rows = (sp.rows || []).map(function (id) { return ocFact(sp, id); }).filter(Boolean);
     function it(f) { return { label: f.label, value: f.value, sub: "", ref: aiRefFind(L, f.value, f.label) }; }
     return { kicker: sp.kicker || "", title: cPlain(ocFill(sp, sp.hook)), subtitle: sp.mk ? sp.mk.name + " · " + sp.mk.date : "", layout: hf && hf.value.length <= 12 ? "hero" : "list",
-      hero: hf ? it(hf) : { label: "", value: "", ref: "" }, items: (hf && hf.value.length > 12 ? [hf] : []).concat(rows).slice(0, 5).map(it), cta: cPlain(ocFill(sp, sp.teaser)), visual: "" };
+      hero: hf ? it(hf) : { label: "", value: "", ref: "" }, items: (hf && hf.value.length > 12 ? [hf] : []).concat(rows).slice(0, aiGeo().H > 1500 ? 8 : 5).map(it), cta: cPlain(ocFill(sp, sp.teaser)), visual: "" };
   }
   if (st.reel) {
     var r = st.reel;
     return { kicker: r.t || "", title: cPlain(r.hook.join("\n")), subtitle: "", layout: "list", hero: { label: "", value: "", ref: "" },
-      items: r.items.slice(0, 5).map(function (x) { return { label: x[0], value: x[1].length <= 24 ? x[1] : "", sub: x[1].length > 24 ? aiCut(x[1], 30) : "", ref: aiRefFind(L, x[1].length <= 24 ? x[1] : x[0], x[0]) }; }), cta: n2cta(st), visual: "" };
+      items: r.items.slice(0, aiGeo().H > 1500 ? 8 : 5).map(function (x) { return { label: x[0], value: x[1].length <= 24 ? x[1] : "", sub: x[1].length > 24 ? aiCut(x[1], 30) : "", ref: aiRefFind(L, x[1].length <= 24 ? x[1] : x[0], x[0]) }; }), cta: n2cta(st), visual: "" };
   }
   // 내 글 등: 첫 줄 제목, 숫자가 있는 줄을 항목으로
   var first = L[0] ? L[0].text : st.title, items = [];
   L.slice(1).forEach(function (l) {
-    if (items.length >= 5) return;
+    if (items.length >= (aiGeo().H > 1500 ? 8 : 5)) return;
     var m = l.text.replace(/^[-·•*]\s*/, "").match(/^(.{1,20}?)\s*[:：]\s*(.+)$/);
     if (m) items.push({ label: m[1], value: aiCut(m[2], 24), sub: "", ref: l.id });
     else if (/\d/.test(l.text)) items.push({ label: aiCut(l.text, 22), value: "", sub: "", ref: l.id });
@@ -200,9 +200,9 @@ function aiPlanCard0(st) {
     y += hh + 24;
   }
   var items = (p.items || []).filter(function (x) { return x.label || x.value; }), room = bottom - y, n = items.length;
-  while (n > 1 && room / n < 104) n--;
+  while (n > 1 && room / n < (REEL.H > 1500 ? 86 : 104)) n--;   // v12.23 릴스형은 칸을 조금 낮춰 항목을 더 담는다
   items = items.slice(0, n);
-  var ih = Math.min(260, Math.floor(room / Math.max(1, n)));   // v12.22 칸을 남은 높이만큼 키우고, 그래도 남으면 위아래 가운데로(빈 띠 없이)
+  var ih = Math.min(260, Math.floor(room / Math.max(1, n)));   // v12.22 칸을 남은 높이만큼 키우고(항목이 다 들어간 뒤에만), 그래도 남으면 위아래 가운데로
   y += Math.max(0, Math.floor((room - ih * n) / 2));
   items.forEach(function (it, i) {
     var yy = y + i * ih, bh = ih - 14, rank = p.layout !== "hero";
@@ -352,7 +352,7 @@ function aiStudio(cfg) {
     $a(".aiRes").scrollIntoView({ behavior: "smooth", block: "start" });
     var request = ["목적: " + goal, kick ? "말머리는 '" + kick + "'로" : "", req, st.tpl && typeof TPL_HINT !== "undefined" ? "카드 양식(반드시 이 모양으로): " + TPL_HINT[st.tpl] : "", st.presetData && typeof libPresetText === "function" ? libPresetText(st.presetData) : "", st.styleVisual ? "이미지 분위기(visual)는 다음과 같게: " + st.styleVisual : ""].filter(Boolean).join("\n");
     var p = !useAi ? Promise.resolve({ plan: aiRulePlan(st), by: "기본 구성(앱 데이터 그대로 · AI 없음)" }) :
-      aiCall({ mode: "plan", title: st.title, deck: st.deckNames.join(", "), lines: st.lines.map(function (l) { return { id: l.id, text: (l.card ? "[" + l.card + "] " : "") + l.text }; }), request: request, images: st.imgs }).then(function (j) {
+      aiCall({ mode: "plan", aspect: typeof hubSize === "function" && hubSize() === "reel" ? "9:16" : "4:5", title: st.title, deck: st.deckNames.join(", "), lines: st.lines.map(function (l) { return { id: l.id, text: (l.card ? "[" + l.card + "] " : "") + l.text }; }), request: request, images: st.imgs }).then(function (j) {
         if (j && j.ok && j.out) return { plan: aiCleanPlan(j.out), by: "AI 기획 · " + j.model + (j.tries && j.tries.length > 1 ? " (" + j.tries.join(" → ") + ")" : "") };
         throw new Error((OC_REASON[j && j.reason] || (j && j.reason) || "알 수 없음") + (j && j.detail ? " — " + j.detail : "") + (j && j.tries ? " [" + j.tries.join(" → ") + "]" : ""));
       });
