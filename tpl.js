@@ -145,10 +145,11 @@ function tplTable(c, s) {
     var yy = y + hh + k * rh; g.fillStyle = k % 2 ? "#ffffff" : TPL_C.box; g.fillRect(P + bx, yy, tw, rh);
     r.forEach(function (v, i) {
       var hl = (s.hlCols || []).indexOf(i) >= 0, cx = (xs[i] + xs[i + 1]) / 2, mw = xs[i + 1] - xs[i] - 14, fsB = Math.max(30, Math.min(42, Math.round(rh * 0.3))), fs = i === 0 ? fsB - 3 : fsB;
-      if (hl) { var tw2 = cW(g, v, fs, 900) + 16; cRound(g, cx - tw2 / 2, yy + rh / 2 - fs * 0.62, tw2, fs * 1.25, 4, TPL_C.hl); }
       var wt = i === 0 ? 800 : 900, col = i === 0 ? TPL_C.ink : tplCol(v);
-      if (cW(g, String(v), fs * 0.8, wt) > mw && rh >= 64) { var ws = Math.min(fs - 4, (rh - 14) / 2 / 1.2), nl = Math.min(2, cWrapCount(g, String(v), mw, ws, 700)); cWrap(g, String(v), cx, yy + rh / 2 - (nl - 1) * ws * 0.6 + ws * 0.36, mw, ws, 700, col, ws * 1.2, 2, "center"); }   // v10.4: 긴 칸은 두 줄
-      else cText(g, cFit(g, String(v), mw, fs, wt), cx, yy + rh / 2 + fs * 0.36, fs, wt, col, "center");
+      if (hl) { var hs = fs; while (hs > fs * 0.6 && cW(g, v, hs, 900) > mw) hs -= 1; var tw2 = Math.min(mw + 8, cW(g, v, hs, 900) + 16); cRound(g, cx - tw2 / 2, yy + rh / 2 - hs * 0.62, tw2, hs * 1.25, 4, TPL_C.hl); }
+      var one = fs; while (one > fs * 0.6 && cW(g, String(v), one, wt) > mw) one -= 1;   // v12.20 한 줄에 들어가도록 먼저 줄이고(최소 60%), 그래도 안 되면 두 줄
+      if (cW(g, String(v), one, wt) > mw && rh >= 64) { var ws = Math.min(fs - 4, (rh - 14) / 2 / 1.2), nl = Math.min(2, cWrapCount(g, String(v), mw, ws, 700)); cWrap(g, String(v), cx, yy + rh / 2 - (nl - 1) * ws * 0.6 + ws * 0.36, mw, ws, 700, col, ws * 1.2, 2, "center"); }
+      else cText(g, cFit(g, String(v), mw, one, wt), cx, yy + rh / 2 + one * 0.36, one, wt, col, "center");
     });
     g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.beginPath(); g.moveTo(P + bx, yy + rh); g.lineTo(P + W, yy + rh); g.stroke();
   });
@@ -178,9 +179,11 @@ function tplCompare(c, s) {
     g.fillStyle = TPL_C.paper; [[x1, ya], [x2, yb]].forEach(function (pt) { g.beginPath(); g.arc(pt[0], pt[1], 13, 0, Math.PI * 2); g.fill(); g.strokeStyle = col; g.lineWidth = 6; g.stroke(); });
     var vs = 40; while (vs > 24 && (cW(g, r.a, vs, 900) > (x2 - x1) / 2 - 40 || cW(g, r.b, vs, 900) > (x2 - x1) / 2 - 40)) vs -= 2;
     // 값은 각 점의 바깥쪽(위 또는 아래)에 — 선과 겹치지 않게
-    cText(g, r.a, x1, up ? ya + vs + 22 : ya - 26, vs, 900, TPL_C.ink, "center"); cText(g, r.b, x2, up ? yb - 26 : yb + vs + 22, vs, 900, col, "center");
-    if (r.aDate) cText(g, r.aDate, x1, up ? ya + vs + 46 : ya - 56, 17, 600, TPL_C.sub, "center"); if (r.bDate) cText(g, r.bDate, x2, up ? yb - 56 : yb + vs + 46, 17, 600, TPL_C.sub, "center");
-    if (r.pct) { var pw = cW(g, r.pct, 24, 900) + 26, mx = (x1 + x2) / 2, my = (ya + yb) / 2; cRound(g, mx - pw / 2, my - 20, pw, 40, 20, col); cText(g, r.pct, mx, my + 9, 24, 900, "#ffffff", "center"); }
+    // 그때 값은 점 왼쪽 정렬, 지금 값은 오른쪽 끝에 맞춰(잘림 방지) 더 크게 — '지금'이 핵심
+    var vb = Math.min(vs + 10, 52); while (vb > 28 && cW(g, r.b, vb, 900) > W - lw - 60) vb -= 2;
+    cText(g, r.a, x1 - 14, up ? ya + vs + 22 : ya - 26, vs, 900, TPL_C.ink, "left"); cText(g, r.b, P + W, up ? yb - 26 : yb + vb + 22, vb, 900, col, "right");
+    if (r.aDate) cText(g, r.aDate, x1 - 14, up ? ya + vs + 46 : ya - 56, 17, 600, TPL_C.sub, "left"); if (r.bDate) cText(g, r.bDate, P + W, up ? yb - 56 : yb + vb + 46, 17, 600, TPL_C.sub, "right");
+    if (r.pct) { var ps2 = 30, pw = cW(g, r.pct, ps2, 900) + 32, mx = (x1 + x2) / 2, my = (ya + yb) / 2; cRound(g, mx - pw / 2, my - 24, pw, 48, 24, col); cText(g, r.pct, mx, my + 11, ps2, 900, "#ffffff", "center"); }
     g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.beginPath(); g.moveTo(P, yy + rh); g.lineTo(P + W, yy + rh); g.stroke();
   });
   return tplFoot(c);
@@ -218,7 +221,8 @@ function tplTimeline(c, s) {
     var dl = String(b.date || "").split("\n"); dl.forEach(function (d, i) { cText(g, d, P + dw / 2, y + h / 2 - (dl.length - 1) * 20 + i * 40 + 12, dl.length > 1 && i === 0 ? 26 : 34, 900, i === dl.length - 1 ? TPL_C.gold : "#ffffff", "center"); });
     tplBand(g, P + dw + 16, y + 10, W - dw - 32, headH - 16, b.title || "", 28, TPL_C.box, TPL_C.ink); g.strokeStyle = TPL_C.ink; g.lineWidth = 3; g.strokeRect(P + dw + 16, y + 10, W - dw - 32, headH - 16);
     items.forEach(function (t, i) {
-      var yy = y + headH + 8 + i * ih + ih * 0.68, x = P + dw + 24, fs = Math.min(27, ih * 0.6);
+      var yy = y + headH + 8 + i * ih + ih * 0.68, x = P + dw + 24, fs = Math.min(34, ih * 0.5), maxW = W - dw - 90;   // v12.20 칸이 크면 글씨도 키우고, 폭에 맞춰 줄인다
+      while (fs > 20 && cW(g, cPlain(String(t)), fs, 800) > maxW) fs -= 1;
       g.fillStyle = TPL_C.ink; g.beginPath(); g.arc(x + 14, yy - fs * 0.35, 14, 0, Math.PI * 2); g.fill(); cText(g, String(i + 1), x + 14, yy - fs * 0.35 + 7, 18, 900, "#ffffff", "center");
       var parts = String(t).split(/\[\[|\]\]/), cx = x + 40; cFont(g, fs, 800);
       parts.forEach(function (p, k) { if (!p) return; var w = g.measureText(p).width; if (k % 2) { g.fillStyle = TPL_C.hl; g.fillRect(cx - 2, yy - fs * 0.95, w + 4, fs * 1.2); } cText(g, p, cx, yy, fs, 800, TPL_C.ink); cx += w; });
@@ -250,17 +254,16 @@ function tplLines(c, s) {
   tplBox(g, P, y, W, rows.length * rh + 20, 18);
   rows.forEach(function (r, i) {
     var yy = y + 10 + i * rh, mid = yy + rh / 2;
-    if (r.icon) cText(g, r.icon, P + 70, mid + 16, 40, 400, TPL_C.ink, "center");
-    var lsz = 38; while (lsz > 26 && cW(g, r.left, lsz, 900) > (r.icon ? 340 : 400)) lsz -= 2;   // v11.6 길면 줄여서 다 보이게
-    cText(g, cFit(g, r.left, r.icon ? 340 : 400, lsz, 900), r.icon ? P + 130 : P + 40, mid + 14, lsz, 900, TPL_C.ink);
-    cText(g, "➜", P + 500, mid + 14, 38, 900, TPL_C.red, "center");
-    var rw = W - 580, rs = 40; while (rs > 32 && cW(g, r.right, rs, 900) > rw) rs -= 2;
-    if (cW(g, r.right, rs, 900) <= rw) { cText(g, r.right, P + 560, mid + (r.sub ? 6 : 14), rs, 900, TPL_C.red); if (r.sub) cText(g, cFit(g, r.sub, rw, 19, 600), P + 560, mid + 36, 19, 600, TPL_C.sub); }
-    else { var ws = Math.max(20, Math.min(30, (rh - 24) / 2 / 1.25)), nl = Math.min(2, cWrapCount(g, r.right, rw, ws, 800)); cWrap(g, r.right, P + 560, mid - (nl - 1) * ws * 0.62 + ws * 0.36, rw, ws, 800, TPL_C.red, ws * 1.25, 2); }   // v10.4: 길면 두 줄로
+    // v12.20 핀 아이콘 제거 · 왼쪽 용어는 금색 꼬리표 · 오른쪽 뜻은 한 줄(글씨를 줄여서) — 두 줄은 최후 수단
+    var lsz = 34, lmax = 300; while (lsz > 22 && cW(g, r.left, lsz, 900) > lmax - 28) lsz -= 2;
+    var tagW = Math.min(lmax, cW(g, r.left, lsz, 900) + 28); cRound(g, P + 28, mid - 26, tagW, 52, 10, "#f3e7c6"); cText(g, cFit(g, r.left, lmax - 28, lsz, 900), P + 28 + tagW / 2, mid + 12, lsz, 900, TPL_C.ink, "center");
+    var rx = P + 28 + lmax + 24, rw = W - (lmax + 80), rs = 34; while (rs > 24 && cW(g, r.right, rs, 800) > rw) rs -= 1;
+    if (cW(g, r.right, rs, 800) <= rw) { cText(g, r.right, rx, mid + (r.sub ? 4 : 12), rs, 800, TPL_C.ink); if (r.sub) cText(g, cFit(g, r.sub, rw, 19, 600), rx, mid + 34, 19, 600, TPL_C.sub); }
+    else { var ws = Math.max(20, Math.min(26, (rh - 24) / 2 / 1.25)), nl = Math.min(2, cWrapCount(g, r.right, rw, ws, 800)); cWrap(g, r.right, rx, mid - (nl - 1) * ws * 0.62 + ws * 0.36, rw, ws, 800, TPL_C.ink, ws * 1.25, 2); }
     if (i < rows.length - 1) { g.setLineDash([8, 8]); g.strokeStyle = TPL_C.shade; g.lineWidth = 2; g.beginPath(); g.moveTo(P + 30, yy + rh); g.lineTo(P + W - 30, yy + rh); g.stroke(); g.setLineDash([]); }
   });
   y += rows.length * rh + 40;
-  if (s.punch) { cRound(g, P, y, W, 90, 10, TPL_C.black); g.fillStyle = TPL_C.gold; g.fillRect(P, y, 8, 90); cText(g, cFit(g, s.punch.left, 400, 36, 900), P + 30, y + 58, 36, 900, "#ffffff"); cText(g, "➜", P + 470, y + 58, 36, 900, TPL_C.gold); var ps = 44; while (ps > 28 && cW(g, s.punch.right, ps, 900) > W - 560) ps -= 2; cText(g, s.punch.right, P + 520, y + 60, ps, 900, TPL_C.gold); y += 110; }
+  if (s.punch) { cRound(g, P, y, W, 90, 10, TPL_C.black); g.fillStyle = TPL_C.gold; g.fillRect(P, y, 8, 90); cText(g, cFit(g, s.punch.left, 400, 36, 900), P + 30, y + 58, 36, 900, "#ffffff"); cText(g, "→", P + 470, y + 58, 36, 900, TPL_C.gold); var ps = 44; while (ps > 28 && cW(g, s.punch.right, ps, 900) > W - 560) ps -= 2; cText(g, s.punch.right, P + 520, y + 60, ps, 900, TPL_C.gold); y += 110; }
   if (s.closing) cWrap(g, s.closing, P + W / 2, y + 44, W - 40, 30, 800, TPL_C.ink, 40, 2, "center");
   return tplFoot(c);
 }
@@ -297,6 +300,8 @@ function tplCard(cat, meta, spec) { meta = meta || {}; meta.cat = cat; if (meta.
 /* ============================================================
    앱 데이터 → 명세 (양식집 화면용) · 시장별로 내용만 바뀐다
    ============================================================ */
+/* v12.20 '20일선 위 50일선 위 200일선 위' → '20·50·200일선 위' 처럼 같은 꼬리를 묶어 한 칸에 들어가게 */
+function tplReasonShort(t) { t = String(t || "").trim(); if (!t) return t; var groups = {}, order = [], rest = []; t.split(/\s+/).forEach(function (w) { var m = w.match(/^(\d+)일선(위|아래)$/) || (w.match(/^(\d+)일선$/) ? null : null); if (m) { var k = "일선 " + m[2]; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(m[1]); } else rest.push(w); }); var m2 = t.match(/(\d+)일선 (위|아래)/g); if (m2 && m2.length >= 2) { var g2 = {}, o2 = []; m2.forEach(function (x) { var mm = x.match(/(\d+)일선 (위|아래)/); var k = mm[2]; if (!g2[k]) { g2[k] = []; o2.push(k); } g2[k].push(mm[1]); }); var repl = o2.map(function (k) { return g2[k].join("·") + "일선 " + k; }).join(" · "); var others = t.replace(/(\d+)일선 (위|아래)/g, "").replace(/\s{2,}/g, " ").trim(); return (repl + (others ? " · " + others : "")).trim(); } return t; }
 function tplStat(sym) { var r = (typeof briefState !== "undefined" && briefState.recent) || null, d = r && r.symbols[sym]; return d ? briefStats(sym, d, "day") : null; }
 function tplDateTxt(R) { var m = typeof cMktInfo === "function" ? cMktInfo(R) : null; return m ? m.date : cDate(Date.now()); }
 function tplSrc(R) { return "야후 파이낸스 종가 · " + tplDateTxt(R) + " 기준 · StockMind 자동 집계"; }
@@ -348,7 +353,7 @@ function tplSpec(cat, srcId, mkSel) {
     if (srcId === "themes") return { meta: { title: (R.market === "coin" ? "테마" : "업종") + " 성적표", sub: mkName + " · " + date + " · 평균 등락 · 가장 센 " + unit, source: src, catName: mkName + " 업종" }, spec: { cols: [R.market === "coin" ? "테마" : "업종", "평균", "오른 " + unit, "1등", "꼴찌"], widths: [0.26, 0.16, 0.16, 0.21, 0.21], hlCols: [1], rows: R.themes.slice(0, 10).map(function (t) { return [t.name, tplPct(t.ret, 1), t.up + "/" + t.n, briefName(t.best), briefName(t.worst)]; }) } };
     if (srcId === "idx") { var SY = [["^GSPC", "S&P500"], ["^IXIC", "나스닥"], ["^KS11", "코스피"], ["^KQ11", "코스닥"], ["BTC-USD", "비트코인"], ["ETH-USD", "이더리움"], ["GLD", "금"], ["TLT", "미국 장기채"], ["KRW=X", "달러/원"], ["^VIX", "VIX"]]; return { meta: { title: "오늘의 숫자 한눈에", sub: date + " 종가 · 하루 · 1개월 · 고점 대비", source: src, catName: "시장 숫자" }, spec: { cols: ["자산", "종가", "하루", "1개월", "고점 대비"], widths: [0.26, 0.24, 0.16, 0.16, 0.18], hlCols: [2], rows: SY.map(function (a) { var s = tplStat(a[0]); return s ? [a[1], a[0] === "^VIX" ? s.last.toFixed(1) : tplFmt(a[0], s.last), tplPct(s.ret1, 1), tplPct(s.m1, 0), tplPct(s.vsHi, 0)] : null; }).filter(Boolean) } }; }
     var pk = typeof pkReady === "function" ? pkReady(R) : null, side = srcId === "picksWarn" ? "warn" : "buy", L = pk ? pk[side] : [];
-    return { meta: { title: side === "buy" ? "매수 후보 판정표" : "주의 " + unit + " 판정표", sub: mkName + " · " + date + " · 추세·RSI·대금·재무·기사 복합 점수", source: src, catName: "선별 " + unit }, spec: { cols: [unit, "점수", "추세", "RSI", "고점比", "핵심 이유"], widths: [0.2, 0.12, 0.2, 0.1, 0.12, 0.26], hlCols: [1], rows: L.map(function (x) { var s = x.s; return [briefName(s), (side === "buy" ? "+" + x.bs + "/-" + x.ws : "-" + x.ws + "/+" + x.bs), (s.above20 ? "20↑" : "20↓") + (s.above200 == null ? "" : s.above200 ? " 200↑" : " 200↓"), s.rsi != null ? Math.round(s.rsi) : "-", tplPct(s.vsHi, 0), (typeof pkTopReason === "function" ? pkTopReason(x, side) : "").split(" · ").slice(1).join(" ") || "-"]; }), note: L.length ? "점수 = 플러스 항목 합 / 마이너스 항목 합 · 데이터로 고른 후보이며 판단은 본인에게" : "선별 종목이 아직 계산되지 않았어요 — 오늘의 브리핑 화면을 먼저 열어 주세요" } };
+    return { meta: { title: side === "buy" ? "매수 후보 판정표" : "주의 " + unit + " 판정표", sub: mkName + " · " + date + " · 추세·RSI·대금·재무·기사 복합 점수", source: src, catName: "선별 " + unit }, spec: { cols: [unit, "점수", "추세", "RSI", "고점 대비", "핵심 이유"], widths: [0.21, 0.13, 0.17, 0.09, 0.13, 0.27], hlCols: [1], rows: L.map(function (x) { var s = x.s; return [briefName(s), (side === "buy" ? "+" + x.bs + " / -" + x.ws : "-" + x.ws + " / +" + x.bs), (s.above20 ? "20↑" : "20↓") + (s.above200 == null ? "" : s.above200 ? " 200↑" : " 200↓"), s.rsi != null ? Math.round(s.rsi) : "-", tplPct(s.vsHi, 0), tplReasonShort((typeof pkTopReason === "function" ? pkTopReason(x, side) : "").split(" · ").slice(1).join(" ")) || "-"]; }), note: L.length ? "점수 = 플러스 항목 합 / 마이너스 항목 합 · 데이터로 고른 후보이며 판단은 본인에게" : "선별 종목이 아직 계산되지 않았어요 — 오늘의 브리핑 화면을 먼저 열어 주세요" } };
   }
   if (cat === "compare") {
     if (srcId === "hi") { var dd = S.filter(function (s) { return s.vsHi != null && s.hi250; }).sort(function (a, b) { return a.vsHi - b.vsHi; }).slice(0, 4); return { meta: { title: "고점 vs 지금", sub: mkName + " · 52주 최고가 대비 가장 많이 빠진 " + unit + " 4", source: src, catName: mkName + " 낙폭" }, spec: { aLabel: "고점", aSub: "52주 최고가", bLabel: "지금", bSub: date + " 종가", rows: dd.map(function (s) { return { badge: briefName(s), name: "고점 대비 " + tplPct(s.vsHi, 0), a: tplFmt(s.sym, s.hi250), b: tplFmt(s.sym, s.last), pct: tplPct(s.vsHi, 0) }; }) } }; }
