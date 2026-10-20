@@ -24,6 +24,7 @@ function hubLoad(list) { return typeof nbLoad === "function" ? nbLoad(list) : Pr
    pages: [{ top:[결론 줄], title, sub, kind:'rows'|'bars'|'tiles'|'table'|'text'|'news', data, gold:[문장, 작은 문장], foot }] */
 function hubDraw(spec) {
   HUB.lastSpec = spec;
+  spec.pages = (spec.pages || []).filter(Boolean);   // v12.18 조건부 페이지(null) 허용
   var out = [], total = spec.pages.length + 2, pg = 1;
   out.push({ name: "표지", cv: nbCover(spec.small || cDate(Date.now()), spec.hook, spec.lead, spec.meta) });
   spec.pages.forEach(function (p, i) {
@@ -38,12 +39,17 @@ function hubDraw(spec) {
 }
 function hubBody(c, p) {
   var k = p.kind, d = p.data;
+  if (d && typeof d === "object" && !Array.isArray(d) && p.note && !d.note) d.note = p.note;   // v12.18 새 양식이 아래 정리 상자 높이를 미리 알 수 있게
   if (k === "rows") hubRowsFill(c, d, p.leftW);
   else if (k === "rowsNote") { var keepH = NB.H; var noteH = Math.min(260, Math.max(150, 90 + cWrapCount(c.g, p.note || "", NB.W - NB.PAD * 2 - 64, 24, 700) * 36)); NB.H -= noteH; try { hubRowsFill(c, d, p.leftW); } finally { NB.H = keepH; } hubFillRest(c, p); }
   else if (k === "bars") { nbBars(c, d); hubFillRest(c, p); }
   else if (k === "tiles") { nbTiles(c, d.tiles); if (d.rows) hubRowsFill(c, d.rows, p.leftW); else hubFillRest(c, p); }
   else if (k === "table") { hubTableFill(c, d); }
   else if (k === "text") hubTextFill(c, d);
+  else if (k === "line") { hubLineFill(c, d); hubFillRest(c, p); }
+  else if (k === "hist") { hubHistFill(c, d); hubFillRest(c, p); }
+  else if (k === "pair") { hubPairFill(c, d); hubFillRest(c, p); }
+  else if (k === "gauge") { hubGaugeFill(c, d); if (d.tiles) nbTiles(c, d.tiles); hubFillRest(c, p); }
   if (p.gold && k !== "rows" && k !== "table") { var y0 = c.y; if (NB.H - 110 - y0 > 120) nbGoldLine(c, p.gold[0], p.gold[1]); }
 }
 /* 남은 칸을 비우지 않는다: 아래 '한 줄 정리' 상자로 채움 */
@@ -104,6 +110,75 @@ function hubTextFill(c, d) {
   if (d.after) { var g2 = c.g, ah = Math.min(120, NB.H - 96 - c.y); if (ah > 60) { cRound(g2, P, c.y, W, ah, 14, NB_INK); cText(g2, d.after[0], P + 24, c.y + 40, 20, 800, NB_C.gold); cWrap(g2, d.after[1], P + 24, c.y + 76, W - 48, 22, 600, "#f3efe6", 30, 2); c.y += ah; } }
 }
 
+/* ============================================================ v12.18 새 양식 4종 — 선(추이) · 분포 · 짝 막대(둘 비교) · 게이지(지금 위치) ============================================================ */
+function hubYmd(t) { var d = new Date(t + 9 * 3600e3); return String(d.getUTCFullYear()).slice(2) + "." + (d.getUTCMonth() + 1); }
+/* 선: d = { pts:[{t,v}], fmt(v), refs:[{v,label,color}], fill:true, label:'마지막 값 설명', color } — 시간 흐름을 보여줄 때 */
+function hubLineFill(c, d) {
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, pts = (d.pts || []).filter(function (x) { return x && isFinite(x.v); }); if (pts.length < 2) { c.y += 40; return; }
+  var fmt = d.fmt || function (v) { return String(Math.round(v)); }, H = Math.min(420, Math.max(220, NB.H - 110 - c.y - (d.note ? 150 : 0) - 70)), top = c.y + 44, left = P, right = P + W - 150, bottom = top + H;
+  var vs = pts.map(function (x) { return x.v; }).concat((d.refs || []).map(function (r) { return r.v; })), mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs); if (mx === mn) mx = mn + 1; var pad = (mx - mn) * 0.08; mn -= pad; mx += pad;
+  var X = function (i) { return left + (right - left) * i / (pts.length - 1); }, Y = function (v) { return bottom - (v - mn) / (mx - mn) * H; };
+  // 격자 2줄
+  g.strokeStyle = NB_C.line; g.lineWidth = 1.5; [0.33, 0.66].forEach(function (f) { var y = top + H * f; g.beginPath(); g.moveTo(left, y); g.lineTo(right, y); g.stroke(); });
+  // 기준선
+  (d.refs || []).forEach(function (r) { var y = Y(r.v); g.save(); g.setLineDash([10, 8]); g.strokeStyle = r.color || NB_C.grey; g.lineWidth = 2; g.beginPath(); g.moveTo(left, y); g.lineTo(right, y); g.stroke(); g.restore(); cText(g, r.label || fmt(r.v), right + 10, y + 8, 20, 700, r.color || NB_C.sub); });
+  // 영역 + 선
+  var col = d.color || NB_HI;
+  if (d.fill !== false) { g.beginPath(); g.moveTo(X(0), bottom); pts.forEach(function (x, i) { g.lineTo(X(i), Y(x.v)); }); g.lineTo(X(pts.length - 1), bottom); g.closePath(); g.fillStyle = "rgba(184,145,63,0.14)"; g.fill(); }
+  g.strokeStyle = col; g.lineWidth = 5; g.lineJoin = "round"; g.lineCap = "round"; g.beginPath(); pts.forEach(function (x, i) { if (i) g.lineTo(X(i), Y(x.v)); else g.moveTo(X(i), Y(x.v)); }); g.stroke();
+  // 최고·최저·마지막
+  var iMax = 0, iMin = 0; pts.forEach(function (x, i) { if (x.v > pts[iMax].v) iMax = i; if (x.v < pts[iMin].v) iMin = i; });
+  var last = pts[pts.length - 1]; g.fillStyle = col; g.beginPath(); g.arc(X(pts.length - 1), Y(last.v), 11, 0, Math.PI * 2); g.fill(); g.fillStyle = NB_PAPER; g.beginPath(); g.arc(X(pts.length - 1), Y(last.v), 5, 0, Math.PI * 2); g.fill();
+  cText(g, fmt(last.v), right + 14, Y(last.v) + 10, 30, 900, NB_C.txt);
+  if (iMax !== pts.length - 1) cText(g, "최고 " + fmt(pts[iMax].v), Math.min(right - 120, Math.max(left + 60, X(iMax))), Y(pts[iMax].v) - 14, 20, 700, NB_C.sub, "center");
+  if (iMin !== pts.length - 1) cText(g, "최저 " + fmt(pts[iMin].v), Math.min(right - 120, Math.max(left + 60, X(iMin))), Math.min(bottom - 8, Y(pts[iMin].v) + 32), 20, 700, NB_C.sub, "center");
+  // 축 날짜
+  g.strokeStyle = NB_C.sub; g.lineWidth = 2; g.beginPath(); g.moveTo(left, bottom + 2); g.lineTo(right, bottom + 2); g.stroke();
+  cText(g, hubYmd(pts[0].t), left, bottom + 32, 20, 600, NB_C.sub); cText(g, hubYmd(pts[Math.floor(pts.length / 2)].t), (left + right) / 2, bottom + 32, 20, 600, NB_C.sub, "center"); cText(g, hubYmd(last.t), right, bottom + 32, 20, 600, NB_C.sub, "right");
+  c.y = bottom + 50;
+  if (d.label) { cText(g, cFit(g, d.label, W, 22, 600), P, c.y + 20, 22, 600, NB_C.sub); c.y += 34; }
+}
+/* 분포: d = { values:[], bins:n, fmt, mean:true } — 평균 하나가 아니라 퍼짐을 보여줄 때 */
+function hubHistFill(c, d) {
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, v = (d.values || []).filter(isFinite); if (v.length < 5) { c.y += 40; return; }
+  var fmt = d.fmt || function (x) { return cPct(x, 0); }, n = d.bins || 9, mn = Math.min.apply(null, v), mx = Math.max.apply(null, v); if (mx === mn) mx = mn + 1e-6;
+  var cnt = []; for (var i = 0; i < n; i++) cnt.push(0); v.forEach(function (x) { var k = Math.min(n - 1, Math.floor((x - mn) / (mx - mn) * n)); cnt[k]++; });
+  var H = Math.min(360, Math.max(200, NB.H - 110 - c.y - (d.note ? 150 : 0) - 110)), top = c.y + 60, bottom = top + H, bw = W / n, mxc = Math.max.apply(null, cnt) || 1;
+  cnt.forEach(function (k, i) { var lo = mn + (mx - mn) * i / n, hi = lo + (mx - mn) / n, mid = (lo + hi) / 2, h = k / mxc * H, x = P + i * bw + 6; g.fillStyle = mid >= 0 ? NB_C.up : NB_C.down; g.fillRect(x, bottom - h, bw - 12, h); if (k) cText(g, String(k), x + (bw - 12) / 2, bottom - h - 10, 20, 800, NB_C.txt, "center"); if (i % Math.ceil(n / 5) === 0 || i === n - 1) cText(g, fmt(lo), P + i * bw, bottom + 30, 19, 600, NB_C.sub, i === n - 1 ? "left" : "left"); });
+  g.strokeStyle = NB_C.sub; g.lineWidth = 2; g.beginPath(); g.moveTo(P, bottom + 2); g.lineTo(P + W, bottom + 2); g.stroke();
+  if (mn < 0 && mx > 0) { var x0 = P + (0 - mn) / (mx - mn) * W; g.save(); g.setLineDash([8, 8]); g.strokeStyle = NB_C.txt; g.lineWidth = 2; g.beginPath(); g.moveTo(x0, top - 20); g.lineTo(x0, bottom); g.stroke(); g.restore(); cText(g, "0%", x0, top - 28, 20, 800, NB_C.txt, "center"); }
+  var mean = v.reduce(function (a, x) { return a + x; }, 0) / v.length, win = v.filter(function (x) { return x > 0; }).length;
+  c.y = bottom + 48; cText(g, cFit(g, "표본 " + v.length + "회 · 평균 " + fmt(mean) + " · 오른 비율 " + Math.round(win / v.length * 100) + "% · 최악 " + fmt(mn) + " · 최고 " + fmt(mx), W, 22, 700), P, c.y + 22, 22, 700, NB_C.txt); c.y += 40;
+}
+/* 짝 막대: d = { rows:[{l, a, b}], aName, bName, fmt } — 둘(예: S&P500 vs 코스피)을 같은 칸에서 비교 */
+function hubPairFill(c, d) {
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, rows = (d.rows || []).filter(Boolean); if (!rows.length) { c.y += 40; return; }
+  var fmt = d.fmt || function (x) { return cPct(x, 0); }, lw = d.leftW || 300, bx = P + lw, bwid = W - lw - 120, avail = NB.H - 110 - c.y - (d.note ? 150 : 0) - 40, rh = Math.max(70, Math.min(130, Math.floor(avail / rows.length)));
+  var vals = []; rows.forEach(function (r) { if (isFinite(r.a)) vals.push(Math.abs(r.a)); if (isFinite(r.b)) vals.push(Math.abs(r.b)); }); var mxAbs = Math.max.apply(null, vals) || 0.01;
+  // 범례
+  g.fillStyle = NB_HI; g.fillRect(P, c.y + 6, 26, 14); cText(g, d.aName || "A", P + 34, c.y + 20, 20, 700, NB_C.txt); var ax = P + 34 + cW(g, d.aName || "A", 20, 700) + 24; g.fillStyle = NB_C.navy; g.fillRect(ax, c.y + 6, 26, 14); cText(g, d.bName || "B", ax + 34, c.y + 20, 20, 700, NB_C.txt); c.y += 40;
+  var y = c.y;
+  rows.forEach(function (r, i) {
+    if (i % 2 === 0) { g.fillStyle = "rgba(20,22,28,0.035)"; g.fillRect(P - 8, y, W + 16, rh); }
+    cText(g, cFit(g, r.l, lw - 16, 22, 700), P, y + rh / 2 + 8, 22, 700, NB_C.txt);
+    [["a", NB_HI], ["b", NB_C.navy]].forEach(function (k, j) { var v = r[k[0]], by = y + 10 + j * (rh - 20) / 2, bh = (rh - 20) / 2 - 6; if (!isFinite(v)) { cText(g, "표본 부족", bx, by + bh - 4, 18, 600, NB_C.sub); return; } var w = Math.max(4, Math.abs(v) / mxAbs * bwid); g.fillStyle = k[1]; g.globalAlpha = v >= 0 ? 1 : 0.45; g.fillRect(bx, by, w, bh); g.globalAlpha = 1; if (v < 0) { g.strokeStyle = k[1]; g.lineWidth = 2; g.strokeRect(bx + 1, by + 1, w - 2, bh - 2); } cText(g, fmt(v), bx + w + 10, by + bh - 4, 22, 900, v >= 0 ? NB_C.up : NB_C.down); });
+    g.strokeStyle = NB_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(P, y + rh); g.lineTo(P + W, y + rh); g.stroke(); y += rh;
+  });
+  c.y = y + 10;
+}
+/* 게이지: d = { v, min, max, zones:[{to, label, color}], fmt, title, sub } — '지금 위치'를 구간 띠 위에 표시 */
+function hubGaugeFill(c, d) {
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, fmt = d.fmt || function (x) { return String(x); }, mn = d.min, mx = d.max, v = Math.max(mn, Math.min(mx, d.v));
+  var X = function (x) { return P + (x - mn) / (mx - mn) * W; }, y0 = c.y + 70, bh = 44, prev = mn;
+  (d.zones || []).forEach(function (z, i) { var x1 = X(prev), x2 = X(z.to); g.fillStyle = z.color || "#ddd"; g.fillRect(x1, y0, x2 - x1, bh); cText(g, cFit(g, z.label, x2 - x1 - 8, 19, 700), (x1 + x2) / 2, y0 + bh + 28, 19, 700, NB_C.sub, "center"); if (i) { g.strokeStyle = NB_PAPER; g.lineWidth = 3; g.beginPath(); g.moveTo(x1, y0); g.lineTo(x1, y0 + bh); g.stroke(); cText(g, fmt(prev), x1, y0 - 12, 18, 600, NB_C.sub, "center"); } prev = z.to; });
+  // 마커
+  var xv = X(v); g.fillStyle = NB_INK; g.beginPath(); g.moveTo(xv, y0 - 6); g.lineTo(xv - 16, y0 - 34); g.lineTo(xv + 16, y0 - 34); g.closePath(); g.fill();
+  g.fillStyle = NB_INK; g.fillRect(xv - 3, y0, 6, bh);
+  var txt = (d.title ? d.title + " " : "") + fmt(d.v), tw = cW(g, txt, 34, 900) + 36, tx = Math.min(P + W - tw, Math.max(P, xv - tw / 2)); cRound(g, tx, y0 - 96, tw, 54, 12, NB_INK); cText(g, txt, tx + tw / 2, y0 - 58, 34, 900, NB_C.gold, "center");
+  c.y = y0 + bh + 60;
+  if (d.sub) { cWrap(g, d.sub, P, c.y + 24, W, 24, 600, NB_C.txt, 34, 2); c.y += 24 + 34 * Math.min(2, cWrapCount(g, d.sub, W, 24, 600)); }
+  c.y += 10;
+}
 /* ============================================================ 새 데이터 주제 ============================================================ */
 function hubPctTone(v) { return v > 0 ? NB_C.up : v < 0 ? NB_C.down : NB_C.sub; }
 /* 기사 본문: 네이버 뉴스 링크면 서버가 본문 문장을 읽어 온다(하루 캐시) — 요약이 "…"로 끊기지 않게 문장 단위로 칸에 맞춰 넣는다 */
@@ -215,8 +290,10 @@ function hubDecadeDeck() {
 function hubFwdBuckets(rows, nB, bucketOf) {
   var B = []; for (var k = 0; k < nB; k++) B.push({ v: [], last: -1e9 });
   for (var i = 0; i < rows.length - 252; i++) { var b = bucketOf(i); if (b == null || b < 0) continue; if (i - B[b].last < 20) continue; B[b].last = i; B[b].v.push(rows[i + 252].c / rows[i].c - 1); }
-  return B.map(function (x) { var v = x.v; if (!v.length) return { n: 0 }; var s = v.slice().sort(function (a, b) { return a - b; }); return { n: v.length, avg: v.reduce(function (a, y) { return a + y; }, 0) / v.length, med: s[v.length >> 1], win: v.filter(function (y) { return y > 0; }).length / v.length }; });
+  return B.map(function (x) { var v = x.v; if (!v.length) return { n: 0, v: [] }; var s = v.slice().sort(function (a, b) { return a - b; }); return { n: v.length, v: v, avg: v.reduce(function (a, y) { return a + y; }, 0) / v.length, med: s[v.length >> 1], win: v.filter(function (y) { return y > 0; }).length / v.length }; });
 }
+function hubLinePts(rows, years, n) { var r = rows.slice(-Math.round(years * 252)); if (r.length < 10) return []; var step = Math.max(1, Math.floor(r.length / (n || 160))), out = []; for (var i = 0; i < r.length; i += step) out.push({ t: r[i].t, v: r[i].c }); if (out[out.length - 1].t !== r[r.length - 1].t) out.push({ t: r[r.length - 1].t, v: r[r.length - 1].c }); return out; }
+function hubPairRows(L, A, B) { return L.map(function (l, i) { return { l: l, a: A[i].n ? A[i].avg : NaN, b: B[i].n ? B[i].avg : NaN }; }); }
 function hubFwdRows(labels, B, mk) { return labels.map(function (l, i) { var b = B[i]; return b.n ? [l, (mk ? mk + " · " : "") + "오른 비율 " + Math.round(b.win * 100) + "% · " + b.n + "회", "1년 뒤 " + cPct(b.avg, 0), hubPctTone(b.avg)] : [l, "표본 부족", "-", NB_C.sub]; }); }
 /* ⑪ 고점 대비 낙폭 구간별 1년 뒤 */
 function hubDdDeck() {
@@ -227,8 +304,9 @@ function hubDdDeck() {
   var zs = zone(sp.cur), zk = zone(ks.cur), bs = sp.B[zs], bk = ks.B[zk];
   return hubDraw({ small: "데이터로 보는 투자", hook: [sp.cur > -0.03 ? "S&P500이 [[고점 근처]]인 지금," : "고점에서 [[" + Math.round(-sp.cur * 100) + "%]] 빠진 지금,", "과거엔 1년 뒤 어땠을까?"], lead: "S&P500과 코스피의 전 기간 일봉에서 '그날이 직전 고점 대비 몇 % 아래였나'로 칸을 나누고, 그날 종가에 샀다면 1년(252거래일) 뒤 수익률을 모았어요. 같은 국면 중복을 줄이려 20거래일 간격으로 뽑았어요.", pages: [
     { top: ["S&P500 · 고점 대비 낙폭별", "1년 뒤 평균 수익률"], title: "S&P500 — 떨어진 폭별로 1년 뒤", sub: "직전 고점 대비 그날 위치 → 1년 뒤", kind: "rows", data: hubFwdRows(L, sp.B, "S&P500"), leftW: 330 },
-    { top: ["코스피 · 고점 대비 낙폭별", "1년 뒤 평균 수익률"], title: "코스피 — 떨어진 폭별로 1년 뒤", sub: "직전 고점 대비 그날 위치 → 1년 뒤", kind: "rows", data: hubFwdRows(L, ks.B, "코스피"), leftW: 330 },
-    { top: ["지금 S&P500은 고점 대비 [[" + cPct(sp.cur, 0) + "]]", "코스피는 [[" + cPct(ks.cur, 0) + "]]"], title: "지금 위치에 해당하는 칸", sub: "과거 같은 칸의 1년 뒤 — 평균일 뿐 보장이 아님", kind: "tiles", data: { tiles: [{ v: bs.n ? cPct(bs.avg, 0) : "-", l: "S&P500 · " + L[zs] + " 1년 뒤 평균", color: bs.n ? hubPctTone(bs.avg) : NB_C.sub }, { v: bs.n ? Math.round(bs.win * 100) + "%" : "-", l: "S&P500 · 1년 뒤 올라 있던 비율 (" + (bs.n || 0) + "회)", color: NB_C.navy }, { v: bk.n ? cPct(bk.avg, 0) : "-", l: "코스피 · " + L[zk] + " 1년 뒤 평균 (" + (bk.n || 0) + "회)", color: bk.n ? hubPctTone(bk.avg) : NB_C.sub }] }, note: "많이 빠진 칸일수록 1년 뒤 평균이 높게 나오는 경향이 있지만, 표본이 적고(큰 하락은 드물어요) 2000·2008년처럼 1년 뒤에도 더 빠져 있던 때가 섞여 있어요. 평균이 아니라 '오른 비율'과 '표본 수'를 같이 보세요.", gold: ["낙폭은 기회의 크기이자 위험의 크기", "버틸 수 있는 비중이 먼저"] }
+    { top: ["같은 칸에서 S&P500과 코스피는", "[[얼마나 달랐나]]"], title: "S&P500 vs 코스피 — 칸별 1년 뒤 평균", sub: "같은 낙폭 칸 · 막대 길이 = 1년 뒤 평균 수익률", kind: "pair", data: { rows: hubPairRows(L, sp.B, ks.B), aName: "S&P500", bName: "코스피", leftW: 300 }, note: "코스피는 큰 하락 뒤 반등이 더 가파른 편이지만, 고점 근처 칸의 1년 뒤는 S&P500보다 낮은 경우가 많았어요. 같은 '낙폭'이라도 시장마다 결이 달라요." },
+    { top: ["S&P500 최근 3년 흐름과", "[[지금 위치]]"], title: "S&P500 · 최근 3년", sub: "SPY 종가 · 점 = 오늘", kind: "line", data: { pts: hubLinePts(sp.r, 3, 160), fmt: function (v) { return "$" + Math.round(v); }, label: "고점 대비 " + cPct(sp.cur, 1) + " · 지금 칸 = " + L[zs] }, note: "선이 최고점에서 얼마나 내려와 있는지가 '칸'을 정해요. 칸은 매일 바뀌니 저장해 두고 다음 조정 때 다시 보세요." },
+    { top: ["지금 S&P500은 고점 대비 [[" + cPct(sp.cur, 0) + "]]", "코스피는 [[" + cPct(ks.cur, 0) + "]]"], title: "지금 위치에 해당하는 칸", sub: "과거 같은 칸의 1년 뒤 — 평균일 뿐 보장이 아님", kind: "gauge", data: { v: sp.cur, min: -0.4, max: 0, fmt: function (x) { return cPct(x, 0); }, title: "S&P500", zones: [{ to: -0.3, label: "-30% 넘게", color: "#2f6fd6" }, { to: -0.2, label: "-20~-30%", color: "#6f95dd" }, { to: -0.1, label: "-10~-20%", color: "#a9bde6" }, { to: -0.05, label: "-5~-10%", color: "#d9d2c0" }, { to: 0, label: "고점 근처", color: "#e6c57a" }], tiles: [{ v: bs.n ? cPct(bs.avg, 0) : "-", l: "S&P500 · " + L[zs] + " 1년 뒤 평균", color: bs.n ? hubPctTone(bs.avg) : NB_C.sub }, { v: bs.n ? Math.round(bs.win * 100) + "%" : "-", l: "S&P500 · 1년 뒤 올라 있던 비율 (" + (bs.n || 0) + "회)", color: NB_C.navy }, { v: bk.n ? cPct(bk.avg, 0) : "-", l: "코스피 · " + L[zk] + " 1년 뒤 평균 (" + (bk.n || 0) + "회)", color: bk.n ? hubPctTone(bk.avg) : NB_C.sub }] }, note: "많이 빠진 칸일수록 1년 뒤 평균이 높게 나오는 경향이 있지만, 표본이 적고(큰 하락은 드물어요) 2000·2008년처럼 1년 뒤에도 더 빠져 있던 때가 섞여 있어요. 평균이 아니라 '오른 비율'과 '표본 수'를 같이 보세요.", gold: ["낙폭은 기회의 크기이자 위험의 크기", "버틸 수 있는 비중이 먼저"] }
   ], close: ["지금 칸에서 여러분은 어떻게 하시겠어요?", ["저장해 두고 1년 뒤 숫자와 맞춰 보세요.", "과거 평균이 미래를 보장하진 않아요."]], foot: "야후 파이낸스 종가 · S&P500은 SPY(ETF) 기준 · 1년 = 252거래일 · 과거 자료이며 투자 권유 아님" });
 }
 /* ⑫ 공포지수(VIX) 구간별 1년 뒤 */
@@ -241,7 +319,9 @@ function hubVixDeck() {
   var hi = v.slice().sort(function (a, c) { return c.c - a.c; })[0], hd = new Date(hi.t + 9 * 3600e3);
   return hubDraw({ small: "데이터로 보는 투자", hook: ["공포지수 [[" + now.toFixed(0) + "]] — " + L[z].split(" (")[1].replace(")", "") + ".", "공포가 컸던 날 샀다면 1년 뒤는?"], lead: "VIX(S&P500 변동성 지수)는 '시장이 얼마나 겁먹었나'의 숫자예요. VIX 구간별로 그날 S&P500(SPY)을 샀다면 1년 뒤 수익률을 모았어요(20거래일 간격 표본).", pages: [
     { top: ["VIX 구간별", "S&P500 1년 뒤 평균 수익률"], title: "공포가 클수록 1년 뒤는", sub: "그날 VIX 구간 → 그날 종가에 샀다면 1년 뒤", kind: "rows", data: hubFwdRows(L, B, "S&P500"), leftW: 330 },
-    { top: ["지금 VIX " + now.toFixed(1) + " —", "[[" + L[z] + "]] 칸"], title: "지금 칸의 과거 결과", sub: "역대 최고 VIX " + hi.c.toFixed(0) + " (" + hd.getUTCFullYear() + "." + (hd.getUTCMonth() + 1) + ")", kind: "tiles", data: { tiles: [{ v: now.toFixed(1), l: "오늘 VIX", color: now >= 30 ? NB_C.up : now >= 20 ? NB_C.gold2 : NB_C.navy }, { v: b.n ? cPct(b.avg, 0) : "-", l: "같은 칸 1년 뒤 평균 (" + (b.n || 0) + "회)", color: b.n ? hubPctTone(b.avg) : NB_C.sub }, { v: b.n ? Math.round(b.win * 100) + "%" : "-", l: "1년 뒤 올라 있던 비율", color: NB_C.navy }] }, note: "VIX가 30을 넘은 날은 전체의 몇 %뿐이고 대부분 급락 한가운데예요. 그날 사는 건 무섭지만 1년 뒤 결과는 평온한 날보다 나은 편이었어요. 반대로 VIX가 아주 낮을 때는 '좋은 소식이 다 반영된 때'일 수 있어요. 다만 2008년처럼 공포가 몇 달 이어진 때도 있어요.", gold: ["공포지수는 매수 신호가 아니라 체온계", "비중을 정해 두면 공포가 기회가 된다"] }
+    { top: ["VIX 최근 3년 —", "[[20]]을 넘으면 불안, [[30]]을 넘으면 공포"], title: "공포지수 · 최근 3년", sub: "^VIX 종가 · 점 = 오늘 · 역대 최고 " + hi.c.toFixed(0) + " (" + hd.getUTCFullYear() + "." + (hd.getUTCMonth() + 1) + ")", kind: "line", data: { pts: hubLinePts(v, 3, 180), fmt: function (x) { return x.toFixed(0); }, refs: [{ v: 20, label: "불안 20", color: NB_C.gold2 }, { v: 30, label: "공포 30", color: NB_C.up }], label: "VIX는 급등했다가 빠르게 내려오는 성질이 있어요 — 30 위에 오래 머문 적은 드물어요" } },
+    b.n >= 5 ? { top: ["[[" + L[z] + "]] 칸에서 샀던", b.n + "번의 1년 뒤는 이렇게 퍼져 있었다"], title: "지금 칸의 1년 뒤 분포", sub: "평균 하나가 아니라 퍼짐을 보세요 — 빨강 = 올랐던 경우, 파랑 = 내렸던 경우", kind: "hist", data: { values: b.v, bins: 9 }, note: "같은 칸이라도 결과는 넓게 퍼져 있어요. 평균이 플러스라도 마이너스로 끝난 경우가 " + Math.round((1 - b.win) * 100) + "%였어요 — 그 경우를 버틸 수 있는 비중인지가 핵심이에요." } : null,
+    { top: ["지금 VIX " + now.toFixed(1) + " —", "[[" + L[z] + "]] 칸"], title: "지금 칸의 과거 결과", sub: "역대 최고 VIX " + hi.c.toFixed(0) + " (" + hd.getUTCFullYear() + "." + (hd.getUTCMonth() + 1) + ")", kind: "gauge", data: { v: now, min: 0, max: 50, fmt: function (x) { return x.toFixed(x >= 10 ? 0 : 1); }, title: "VIX", zones: [{ to: 15, label: "아주 평온", color: "#d9d2c0" }, { to: 20, label: "평온", color: "#e6c57a" }, { to: 30, label: "불안", color: "#e39a8a" }, { to: 50, label: "공포", color: "#d9342b" }], tiles: [{ v: now.toFixed(1), l: "오늘 VIX", color: now >= 30 ? NB_C.up : now >= 20 ? NB_C.gold2 : NB_C.navy }, { v: b.n ? cPct(b.avg, 0) : "-", l: "같은 칸 1년 뒤 평균 (" + (b.n || 0) + "회)", color: b.n ? hubPctTone(b.avg) : NB_C.sub }, { v: b.n ? Math.round(b.win * 100) + "%" : "-", l: "1년 뒤 올라 있던 비율", color: NB_C.navy }] }, note: "VIX가 30을 넘은 날은 전체의 몇 %뿐이고 대부분 급락 한가운데예요. 그날 사는 건 무섭지만 1년 뒤 결과는 평온한 날보다 나은 편이었어요. 반대로 VIX가 아주 낮을 때는 '좋은 소식이 다 반영된 때'일 수 있어요. 다만 2008년처럼 공포가 몇 달 이어진 때도 있어요.", gold: ["공포지수는 매수 신호가 아니라 체온계", "비중을 정해 두면 공포가 기회가 된다"] }
   ], close: ["VIX가 30을 넘으면 여러분은 무엇을 하시나요?", ["저장해 두고 다음 급락 때 꺼내 보세요.", "평균은 참고, 비중은 내 그릇만큼."]], foot: "야후 파이낸스 종가 · VIX(^VIX) · S&P500은 SPY(ETF) 기준 · 과거 자료이며 투자 권유 아님" });
 }
 /* ⑬ 200일선 위/아래에서 산 뒤 1년 */
@@ -253,8 +333,8 @@ function hubMa200Deck() {
   var zs = zone(sp.d), zk = zone(ks.d);
   return hubDraw({ small: "데이터로 보는 투자", hook: ["[[200일선]] 위에서 사는 게 나을까,", "아래에서 사는 게 나을까?"], lead: "200일 이동평균선은 '최근 1년 평균 가격'이에요. 지수가 그 선보다 얼마나 위·아래에 있었는지로 칸을 나누고, 그날 샀다면 1년 뒤 수익률을 모았어요.", pages: [
     { top: ["S&P500 · 200일선 대비 위치별", "1년 뒤 평균 수익률"], title: "S&P500 — 200일선 위·아래에서 산 뒤", sub: "그날 종가 ÷ 200일 평균 → 1년 뒤", kind: "rows", data: hubFwdRows(L, sp.B, "S&P500"), leftW: 330 },
-    { top: ["코스피 · 200일선 대비 위치별", "1년 뒤 평균 수익률"], title: "코스피 — 200일선 위·아래에서 산 뒤", sub: "그날 종가 ÷ 200일 평균 → 1년 뒤", kind: "rows", data: hubFwdRows(L, ks.B, "코스피"), leftW: 330 },
-    { top: ["지금 S&P500은 200일선보다 [[" + cPct(sp.d, 1) + "]]", "코스피는 [[" + cPct(ks.d, 1) + "]]"], title: "지금 위치", sub: "같은 칸의 과거 1년 뒤", kind: "tiles", data: { tiles: [{ v: cPct(sp.d, 1), l: "S&P500 · 200일선 대비 (" + L[zs] + ")", color: hubPctTone(sp.d) }, { v: sp.B[zs].n ? cPct(sp.B[zs].avg, 0) : "-", l: "S&P500 같은 칸 1년 뒤 평균 (" + (sp.B[zs].n || 0) + "회)", color: NB_C.navy }, { v: ks.B[zk].n ? cPct(ks.B[zk].avg, 0) : "-", l: "코스피 같은 칸 1년 뒤 평균 (" + (ks.B[zk].n || 0) + "회)", color: NB_C.navy }] }, note: "'추세를 따르라'와 '쌀 때 사라'는 서로 반대 조언인데, 지수에서는 어느 쪽이든 1년 뒤 평균은 플러스인 경우가 많았어요. 차이를 만든 건 선 위냐 아래냐보다 '1년을 들고 있었나'였어요. 200일선보다 10% 넘게 아래는 급락 한가운데라 표본이 적고 편차가 커요.", gold: ["선의 위치보다 보유 기간", "급락 칸은 평균보다 편차를 보라"] }
+    { top: ["같은 칸에서 S&P500과 코스피는", "[[얼마나 달랐나]]"], title: "S&P500 vs 코스피 — 칸별 1년 뒤 평균", sub: "200일선 대비 같은 위치 칸 · 막대 = 1년 뒤 평균", kind: "pair", data: { rows: hubPairRows(L, sp.B, ks.B), aName: "S&P500", bName: "코스피", leftW: 300 }, note: "두 시장 모두 '선 위냐 아래냐'보다 1년을 들고 있었는지가 더 큰 차이를 만들었어요. 선 아래 칸은 표본이 적어 편차가 커요." },
+    { top: ["지금 S&P500은 200일선보다 [[" + cPct(sp.d, 1) + "]]", "코스피는 [[" + cPct(ks.d, 1) + "]]"], title: "지금 위치", sub: "같은 칸의 과거 1년 뒤", kind: "gauge", data: { v: sp.d, min: -0.25, max: 0.25, fmt: function (x) { return cPct(x, 0); }, title: "S&P500 200일선 대비", zones: [{ to: -0.1, label: "10% 넘게 아래", color: "#2f6fd6" }, { to: 0, label: "아래", color: "#a9bde6" }, { to: 0.1, label: "위", color: "#e6c57a" }, { to: 0.25, label: "10% 넘게 위", color: "#d9342b" }], tiles: [{ v: cPct(sp.d, 1), l: "S&P500 · 200일선 대비 (" + L[zs] + ")", color: hubPctTone(sp.d) }, { v: sp.B[zs].n ? cPct(sp.B[zs].avg, 0) : "-", l: "S&P500 같은 칸 1년 뒤 평균 (" + (sp.B[zs].n || 0) + "회)", color: NB_C.navy }, { v: ks.B[zk].n ? cPct(ks.B[zk].avg, 0) : "-", l: "코스피 같은 칸 1년 뒤 평균 (" + (ks.B[zk].n || 0) + "회)", color: NB_C.navy }] }, note: "'추세를 따르라'와 '쌀 때 사라'는 서로 반대 조언인데, 지수에서는 어느 쪽이든 1년 뒤 평균은 플러스인 경우가 많았어요. 차이를 만든 건 선 위냐 아래냐보다 '1년을 들고 있었나'였어요. 200일선보다 10% 넘게 아래는 급락 한가운데라 표본이 적고 편차가 커요.", gold: ["선의 위치보다 보유 기간", "급락 칸은 평균보다 편차를 보라"] }
   ], close: ["여러분은 선 위에서 사는 편인가요, 아래에서 사는 편인가요?", ["저장해 두고 다음에 선을 깰 때 꺼내 보세요.", "지수 이야기예요 — 개별 종목은 0이 될 수도 있어요."]], foot: "야후 파이낸스 종가 · 200일 단순이동평균 · S&P500은 SPY(ETF) 기준 · 과거 자료이며 투자 권유 아님" });
 }
 /* ⑦~⑩ 오늘 데이터: 52주 신고가·신저가 / 업종 / 고점 대비 할인 / 돈이 몰린 곳 */
@@ -305,6 +385,7 @@ function hubFxDeck() {
   var f1 = fx[fx.length - 1].c;
   return hubDraw({ small: "환율 상식", hook: ["같은 S&P500인데", "[[원화로 보면]] 수익률이 다르다"], lead: "미국 주식은 '주가'와 '환율'을 같이 산 거예요. 같은 기간 달러 기준과 원화 기준 수익률을 비교했어요. 지금 환율 " + Math.round(f1).toLocaleString("ko-KR") + "원.", pages: [
     { top: [P[P.length - 1].y + "년 기준 차이", "달러 " + cPct(P[P.length - 1].usd, 0) + " → 원화 [[" + cPct(P[P.length - 1].krw, 0) + "]]"], title: "S&P500 · 달러 기준 vs 원화 기준", sub: "기간별 수익률 · 원화 = (1 + 달러 수익률) × (1 + 환율 변화) - 1", kind: "table", data: { cols: ["기간", "달러 기준", "환율 변화", "원화 기준", "그때 환율"], rows: P.map(function (x) { return [x.y + "년", cPct(x.usd, 0), cPct(x.fx, 0), cPct(x.krw, 0), Math.round(x.f0).toLocaleString("ko-KR") + "원"]; }), note: "배당·세금·환전 수수료 제외 · SPY(S&P500 ETF) 종가" } },
+    { top: ["달러/원 최근 3년 —", "지금 [[" + Math.round(fx[fx.length - 1].c).toLocaleString("ko-KR") + "원]]"], title: "달러/원 환율 · 최근 3년", sub: "야후 KRW=X 종가 · 점 = 오늘", kind: "line", data: { pts: hubLinePts(fx, 3, 180), fmt: function (v) { return Math.round(v).toLocaleString("ko-KR") + "원"; }, label: "환율이 오르면(원화 약세) 미국 주식의 원화 평가액이 늘고, 내리면 줄어요" } },
     { top: ["환율이 오르면 미국 주식은", "[[원화로 더 벌고]], 내리면 덜 번다."], title: "환율이 바꾼 숫자", sub: "기간별 원화 기준 − 달러 기준", kind: "bars", data: P.map(function (x) { return { l: x.y + "년", v: x.krw - x.usd, color: hubPctTone(x.krw - x.usd), txt: cPct(x.krw - x.usd, 0).replace("%", "%p") }; }), note: "환율이 높을 때 미국 주식을 사면, 나중에 환율이 내려갈 때 주가가 올라도 수익이 깎일 수 있어요. 반대로 위기 때는 환율이 오르면서 원화 기준 손실을 줄여 주는 '자연 헷지' 역할도 했어요. 환율을 맞히기보다 나눠서 사는 게 편해요.", gold: ["미국 주식 = 주가 × 환율", "환헤지(H) 상품은 환율 영향을 줄인 대신 비용이 있어요"] }
   ], close: ["미국 주식 살 때 환율도 보시나요?", ["저장해 두고, 환율이 크게 움직일 때", "다시 꺼내 보세요."]], foot: "야후 파이낸스 종가(SPY · 달러/원) · 배당·세금 제외 · 과거 자료이며 투자 권유 아님" });
 }
@@ -562,6 +643,8 @@ function hubSpecFacts(spec) {
   var per = [];
   spec.pages.forEach(function (p) {
     var L = [], d = p.data;
+    if (p.kind === "gauge" && d && isFinite(d.v)) L.push({ label: (d.title || "") + " 지금 위치", value: (d.fmt || String)(d.v) });
+    if (p.kind === "pair" && d && d.rows) d.rows.forEach(function (r) { if (isFinite(r.a)) L.push({ label: (d.aName || "A") + " · " + hubStrip(r.l), value: (d.fmt || function (x) { return cPct(x, 0); })(r.a) }); if (isFinite(r.b)) L.push({ label: (d.bName || "B") + " · " + hubStrip(r.l), value: (d.fmt || function (x) { return cPct(x, 0); })(r.b) }); });
     if (p.kind === "rows" || (p.kind === "tiles" && d.rows)) (p.kind === "rows" ? d : d.rows).forEach(function (r) { if (r && r[2] != null && String(r[2]).trim() !== "-" && !/표본 부족|데이터 없음/.test(String(r[1]))) L.push({ label: hubStrip(r[1]) + (r[0] && !/^\d+$/.test(r[0]) ? " · " + hubStrip(r[0]) : ""), value: hubStrip(r[2]) }); });   // v12.17 값 없는 행은 한 장에서 뺀다
     if (p.kind === "tiles") d.tiles.forEach(function (t) { L.push({ label: hubStrip(t.l), value: hubStrip(t.v) }); });
     if (p.kind === "bars") d.forEach(function (b) { L.push({ label: hubStrip(b.l), value: b.txt || cPct(b.v, 1) }); });
