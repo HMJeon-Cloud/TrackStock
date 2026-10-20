@@ -17,7 +17,8 @@ npx playwright install chromium
 | `npm run daily` | 오늘 탭(전체 시장 요약) + 데일리 9장 카드 생성 | `cards 9`, `오류 0` |
 | `npm run report` | 리포트(시장/종목) 전시·종합 해석 | `오류 0` |
 | `npm run analyst` | 애널리스트 페이지 · 기록 · 보정 | `오류 0` |
-| `npm run all` | 위 네 개 순서대로 | |
+| `npm run decks` | 연구노트 카드 묶음 14종(새 카드 3종 포함) 생성 · 한 장 요약 | `ok true`, `오류 0` |
+| `npm run all` | 위 다섯 개 순서대로 | |
 
 스크린샷은 `tests/pf/` 에 저장됩니다(깃에 올릴 필요 없음).
 포트 878x–880x 를 씁니다. 이미 쓰고 있으면 스크립트 안의 포트 숫자를 바꾸세요.

@@ -8,7 +8,7 @@
    모든 카드는 종이색 1080×1350 (연구노트 틀) — 릴스(상식 리스트)도 같은 틀로 다시 그린다
    ============================================================ */
 var HUB = { cache: {}, loading: {} };
-var HUB_HIST = ["SPY", "QQQ", "^KS11", "GLD", "TLT", "BTC-USD", "005930.KS", "000660.KS", "NVDA", "AAPL", "TSLA", "MSFT", "KRW=X", "^GSPC"];
+var HUB_HIST = ["SPY", "QQQ", "^KS11", "GLD", "TLT", "BTC-USD", "005930.KS", "000660.KS", "NVDA", "AAPL", "TSLA", "MSFT", "KRW=X", "^GSPC", "^VIX"];
 function hubSeed() { return Math.floor((Date.now() + 9 * 3600e3) / 86400e3); }
 function hubKst() { return new Date(Date.now() + 9 * 3600e3); }
 function hubR() { return (typeof briefState !== "undefined" && briefState.result) || (typeof chState !== "undefined" && chState.brief) || null; }
@@ -210,6 +210,53 @@ function hubDecadeDeck() {
     { top: ["1등 종목을 미리 알 순 없었다.", "[[지수]]는 대부분 그 중간에 있었다."], title: "결과만 보면 쉬워 보이지만", sub: "10년 전 시점에서 본 질문들", kind: "tiles", data: { tiles: [{ v: man((t10.filter(function (x) { return x.sym === "SPY"; })[0] || t10[0]).v), l: "S&P500 10년", color: NB_C.navy }, { v: man((t10.filter(function (x) { return x.sym === "^KS11"; })[0] || t10[1]).v), l: "코스피 10년", color: NB_C.teal }, { v: man((t10.filter(function (x) { return x.sym === "GLD"; })[0] || t10[2]).v), l: "금 10년", color: NB_C.gold2 }] }, note: "지금 1등인 자산을 10년 전에 고를 수 있었을까요? 당시엔 다른 종목이 더 유망해 보였을 수도 있어요. 개별 종목은 0원이 될 수도 있지만 지수는 시장 전체라 그 위험이 작아요. 이 결과는 지금까지 살아남은 종목만 본 것(생존편향)이에요.", gold: ["모르면 지수, 알면 일부만", "결과를 보고 고른 목록이라는 점을 기억"] }
   ], close: ["10년 전으로 돌아간다면 무엇을 사시겠어요?", ["지난 10년이 다음 10년은 아니에요.", "저장해 두고 5년 뒤에 맞춰 보세요."]], foot: "야후 파이낸스 종가 · 원화 환산(달러/원) · 배당·세금 제외 · 과거 자료이며 투자 권유 아님" });
 }
+/* ============================================================ v12.17 새 카드 3종 — "그 상황에 샀다면 1년 뒤" 시리즈 (모두 앱 과거 데이터로 직접 계산) ============================================================ */
+/* 공통: 날짜별로 bucket(i)->칸 번호를 주면, 칸마다 252거래일 뒤 수익률의 평균·중앙값·오른 비율·표본수. 20거래일 간격으로 뽑아 같은 국면 중복을 줄인다 */
+function hubFwdBuckets(rows, nB, bucketOf) {
+  var B = []; for (var k = 0; k < nB; k++) B.push({ v: [], last: -1e9 });
+  for (var i = 0; i < rows.length - 252; i++) { var b = bucketOf(i); if (b == null || b < 0) continue; if (i - B[b].last < 20) continue; B[b].last = i; B[b].v.push(rows[i + 252].c / rows[i].c - 1); }
+  return B.map(function (x) { var v = x.v; if (!v.length) return { n: 0 }; var s = v.slice().sort(function (a, b) { return a - b; }); return { n: v.length, avg: v.reduce(function (a, y) { return a + y; }, 0) / v.length, med: s[v.length >> 1], win: v.filter(function (y) { return y > 0; }).length / v.length }; });
+}
+function hubFwdRows(labels, B, mk) { return labels.map(function (l, i) { var b = B[i]; return b.n ? [l, (mk ? mk + " · " : "") + "오른 비율 " + Math.round(b.win * 100) + "% · " + b.n + "회", "1년 뒤 " + cPct(b.avg, 0), hubPctTone(b.avg)] : [l, "표본 부족", "-", NB_C.sub]; }); }
+/* ⑪ 고점 대비 낙폭 구간별 1년 뒤 */
+function hubDdDeck() {
+  function calc(sym) { var r = hubRows(sym); if (r.length < 1500) return null; var pk = -Infinity, dd = []; r.forEach(function (x) { if (x.c > pk) pk = x.c; dd.push(x.c / pk - 1); }); var edges = [-0.05, -0.1, -0.2, -0.3]; var B = hubFwdBuckets(r, 5, function (i) { var d = dd[i]; return d > -0.05 ? 0 : d > -0.1 ? 1 : d > -0.2 ? 2 : d > -0.3 ? 3 : 4; }); return { r: r, B: B, cur: dd[dd.length - 1] }; }
+  var sp = calc("SPY") || calc("^GSPC"), ks = calc("^KS11"); if (!sp || !ks) return [];
+  var L = ["고점 근처 (-5% 이내)", "-5 ~ -10%", "-10 ~ -20%", "-20 ~ -30%", "-30% 넘게 빠졌을 때"];
+  function zone(d) { return d > -0.05 ? 0 : d > -0.1 ? 1 : d > -0.2 ? 2 : d > -0.3 ? 3 : 4; }
+  var zs = zone(sp.cur), zk = zone(ks.cur), bs = sp.B[zs], bk = ks.B[zk];
+  return hubDraw({ small: "데이터로 보는 투자", hook: [sp.cur > -0.03 ? "S&P500이 [[고점 근처]]인 지금," : "고점에서 [[" + Math.round(-sp.cur * 100) + "%]] 빠진 지금,", "과거엔 1년 뒤 어땠을까?"], lead: "S&P500과 코스피의 전 기간 일봉에서 '그날이 직전 고점 대비 몇 % 아래였나'로 칸을 나누고, 그날 종가에 샀다면 1년(252거래일) 뒤 수익률을 모았어요. 같은 국면 중복을 줄이려 20거래일 간격으로 뽑았어요.", pages: [
+    { top: ["S&P500 · 고점 대비 낙폭별", "1년 뒤 평균 수익률"], title: "S&P500 — 떨어진 폭별로 1년 뒤", sub: "직전 고점 대비 그날 위치 → 1년 뒤", kind: "rows", data: hubFwdRows(L, sp.B, "S&P500"), leftW: 330 },
+    { top: ["코스피 · 고점 대비 낙폭별", "1년 뒤 평균 수익률"], title: "코스피 — 떨어진 폭별로 1년 뒤", sub: "직전 고점 대비 그날 위치 → 1년 뒤", kind: "rows", data: hubFwdRows(L, ks.B, "코스피"), leftW: 330 },
+    { top: ["지금 S&P500은 고점 대비 [[" + cPct(sp.cur, 0) + "]]", "코스피는 [[" + cPct(ks.cur, 0) + "]]"], title: "지금 위치에 해당하는 칸", sub: "과거 같은 칸의 1년 뒤 — 평균일 뿐 보장이 아님", kind: "tiles", data: { tiles: [{ v: bs.n ? cPct(bs.avg, 0) : "-", l: "S&P500 · " + L[zs] + " 1년 뒤 평균", color: bs.n ? hubPctTone(bs.avg) : NB_C.sub }, { v: bs.n ? Math.round(bs.win * 100) + "%" : "-", l: "S&P500 · 1년 뒤 올라 있던 비율 (" + (bs.n || 0) + "회)", color: NB_C.navy }, { v: bk.n ? cPct(bk.avg, 0) : "-", l: "코스피 · " + L[zk] + " 1년 뒤 평균 (" + (bk.n || 0) + "회)", color: bk.n ? hubPctTone(bk.avg) : NB_C.sub }] }, note: "많이 빠진 칸일수록 1년 뒤 평균이 높게 나오는 경향이 있지만, 표본이 적고(큰 하락은 드물어요) 2000·2008년처럼 1년 뒤에도 더 빠져 있던 때가 섞여 있어요. 평균이 아니라 '오른 비율'과 '표본 수'를 같이 보세요.", gold: ["낙폭은 기회의 크기이자 위험의 크기", "버틸 수 있는 비중이 먼저"] }
+  ], close: ["지금 칸에서 여러분은 어떻게 하시겠어요?", ["저장해 두고 1년 뒤 숫자와 맞춰 보세요.", "과거 평균이 미래를 보장하진 않아요."]], foot: "야후 파이낸스 종가 · S&P500은 SPY(ETF) 기준 · 1년 = 252거래일 · 과거 자료이며 투자 권유 아님" });
+}
+/* ⑫ 공포지수(VIX) 구간별 1년 뒤 */
+function hubVixDeck() {
+  var v = hubRows("^VIX"), r = hubRows("SPY"); if (v.length < 1500 || r.length < 1500) return [];
+  var vt = {}; v.forEach(function (x) { vt[Math.floor((x.t + 9 * 3600e3) / 86400e3)] = x.c; });
+  function zone(x) { return x < 15 ? 0 : x < 20 ? 1 : x < 30 ? 2 : 3; }
+  var B = hubFwdBuckets(r, 4, function (i) { var x = vt[Math.floor((r[i].t + 9 * 3600e3) / 86400e3)]; return x == null ? null : zone(x); });
+  var now = v[v.length - 1].c, z = zone(now), L = ["VIX 15 미만 (아주 평온)", "15 ~ 20 (평온)", "20 ~ 30 (불안)", "30 이상 (공포)"], b = B[z];
+  var hi = v.slice().sort(function (a, c) { return c.c - a.c; })[0], hd = new Date(hi.t + 9 * 3600e3);
+  return hubDraw({ small: "데이터로 보는 투자", hook: ["공포지수 [[" + now.toFixed(0) + "]] — " + L[z].split(" (")[1].replace(")", "") + ".", "공포가 컸던 날 샀다면 1년 뒤는?"], lead: "VIX(S&P500 변동성 지수)는 '시장이 얼마나 겁먹었나'의 숫자예요. VIX 구간별로 그날 S&P500(SPY)을 샀다면 1년 뒤 수익률을 모았어요(20거래일 간격 표본).", pages: [
+    { top: ["VIX 구간별", "S&P500 1년 뒤 평균 수익률"], title: "공포가 클수록 1년 뒤는", sub: "그날 VIX 구간 → 그날 종가에 샀다면 1년 뒤", kind: "rows", data: hubFwdRows(L, B, "S&P500"), leftW: 330 },
+    { top: ["지금 VIX " + now.toFixed(1) + " —", "[[" + L[z] + "]] 칸"], title: "지금 칸의 과거 결과", sub: "역대 최고 VIX " + hi.c.toFixed(0) + " (" + hd.getUTCFullYear() + "." + (hd.getUTCMonth() + 1) + ")", kind: "tiles", data: { tiles: [{ v: now.toFixed(1), l: "오늘 VIX", color: now >= 30 ? NB_C.up : now >= 20 ? NB_C.gold2 : NB_C.navy }, { v: b.n ? cPct(b.avg, 0) : "-", l: "같은 칸 1년 뒤 평균 (" + (b.n || 0) + "회)", color: b.n ? hubPctTone(b.avg) : NB_C.sub }, { v: b.n ? Math.round(b.win * 100) + "%" : "-", l: "1년 뒤 올라 있던 비율", color: NB_C.navy }] }, note: "VIX가 30을 넘은 날은 전체의 몇 %뿐이고 대부분 급락 한가운데예요. 그날 사는 건 무섭지만 1년 뒤 결과는 평온한 날보다 나은 편이었어요. 반대로 VIX가 아주 낮을 때는 '좋은 소식이 다 반영된 때'일 수 있어요. 다만 2008년처럼 공포가 몇 달 이어진 때도 있어요.", gold: ["공포지수는 매수 신호가 아니라 체온계", "비중을 정해 두면 공포가 기회가 된다"] }
+  ], close: ["VIX가 30을 넘으면 여러분은 무엇을 하시나요?", ["저장해 두고 다음 급락 때 꺼내 보세요.", "평균은 참고, 비중은 내 그릇만큼."]], foot: "야후 파이낸스 종가 · VIX(^VIX) · S&P500은 SPY(ETF) 기준 · 과거 자료이며 투자 권유 아님" });
+}
+/* ⑬ 200일선 위/아래에서 산 뒤 1년 */
+function hubMa200Deck() {
+  function calc(sym) { var r = hubRows(sym); if (r.length < 1500) return null; var sum = 0, ma = []; for (var i = 0; i < r.length; i++) { sum += r[i].c; if (i >= 200) sum -= r[i - 200].c; ma.push(i >= 199 ? sum / 200 : null); } var B = hubFwdBuckets(r, 4, function (i) { if (ma[i] == null) return null; var d = r[i].c / ma[i] - 1; return d >= 0.1 ? 0 : d >= 0 ? 1 : d >= -0.1 ? 2 : 3; }); var last = r[r.length - 1].c, m = ma[ma.length - 1]; return { B: B, d: m ? last / m - 1 : null }; }
+  var sp = calc("SPY"), ks = calc("^KS11"); if (!sp || !ks || sp.d == null || ks.d == null) return [];
+  var L = ["200일선보다 10% 넘게 위", "200일선 위 (0~10%)", "200일선 아래 (0~-10%)", "200일선보다 10% 넘게 아래"];
+  function zone(d) { return d >= 0.1 ? 0 : d >= 0 ? 1 : d >= -0.1 ? 2 : 3; }
+  var zs = zone(sp.d), zk = zone(ks.d);
+  return hubDraw({ small: "데이터로 보는 투자", hook: ["[[200일선]] 위에서 사는 게 나을까,", "아래에서 사는 게 나을까?"], lead: "200일 이동평균선은 '최근 1년 평균 가격'이에요. 지수가 그 선보다 얼마나 위·아래에 있었는지로 칸을 나누고, 그날 샀다면 1년 뒤 수익률을 모았어요.", pages: [
+    { top: ["S&P500 · 200일선 대비 위치별", "1년 뒤 평균 수익률"], title: "S&P500 — 200일선 위·아래에서 산 뒤", sub: "그날 종가 ÷ 200일 평균 → 1년 뒤", kind: "rows", data: hubFwdRows(L, sp.B, "S&P500"), leftW: 330 },
+    { top: ["코스피 · 200일선 대비 위치별", "1년 뒤 평균 수익률"], title: "코스피 — 200일선 위·아래에서 산 뒤", sub: "그날 종가 ÷ 200일 평균 → 1년 뒤", kind: "rows", data: hubFwdRows(L, ks.B, "코스피"), leftW: 330 },
+    { top: ["지금 S&P500은 200일선보다 [[" + cPct(sp.d, 1) + "]]", "코스피는 [[" + cPct(ks.d, 1) + "]]"], title: "지금 위치", sub: "같은 칸의 과거 1년 뒤", kind: "tiles", data: { tiles: [{ v: cPct(sp.d, 1), l: "S&P500 · 200일선 대비 (" + L[zs] + ")", color: hubPctTone(sp.d) }, { v: sp.B[zs].n ? cPct(sp.B[zs].avg, 0) : "-", l: "S&P500 같은 칸 1년 뒤 평균 (" + (sp.B[zs].n || 0) + "회)", color: NB_C.navy }, { v: ks.B[zk].n ? cPct(ks.B[zk].avg, 0) : "-", l: "코스피 같은 칸 1년 뒤 평균 (" + (ks.B[zk].n || 0) + "회)", color: NB_C.navy }] }, note: "'추세를 따르라'와 '쌀 때 사라'는 서로 반대 조언인데, 지수에서는 어느 쪽이든 1년 뒤 평균은 플러스인 경우가 많았어요. 차이를 만든 건 선 위냐 아래냐보다 '1년을 들고 있었나'였어요. 200일선보다 10% 넘게 아래는 급락 한가운데라 표본이 적고 편차가 커요.", gold: ["선의 위치보다 보유 기간", "급락 칸은 평균보다 편차를 보라"] }
+  ], close: ["여러분은 선 위에서 사는 편인가요, 아래에서 사는 편인가요?", ["저장해 두고 다음에 선을 깰 때 꺼내 보세요.", "지수 이야기예요 — 개별 종목은 0이 될 수도 있어요."]], foot: "야후 파이낸스 종가 · 200일 단순이동평균 · S&P500은 SPY(ETF) 기준 · 과거 자료이며 투자 권유 아님" });
+}
 /* ⑦~⑩ 오늘 데이터: 52주 신고가·신저가 / 업종 / 고점 대비 할인 / 돈이 몰린 곳 */
 function hubStocks() { var R = hubR(); return R ? (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); }) : []; }
 function hubTodayDeck(kind) {
@@ -257,7 +304,7 @@ function hubFxDeck() {
   if (P.length < 3) return [];
   var f1 = fx[fx.length - 1].c;
   return hubDraw({ small: "환율 상식", hook: ["같은 S&P500인데", "[[원화로 보면]] 수익률이 다르다"], lead: "미국 주식은 '주가'와 '환율'을 같이 산 거예요. 같은 기간 달러 기준과 원화 기준 수익률을 비교했어요. 지금 환율 " + Math.round(f1).toLocaleString("ko-KR") + "원.", pages: [
-    { top: ["10년 기준 차이", "달러 " + cPct(P[P.length - 1].usd, 0) + " → 원화 [[" + cPct(P[P.length - 1].krw, 0) + "]]"], title: "S&P500 · 달러 기준 vs 원화 기준", sub: "기간별 수익률 · 원화 = (1 + 달러 수익률) × (1 + 환율 변화) - 1", kind: "table", data: { cols: ["기간", "달러 기준", "환율 변화", "원화 기준", "그때 환율"], rows: P.map(function (x) { return [x.y + "년", cPct(x.usd, 0), cPct(x.fx, 0), cPct(x.krw, 0), Math.round(x.f0).toLocaleString("ko-KR") + "원"]; }), note: "배당·세금·환전 수수료 제외 · SPY(S&P500 ETF) 종가" } },
+    { top: [P[P.length - 1].y + "년 기준 차이", "달러 " + cPct(P[P.length - 1].usd, 0) + " → 원화 [[" + cPct(P[P.length - 1].krw, 0) + "]]"], title: "S&P500 · 달러 기준 vs 원화 기준", sub: "기간별 수익률 · 원화 = (1 + 달러 수익률) × (1 + 환율 변화) - 1", kind: "table", data: { cols: ["기간", "달러 기준", "환율 변화", "원화 기준", "그때 환율"], rows: P.map(function (x) { return [x.y + "년", cPct(x.usd, 0), cPct(x.fx, 0), cPct(x.krw, 0), Math.round(x.f0).toLocaleString("ko-KR") + "원"]; }), note: "배당·세금·환전 수수료 제외 · SPY(S&P500 ETF) 종가" } },
     { top: ["환율이 오르면 미국 주식은", "[[원화로 더 벌고]], 내리면 덜 번다."], title: "환율이 바꾼 숫자", sub: "기간별 원화 기준 − 달러 기준", kind: "bars", data: P.map(function (x) { return { l: x.y + "년", v: x.krw - x.usd, color: hubPctTone(x.krw - x.usd), txt: cPct(x.krw - x.usd, 0).replace("%", "%p") }; }), note: "환율이 높을 때 미국 주식을 사면, 나중에 환율이 내려갈 때 주가가 올라도 수익이 깎일 수 있어요. 반대로 위기 때는 환율이 오르면서 원화 기준 손실을 줄여 주는 '자연 헷지' 역할도 했어요. 환율을 맞히기보다 나눠서 사는 게 편해요.", gold: ["미국 주식 = 주가 × 환율", "환헤지(H) 상품은 환율 영향을 줄인 대신 비용이 있어요"] }
   ], close: ["미국 주식 살 때 환율도 보시나요?", ["저장해 두고, 환율이 크게 움직일 때", "다시 꺼내 보세요."]], foot: "야후 파이낸스 종가(SPY · 달러/원) · 배당·세금 제외 · 과거 자료이며 투자 권유 아님" });
 }
@@ -350,7 +397,10 @@ var HUB_NEW = [
   { id: "worst", t: "🌪️ 최악의 하루 TOP10 — 1년 뒤", d: "하루 낙폭이 가장 컸던 날과 그 뒤 1년", g: "데이터로 보는 투자", need: "hist", fn: hubWorstDeck },
   { id: "decade", t: "⏳ 10년 전 · 5년 전 100만원", d: "주식·지수·금·채권·비트코인 12개 원화 기준", g: "재미로 보는 숫자", need: "hist", fn: hubDecadeDeck },
   { id: "dow", t: "📅 무슨 요일에 가장 많이 올랐나", d: "S&P500·코스피 요일별 평균 등락 · 오른 날 비율", g: "재미로 보는 숫자", need: "hist", fn: hubDowDeck },
-  { id: "fx", t: "💱 같은 S&P500, 원화로 보면", d: "1·3·5·10년 달러 기준 vs 원화 기준 · 환율 효과", g: "데이터로 보는 투자", need: "hist", fn: hubFxDeck }
+  { id: "fx", t: "💱 같은 S&P500, 원화로 보면", d: "1·3·5·10년 달러 기준 vs 원화 기준 · 환율 효과", g: "데이터로 보는 투자", need: "hist", fn: hubFxDeck },
+  { id: "dd", t: "📉 고점 대비 낙폭별 — 1년 뒤", d: "S&P500·코스피 · 고점에서 -5/-10/-20/-30% 빠진 날 샀다면 1년 뒤 평균·오른 비율 + 지금 칸", g: "데이터로 보는 투자", need: "hist", fn: hubDdDeck },
+  { id: "vix", t: "😱 공포지수 구간별 — 1년 뒤", d: "VIX 15/20/30 구간별 S&P500 1년 뒤 · 지금 VIX 칸 · 역대 최고", g: "데이터로 보는 투자", need: "hist", fn: hubVixDeck },
+  { id: "ma200", t: "📏 200일선 위·아래에서 산 뒤 1년", d: "S&P500·코스피 · 200일선 대비 위치별 1년 뒤 · 지금 위치", g: "데이터로 보는 투자", need: "hist", fn: hubMa200Deck }
 ];
 function hubPrep(need) {
   if (need === "hist") return hubLoad(HUB_HIST);
@@ -413,6 +463,9 @@ function hubTopics() {
       if (h.id === "worst") return { s: (vixV >= 25 || (temp && temp.upPct < 0.25)) ? 9 : 3, why: vixV >= 25 ? "VIX " + vixV.toFixed(0) + " — 공포가 큰 날 '최악의 날 1년 뒤'가 가장 위로가 돼요" : temp && temp.upPct < 0.25 ? "오른 종목 " + Math.round(temp.upPct * 100) + "% — 크게 빠진 날" : "급락장에 꺼내 쓰는 주제" };
       if (h.id === "decade") return { s: (dow === 0 || dow === 6) ? 7 : 3 + (seed % 5 === 1 ? 2 : 0), why: dow === 0 || dow === 6 ? "주말 — 가볍게 보는 '그때 샀다면' 시리즈가 공유가 많아요" : "재미형 상시 콘텐츠" };
       if (h.id === "dow") return { s: (dow === 0 || dow === 6) ? 6 : 2 + (seed % 6 === 3 ? 3 : 0), why: "재미로 보는 숫자 — 댓글 참여형" };
+      if (h.id === "dd") { var spq = typeof nbStat === "function" ? nbStat("SPY") : null, ksq = typeof nbStat === "function" ? nbStat("^KS11") : null, ddm = Math.min(spq && spq.vsHi != null ? spq.vsHi : 0, ksq && ksq.vsHi != null ? ksq.vsHi : 0); return { s: ddm <= -0.2 ? 9.5 : ddm <= -0.1 ? 9 : ddm <= -0.05 ? 6 : 3 + (seed % 9 === 4 ? 2 : 0), why: ddm <= -0.05 ? "지수가 고점 대비 " + cPct(ddm, 0) + " — '이만큼 빠졌을 때 1년 뒤'가 가장 읽히는 때" : "고점 근처 — 조정이 오면 꺼내 쓰는 주제 (순환 노출)" }; }
+      if (h.id === "vix") return { s: vixV >= 30 ? 9.5 : vixV >= 20 ? 8.5 : vixV != null && vixV < 13 ? 6 : 3 + (seed % 8 === 5 ? 2 : 0), why: vixV != null ? "VIX " + vixV.toFixed(1) + (vixV >= 20 ? " — 공포 구간, '공포에 샀다면'이 가장 위로되는 때" : vixV < 13 ? " — 너무 평온할 때의 경고로" : " — 평온, 상시 저장용") : "VIX 데이터 준비 중" };
+      if (h.id === "ma200") { var a200 = temp && temp.above200Pct != null ? temp.above200Pct : null; return { s: a200 != null && (a200 <= 0.35 || a200 >= 0.8) ? 8 : 3 + (seed % 7 === 6 ? 2 : 0), why: a200 != null ? "200일선 위 종목 " + Math.round(a200 * 100) + "%" + (a200 <= 0.35 ? " — 대부분 선 아래, '아래에서 사면?' 질문이 나오는 때" : a200 >= 0.8 ? " — 대부분 선 위, 추격 매수 고민이 많은 때" : "") : "추세 상식 — 상시" }; }
       if (h.id === "fx") { var krw = typeof nbStat === "function" ? nbStat("KRW=X") : null; return { s: krw && Math.abs(krw.m1) >= 0.02 ? 8 : 3, why: krw ? "달러/원 1개월 " + cPct(krw.m1, 1) + (Math.abs(krw.m1) >= 0.02 ? " — 환율이 크게 움직인 달" : "") : "환율이 움직일 때 꺼내 쓰는 상식" }; }
       return { s: 3, why: "" };
     } });
@@ -509,7 +562,7 @@ function hubSpecFacts(spec) {
   var per = [];
   spec.pages.forEach(function (p) {
     var L = [], d = p.data;
-    if (p.kind === "rows" || (p.kind === "tiles" && d.rows)) (p.kind === "rows" ? d : d.rows).forEach(function (r) { if (r) L.push({ label: hubStrip(r[1]) + (r[0] && !/^\d+$/.test(r[0]) ? " · " + hubStrip(r[0]) : ""), value: hubStrip(r[2]) }); });
+    if (p.kind === "rows" || (p.kind === "tiles" && d.rows)) (p.kind === "rows" ? d : d.rows).forEach(function (r) { if (r && r[2] != null && String(r[2]).trim() !== "-" && !/표본 부족|데이터 없음/.test(String(r[1]))) L.push({ label: hubStrip(r[1]) + (r[0] && !/^\d+$/.test(r[0]) ? " · " + hubStrip(r[0]) : ""), value: hubStrip(r[2]) }); });   // v12.17 값 없는 행은 한 장에서 뺀다
     if (p.kind === "tiles") d.tiles.forEach(function (t) { L.push({ label: hubStrip(t.l), value: hubStrip(t.v) }); });
     if (p.kind === "bars") d.forEach(function (b) { L.push({ label: hubStrip(b.l), value: b.txt || cPct(b.v, 1) }); });
     if (p.kind === "table") d.rows.forEach(function (r) { L.push({ label: hubStrip(r[0]) + " · " + d.cols[1], value: hubStrip(r[1]), note: d.cols.slice(2).map(function (c, i) { return c + " " + hubStrip(r[i + 2]); }).join(" · ") }); });

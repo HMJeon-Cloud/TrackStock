@@ -6,7 +6,8 @@
     "daily": "node dl3_run.js",
     "report": "node rp_run.js",
     "analyst": "node an5_run.js",
-    "all": "node sw_run.js && node dl3_run.js && node rp_run.js && node an5_run.js"
+    "all": "node sw_run.js && node dl3_run.js && node rp_run.js && node an5_run.js && node decks_run.js",
+    "decks": "node decks_run.js"
   },
   "dependencies": {
     "chart.js": "^4.4.3",
