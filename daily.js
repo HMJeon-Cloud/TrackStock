@@ -30,6 +30,7 @@ function dlNew(no, title, R) {
   return { cv: cv, g: g, y: 150 };
 }
 function dlHead(c, big, sub) {
+  DL.bigs = DL.bigs || []; DL.bigs.push(String(big));   // v12.21 캡션·스레드 글감(장마다 결론 문장)
   var g = c.g, W = DL.W - DL.P * 2, fs = 58; while (fs > 40 && cWrapCount(g, big, W, fs, 900) > 2) fs -= 2;
   var n = cWrapCount(g, big, W, fs, 900); cWrap(g, big, DL.P, c.y + fs, W, fs, 900, DL_C.ink, fs * 1.22, 2); c.y += n * fs * 1.22 + 10;
   g.fillStyle = DL_C.ink; g.fillRect(DL.P, c.y + 20, W, 3); g.fillStyle = DL_C.gold; g.fillRect(DL.P, c.y + 17, 120, 9); c.y += 26;   // v12.19 금색 시작 줄
@@ -237,7 +238,7 @@ function dlUniTemp(U) {
   return t;
 }
 function dlDeck() {
-  var R = typeof hubR === "function" ? hubR() : null; if (!R) return [];
+  var R = typeof hubR === "function" ? hubR() : null; if (!R) return []; DL.bigs = [];
   var list = [], defs = [["오늘시장", dlCard1], ["시장체력", dlCard2], ["업종성과", dlCard3], ["거래집중", dlCard4], ["업종거래", dlCard5], ["신고신저", dlCard6], ["자산군", dlCard7], ["성적표", dlCard8], ["시장해설", dlCard9]];
   defs.forEach(function (d) { var cv = null; try { cv = d[1](R); } catch (e) { console.warn("daily " + d[0], e); } if (cv) list.push({ name: d[0], cv: cv }); });
   return list;

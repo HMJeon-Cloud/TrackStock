@@ -23,7 +23,7 @@ function hubLoad(list) { return typeof nbLoad === "function" ? nbLoad(list) : Pr
 /* ---------- 공용: 종이 카드 덱 그리기 (연구노트 틀) ----------
    pages: [{ top:[결론 줄], title, sub, kind:'rows'|'bars'|'tiles'|'table'|'text'|'news', data, gold:[문장, 작은 문장], foot }] */
 function hubDraw(spec) {
-  HUB.lastSpec = spec;
+  HUB.lastSpec = spec; HUB.lastSpecAt = Date.now();
   spec.pages = (spec.pages || []).filter(Boolean);   // v12.18 조건부 페이지(null) 허용
   var out = [], total = spec.pages.length + 2, pg = 1;
   out.push({ name: "표지", cv: nbCover(spec.small || cDate(Date.now()), spec.hook, spec.lead, spec.meta, spec.pages.map(function (p) { return p.title; })) });
@@ -597,8 +597,34 @@ function hubBind(box) {
   });
 }
 /* 카드 목록 보여주기 (공용 창) */
+/* v12.21 모든 카드에 인스타 캡션 + 스레드 글 — 묶음이 직접 만든 글(opts.thr)이 없으면 카드의 결론 문장·읽는 요약으로 자동 작성 */
+function hubThreadsAuto(title, list, opts) {
+  if (typeof thrCompose !== "function") return [];
+  var spec = HUB.lastSpec && Date.now() - (HUB.lastSpecAt || 0) < 90e3 ? HUB.lastSpec : null, B = opts.brief || null;
+  var tops = spec && spec.pages ? spec.pages.map(function (p) { return cPlain((p.top || []).filter(Boolean).join(" ")).replace(/\s{2,}/g, " ").trim(); }).filter(Boolean).slice(0, 5) : [];
+  if (!tops.length && opts.lines) tops = opts.lines.slice(0, 5);
+  if (!tops.length) tops = [hubStrip(String(opts.note || title))];
+  var base = { summary: (B && B.head ? [B.head] : []).concat(tops).slice(0, 6), insights: B ? [B.issueLine, B.expLine, B.gapLine, B.so].filter(Boolean) : [spec && spec.lead ? spec.lead : ""].filter(Boolean), cardList: list.map(function (x, i) { return (i + 1) + " " + x.name; }), question: "이 중에 가장 의외였던 건 뭐였나요?", tags: ["우상향연구소", "주식초보", "재테크", "투자공부"], foot: "과거·오늘 종가 자동 집계 · 투자 권유 아님" };
+  var out = []; function add(label, hook) { try { var c = thrCompose(Object.assign({}, base, { hook: hook })); out.push({ label: label, th: c.th, r1: c.r1, r2: c.r2, ig: c.ig }); } catch (e) {} }
+  var name = hubStrip(String(title)).replace(/ · (한 장|여러 장)$/, "");
+  add("초보 질문형", name + ",\n숫자로 보면 어떨까요?"); add("반전형", name + ".\n생각과 다른 숫자가 있었어요."); add("정리형", name + " —\n오늘 숫자를 한 장에 정리했어요.");
+  return out;
+}
+/* v12.21 릴스형(1080×1920): 게시형 카드를 검정 바탕 가운데에 두고(인스타 UI가 덮는 위 250·아래 350px은 비움) 위엔 채널명, 아래엔 저장 안내 */
+function hubReelWrap(cv) {
+  var out = document.createElement("canvas"); out.width = 1080; out.height = 1920; var g = out.getContext("2d");
+  g.fillStyle = "#14161c"; g.fillRect(0, 0, 1080, 1920);
+  var y0 = Math.round((1920 - cv.height) / 2); g.save(); g.shadowColor = "rgba(0,0,0,0.5)"; g.shadowBlur = 40; g.drawImage(cv, 0, y0, 1080, cv.height); g.restore();
+  g.textBaseline = "alphabetic"; cText(g, "우상향연구소 · 데이터로 보는 투자", 540, y0 - 36, 24, 800, "#e6c57a", "center");
+  cText(g, "저장해 두고 다음에 다시 보세요 · @uphill.lab", 540, y0 + cv.height + 56, 22, 700, "#a9a291", "center");
+  return out;
+}
+function hubSize() { return (typeof MK !== "undefined" && MK.size) || (function () { try { return localStorage.getItem("sm.cardSize") || "post"; } catch (e) { return "post"; } })(); }
 function hubShow(title, list, opts) {
-  opts = opts || {}; var day = typeof pubToday === "function" ? pubToday().replace(/-/g, "") : "", box = document.createElement("div"), slug = String(title).replace(/[^가-힣A-Za-z0-9]/g, "").slice(0, 14);
+  opts = opts || {};
+  if (hubSize() === "reel") list.forEach(function (it) { if (it.cv && it.cv.height !== 1920) it.cv = hubReelWrap(it.cv); });
+  if (!opts.thr || !opts.thr.length) opts.thr = hubThreadsAuto(title, list, opts);
+  var day = typeof pubToday === "function" ? pubToday().replace(/-/g, "") : "", box = document.createElement("div"), slug = String(title).replace(/[^가-힣A-Za-z0-9]/g, "").slice(0, 14);
   box.innerHTML = (opts.note ? '<div class="briefDim" style="margin-bottom:8px">' + opts.note + '</div>' : '') + '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button></div>' + (opts.thr && typeof thrPanelHtml === "function" ? thrPanelHtml("주식") : "") + (opts.log ? '<details class="howto"><summary>숫자 확인 ' + opts.log.length + '줄</summary><div class="body"><ul>' + opts.log.map(function (l) { return '<li>' + hubEsc(l) + '</li>'; }).join("") + '</ul></div></details>' : '') + '<div class="cardsWrap"></div>';
   var wrap = box.querySelector(".cardsWrap");
   list.forEach(function (it, i) { it.url = it.cv.toDataURL("image/png"); it.file = "uphill.lab_" + slug + "_" + day + "_" + (i + 1) + "_" + String(it.name).replace(/[^가-힣A-Za-z0-9_]/g, "") + ".png"; var f = document.createElement("figure"); f.innerHTML = '<img alt=""><figcaption><span>' + (i + 1) + ". " + hubEsc(it.name) + '</span><button class="chip" style="padding:3px 10px;font-size:11px">저장</button></figcaption>'; f.querySelector("img").src = it.url; f.querySelector("button").onclick = function () { cardsDownload(it); }; wrap.appendChild(f); });
@@ -790,7 +816,8 @@ function hubThreads(ctx, list, B) {
     if (kind === "story" && typeof thrStory === "function") return thrOr(thrStory(arg, list.map(function (x) { return x.name; })), storyCaption(arg));
   } catch (e) {}
   var t = hubTopic(ctx), name = t ? cPlain(t.t).replace(/^\S+\s/, "") : "오늘의 카드", lines = [];
-  var base = { summary: B ? [B.head].concat(B.nums.slice(0, 3).map(function (f) { return f.label + " " + f.value; })) : [t ? t.d : ""], insights: B ? [B.issueLine, B.expLine, B.gapLine, B.so].filter(Boolean) : [], cardList: list.map(function (x, i) { return (i + 1) + " " + x.name; }), question: "이 중에 가장 의외였던 건 뭐였나요?", tags: ["우상향연구소", "주식초보", "재테크", "투자공부"], foot: "과거·오늘 종가 자동 집계" + (B && B.issue.length ? " · 기사: " + B.issue.map(function (x) { return x.press; }).filter(Boolean).join(", ") : "") + " · 투자 권유 아님", data: B ? B.nums.slice(0, 6).map(function (f) { return f.label + " " + f.value; }) : [t ? t.d : name], sort: false, thFoot: "종가 자동 집계 · 투자 권유 아님", limit: ["한계도 적어둘게요.", "과거 숫자예요. 같은 상황에서 같은 결과가 나온다는 보장은 없습니다."], reply: "다음엔 어떤 숫자가 궁금하세요?" };
+  var spec = HUB.lastSpec && Date.now() - (HUB.lastSpecAt || 0) < 90e3 ? HUB.lastSpec : null, tops = kind === "hub" && arg === "daily" && typeof DL !== "undefined" && DL.bigs ? DL.bigs.slice(0, 5) : spec && spec.pages ? spec.pages.map(function (p) { return cPlain((p.top || []).filter(Boolean).join(" ")).replace(/\s{2,}/g, " ").trim(); }).filter(Boolean).slice(0, 5) : [];   // v12.21 카드의 결론 문장을 글감으로
+  var base = { summary: (B ? [B.head].concat(B.nums.slice(0, 3).map(function (f) { return f.label + " " + f.value; })) : []).concat(tops).slice(0, 7).filter(Boolean).length ? (B ? [B.head] : []).concat(tops.length ? tops : B ? B.nums.slice(0, 3).map(function (f) { return f.label + " " + f.value; }) : [t ? t.d : ""]) : [t ? t.d : ""], insights: B ? [B.issueLine, B.expLine, B.gapLine, B.so].filter(Boolean) : [], cardList: list.map(function (x, i) { return (i + 1) + " " + x.name; }), question: "이 중에 가장 의외였던 건 뭐였나요?", tags: ["우상향연구소", "주식초보", "재테크", "투자공부"], foot: "과거·오늘 종가 자동 집계" + (B && B.issue.length ? " · 기사: " + B.issue.map(function (x) { return x.press; }).filter(Boolean).join(", ") : "") + " · 투자 권유 아님", data: B ? B.nums.slice(0, 6).map(function (f) { return f.label + " " + f.value; }) : [t ? t.d : name], sort: false, thFoot: "종가 자동 집계 · 투자 권유 아님", limit: ["한계도 적어둘게요.", "과거 숫자예요. 같은 상황에서 같은 결과가 나온다는 보장은 없습니다."], reply: "다음엔 어떤 숫자가 궁금하세요?" };
   var out = []; function add(label, hook) { var c = thrCompose(Object.assign({}, base, { hook: hook })); out.push({ label: label, th: c.th, r1: c.r1, r2: c.r2, ig: c.ig }); }
   add("초보 질문형", name + ",\n숫자로 보면 어떨까요?"); add("반전형", name + ".\n생각과 다른 숫자가 있었어요.");
   return thrSafe(out);

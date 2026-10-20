@@ -222,7 +222,8 @@ function issuesCardOpen(list) {
     var txt = CARD_TXT.replace(/\s+/g, "");
     return Promise.all([500, 600, 700, 800].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); }));
   }).then(function () {
-    var cv = issuesCard(list), url = cv.toDataURL("image/png"), file = "uphill.lab_핵심이슈5_" + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "") + ".png";
+    var cv = issuesCard(list); if (typeof hubSize === "function" && hubSize() === "reel" && typeof hubReelWrap === "function") cv = hubReelWrap(cv);   // v12.21 릴스형
+    var url = cv.toDataURL("image/png"), file = "uphill.lab_핵심이슈5_" + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "") + ".png";
     var box = document.createElement("div");
     box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="save">⬇ 저장</button>' +
       (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유</button>' : '') + '<span class="briefDim">1080×1350 · 카드 묶음(🃏 카드 만들기)에도 맨 앞에 들어가요</span></div>' +
@@ -231,6 +232,7 @@ function issuesCardOpen(list) {
     box.querySelector('[data-act="save"]').onclick = function () { var l = document.createElement("a"); l.href = url; l.download = file; document.body.appendChild(l); l.click(); l.remove(); };
     var sh = box.querySelector('[data-act="share"]');
     if (sh) sh.onclick = function () { cv.toBlob(function (b) { var f = new File([b], file, { type: "image/png" }); if (navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(function () {}); }); };
+    if (typeof thrPanelHtml === "function" && typeof hubThreadsAuto === "function") { var tpd = document.createElement("div"); tpd.innerHTML = thrPanelHtml("주식"); box.appendChild(tpd.firstChild); try { thrBind(box, hubThreadsAuto("오늘의 핵심 이슈 5", [{ name: "핵심 이슈 5" }], { lines: list.slice(0, 5).map(function (it) { return String(it.title || "").replace(/<[^>]+>/g, ""); }) })); } catch (e) {} }   // v12.21 캡션·스레드 글
     infoModal.open("📌 " + (ISS_LBL[list.mode] || "오늘") + "의 핵심 이슈 5", box);
     if (typeof ocHook === "function") try { ocHook("issues", ["핵심 이슈 5"], box); } catch (e) { console.warn(e); }
   });

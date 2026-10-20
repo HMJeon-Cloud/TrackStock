@@ -4,7 +4,7 @@
       '고쳐 쓰기'를 누르면 앱 데이터가 입력칸 글로 바뀌어 그대로 고칠 수 있다 (글 ↔ 양식 명세 변환기 MK_FMT)
    ② 카드 묶음(여러 장): 오늘의 브리핑·오늘 한 장·채널·정기 발행·연구노트·정책·일정·용어·릴스를 버튼 하나로
    ============================================================ */
-var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "work", sel: null, filt: "today", q: "" };
+var MK = { mk: null, cat: "rank", src: null, mode: "app", text: {}, meta: {}, url: null, timer: null, tab: "work", sel: null, filt: "today", q: "", size: (function () { try { return localStorage.getItem("sm.cardSize") || "post"; } catch (e) { return "post"; } })() };   // v12.21 size: post(1080×1350) | reel(1080×1920)
 var MK_TABS = [["work", "작업대"], ["one", "직접 쓰기"], ["lib", "보관함"]];   // v12.1 오늘 할 일 + 묶음 카드 → 작업대(① 상태 ② 주제 ③ 만들기 ④ 결과)
 /* 다른 화면에서 '카드 만들기 ›'로 들어올 때: 탭·시장을 정해서 연다 */
 function makerGo(tab, mk) { if (tab) MK.tab = tab; if (mk) MK.mk = mk; if (typeof navTo === "function") navTo("onecard"); else switchTab("onecard"); }
@@ -63,6 +63,8 @@ function mkWarm() {
 function mkChannelReady() { if (typeof chState === "undefined" || !chState.recent) { if (typeof renderChannel === "function") try { renderChannel(); } catch (e) {} } }
 
 /* ---------- 화면 ---------- */
+/* 직접 쓰기 카드의 글감: 양식 제목·부제 + 표의 첫 행들 */
+function mkCardLines(cat) { var L = []; try { var x = MK.mode === "app" ? tplSpec(cat, MK.src, MK.mk) : null; if (x) { if (x.meta && x.meta.title) L.push(cPlain(String(x.meta.title)).replace(/\n/g, " ")); if (x.meta && x.meta.sub) L.push(String(x.meta.sub)); var sp = x.spec || {}; (sp.rows || sp.items || sp.boxes || []).slice(0, 4).forEach(function (r) { if (Array.isArray(r)) L.push(r.map(String).join(" ")); else if (r && typeof r === "object") L.push([r.name || r.label || r.left, r.value || r.pct || r.b || r.right].filter(Boolean).join(" ")); }); } else { var m = MK.meta[cat] || {}; if (m.title) L.push(cPlain(String(m.title)).replace(/\n/g, " ")); if (MK.text[cat]) L = L.concat(String(MK.text[cat]).split("\n").slice(0, 4)); } } catch (e) {} return L.filter(Boolean); }
 function makerRender() {
   var root = document.getElementById("mkBody"); if (!root) return;
   if (!MK.inited) { mkLoad(); MK.inited = true; }
@@ -70,10 +72,12 @@ function makerRender() {
   mkChannelReady();
   MK.mk = MK.mk || briefState.market || "all";
   var top = '<div class="mkTop"><div class="pills seg mkMkt" title="모든 탭에 적용">' + TPL_MKS.map(function (m) { return '<button data-mmk="' + m[0] + '"' + (m[0] === MK.mk ? ' class="active"' : '') + '>' + m[1] + '</button>'; }).join("") + '</div>' +
+    '<div class="pills seg mkSize" title="만드는 카드 크기 — 모든 카드에 적용"><button data-msize="post"' + (MK.size !== "reel" ? ' class="active"' : '') + '>게시형 4:5</button><button data-msize="reel"' + (MK.size === "reel" ? ' class="active"' : '') + '>릴스형 9:16</button></div>' +
     (MK.tab === "work" ? '' : '<button class="chip aiBtn" data-ai-open="custom" title="내가 쓴 글·데이터로 AI가 한 장 카드를">내 글로 AI 카드</button>') + '</div>' +
     '<div class="mkTabs">' + MK_TABS.map(function (t) { return '<button data-mtab="' + t[0] + '"' + (t[0] === MK.tab ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div><div class="mkPane"></div>';
   root.innerHTML = top;
   Array.prototype.forEach.call(root.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); if (typeof switchBriefMarket === "function" && briefState.market !== MK.mk) switchBriefMarket(MK.mk); makerRender(); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-msize]"), function (b) { b.onclick = function () { MK.size = b.getAttribute("data-msize"); try { localStorage.setItem("sm.cardSize", MK.size); } catch (e) {} makerRender(); }; });
   Array.prototype.forEach.call(root.querySelectorAll("[data-mtab]"), function (b) { b.onclick = function () { MK.tab = b.getAttribute("data-mtab"); makerRender(); }; });
   var pane = root.querySelector(".mkPane");
   if (MK.tab === "reels" || MK.tab === "decks" || MK.tab === "today") MK.tab = "work";
@@ -106,6 +110,7 @@ function mkOneRender(box) {
       '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="chip" data-mex>예시 넣기</button><button class="chip" data-mclear>비우기</button><button class="chip aiBtn" data-mai>✨ 이 글로 AI 카드</button></div></div>';
   }
   h += '<div class="row" style="gap:6px;margin-top:12px"><button class="primary" data-msave disabled>⬇ 저장 (1080×1350)</button><span class="briefDim mkMsg"></span></div>';
+  if (typeof thrPanelHtml === "function") h += thrPanelHtml("주식");
   h += '</div><div class="mkRight"><div class="mkPrev"><img alt="" hidden><div class="briefDim mkPh">미리보기를 만드는 중…</div></div></div></div>';
   box.innerHTML = h;
   var $m = function (q) { return box.querySelector(q); };
@@ -136,8 +141,11 @@ function mkPreview() {
       else { var m = MK.meta[cat] || {}, spec = MK_FMT[cat].from(MK.text[cat] != null ? MK.text[cat] : MK_FMT[cat].ex); cv = tplCard(cat, { title: m.title || TPL_CAT[cat].name, sub: m.sub, source: m.source, catName: m.catName || "" }, spec); }
     } catch (e) { console.warn(e); if (msg) msg.textContent = "그리지 못했어요: " + e.message; }
     if (!cv) { if (ph) ph.textContent = "이 내용은 아직 데이터가 없어요"; return; }
+    if (MK.size === "reel" && typeof hubReelWrap === "function") cv = hubReelWrap(cv);
     MK.url = cv.toDataURL("image/png"); img.src = MK.url; img.hidden = false; if (ph) ph.hidden = true;
-    var sv = box.querySelector("[data-msave]"); if (sv) sv.disabled = false; if (msg) msg.textContent = "";
+    var sv = box.querySelector("[data-msave]"); if (sv) { sv.disabled = false; sv.textContent = "⬇ 저장 (" + (MK.size === "reel" ? "1080×1920" : "1080×1350") + ")"; } if (msg) msg.textContent = "";
+    // v12.21 직접 쓰기도 인스타 캡션 + 스레드 글
+    var tp = box.querySelector(".thrPanel"); if (tp && typeof thrBind === "function" && typeof hubThreadsAuto === "function") { var meta = MK.mode === "app" ? (TPL_CAT[cat] ? TPL_CAT[cat].name : cat) : ((MK.meta[cat] || {}).title || TPL_CAT[cat].name); try { var mlines = mkCardLines(cat); thrBind(box, hubThreadsAuto(mlines[0] || cPlain(String(meta)), [{ name: "한장" }], { lines: mlines.slice(1) })); } catch (e) {} }
   });
 }
 /* ============================================================ v12.1 작업대 — ① 오늘 상태 ② 주제 고르기 ③ 만들기 ④ 결과 ============================================================ */
