@@ -26,7 +26,7 @@ function hubDraw(spec) {
   HUB.lastSpec = spec;
   spec.pages = (spec.pages || []).filter(Boolean);   // v12.18 조건부 페이지(null) 허용
   var out = [], total = spec.pages.length + 2, pg = 1;
-  out.push({ name: "표지", cv: nbCover(spec.small || cDate(Date.now()), spec.hook, spec.lead, spec.meta) });
+  out.push({ name: "표지", cv: nbCover(spec.small || cDate(Date.now()), spec.hook, spec.lead, spec.meta, spec.pages.map(function (p) { return p.title; })) });
   spec.pages.forEach(function (p, i) {
     var c = nbNew(); pg++;
     nbTop(c, i + 1, p.top, pg, total);

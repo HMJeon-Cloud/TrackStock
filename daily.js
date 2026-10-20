@@ -20,17 +20,19 @@ function dlNew(no, title, R) {
   // 위 검정 띠: 로고 + 금색 라벨 (연구노트와 같은 머리)
   g.fillStyle = DL_C.ink; g.fillRect(0, 0, DL.W, 72); g.fillStyle = DL_C.lime; g.fillRect(0, 72, DL.W, 3);
   if (typeof cLogo === "function") cLogo(g, DL.P, 0);
-  var tag = "🗞️ 오늘 시장 데일리", tw = cW(g, tag, 20, 800) + 32; cRound(g, DL.W - DL.P - tw, 17, tw, 38, 19, null); g.strokeStyle = DL_C.lime; g.lineWidth = 2; g.stroke(); cText(g, tag, DL.W - DL.P - tw / 2, 43, 20, 800, DL_C.lime, "center");
-  // 장 번호 · 제목 (금색) + 날짜
-  cText(g, "관찰 " + String(no).padStart(2, "0") + " · " + title, DL.P, 122, 24, 900, DL_C.gold);
+  // v12.19 진행 눈금(9장) — 연구노트와 같은 머리
+  var tot = 9, segW = 22, x0 = DL.W - DL.P - tot * (segW + 4) + 4; for (var i = 0; i < tot; i++) { g.fillStyle = i < no ? DL_C.lime : "rgba(255,255,255,0.22)"; g.fillRect(x0 + i * (segW + 4), 31, segW, 10); }
+  // 번호 알약 + 제목 + 날짜 (예전 '관찰 NN' 표기 대신)
+  cRound(g, DL.P, 98, 66, 36, 18, DL_C.ink); cText(g, String(no).padStart(2, "0"), DL.P + 33, 124, 20, 900, DL_C.lime, "center");
+  cText(g, title, DL.P + 82, 124, 22, 900, DL_C.gold);
   var mk = R && R.market, U = dlUni(R), asOf = U && U.asOf ? U.asOf : mk === "kr" ? R.asOfKr : mk === "us" ? R.asOfUs : (R && (R.asOfUs || R.asOfKr)), lab = mk === "kr" ? "한국 거래일" : mk === "us" ? "미국 거래일" : "기준일";
-  cText(g, lab + " " + dlD(asOf) + " · 발행 " + dlD(Date.now()), DL.W - DL.P, 122, 20, 600, DL_C.sub, "right");
+  cText(g, lab + " " + dlD(asOf) + " · 발행 " + dlD(Date.now()), DL.W - DL.P, 124, 18, 600, DL_C.sub, "right");
   return { cv: cv, g: g, y: 150 };
 }
 function dlHead(c, big, sub) {
   var g = c.g, W = DL.W - DL.P * 2, fs = 58; while (fs > 40 && cWrapCount(g, big, W, fs, 900) > 2) fs -= 2;
   var n = cWrapCount(g, big, W, fs, 900); cWrap(g, big, DL.P, c.y + fs, W, fs, 900, DL_C.ink, fs * 1.22, 2); c.y += n * fs * 1.22 + 10;
-  if (typeof cUphill === "function") cUphill(g, DL.P, c.y + 26, W); c.y += 26;
+  g.fillStyle = DL_C.ink; g.fillRect(DL.P, c.y + 20, W, 3); g.fillStyle = DL_C.gold; g.fillRect(DL.P, c.y + 17, 120, 9); c.y += 26;   // v12.19 금색 시작 줄
   if (sub) { var m = cWrapCount(g, sub, W, 28, 500); cWrap(g, sub, DL.P, c.y + 30, W, 28, 500, "#3b4256", 40, 2); c.y += Math.min(2, m) * 40 + 24; }
   c.y += 10;
 }
@@ -38,11 +40,12 @@ function dlFoot(c, method, src) {
   var g = c.g, W = DL.W - DL.P * 2, F = 64, y0 = DL.H - F, y = y0 - 112;
   g.strokeStyle = DL_C.line; g.lineWidth = 2; g.beginPath(); g.moveTo(DL.P, y); g.lineTo(DL.P + W, y); g.stroke();
   cWrap(g, method, DL.P, y + 28, W, 18, 500, DL_C.sub, 26, 3);
-  g.fillStyle = DL_C.ink; g.fillRect(0, y0, DL.W, F); g.fillStyle = DL_C.lime; g.fillRect(0, y0, DL.W, 3);
-  var bw = cW(g, "@uphill.lab", 22, 900);
-  cText(g, cFit(g, src + " · 투자 권유 아님", DL.W - DL.P * 2 - bw - 70, 16, 600), DL.P, y0 + 27, 16, 600, "#a9a291");
-  cText(g, "다음 장 →", DL.P, y0 + 52, 17, 800, DL_C.lime);
-  if (typeof cMark === "function") cMark(g, DL.W - DL.P, y0 + F / 2 + 9);
+  // v12.19 종이 발: 먹선 + 출처 + 검정 알약 @uphill.lab (연구노트와 같은 발)
+  g.fillStyle = DL_C.ink; g.fillRect(DL.P, y0, W, 2);
+  var pillW = cW(g, "@uphill.lab", 20, 900) + 64; cRound(g, DL.W - DL.P - pillW, y0 + 14, pillW, 38, 19, DL_C.ink);
+  if (typeof cBrandMark === "function") cBrandMark(g, DL.W - DL.P - pillW + 10, y0 + 20, 26); cText(g, "@uphill.lab", DL.W - DL.P - 14, y0 + 40, 20, 900, DL_C.gold, "right");
+  cText(g, cFit(g, src + " · 투자 권유 아님", W - pillW - 30, 16, 600), DL.P, y0 + 27, 16, 600, DL_C.sub);
+  cText(g, "다음 장 →", DL.P, y0 + 51, 16, 800, DL_C.gold);
 }
 function dlNote(c, text) {   // '읽는 법' 상자
   var g = c.g, W = DL.W - DL.P * 2, fs = 26, n = cWrapCount(g, text, W - 56, fs, 500), h = n * 38 + 44;

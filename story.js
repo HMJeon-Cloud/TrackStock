@@ -16,50 +16,79 @@ var NB_WORD = { label: "연구노트", obs: "관찰", next: "다음 장 →", sa
 function nbJosa(w, pair) { var ch = String(w).slice(-1), code = ch.charCodeAt(0), bat = code >= 0xAC00 && code <= 0xD7A3 ? (code - 0xAC00) % 28 !== 0 : /[0-9]$/.test(ch) ? /[013678]$/.test(ch) : /[^aeiouAEIOU\s]$/.test(ch) && /[A-Za-z]$/.test(ch) ? /[lmnrLMNR]$/.test(ch) : false; var p = pair.split("/"); return w + (bat ? p[0] : p[1]); }
 function nbName(sym) { return NB_ASSETS[sym] || (typeof chName === "function" ? chName(sym) : sym); }
 
-/* ---------- 틀 (v10.4 uphill.lab 공통 얼굴: 위 검정 띠 · 아이보리 종이 · 우상향 선 · 아래 검정 띠) ---------- */
+/* ---------- 틀 v12.19 "숫자 먼저" — 우상향연구소 고유 배치 ----------
+   위 검정 띠(로고 + 진행 눈금) → 번호 알약 + 가는 줄 → 핵심 숫자(큰 글씨, 왼쪽) + 결론 문장(오른쪽) → 금색 시작 줄 → 근거 제목 → 본문 → 종이 발 (출처 · @uphill.lab 알약)
+   예전 '관찰 NN · 문장 아래 정렬 · 우상향 꺾은선 · 검정 발' 배치를 버렸다. 본문 채우기 함수들은 c.y / NB.H-96 그대로 쓰므로 영향 없음. */
 var NB_PAPER = "#fbf8f1", NB_INK = "#14161c", NB_HI = "#b8913f";
-function nbBand(g) {
+var NB_HOOK_TOP = 200, NB_RULE = NB.SPLIT - 20;   // 결론 영역 시작 · 구분선 위치
+function nbBand(g, page, total) {
   g.fillStyle = NB_PAPER; g.fillRect(0, 0, NB.W, NB.H);
-  g.fillStyle = NB_INK; g.fillRect(0, 0, NB.W, 72); g.fillStyle = NB_C.gold; g.fillRect(0, 72, NB.W, 3);
-  if (typeof cLogo === "function") cLogo(g, NB.PAD, 0);
-  var tag = "📓 " + NB_WORD.label, tw = cW(g, tag, 20, 800) + 32;
-  cRound(g, NB.W - NB.PAD - tw, 17, tw, 38, 19, null); g.strokeStyle = NB_C.gold; g.lineWidth = 2; g.stroke();
-  cText(g, tag, NB.W - NB.PAD - tw / 2, 43, 20, 800, NB_C.gold, "center");
+  nbTopBand(g, page, total);
 }
-function nbNew() {
+function nbTopBand(g, page, total) {   // 검정 띠만 다시 그림 (본문은 건드리지 않음)
+  g.fillStyle = NB_INK; g.fillRect(0, 0, NB.W, 72);
+  if (typeof cLogo === "function") cLogo(g, NB.PAD, 0);
+  // 진행 눈금(쪽 번호 대신): 금색 칸이 현재 쪽까지 채워진다
+  if (page && total) { var n = Math.min(12, total), segW = Math.min(26, Math.floor(220 / n) - 4), x0 = NB.W - NB.PAD - n * (segW + 4) + 4; for (var i = 0; i < n; i++) { g.fillStyle = i < page ? NB_C.gold : "rgba(255,255,255,0.22)"; g.fillRect(x0 + i * (segW + 4), 31, segW, 10); } }
+  else { var tag = NB_WORD.label; cText(g, tag, NB.W - NB.PAD, 43, 18, 800, NB_C.gold, "right"); }
+  g.fillStyle = NB_C.gold; g.fillRect(0, 72, NB.W, 3);
+}
+function nbNew(page, total) {
   var cv = document.createElement("canvas"); cv.width = NB.W; cv.height = NB.H;
   var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
-  nbBand(g);
-  if (typeof cUphill === "function") cUphill(g, NB.PAD, NB.SPLIT - 16, NB.W - NB.PAD * 2);
+  nbBand(g, page, total);
   return { cv: cv, g: g, y: NB.SPLIT + 60 };
 }
-/* 결론 먼저: "관찰 01" (금색 작은 글씨) + 쪽번호 + 큰 결론 문장들 (검정 글씨 · 강조 금색) */
+/* 구분선: 굵은 먹선 + 왼쪽 금색 시작 토막 (우상향연구소 '금색 시작' 모티프) */
+function nbRule(g, y) { var P = NB.PAD; g.fillStyle = NB_INK; g.fillRect(P, y, NB.W - P * 2, 3); g.fillStyle = NB_C.gold2; g.fillRect(P, y - 3, 120, 9); }
+/* 결론 먼저: 번호 알약 + 핵심 숫자(큰 글씨) + 결론 문장. 숫자가 없으면 문장만 크게 */
 function nbTop(c, n, lines, page, total) {
-  var g = c.g, P = NB.PAD;
-  cText(g, NB_WORD.obs + " " + (n < 10 ? "0" + n : n), P, 122, 24, 900, NB_HI);
-  if (page) cText(g, page + " / " + total, NB.W - P, 122, 22, 700, NB_C.sub, "right");
-  var size = 50, lh = 66, flat;
-  function build() { flat = []; lines.forEach(function (l) { flat = flat.concat(nbSplit(g, l, NB.W - P * 2, size)); }); }
-  build(); while (flat.length * lh > 320 && size > 34) { size -= 2; lh = size * 1.32; build(); }
-  // v11.6 결론이 짧으면 글씨를 키워 위쪽 빈 곳을 줄인다 (최대 68)
-  while (size < 68) { var keep = [size, lh, flat]; size += 2; lh = size * 1.32; build(); if (flat.length * lh > 330) { size = keep[0]; lh = keep[1]; flat = keep[2]; break; } }
-  var y0 = NB.SPLIT - 70 - (flat.length - 1) * lh;
-  flat.forEach(function (l, i) { cRich(g, l, P, y0 + i * lh, size, 800, NB_INK, NB_HI); });
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2;
+  if (page && total) nbTopBand(g, page, total);   // 진행 눈금(nbNew 가 쪽 번호 없이 불렸을 때)
+  var num = n < 10 ? "0" + n : String(n); cRound(g, P, 98, 66, 36, 18, NB_INK); cText(g, num, P + 33, 124, 20, 900, NB_C.gold, "center");
+  g.fillStyle = NB_C.line; g.fillRect(P + 80, 115, W - 80, 2);
+  lines = (lines || []).map(function (l) { return l == null ? "" : String(l); });
+  var joined = lines.join(" "), m = joined.match(/\[\[([^\]]+)\]\]/), hero = m && m[1].length <= 9 && /[\d%]/.test(m[1]) ? m[1] : null;
+  var top = NB_HOOK_TOP, bottom = NB_RULE - 36, avail = bottom - top;
+  if (hero) {
+    // 왼쪽 큰 숫자
+    var hs = 150; while (hs > 72 && cW(g, hero, hs, 900) > 430) hs -= 4;
+    var hx = P, hy = top + Math.min(avail - 40, 150 + (avail - 150) / 2);
+    cText(g, hero, hx, hy, hs, 900, NB_INK); g.fillStyle = NB_C.gold; g.fillRect(hx, hy + 14, Math.min(430, cW(g, hero, hs, 900)), 10);
+    // 오른쪽 문장(숫자 자리는 비우고 나머지 강조는 금색)
+    var rest = lines.map(function (l) { return l.replace("[[" + hero + "]]", "").replace(/\s{2,}/g, " ").replace(/^[\s,·]+|[\s,·]+$/g, ""); }).filter(function (l) { return l.trim(); });
+    if (!rest.length) rest = [cPlain(joined).replace(hero, "").trim()];
+    var tx = P + 470, tw = W - 470, size = 40, lh = 54, flat;
+    function build() { flat = []; rest.forEach(function (l) { flat = flat.concat(nbSplit(g, l, tw, size)); }); }
+    build(); while (flat.length * lh > avail - 10 && size > 26) { size -= 2; lh = size * 1.35; build(); }
+    var y0 = top + (avail - flat.length * lh) / 2 + size;
+    flat.forEach(function (l, i) { cRich(g, l, tx, y0 + i * lh, size, 800, NB_INK, NB_HI); });
+  } else {
+    var size2 = 52, lh2 = 68, flat2;
+    function build2() { flat2 = []; lines.forEach(function (l) { flat2 = flat2.concat(nbSplit(g, l, W, size2)); }); }
+    build2(); while (flat2.length * lh2 > avail && size2 > 32) { size2 -= 2; lh2 = size2 * 1.32; build2(); }
+    while (size2 < 66) { var keep = [size2, lh2, flat2]; size2 += 2; lh2 = size2 * 1.32; build2(); if (flat2.length * lh2 > avail - 10) { size2 = keep[0]; lh2 = keep[1]; flat2 = keep[2]; break; } }
+    var yy = top + (avail - flat2.length * lh2) / 2 + size2 * 0.95;
+    flat2.forEach(function (l, i) { cRich(g, l, P, yy + i * lh2, size2, 800, NB_INK, NB_HI); });
+  }
+  nbRule(g, NB_RULE);
 }
-/* 근거 제목 + 부제 */
+/* 근거 제목 + 부제 (왼쪽 금색 세로 막대) */
 function nbBody(c, title, sub) {
   var g = c.g, P = NB.PAD;
-  cText(g, cFit(g, title, NB.W - P * 2, 30, 900), P, NB.SPLIT + 52, 30, 900, NB_INK);
-  if (sub) cWrap(g, sub, P, NB.SPLIT + 86, NB.W - P * 2, 20, 600, NB_C.sub, 26, 2);
-  c.y = NB.SPLIT + (sub && cWrapCount(g, sub, NB.W - P * 2, 20, 600) > 1 ? 140 : 120);
+  g.fillStyle = NB_C.gold2; g.fillRect(P, NB.SPLIT + 26, 8, sub ? 64 : 36);
+  cText(g, cFit(g, title, NB.W - P * 2 - 24, 30, 900), P + 24, NB.SPLIT + 52, 30, 900, NB_INK);
+  if (sub) cWrap(g, sub, P + 24, NB.SPLIT + 86, NB.W - P * 2 - 24, 20, 600, NB_C.sub, 26, 2);
+  c.y = NB.SPLIT + (sub && cWrapCount(g, sub, NB.W - P * 2 - 24, 20, 600) > 1 ? 140 : 120);
 }
+/* 종이 발: 먹선 + 출처(회색) + 오른쪽 검정 알약 @uphill.lab — 높이 64는 그대로(본문 채우기 함수 기준) */
 function nbFoot(c, src, cta) {
   var g = c.g, P = NB.PAD, F = 64, y0 = NB.H - F;
-  g.fillStyle = NB_INK; g.fillRect(0, y0, NB.W, F); g.fillStyle = NB_C.gold; g.fillRect(0, y0, NB.W, 3);
-  var bw = cW(g, "@uphill.lab", 22, 900);
-  cText(g, cFit(g, src || "StockMind 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", NB.W - P * 2 - bw - 70, 16, 600), P, y0 + 27, 16, 600, "#a9a291");
-  cText(g, cta || NB_WORD.next, P, y0 + 52, 17, 800, NB_C.gold);
-  if (typeof cMark === "function") cMark(g, NB.W - P, y0 + F / 2 + 9);
+  g.fillStyle = NB_PAPER; g.fillRect(0, y0, NB.W, F); g.fillStyle = NB_INK; g.fillRect(P, y0, NB.W - P * 2, 2);
+  var pillW = cW(g, "@uphill.lab", 20, 900) + 64; cRound(g, NB.W - P - pillW, y0 + 14, pillW, 38, 19, NB_INK);
+  if (typeof cBrandMark === "function") cBrandMark(g, NB.W - P - pillW + 10, y0 + 20, 26); cText(g, "@uphill.lab", NB.W - P - 14, y0 + 40, 20, 900, NB_C.gold, "right");
+  cText(g, cFit(g, src || "StockMind 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", NB.W - P * 2 - pillW - 30, 16, 600), P, y0 + 27, 16, 600, NB_C.sub);
+  cText(g, cta || NB_WORD.next, P, y0 + 51, 16, 800, NB_HI);
 }
 function nbSplit(g, s, maxW, size) {
   if (s === "") return [""];
@@ -68,25 +97,45 @@ function nbSplit(g, s, maxW, size) {
   if (line) lines.push(line);
   var open = false; return lines.map(function (l) { var o = open, n = (l.match(/\[\[/g) || []).length - (l.match(/\]\]/g) || []).length; if (o) l = "[[" + l; if (n > 0) { l += "]]"; open = true; } else if (n < 0) open = false; return l; });
 }
-/* 표지 / 마무리 (종이 위 큰 제목 · v10.4) */
-function nbCover(small, lines, sub, meta) {
-  var c = nbNew(), g = c.g, P = NB.PAD; g.fillStyle = NB_PAPER; g.fillRect(0, 75, NB.W, NB.H - 75);
-  cText(g, small, P, 470, 32, 700, NB_HI);
-  var flat = []; lines.forEach(function (l) { flat = flat.concat(nbSplit(g, l, NB.W - P * 2, 76)); });
-  flat.forEach(function (l, i) { cRich(g, l, P, 580 + i * 96, 76, 900, NB_INK, NB_HI); });
-  var y = 580 + (flat.length - 1) * 96 + 50; if (typeof cUphill === "function") cUphill(g, P, y, NB.W - P * 2);
-  cWrap(g, sub, P, y + 64, NB.W - P * 2, 27, 600, NB_C.txt, 40, 4);
-  nbFoot(c, meta || cDate(Date.now()) + " 기준 · 과거 데이터 비교 자료 · 투자 권유 아님");
+/* 표지: 위 종이(질문 크게) + 아래 검정 블록(설명 · 넘겨 보기) — 검정이 아래로 */
+function nbCover(small, lines, sub, meta, items) {
+  var c = nbNew(), g = c.g, P = NB.PAD, W = NB.W - P * 2;
+  cRound(g, P, 118, cW(g, small, 22, 800) + 36, 40, 20, null); g.strokeStyle = NB_HI; g.lineWidth = 2; g.stroke(); cText(g, small, P + 18, 146, 22, 800, NB_HI);
+  var size = 78, lh = 98, flat; function build() { flat = []; lines.forEach(function (l) { flat = flat.concat(nbSplit(g, l, W, size)); }); } build();
+  while (flat.length * lh > 480 && size > 54) { size -= 2; lh = size * 1.26; build(); }
+  var y = 300; flat.forEach(function (l, i) { cRich(g, l, P, y + i * lh, size, 900, NB_INK, NB_HI); });
+  var ry = y + (flat.length - 1) * lh + 60; nbRule(g, ry);
+  // 아래 검정 블록 — 제목 바로 아래부터 끝까지, 설명 글씨는 블록 높이에 맞춰 키운다(빈 곳 없이)
+  var by = ry + 70, bh = NB.H - by; g.fillStyle = NB_INK; g.fillRect(0, by, NB.W, bh);
+  items = (items || []).filter(Boolean).slice(0, 7); var listH = items.length ? items.length * 44 + 60 : 0;
+  var room = bh - 250 - listH, fs = 28; while (fs < 36 && cWrapCount(g, sub, W, fs + 2, 600) * (fs + 2) * 1.5 <= room) fs += 2; while (fs > 22 && cWrapCount(g, sub, W, fs, 600) * fs * 1.5 > room) fs -= 2;
+  var nl = cWrapCount(g, sub, W, fs, 600), ty = by + 60 + (items.length ? 0 : Math.max(0, (room - nl * fs * 1.5) / 2)) + fs;
+  var ly = cWrap(g, sub, P, ty, W, fs, 600, "#f3efe6", fs * 1.5, 8);
+  if (items.length) {   // 이 묶음의 차례 (쪽 제목) — 빈 검정을 차례로 채운다
+    var top = Math.max(ly + 30, by + 60 + nl * fs * 1.5 + 30), gap = Math.min(44, Math.floor((NB.H - 150 - top) / items.length));
+    g.fillStyle = "rgba(255,255,255,0.18)"; g.fillRect(P, top, W, 1);
+    items.forEach(function (t, i) { var yy = top + 26 + i * gap + 18; cRound(g, P, yy - 22, 44, 28, 14, NB_C.gold); cText(g, String(i + 1).padStart(2, "0"), P + 22, yy - 2, 16, 900, NB_INK, "center"); cText(g, cFit(g, cPlain(t), W - 70, 22, 700), P + 60, yy, 22, 700, "#f3efe6"); });
+  }
+  cText(g, "넘겨서 보기 →", P, NB.H - 110, 30, 900, NB_C.gold);
+  cText(g, cFit(g, meta || cDate(Date.now()) + " 기준 · 과거 데이터 비교 자료 · 투자 권유 아님", W - 200, 16, 600), P, NB.H - 60, 16, 600, "#a9a291");
+  if (typeof cMark === "function") cMark(g, NB.W - P, NB.H - 62);
   return c.cv;
 }
+/* 마무리: 위 종이(질문) + 아래 검정 블록(댓글 유도 · 저장) */
 function nbClose(q, lines, foot) {
-  var c = nbNew(), g = c.g, P = NB.PAD; g.fillStyle = NB_PAPER; g.fillRect(0, 75, NB.W, NB.H - 75);
-  var y = cWrap(g, q, P, 420, NB.W - P * 2, 54, 900, NB_INK, 70, 3);
-  if (typeof cUphill === "function") cUphill(g, P, y, NB.W - P * 2);
-  cText(g, NB_WORD.cta, P, y + 100, 46, 900, NB_HI);
-  lines.forEach(function (l, i) { cText(g, l, P, y + 200 + i * 54, 32, 700, NB_C.txt); });
-  cText(g, foot || "매일 아침 전일 정리 · 일요일 한 주 정리 · 월요일 한 주 예상", P, y + 220 + lines.length * 54 + 40, 23, 600, NB_C.sub);
-  nbFoot(c, "StockMind 자동 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", NB_WORD.save);
+  var c = nbNew(), g = c.g, P = NB.PAD, W = NB.W - P * 2;
+  cText(g, "마지막 장", P, 146, 22, 800, NB_HI);
+  var qs = 56; while (qs < 72 && cWrapCount(g, q, W, qs + 2, 900) <= 3 && cWrapCount(g, q, W, qs + 2, 900) * (qs + 2) * 1.3 < 300) qs += 2;
+  var y = cWrap(g, q, P, 230 + qs, W, qs, 900, NB_INK, qs * 1.3, 3); nbRule(g, y + 20);
+  cText(g, NB_WORD.cta, P, y + 110, 44, 900, NB_HI);
+  var by = y + 160, bh = NB.H - by; g.fillStyle = NB_INK; g.fillRect(0, by, NB.W, bh);
+  var ls = 30; while (ls < 42 && lines.every(function (l) { return cW(g, l, ls + 2, 700) <= W; }) && (lines.length * (ls + 2) * 1.6 + 120) < bh - 200) ls += 2;
+  var ly = by + 70 + Math.max(0, (bh - 220 - lines.length * ls * 1.6) / 2) + ls;
+  lines.forEach(function (l, i) { cText(g, cFit(g, l, W, ls, 700), P, ly + i * ls * 1.6, ls, 700, "#f3efe6"); });
+  cText(g, cFit(g, foot || "매일 아침 전일 정리 · 일요일 한 주 정리 · 월요일 한 주 예상", W, 20, 600), P, ly + lines.length * ls * 1.6 + 10, 20, 600, "#a9a291");
+  cText(g, NB_WORD.save, P, NB.H - 110, 30, 900, NB_C.gold);
+  cText(g, "StockMind 자동 집계 · 야후 파이낸스 종가 · 과거 자료이며 투자 권유 아님", P, NB.H - 60, 16, 600, "#a9a291");
+  if (typeof cMark === "function") cMark(g, NB.W - P, NB.H - 62);
   return c.cv;
 }
 
