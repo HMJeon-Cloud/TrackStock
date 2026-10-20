@@ -569,6 +569,7 @@
   /* v9.5 대표 카드 검증 화면 */
   .ocV { display: grid; grid-template-columns: 1fr; gap: 14px; } @media (min-width: 900px) { .ocV { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
   .modalBox:has(.ocV) { max-width: min(1180px, 96vw) !important; width: 96vw; }
+  .modalBox:has(.dgWrap) { max-width: min(1000px, 96vw) !important; width: 96vw; } .dgWrap .tableWrap { max-height: none; overflow-y: visible; }   /* v12.15 데이터 연동 안내는 넓게·전체 표시 */
   .ocVR { position: sticky; top: 0; align-self: start; }
   .ocVR img.ocChecker { background: repeating-conic-gradient(#d9d9d9 0% 25%, #f5f5f5 0% 50%) 50% / 24px 24px; }
   .ocData { border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; } .ocData input { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font: inherit; background: var(--card, #fff); color: inherit; }
@@ -821,6 +822,12 @@
   .mkCats button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--card, #fff); color: var(--txt); font-size: 12px; cursor: pointer; }
   .mkCats button.on { border-color: #b8913f; background: #fbf3df; color: #14161c; font-weight: 800; }
   .mkCats i { font-style: normal; font-size: 20px; }
+  .anRevH { margin: 14px 0 6px; font-weight: 800; font-size: 13.5px; } .anRev { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; } .anRevIn { margin-top: 8px; }
+  /* v12.15 데이터 연동 안내 */
+  .dgWrap { font-size: 13px; line-height: 1.55; } .dgWrap h4 { margin: 16px 0 6px; font-size: 14px; } .dgWrap h4 small { color: var(--sub); font-weight: normal; margin-left: 6px; }
+  .dgIntro { background: var(--soft); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: var(--txt2); }
+  .dgT th, .dgT td { text-align: left; white-space: normal; vertical-align: top; font-size: 12.5px; padding: 8px 8px; } .dgT th { font-size: 11.5px; } .dgT .dgName { min-width: 150px; } .dgT code { font-size: 11px; background: var(--soft); padding: 1px 4px; border-radius: 4px; }
+  .dgOk { color: #2e7d4f; font-weight: 700; white-space: nowrap; } .dgNo { color: #b45309; font-weight: 700; white-space: nowrap; } .dgNa { color: var(--sub); white-space: nowrap; }
   .mkPane.wbCollapsed > :not(#mkResult) { display: none; }   /* v12.14 결과가 있으면 ①②③ 접기 */
   .mkSrcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; margin-top: 8px; }   /* v12.14 12줄 세로 목록 → 칩 격자 */
   .mkSrcs button { text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff); color: var(--txt); font-size: 12.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2271,7 +2278,7 @@
 <div id="tab-channel" class="hidden">
 <div class="card" id="channelCard">
   <div class="pgHead"><h2>채널 브리핑 <small>오늘 쓸 글 · 근거 자료 (데일리 글 · MDD · 자산배분 · 과거 사례) · 운영자용</small></h2><button class="chip" id="ownerLock" title="이 기기에서 운영자 모드 끄기">🔒 운영자 모드 끄기</button></div>
-  <div class="toolbar"><div class="tbActions" style="margin-left:0"><button class="primary" onclick="makerGo('today')">🃏 카드 만들기 ›</button><button class="chip" id="chFullCopy">📋 전체 글 복사</button><button class="chip" id="chShortCopy">스레드용(500자) 복사</button><span id="chCount" class="briefDim"></span></div></div>
+  <div class="toolbar"><div class="tbActions" style="margin-left:0"><button class="primary" onclick="makerGo('today')">🃏 카드 만들기 ›</button><button class="chip" id="chFullCopy">📋 전체 글 복사</button><button class="chip" id="chShortCopy">스레드용(500자) 복사</button><button class="chip" id="chDataGuide" title="API 키 · 자동 수집 · 수동 작업을 한 장에">🔌 데이터 연동 안내</button><span id="chCount" class="briefDim"></span></div></div>
 
   <section class="briefSec slHero" id="chHero"></section>
   <div class="chCols"><div class="chColL">
@@ -2540,7 +2547,7 @@
   </div>
 </div>
 
-<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · <span id="footVer">v12.14</span><div class="popSrc" data-pop="이용 안내" data-popid="footPop">
+<footer class="footLine">정보 제공·학습용 도구이며 투자 조언이 아니에요 · <button class="linkBtn" id="footInfo">이용 안내</button> <span id="footChannelWrap" class="ownerOnly">· <button class="linkBtn" id="footChannel" title="운영자용">채널 운영</button></span> · <span id="footVer">v12.15</span><div class="popSrc" data-pop="이용 안내" data-popid="footPop">
   이 서비스는 과거 가격·재무 데이터를 계산해 보여주는 <b>정보 제공·교육 목적의 도구</b>이며, 특정 종목의 매매를 권유하거나 투자 판단을 대신하지 않습니다.
   화면의 예시 종목·예시 비중·예시 규칙은 표를 읽는 연습을 위한 것으로 투자 조언이 아닙니다.
   모든 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.<br>
@@ -2554,7 +2561,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.14"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.15"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";

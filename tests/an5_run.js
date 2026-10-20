@@ -134,6 +134,15 @@ if(u.pathname==="/api/fund"){const sym=u.searchParams.get("symbol");const kr=/\.
  const pr=await p0.evaluate(()=>document.querySelector(".anPrBox textarea").value);const ci=pr.indexOf("[보정 메모");console.log("PROMPT calib:",ci>=0?pr.slice(ci,ci+500):"(none)");
  console.log("CALHTML:",await p0.evaluate(()=>document.querySelector("#anCal").innerText.replace(/\s+/g," ").slice(0,500)));
  await p0.click("[data-ancal]");await p0.waitForTimeout(300);console.log("calib off CKS:",await p0.evaluate(()=>[...document.querySelectorAll(".anCks.one .anCk")].map(c=>c.querySelector(".anSt").textContent).join("")));
+ // v12.15 검토 프롬프트 4종 + 데이터 연동 안내
+ console.log("REV pre:",await p0.evaluate(()=>anPromptPremortem(AN.out).slice(0,160).replace(/\n/g," | ")));
+ console.log("REV fact:",await p0.evaluate(()=>anPromptFactcheck(AN.out,"삼성전자 영업이익 50% 증가").split("\n").length));
+ console.log("REV insp:",await p0.evaluate(()=>anPromptInspector(AN.out,"테스트 답변").slice(0,120)));
+ console.log("REV morn:",await p0.evaluate(()=>anPromptMorning().slice(0,200).replace(/\n/g," | ")));
+ await p0.click('[data-anrev="fact"]');await p0.waitForTimeout(200);console.log("REV ui:",await p0.evaluate(()=>!document.querySelector(".anRevIn").hidden));
+ await p0.evaluate(()=>{switchTab("channel");});await p0.waitForTimeout(1500);await p0.evaluate(()=>chDataGuide());await p0.waitForTimeout(500);
+ console.log("GUIDE:",await p0.evaluate(()=>{const m=document.querySelector(".dgWrap");return m?m.querySelectorAll("tr").length+" rows · "+m.innerText.slice(0,120).replace(/\n/g," "):"none";}));
+ await p0.screenshot({path:path.join(OUT,"dg-1280.png")});await p0.evaluate(()=>infoModal.close&&infoModal.close());await p0.evaluate(()=>switchTab("analyst"));await p0.waitForTimeout(300);
  const o=await p0.evaluate(OVL);console.log("ovl 1280",JSON.stringify(o));await p0.screenshot({path:path.join(OUT,"an4-1280.png"),fullPage:true});
  await p0.context().close();
  const p1=await mk(390,844);await p1.evaluate(()=>switchTab("analyst"));await p1.waitForSelector("#anBody .anGrid",{timeout:60000});await p1.evaluate(()=>{AN.mod="biz";AN.sym="005930.KS";anRun();});await p1.waitForFunction(()=>!AN.busy&&document.querySelectorAll(".arcRow").length>=2,{timeout:120000});await p1.waitForTimeout(800);

@@ -354,6 +354,52 @@ function anPromptAll(outs) {
   L.push(AN_FORMAT.replace("(항목 줄은 체크리스트 수만큼 반복)", "(항목 줄은 여섯 틀 각각 1줄 = 6줄: '기업' '차트' '실적' '재무' '포트폴리오' '매크로')"));
   return L.join("\n");
 }
+/* ============================================================ v12.15 검토 프롬프트 4종 — 참고 자료(클로드로 주식 분석하는 8가지 방법)에서 우리에게 없던 것만 ============================================================
+   · 실패 시나리오(pre-mortem) · 팩트체크(붙여넣은 글 vs 앱 숫자) · 검사관 모드(받은 답변 재검토 = 출처 검증 + 검사관) · 아침 3분 브리핑(보유 종목 + 오늘 기사)
+   공시 원문(10-Q/10-K)·실적 PDF 검산은 무료 연동이 없어 제외. 모두 앱 숫자를 근거로 넣고, 지어내지 말라는 규칙을 붙인다. */
+function anDataBlock(out) { if (!out) return []; var L = ["[내 앱(StockMind)이 계산한 데이터 — 이 숫자만 근거로 쓰고, 없는 숫자는 '데이터 없음'이라고 써줘. 출처를 붙이고 지어내지 마.]"]; anLines(out).forEach(function (l) { L.push("- " + l.text); }); return L; }
+function anPromptPremortem(out) {
+  var name = AN.sym ? anName(AN.sym) + "(" + AN.sym + ")" : "[기업명/티커]", L = [];
+  L.push("너는 회의적인 리스크 매니저야. " + name + "을(를) 지금 매수한 뒤 6개월 후 주가가 30% 하락했다고 가정해줘(사전 부검, pre-mortem).");
+  L.push("1) 가능한 원인 3가지를 '가능성 높은 순'으로, 각각 왜 그럴 수 있는지 아래 앱 숫자와 연결해서 써줘.");
+  L.push("2) 원인마다 '조기 경고 신호' 2개씩 — 내가 어디서(공시·기사·숫자) 무엇을 보면 알 수 있는지 구체적으로.");
+  L.push("3) '내 투자 가설이 틀렸다고 판단할 조건' 3가지 — 숫자나 사건으로 딱 잘라서(예: 영업이익률이 X% 아래, 가이던스 하향).");
+  L.push("4) 반대로 '내가 틀리지 않았는데 주가만 빠진 경우'를 구분하는 기준 1가지.");
+  L.push(""); L = L.concat(anDataBlock(out));
+  L.push(""); L.push("## 서술형"); L.push("(위 1~4를 문단으로)"); L.push("## 카드형"); L.push("제목: " + name.replace(/\(.*\)/, "") + " 실패 시나리오"); L.push("한 줄: (가장 가능성 높은 원인 한 문장)"); L.push("원인 1|가능성|핵심|경고 신호|틀렸다고 볼 조건"); L.push("원인 2|…"); L.push("원인 3|…"); L.push("확인할 것: (쉼표로)");
+  return L.join("\n");
+}
+function anPromptFactcheck(out, text) {
+  var name = AN.sym ? anName(AN.sym) + "(" + AN.sym + ")" : "[기업명/티커]", L = [];
+  L.push("너는 팩트체커야. 아래 [글]은 " + name + "에 대해 내가 받은 리포트·커뮤니티·기사 내용이야. 글의 핵심 주장을 번호를 붙여 정리하고, 주장마다 (a) 사실/추정/의견 중 무엇인지, (b) 아래 앱 숫자와 맞는지(맞음·다름·확인 불가), (c) 다르면 글의 값 → 앱의 값 → 차이의 이유 후보(기준일·단위·GAAP/Non-GAAP·전분기 vs 전년 동기 혼용)를 써줘.");
+  L.push("앱에 없는 숫자는 '확인 불가'로 두고 지어내지 마. 마지막에 '이 글을 믿어도 되는 정도'를 상·중·하로 매기고 이유 한 줄.");
+  L.push(""); L.push("[글]"); L.push(text || "(여기에 글을 붙여넣기)"); L.push("[/글]");
+  L.push(""); L = L.concat(anDataBlock(out));
+  L.push(""); L.push("## 서술형"); L.push("(주장별 검증 문단)"); L.push("## 카드형"); L.push("제목: " + name.replace(/\(.*\)/, "") + " 팩트체크"); L.push("한 줄: (믿어도 되는 정도와 이유)"); L.push("주장 1|판정(맞음/다름/확인 불가)|글의 값|앱의 값|차이 이유"); L.push("주장 2|…"); L.push("확인할 것: (쉼표로)");
+  return L.join("\n");
+}
+function anPromptInspector(out, answer) {
+  var L = [];
+  L.push("너는 비판적인 검토자(검사관)야. 아래 [분석]은 방금 받은 AI 분석이야. 다음을 점검해서 틀린 곳을 고쳐줘.");
+  L.push("1) 숫자·증감률·날짜·단위를 다시 계산해 확인. 2) 아래 [앱 데이터]에 없는 숫자는 '출처 없음'으로 표시하고 삭제하거나 '확인 필요'로 바꿔. 3) 인용·근거가 실제로 있는지, 논리 비약·과장은 없는지. 4) 틀렸거나 확인되지 않은 항목만 '원래 → 수정 → 근거'로 표로 정리. 5) 고칠 게 없으면 '확인된 수정 사항 없음'이라고만 답해.");
+  L.push("6) 마지막에 수정을 반영한 [분석]의 '## 카드형' 블록을 다시 써줘(항목|판정|핵심|근거 숫자|의미 형식 유지).");
+  L.push(""); L.push("[분석]"); L.push(answer || "(여기에 받은 답변을 붙여넣기)"); L.push("[/분석]");
+  L.push(""); L = L.concat(anDataBlock(out));
+  return L.join("\n");
+}
+function anPromptMorning() {
+  var lots = []; try { lots = loadHoldings().lots || []; } catch (e) {}
+  var syms = [], seen = {}; lots.forEach(function (x) { if (x.s && !seen[x.s]) { seen[x.s] = 1; syms.push(x.s); } });
+  if (!syms.length && AN.sym) syms.push(AN.sym);
+  var news = typeof hubNewsItems === "function" ? hubNewsItems() : [], L = [], today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  L.push("오늘은 " + today + ". 내 보유 종목은 " + (syms.length ? syms.map(function (s) { return anName(s) + "(" + s + ")"; }).join(", ") : "[종목1], [종목2]") + "이야.");
+  L.push("지난 24시간 동안 각 종목의 주요 뉴스·공시를 정리하고, 매출·이익에 미칠 영향과 중요도(상·중·하), 출처 링크를 알려줘. 특이사항이 없으면 '없다'고 해. 3분 안에 읽을 분량으로, 종목마다 2~3줄.");
+  L.push("아래 [오늘 기사]는 내 앱이 네이버 검색으로 모은 제목이야 — 여기 없는 사건은 '확인 필요'로 표시하고 지어내지 마.");
+  L.push(""); L.push("[오늘 기사]"); news.slice(0, 25).forEach(function (n) { L.push("- " + n.t + (n.it && n.it.press ? " (" + n.it.press + (n.it.time ? " · " + n.it.time : "") + ")" : "") + (n.it && n.it.url ? " " + n.it.url : "")); }); if (!news.length) L.push("(앱에 수집된 기사 없음 — 관심 탭 뉴스를 먼저 열면 채워져요)"); L.push("[/오늘 기사]");
+  (syms.length ? syms : []).forEach(function (s) { var r = typeof rpRows === "function" ? rpRows(s) : []; if (r.length > 1) L.push("- " + anName(s) + " 전일 종가 " + anPrice(s, r[r.length - 1].c) + " (" + anPct(r[r.length - 1].c / r[r.length - 2].c - 1, 2) + ")"); });
+  L.push(""); L.push("## 서술형"); L.push("(종목별 2~3줄)"); L.push("## 카드형"); L.push("제목: 보유 종목 아침 브리핑 " + today); L.push("한 줄: (오늘 가장 중요한 한 가지)"); L.push("종목|중요도(상/중/하)|핵심|영향|출처");
+  return L.join("\n");
+}
 function anCopy(text, btn) {
   var done = function () { if (btn) { var o = btn.innerHTML; btn.textContent = "✓ 복사됨"; setTimeout(function () { btn.innerHTML = o; }, 1500); } };
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(done).catch(function () { var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch (e) { alert("복사가 막혔어요. 아래 '프롬프트 보기'에서 직접 복사해 주세요."); } document.body.removeChild(ta); });
@@ -465,7 +511,14 @@ function renderAnalyst() {
   h += '<section class="anSec' + (ready ? '' : ' dim') + '"><div class="mkStep"><b>3</b> 프롬프트 복사 <small class="briefDim">AI에 붙여넣으면 항목별 답 → 종합이 서술형 + 카드형으로 돌아와요</small></div>';
   h += '<div class="anPrOpts">' + [["module", "이 틀만", m.no + " " + m.t + " · 체크리스트 " + m.ck.length + "개 + 앱 데이터"], ["full", "종목 풀세트", "01~04 네 틀 한 번에 → 틀별 종합 → 최종 투자 판단" + (m.need === "stock" ? "" : " (종목 선택 필요)")], ["all", "전체 6틀", "종목 4 + 포트폴리오 + 매크로 → 최종 판단·비중 제안"]].map(function (o) { return '<label class="anPrOpt' + (AN.pScope === o[0] ? ' on' : '') + '"><input type="radio" name="anScope" value="' + o[0] + '"' + (AN.pScope === o[0] ? ' checked' : '') + '><b>' + o[1] + '</b><small>' + o[2] + '</small></label>'; }).join("") + '</div>';
   h += '<label class="anCtxOpt"><input type="checkbox" data-anctx' + (AN.useCtx !== false ? ' checked' : '') + '> 과거 분석 기록 넣기 <small class="briefDim">' + (past.length ? "이 " + (m.need === "stock" ? "종목" : "틀") + " 기록 " + past.length + "건 중 최근 3건 → '그때 vs 지금 · 판단 조정' 문단을 요청" : "아직 기록 없음 — 저장이 쌓이면 자동으로 들어가요") + '</small></label>';
-  h += '<div class="anActs"><button class="primary" data-ancopy' + (ready || AN.pScope !== "module" ? '' : ' disabled') + '>📋 프롬프트 복사</button><button class="chip" data-anprev>프롬프트 보기</button><span class="briefDim anPrMsg"></span></div><div class="anPrBox" hidden><textarea class="thrText" rows="14" spellcheck="false" readonly></textarea></div></section>';
+  h += '<div class="anActs"><button class="primary" data-ancopy' + (ready || AN.pScope !== "module" ? '' : ' disabled') + '>📋 프롬프트 복사</button><button class="chip" data-anprev>프롬프트 보기</button><span class="briefDim anPrMsg"></span></div><div class="anPrBox" hidden><textarea class="thrText" rows="14" spellcheck="false" readonly></textarea></div>';
+  // v12.15 검토 프롬프트 — 틀 분석과 별개로 한 번에 복사해 쓰는 4가지 (앱 숫자 포함)
+  h += '<div class="anRevH">검토 프롬프트 <small class="briefDim">틀 분석과 별개 · 앱 숫자를 근거로 넣어요 · 답변은 ④에 저장</small></div><div class="anRev">' +
+    '<button class="wbAct" data-anrev="pre"' + (ready ? '' : ' disabled') + '><b>⚠️ 실패 시나리오</b><small>6개월 뒤 -30% 가정 → 원인 3 · 경고 신호 · 가설 폐기 조건</small></button>' +
+    '<button class="wbAct" data-anrev="fact"' + (ready ? '' : ' disabled') + '><b>🔍 팩트체크</b><small>리포트·커뮤니티 글을 붙여넣으면 주장별로 앱 숫자와 대조</small></button>' +
+    '<button class="wbAct" data-anrev="insp"' + (ready ? '' : ' disabled') + '><b>🧐 검사관 모드</b><small>받은 답변의 숫자·출처·논리 재검토 → 수정표 + 카드형 다시</small></button>' +
+    '<button class="wbAct" data-anrev="morn"><b>☕ 아침 3분 브리핑</b><small>내 자산 보유 종목 + 오늘 기사 → 종목별 2~3줄</small></button></div>' +
+    '<div class="anRevIn" hidden><textarea class="anAnsIn" rows="6" placeholder=""></textarea><div class="anActs"><button class="primary" data-anrevcopy>📋 프롬프트 복사</button><button class="chip" data-anrevclose>닫기</button></div></div></section>';
   // ④ 답변
   h += '<section class="anSec"><div class="mkStep"><b>4</b> 받은 답변 붙여넣기 · 저장 <small class="briefDim">' + (mine.length ? '이 틀 ' + mine.length + '건 저장됨' : '서버에 쌓여 자산이 돼요 · 그때 가격·숫자도 같이 저장') + '</small></div>';
   h += '<textarea class="anAnsIn" rows="7" placeholder="AI 답변 전체를 여기에 붙여넣고 [저장]을 누르세요. (## 서술형 / ## 카드형 블록이 있으면 항목·판정·리스크를 자동으로 읽어요)"></textarea><div class="anActs"><button class="primary" data-ansave>💾 저장</button><button class="chip" data-anclear>비우기</button></div>';
@@ -489,6 +542,16 @@ function renderAnalyst() {
     inp.addEventListener("blur", function () { setTimeout(function () { res.style.display = "none"; }, 150); });
   }
   var tg = root.querySelector("[data-antg]"); if (tg) tg.onclick = function () { AN.showData = AN.showData === false ? true : false; renderAnalyst(); };
+  // v12.15 검토 프롬프트
+  var revIn = root.querySelector(".anRevIn"), revTa = revIn && revIn.querySelector("textarea"), revKind = null;
+  Array.prototype.forEach.call(root.querySelectorAll("[data-anrev]"), function (b) { b.onclick = function () {
+    revKind = b.getAttribute("data-anrev");
+    if (revKind === "pre") { anCopy(anPromptPremortem(O), b); revIn.hidden = true; return; }
+    if (revKind === "morn") { anCopy(anPromptMorning(), b); revIn.hidden = true; return; }
+    revIn.hidden = false; revTa.value = revKind === "insp" && cur && cur.text ? cur.text : ""; revTa.placeholder = revKind === "fact" ? "검증할 리포트·커뮤니티 글·기사를 여기에 붙여넣고 [프롬프트 복사]" : "재검토할 AI 답변을 여기에 붙여넣고 [프롬프트 복사] (④에서 고른 답변이 있으면 자동으로 들어가요)"; revTa.focus();
+  }; });
+  var rc = root.querySelector("[data-anrevcopy]"); if (rc) rc.onclick = function () { anCopy(revKind === "fact" ? anPromptFactcheck(O, revTa.value.trim()) : anPromptInspector(O, revTa.value.trim()), rc); };
+  var rx = root.querySelector("[data-anrevclose]"); if (rx) rx.onclick = function () { revIn.hidden = true; };
   Array.prototype.forEach.call(root.querySelectorAll('input[name="anScope"]'), function (r) { r.onchange = function () { AN.pScope = r.value; renderAnalyst(); }; });
   function buildPrompt(cb) {
     var msg = root.querySelector(".anPrMsg"), ctxP = AN.useCtx !== false && typeof arcContext === "function" ? arcContext(m.need === "stock" ? AN.sym : null, m.need === "stock" ? null : m.id, 3) : Promise.resolve("");

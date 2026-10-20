@@ -35,6 +35,10 @@ export default async function handler(req, res) {
                 (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET));
   out.sync = !!(process.env.USER_SALT && process.env.USER_SALT.length >= 16 && (redis || process.env.BLOB_READ_WRITE_TOKEN));
   out.syncStore = redis ? "redis" : (process.env.BLOB_READ_WRITE_TOKEN ? "blob" : null);
+  // v12.15 운영자 '데이터 연동 안내'용 — 키가 '있는지'만 알린다(값은 절대 내보내지 않음)
+  const E = process.env, has = (k) => !!(E[k] && String(E[k]).length);
+  out.keys = { redis: !!redis, cron: has("CRON_SECRET"), owner: has("OWNER_KEY"), salt: !!(E.USER_SALT && E.USER_SALT.length >= 16), naverHub: has("NAVER_HUB_KEY_ID") && has("NAVER_HUB_KEY"), naverDev: has("NAVER_CLIENT_ID") && has("NAVER_CLIENT_SECRET"),
+    dart: has("DART_API_KEY"), secUa: has("SEC_UA"), ecos: has("ECOS_API_KEY"), fred: has("FRED_API_KEY"), openai: has("OPENAI_API_KEY") };
   res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1200");
   res.status(200).json(out);
 }

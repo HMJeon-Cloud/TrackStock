@@ -215,7 +215,8 @@ async function runAudit(redis, res) {
 export default async function handler(req, res) {
   const started = Date.now();
   const uniOnly = (req.query.universe === "us" || req.query.universe === "kr") && req.query.only === "1";   // v12.9 유니버스만 지금 받기 — 운영자 토큰으로도 가능
-  const ownerOk = (req.query.audit === "1" || uniOnly) && reqIsOwner(req);   // 데이터 점검·유니버스는 운영자 토큰으로도 실행 가능 (전체 수집은 CRON_SECRET만)
+  const ownerRun = req.query.run === "1" && reqIsOwner(req);   // v12.15 앱 운영자 화면 '아침 수집 지금 실행' — 크론과 같은 전체 수집(운영자 토큰)
+  const ownerOk = (req.query.audit === "1" || uniOnly || ownerRun) && reqIsOwner(req);   // 데이터 점검·유니버스·전체 수집은 운영자 토큰으로도 실행 가능
   if (process.env.CRON_SECRET && !ownerOk) {
     const auth = req.headers.authorization || "";
     const key = req.query.key || "";
