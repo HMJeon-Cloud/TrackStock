@@ -253,7 +253,9 @@ async function aiInsight(res, key, model, fallback, b) {
 async function aiImage(res, key, imgModel, b) {
   const p = b.plan || {}, visual = String(p.visual || "").slice(0, 600);
   const isIcon = b.scope === "icon", size = isIcon ? "1024x1024" : "1024x1536";
-  const base = "Vertical 2:3 poster for an Instagram Reel by a Korean investing education channel 'uphill.lab'. Premium, modern, high contrast. Brand palette: deep black/navy with warm gold accents. " + (visual ? "Scene/mood: " + visual + ". " : "");
+  const asp = b.aspect === "4:5" ? "4:5" : "9:16";   // v12.22 앱이 2:3 이미지를 이 비율로 가운데 기준 잘라 쓴다
+  const safe = asp === "4:5" ? "The final image will be center-cropped to 4:5 (top and bottom ~9% each are cut): keep ALL text and key elements inside the central 80% of the height." : "The final image will be center-cropped to 9:16 (left and right ~8% each are cut): keep ALL text and key elements inside the central 84% of the width, and away from the top 14% and bottom 19% (Instagram UI).";
+  const base = "Vertical poster for Instagram (" + (asp === "4:5" ? "feed post 4:5" : "Reel 9:16") + ") by a Korean investing education channel 'uphill.lab'. " + safe + " Premium, modern, high contrast. Brand palette: deep black/navy with warm gold accents. " + (visual ? "Scene/mood: " + visual + ". " : "");
   let prompt;
   if (isIcon) prompt = "One single flat minimal icon of: " + String(b.subject || p.title || "chart going up").slice(0, 120) + ". Brand 'uphill.lab': use ONLY deep black (#14161c) and warm gold (#e6c57a), on a plain solid ivory (#fbf8f1) background. Centered, bold rounded geometric shapes, consistent 2px-style outline weight, generous padding. ABSOLUTELY NO text, letters, numbers, shadows, gradients, frames or watermarks.";
   else if (b.scope === "bg") prompt = base + "This is ONLY a background: keep the center and lower 70% calm and darker so white text can be overlaid later. ABSOLUTELY NO text, letters, numbers, signs, logos, UI, charts with labels or watermarks anywhere.";
