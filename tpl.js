@@ -72,6 +72,7 @@ function tplFoot(c, note) {
   cText(g, brand, TPL.W - P, y0 + F / 2 + 9, 22, 900, TPL_C.gold, "right");
   return c.cv;
 }
+function tplK() { return TPL.H / 1350; }   // v12.22 릴스형(1920)이면 1.42 — 고정 높이 칸을 이 배율로 늘린다
 function tplBox(g, x, y, w, h, r, fill, lw, stroke) { cRound(g, x, y, w, h, r, fill || "#ffffff"); g.strokeStyle = stroke || TPL_C.ink; g.lineWidth = lw || 3; g.stroke(); }
 function tplCol(v) { return /^[-▼]/.test(String(v)) ? TPL_C.blue : /^[+▲]/.test(String(v)) ? TPL_C.red : TPL_C.ink; }
 function tplBand(g, x, y, w, h, text, size, bg, color) { cRound(g, x, y, w, h, 8, bg || TPL_C.black); cText(g, cFit(g, text, w - 24, size || 26, 900), x + w / 2, y + h / 2 + (size || 26) * 0.36, size || 26, 900, color || "#ffffff", "center"); }
@@ -82,35 +83,35 @@ function tplMarket(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y;
   var pv = function (t) { var m = String(t || "").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) * (/^[-▼]/.test(String(t)) ? -1 : 1) : 0; };
   // ① 지수 2줄
-  var ix = (s.indexes || []).slice(0, 2), rh = 104;
+  var K = 1 + (tplK() - 1) * 1.4, ix = (s.indexes || []).slice(0, 2), rh = Math.round(104 * K);
   ix.forEach(function (it, i) {
-    var yy = y + i * rh, col = tplCol(it.pct);
+    var yy = y + i * rh + (rh - 104) / 2, col = tplCol(it.pct);
     cText(g, it.name, P, yy + 62, 34, 900, TPL_C.ink);
     var pct = String(it.pct || ""), pw = cW(g, pct, 26, 900) + 28; cRound(g, P + W - pw, yy + 22, pw, 44, 10, col); cText(g, pct, P + W - pw / 2, yy + 54, 26, 900, "#ffffff", "center");
     var vs = 60; while (vs > 36 && cW(g, it.val, vs, 900) > W - pw - 24 - cW(g, it.name, 34, 900) - 40) vs -= 4;
     cText(g, it.val, P + W - pw - 24, yy + 66, vs, 900, TPL_C.ink, "right");
     if (it.chg) cText(g, "전일 대비 " + it.chg, P + W - pw - 24, yy + 92, 18, 600, TPL_C.sub, "right");
-    g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.beginPath(); g.moveTo(P, yy + rh); g.lineTo(P + W, yy + rh); g.stroke();
+    g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.beginPath(); g.moveTo(P, y + (i + 1) * rh); g.lineTo(P + W, y + (i + 1) * rh); g.stroke();
   });
-  y += ix.length * rh + 24;
+  y += ix.length * rh + Math.round(24 * K);
   // ② 주요 움직임 3개 — 가로 막대 (길이 = |등락|, 색 = 방향)
   var ft = (s.features || []).slice(0, 3), mx = Math.max.apply(null, ft.map(function (f) { return Math.abs(pv(f.pct)); }).concat([0.01]));
   cText(g, "오늘 가장 크게 움직인 종목", P, y + 24, 22, 800, TPL_C.sub); y += 40;
-  var fh = 96, lw = 260, bwMax = W - lw - 170;
+  var fh = Math.round(96 * K), lw = 260, bwMax = W - lw - 170;
   ft.forEach(function (f, i) {
-    var yy = y + i * fh, col = tplCol(f.pct), w = Math.max(16, Math.abs(pv(f.pct)) / mx * bwMax);
+    var yy = y + i * fh + (fh - 96) / 2, col = tplCol(f.pct), w = Math.max(16, Math.abs(pv(f.pct)) / mx * bwMax);
     cText(g, cFit(g, f.name, lw - 20, 34, 900), P, yy + 50, 34, 900, TPL_C.ink); if (f.sub) cText(g, cFit(g, f.sub, lw - 20, 18, 600), P, yy + 76, 18, 600, TPL_C.sub);
     cRound(g, P + lw, yy + 24, w, 44, 8, col); cText(g, f.pct, P + lw + w + 14, yy + 58, 40, 900, col);
-    g.strokeStyle = TPL_C.soft; g.lineWidth = 1.5; g.beginPath(); g.moveTo(P, yy + fh); g.lineTo(P + W, yy + fh); g.stroke();
+    g.strokeStyle = TPL_C.soft; g.lineWidth = 1.5; g.beginPath(); g.moveTo(P, y + (i + 1) * fh); g.lineTo(P + W, y + (i + 1) * fh); g.stroke();
   });
-  y += ft.length * fh + 26;
+  y += ft.length * fh + Math.round(26 * K);
   // ③ 관심 8개 — 2×4 타일 (이름 왼쪽 · 등락 오른쪽)
-  var ch = (s.chips || []).slice(0, 8), cols = 4, gap = 12, tw = (W - gap * (cols - 1)) / cols, th = 88;
+  var ch = (s.chips || []).slice(0, 8), cols = 4, gap = 12, tw = (W - gap * (cols - 1)) / cols, th = Math.round(88 * K);
   cText(g, "그 밖의 관심 종목", P, y + 24, 22, 800, TPL_C.sub); y += 40;
   ch.forEach(function (k, i) {
     var x = P + (i % cols) * (tw + gap), yy = y + Math.floor(i / cols) * (th + gap), col = tplCol(k.pct);
     cRound(g, x, yy, tw, th, 12, TPL_C.box); g.fillStyle = col; g.fillRect(x, yy + 14, 6, th - 28);
-    cText(g, cFit(g, k.name, tw - 30, 22, 800), x + 18, yy + 36, 22, 800, TPL_C.ink); cText(g, k.pct, x + 18, yy + 70, 28, 900, col);
+    var kf = th > 110 ? 1.25 : 1; cText(g, cFit(g, k.name, tw - 30, 22 * kf, 800), x + 18, yy + th / 2 - 8, 22 * kf, 800, TPL_C.ink); cText(g, k.pct, x + 18, yy + th / 2 + 30 * kf, 28 * kf, 900, col);
   });
   y += Math.ceil(ch.length / cols) * (th + gap) + 10;
   if (s.foot) tplBand(g, P, Math.min(y + 10, TPL.H - 164), W, 70, s.foot, 28);
@@ -119,7 +120,18 @@ function tplMarket(c, s) {
 /* ---------- ② 순위 12칸: {items:[{rank,tag,name,value,sub}]} ---------- */
 function tplRank(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, items = (s.items || []).slice(0, 12), n = items.length;
-  var cols = n <= 4 ? 2 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(420, (TPL.H - 74 - y - gap * (rows - 1)) / rows);
+  var cols = n <= 3 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = (TPL.H - 74 - y - gap * (rows - 1)) / rows;   // v12.22 3개 이하는 가로로 긴 칸, 높이는 남은 만큼(빈 칸 없이)
+  if (cols === 1) {   // v12.22 3개 이하: 가로 한 줄 — 왼쪽 큰 순위 · 가운데 이름(+부가) · 오른쪽 큰 값
+    var y0 = y + Math.max(0, ((TPL.H - 74 - y) - (bh * n + gap * (n - 1))) / 2);
+    items.forEach(function (it, i) {
+      var yy = y0 + i * (bh + gap), rk = it.rank || i + 1, top3 = rk <= 3; tplBox(g, P, yy, W, bh, 14, "#ffffff", top3 ? 5 : 3, top3 ? TPL_C.gold2 : TPL_C.ink);
+      var rs = Math.min(120, bh * 0.55); cText(g, String(rk), P + 40, yy + bh / 2 + rs * 0.36, rs, 900, TPL_C.gold2); var nx = P + 40 + cW(g, String(rk), rs, 900) + 36;
+      var vs = Math.min(76, bh * 0.36); while (vs > 30 && cW(g, it.value, vs, 900) > W * 0.4) vs -= 2; var vw = cW(g, it.value, vs, 900) + 40; cRound(g, P + W - vw - 24, yy + bh / 2 - vs * 0.75, vw, vs * 1.5, 12, TPL_C.black); cText(g, it.value, P + W - 24 - vw / 2, yy + bh / 2 + vs * 0.36, vs, 900, "#ffffff", "center");
+      var mw = P + W - vw - 48 - nx, ns = Math.min(64, bh * 0.3); while (ns > 24 && cW(g, it.name, ns, 900) > mw) ns -= 2;
+      cText(g, it.name, nx, yy + bh / 2 + (it.sub || it.tag ? -4 : ns * 0.36), ns, 900, TPL_C.ink); if (it.sub || it.tag) cText(g, cFit(g, [it.tag, it.sub].filter(Boolean).join(" · "), mw, 24, 600), nx, yy + bh / 2 + 36, 24, 600, TPL_C.sub);
+    });
+    return tplFoot(c);
+  }
   items.forEach(function (it, i) {
     var x = P + (i % cols) * (bw + gap), yy = y + Math.floor(i / cols) * (bh + gap);
     var top3 = (it.rank || i + 1) <= 3; tplBox(g, x, yy, bw, bh, 10, "#ffffff", top3 ? 5 : 3, top3 ? TPL_C.gold2 : TPL_C.ink);
@@ -198,16 +210,16 @@ function tplQuote(c, s) {
   g.fillStyle = TPL_C.black; g.beginPath(); g.arc(P + lw / 2, py + 90, 64, 0, Math.PI * 2); g.fill(); cText(g, ini, P + lw / 2, py + 108, 44, 900, TPL_C.gold, "center");
   cText(g, cFit(g, (s.person && s.person.name) || "", lw - 20, 30, 900), P + lw / 2, py + 196, 30, 900, TPL_C.ink, "center");
   if (s.person && s.person.role) cText(g, cFit(g, s.person.role, lw - 20, 20, 600), P + lw / 2, py + 222, 20, 600, TPL_C.sub, "center");
-  var facts = (s.person && s.person.facts || []).slice(0, 6), fy = py + 250, fw = (lw - 14) / 2, fh = 120;
+  var facts = (s.person && s.person.facts || []).slice(0, 6), fy = py + 250, fw = (lw - 14) / 2, fh = Math.round(120 * tplK());
   facts.forEach(function (f, i) { var x = P + (i % 2) * (fw + 14), yy = fy + Math.floor(i / 2) * (fh + 14); tplBox(g, x, yy, fw, fh, 10); var vs = 36; while (vs > 20 && cW(g, f[1], vs, 900) > fw - 20) vs -= 2; cText(g, f[1], x + fw / 2, yy + 58, vs, 900, TPL_C.ink, "center"); cText(g, cFit(g, f[0], fw - 16, 19, 700), x + fw / 2, yy + 96, 19, 700, TPL_C.sub, "center"); });
   // 오른쪽 요지
   var rx = P + lw + 40, rw = W - lw - 40, ry = py + 10, paras = (s.paras || []).slice(0, 3), avail = TPL.H - 94 - ry;
   var fs = 34, lh = 50;
   function total() { var n = 0; paras.forEach(function (p) { n += cWrapCount(g, p, rw, fs, 700); }); return n * lh + (paras.length - 1) * 40; }
   while (total() > avail && fs > 22) { fs -= 2; lh = Math.round(fs * 1.5); }
-  while (total() < avail * 0.62 && fs < 46) { fs += 2; lh = Math.round(fs * 1.5); }   // v11.6 요지가 짧으면 키워서 빈 곳 없이
+  while (total() < avail * 0.62 && fs < Math.round(46 * Math.min(1.25, tplK()))) { fs += 2; lh = Math.round(fs * 1.5); }   // v11.6 요지가 짧으면 키워서 빈 곳 없이
   if (total() > avail) { fs -= 2; lh = Math.round(fs * 1.5); }
-  var ty = ry + lh; paras.forEach(function (p) { var n = cWrapCount(g, p, rw, fs, 700); cWrap(g, p, rx + rw / 2, ty, rw, fs, 700, TPL_C.ink, lh, 8, "center"); ty += n * lh + 40; });
+  var ty = ry + lh + Math.max(0, (avail - total()) / 2 - 20); paras.forEach(function (p) { var n = cWrapCount(g, p, rw, fs, 700); cWrap(g, p, rx + rw / 2, ty, rw, fs, 700, TPL_C.ink, lh, 8, "center"); ty += n * lh + 40; });
   return tplFoot(c);
 }
 /* ---------- ⑥ 날짜별 정리: {blocks:[{date:"2026\n6.27", title, items:[문장 with [[형광]]]}] ≤4} ---------- */
@@ -234,7 +246,7 @@ function tplTimeline(c, s) {
 /* ---------- ⑦ 숫자 12칸: {boxes:[{label, value, unit}] ≤12, note} ---------- */
 function tplGrid(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, boxes = (s.boxes || []).slice(0, 12), n = boxes.length;
-  var cols = n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(330, (TPL.H - 104 - y - gap * (rows - 1)) / rows);
+  var cols = n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14, bw = (W - gap * (cols - 1)) / cols, bh = Math.min(330 * tplK(), (TPL.H - 104 - y - gap * (rows - 1)) / rows);
   if (s.lead) { cWrap(g, s.lead, P, y + 30, W, 28, 800, TPL_C.ink, 36, 2); y += 76; bh = Math.min(bh, (TPL.H - 104 - y - gap * (rows - 1)) / rows); }
   boxes.forEach(function (b, i) {
     var x = P + (i % cols) * (bw + gap), yy = y + Math.floor(i / cols) * (bh + gap);
@@ -270,7 +282,7 @@ function tplLines(c, s) {
 /* ---------- ⑨ 달력: {year, month, events:{"d":[{t,k}]}, side:{title, items[]} } ---------- */
 function tplCalendar(c, s) {
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y, first = new Date(Date.UTC(s.year, s.month - 1, 1)), dow0 = first.getUTCDay(), days = new Date(Date.UTC(s.year, s.month, 0)).getUTCDate();
-  var cw = W / 7, hh = 64, weeks = Math.ceil((dow0 + days) / 7), rh = Math.min(170, (TPL.H - 94 - y - hh) / weeks);
+  var cw = W / 7, hh = 64, weeks = Math.ceil((dow0 + days) / 7), rh = Math.min(170 * tplK() * 1.25, (TPL.H - 94 - y - hh) / weeks);
   cRound(g, P, y, W, hh, 0, TPL_C.black); "일월화수목금토".split("").forEach(function (d, i) { cText(g, d, P + cw * i + cw / 2, y + 46, 34, 900, i === 0 ? "#ff6b6b" : i === 6 ? "#7fb2ff" : "#ffffff", "center"); });
   for (var i = 0; i < weeks * 7; i++) {
     var d = i - dow0 + 1, x = P + (i % 7) * cw, yy = y + hh + Math.floor(i / 7) * rh;

@@ -200,7 +200,7 @@ function issuesCard(list, page, total) {
     if (hl && hl.hook) { hook = hl.hook; if (cW(g, cPlain(hook), 44, 800) > (CARD.W - P * 2) * 1.9) hook = "[[" + cPlain(hook).replace(/\[\[|\]\]/g, "").split(/ — | vs |, /)[0] + "]]"; if (hl.sub) sub = hl.sub; }
   } catch (e) { console.warn(e); }
   cHead(c, tag + " · " + mk + cDate(list.asOf), hook, sub, page || 0, total || 0);
-  var per = Math.min(150, Math.floor((CARD.H - 110 - c.y) / list.length));
+  var per = Math.min(Math.round(150 * CARD.H / 1350), Math.floor((CARD.H - 110 - c.y) / list.length));   // v12.22 릴스형이면 칸도 키움
   list.forEach(function (it, i) {
     var y = c.y, bh = per - 12, mid = y + bh / 2;
     cBox(g, P, y, W, bh, 16);
@@ -222,7 +222,7 @@ function issuesCardOpen(list) {
     var txt = CARD_TXT.replace(/\s+/g, "");
     return Promise.all([500, 600, 700, 800].map(function (w) { return document.fonts.load(w + ' 40px "Pretendard Variable"', txt).catch(function () {}); }));
   }).then(function () {
-    var cv = issuesCard(list); if (typeof hubSize === "function" && hubSize() === "reel" && typeof hubReelWrap === "function") cv = hubReelWrap(cv);   // v12.21 릴스형
+    var cv = issuesCard(list);
     var url = cv.toDataURL("image/png"), file = "uphill.lab_핵심이슈5_" + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "") + ".png";
     var box = document.createElement("div");
     box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="save">⬇ 저장</button>' +

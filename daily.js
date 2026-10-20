@@ -29,6 +29,8 @@ function dlNew(no, title, R) {
   cText(g, lab + " " + dlD(asOf) + " · 발행 " + dlD(Date.now()), DL.W - DL.P, 124, 18, 600, DL_C.sub, "right");
   return { cv: cv, g: g, y: 150 };
 }
+/* v12.22 릴스형(1080×1920)에서는 블록 사이 간격을 높이 비율만큼 벌려 세로를 고르게 채운다 */
+function dlS(v) { return Math.round(v * (DL.R || 1)); }
 function dlHead(c, big, sub) {
   DL.bigs = DL.bigs || []; DL.bigs.push(String(big));   // v12.21 캡션·스레드 글감(장마다 결론 문장)
   var g = c.g, W = DL.W - DL.P * 2, fs = 58; while (fs > 40 && cWrapCount(g, big, W, fs, 900) > 2) fs -= 2;
@@ -38,6 +40,7 @@ function dlHead(c, big, sub) {
   c.y += 10;
 }
 function dlFoot(c, method, src) {
+  DL._lastY = c.y;   // v12.22 본문이 끝난 위치(릴스형 2차 렌더에서 간격 배율 계산용)
   var g = c.g, W = DL.W - DL.P * 2, F = 64, y0 = DL.H - F, y = y0 - 112;
   g.strokeStyle = DL_C.line; g.lineWidth = 2; g.beginPath(); g.moveTo(DL.P, y); g.lineTo(DL.P + W, y); g.stroke();
   cWrap(g, method, DL.P, y + 28, W, 18, 500, DL_C.sub, 26, 3);
@@ -50,11 +53,11 @@ function dlFoot(c, method, src) {
 }
 function dlNote(c, text) {   // '읽는 법' 상자
   var g = c.g, W = DL.W - DL.P * 2, fs = 26, n = cWrapCount(g, text, W - 56, fs, 500), h = n * 38 + 44;
-  cRound(g, DL.P, c.y, W, h, 12, DL_C.tile); g.fillStyle = DL_C.gold; g.fillRect(DL.P, c.y + 6, 8, h - 12); cWrap(g, text, DL.P + 32, c.y + 22 + fs, W - 60, fs, 500, "#3b4256", 38, 4); c.y += h + 16;
+  cRound(g, DL.P, c.y, W, h, 12, DL_C.tile); g.fillStyle = DL_C.gold; g.fillRect(DL.P, c.y + 6, 8, h - 12); cWrap(g, text, DL.P + 32, c.y + 22 + fs, W - 60, fs, 500, "#3b4256", 38, 4); c.y += h + dlS(16);
 }
 function dlBanner(c, lines) {   // 짙은 결론 띠
   var g = c.g, W = DL.W - DL.P * 2, h = 56 + lines.length * 44; cRound(g, DL.P, c.y, W, h, 14, DL_C.dark);
-  lines.forEach(function (l, i) { cRich(g, l, DL.P + 28, c.y + 54 + i * 44, 30, 800, DL_C.white, DL_C.lime); }); c.y += h + 18;
+  lines.forEach(function (l, i) { cRich(g, l, DL.P + 28, c.y + 54 + i * 44, 30, 800, DL_C.white, DL_C.lime); }); c.y += h + dlS(18);
 }
 
 /* ---------- 데이터 ---------- */
@@ -114,11 +117,11 @@ function dlCard1(R) {
   var main = idx[R.market === "us" ? 1 : 0] || idx[0], c = dlNew(1, "오늘 시장 한눈에", R), g = c.g, W = DL.W - DL.P * 2;
   var mixed = n && Math.abs(up / n - 0.5) < 0.1, big = main ? nbJosa(main.name, "은/는") + (main.ret >= 0 ? " 올랐고 " : " 내렸고 ") + (mixed ? "종목별 흐름은 엇갈렸습니다" : up > dn ? "오른 종목이 더 많았습니다" : "내린 종목이 더 많았습니다") : "오늘 시장 한눈에";
   dlHead(c, big, (main ? nbJosa(main.name, "이/가") + " " + Math.abs(main.ret * 100).toFixed(2) + "% " + (main.ret >= 0 ? "올랐고" : "내렸고") + " " : "") + "동일가중 수익률은 " + dlPct(eq) + ", " + T.length + "개 업종 중 " + (T.length - tUp) + "개가 하락했습니다");
-  var tw = (W - 32) / 3; idx.forEach(function (x, i) { var X = DL.P + i * (tw + 16); cRound(g, X, c.y, tw, 180, 14, DL_C.tile); cText(g, x.name, X + 22, c.y + 46, 28, 800, DL_C.ink); cText(g, x.sym.replace(/^\^/, "") + (/^\^/.test(x.sym) ? " · 지수" : ""), X + 22, c.y + 78, 20, 600, DL_C.sub); var vs = 64; while (vs > 40 && cW(g, dlPct(x.ret), vs, 900) > tw - 40) vs -= 2; cText(g, dlPct(x.ret), X + 22, c.y + 150, vs, 900, dlCol(x.ret)); }); c.y += 212;
-  cText(g, "▲ 상승 " + up + "종목", DL.P, c.y + 28, 28, 800, DL_C.ink); cText(g, "하락 " + dn + "종목 ▼", DL.P + W, c.y + 28, 28, 800, DL_C.ink, "right"); c.y += 48;
+  var tw = (W - 32) / 3; idx.forEach(function (x, i) { var X = DL.P + i * (tw + 16); cRound(g, X, c.y, tw, 180, 14, DL_C.tile); cText(g, x.name, X + 22, c.y + 46, 28, 800, DL_C.ink); cText(g, x.sym.replace(/^\^/, "") + (/^\^/.test(x.sym) ? " · 지수" : ""), X + 22, c.y + 78, 20, 600, DL_C.sub); var vs = 64; while (vs > 40 && cW(g, dlPct(x.ret), vs, 900) > tw - 40) vs -= 2; cText(g, dlPct(x.ret), X + 22, c.y + 150, vs, 900, dlCol(x.ret)); }); c.y += dlS(212);
+  cText(g, "▲ 상승 " + up + "종목", DL.P, c.y + 28, 28, 800, DL_C.ink); cText(g, "하락 " + dn + "종목 ▼", DL.P + W, c.y + 28, 28, 800, DL_C.ink, "right"); c.y += dlS(48);
   var uw = n ? W * up / n : W / 2; cRound(g, DL.P, c.y, W, 130, 10, DL_C.red); g.save(); g.fillStyle = dlHatch(g, DL_C.red); cRound(g, DL.P, c.y, W, 130, 10, null); g.clip(); g.fillRect(DL.P, c.y, W, 130); g.restore(); g.fillStyle = DL_C.green; g.fillRect(DL.P, c.y, uw, 130);
-  var upT = n ? (up / n * 100).toFixed(1) + "%" : "-", dnT = n ? (dn / n * 100).toFixed(1) + "%" : "-", bigUp = up >= dn; cText(g, upT, DL.P + uw / 2, c.y + 80, bigUp ? 64 : 48, 900, DL_C.white, "center"); cText(g, "상승", DL.P + uw / 2, c.y + 112, 22, 700, DL_C.white, "center"); cText(g, dnT, DL.P + uw + (W - uw) / 2, c.y + 80, bigUp ? 48 : 64, 900, DL_C.white, "center"); cText(g, "하락", DL.P + uw + (W - uw) / 2, c.y + 112, 22, 700, DL_C.white, "center"); c.y += 150;
-  var hw = (W - 16) / 2; cRound(g, DL.P, c.y, hw, 96, 12, DL_C.white, DL_C.line); cText(g, "종목 평균 (동일가중)", DL.P + 22, c.y + 38, 22, 600, DL_C.sub); cText(g, dlPct(eq), DL.P + 22, c.y + 78, 32, 900, dlCol(eq)); cRound(g, DL.P + hw + 16, c.y, hw, 96, 12, DL_C.white, DL_C.line); cText(g, "업종 " + T.length + "개", DL.P + hw + 38, c.y + 38, 22, 600, DL_C.sub); cText(g, "상승 " + tUp + " · 하락 " + (T.length - tUp), DL.P + hw + 38, c.y + 78, 32, 900, DL_C.ink); c.y += 116;
+  var upT = n ? (up / n * 100).toFixed(1) + "%" : "-", dnT = n ? (dn / n * 100).toFixed(1) + "%" : "-", bigUp = up >= dn; cText(g, upT, DL.P + uw / 2, c.y + 80, bigUp ? 64 : 48, 900, DL_C.white, "center"); cText(g, "상승", DL.P + uw / 2, c.y + 112, 22, 700, DL_C.white, "center"); cText(g, dnT, DL.P + uw + (W - uw) / 2, c.y + 80, bigUp ? 48 : 64, 900, DL_C.white, "center"); cText(g, "하락", DL.P + uw + (W - uw) / 2, c.y + 112, 22, 700, DL_C.white, "center"); c.y += dlS(150);
+  var hw = (W - 16) / 2; cRound(g, DL.P, c.y, hw, 96, 12, DL_C.white, DL_C.line); cText(g, "종목 평균 (동일가중)", DL.P + 22, c.y + 38, 22, 600, DL_C.sub); cText(g, dlPct(eq), DL.P + 22, c.y + 78, 32, 900, dlCol(eq)); cRound(g, DL.P + hw + 16, c.y, hw, 96, 12, DL_C.white, DL_C.line); cText(g, "업종 " + T.length + "개", DL.P + hw + 38, c.y + 38, 22, 600, DL_C.sub); cText(g, "상승 " + tUp + " · 하락 " + (T.length - tUp), DL.P + hw + 38, c.y + 78, 32, 900, DL_C.ink); c.y += dlS(116);
   if (main) dlBanner(c, [main.name + " [[" + dlPct(main.ret) + "]] ↔ 종목 [[상승 " + up + " · 하락 " + dn + "]]", nbJosa(main.name, "이/가") + (main.ret >= 0 ? " 오르고 " : " 내리고 ") + (up > dn ? "오른 종목도 더 많았습니다" : dn > up ? "내린 종목도 더 많았습니다" : "종목은 반반이었습니다")]);
   dlFoot(c, "수익률 유효 " + S.length + "종목 · 보합 " + (S.length - n) + " · 지수 칸은 지수 또는 추종 ETF 1일 수익률 · " + dlUniNote(R) + " · 동일가중 = 종목마다 같은 비중", "지수·종목: 야후 파이낸스 종가 · StockMind 자동 집계 · 매수·매도 신호가 아닙니다");
   return c.cv;
@@ -128,15 +131,15 @@ function dlCard2(R) {
   var pct = rows.map(function (r) { return r[2].length >= 10 ? r[2].filter(r[3]).length / r[2].length : null; }), c = dlNew(2, "시장 체력", R), g = c.g, W = DL.W - DL.P * 2;
   var lead = pct[0] != null ? "20일선 위 종목이 " + (pct[0] * 100).toFixed(1) + "%로 절반을 " + (pct[0] >= 0.5 ? "넘었습니다" : "밑돌았습니다") : "이동평균선 위 종목 비율";
   dlHead(c, lead, "여기서 「상승 흐름」은 주가가 20일 또는 50일 이동평균선 위에 있다는 뜻입니다.");
-  c.y += 20;
-  rows.forEach(function (r, i) { var p = pct[i]; cText(g, r[0], DL.P, c.y + 30, 32, 800, DL_C.ink); cText(g, r[1], DL.P + cW(g, r[0], 32, 800) + 14, c.y + 30, 22, 600, DL_C.sub); var col = p == null ? DL_C.sub : p < 0.25 ? DL_C.red : p < 0.5 ? DL_C.gold : DL_C.green; cText(g, p == null ? "자료 부족" : (p * 100).toFixed(1) + "%", DL.P + W, c.y + 36, p == null ? 30 : 60, 900, col, "right"); c.y += 60; cRound(g, DL.P, c.y, W, 56, 8, DL_C.tile); if (p != null) { cRound(g, DL.P, c.y, Math.max(8, W * p), 56, 8, col); } g.save(); g.setLineDash([8, 6]); g.strokeStyle = DL_C.ink; g.lineWidth = 3; g.beginPath(); g.moveTo(DL.P + W / 2, c.y - 8); g.lineTo(DL.P + W / 2, c.y + 64); g.stroke(); g.restore(); cText(g, "절반 50%", DL.P + W / 2 + 10, c.y + 36, 20, 800, DL_C.ink); c.y += 100; });
+  c.y += dlS(20);
+  rows.forEach(function (r, i) { var p = pct[i]; cText(g, r[0], DL.P, c.y + 30, 32, 800, DL_C.ink); cText(g, r[1], DL.P + cW(g, r[0], 32, 800) + 14, c.y + 30, 22, 600, DL_C.sub); var col = p == null ? DL_C.sub : p < 0.25 ? DL_C.red : p < 0.5 ? DL_C.gold : DL_C.green; cText(g, p == null ? "자료 부족" : (p * 100).toFixed(1) + "%", DL.P + W, c.y + 36, p == null ? 30 : 60, 900, col, "right"); c.y += dlS(60); cRound(g, DL.P, c.y, W, 56, 8, DL_C.tile); if (p != null) { cRound(g, DL.P, c.y, Math.max(8, W * p), 56, 8, col); } g.save(); g.setLineDash([8, 6]); g.strokeStyle = DL_C.ink; g.lineWidth = 3; g.beginPath(); g.moveTo(DL.P + W / 2, c.y - 8); g.lineTo(DL.P + W / 2, c.y + 64); g.stroke(); g.restore(); cText(g, "절반 50%", DL.P + W / 2 + 10, c.y + 36, 20, 800, DL_C.ink); c.y += dlS(100); });
   dlNote(c, "읽는 법 — 20·50·200일 평균 가격보다 위에 있는 종목의 비율입니다. 50% 선은 종목의 절반을 나타내는 비교선이며 매수·매도 기준이 아닙니다. 막대 색은 시장 참여 정도일 뿐 매수·매도 신호가 아닙니다.");
   dlFoot(c, "20일선 유효 " + rows[0][2].length + "종목 · 50일선 유효 " + rows[1][2].length + "종목 · 200일선 유효 " + rows[2][2].length + "종목 (전체 " + S.length + ") · 막대 색: 25% 미만 파랑 · 50% 미만 금색 · 50% 이상 빨강(앱과 같은 한국식 색) · " + dlUniNote(R), "종목: 야후 파이낸스 종가 · 수정주가 기준");
   return c.cv;
 }
 function dlDiverge(c, items, fmt, opt) {   // 가로 가운데 0 기준 막대 (음수 빗금) · 상위·하위 3 굵게
-  var g = c.g, W = DL.W - DL.P * 2, n = items.length, rowH = Math.min(62, Math.floor((opt.maxH || 640) / n)), labW = opt.labW || 300, valW = 150, mid = DL.P + labW + (W - labW - valW) / 2, half = (W - labW - valW) / 2 - 10, mx = Math.max.apply(null, items.map(function (x) { return Math.abs(x.v); })) || 1e-6;
-  cText(g, "▼ 하락 · 상승 ▲", DL.P, c.y + 18, 22, 700, DL_C.sub); cText(g, "0", mid, c.y + 18, 22, 700, DL_C.sub, "center"); c.y += 36;
+  var g = c.g, W = DL.W - DL.P * 2, n = items.length, rowH = Math.min(dlS(62), Math.floor(dlS(opt.maxH || 640) / n)), labW = opt.labW || 300, valW = 150, mid = DL.P + labW + (W - labW - valW) / 2, half = (W - labW - valW) / 2 - 10, mx = Math.max.apply(null, items.map(function (x) { return Math.abs(x.v); })) || 1e-6;
+  cText(g, "▼ 하락 · 상승 ▲", DL.P, c.y + 18, 22, 700, DL_C.sub); cText(g, "0", mid, c.y + 18, 22, 700, DL_C.sub, "center"); c.y += dlS(36);
   g.fillStyle = DL_C.ink; g.fillRect(mid - 2, c.y - 6, 4, rowH * n + 12);
   var hp = dlHatch(g, opt.negColor || DL_C.red);
   items.forEach(function (it, i) { var y = c.y + i * rowH, bold = i < 3 || i >= n - 3, w = Math.max(4, Math.abs(it.v) / mx * half), col = it.v >= 0 ? (opt.posColor || DL_C.green) : (opt.negColor || DL_C.red); cText(g, cFit(g, it.l, labW - 16, 27, bold ? 900 : 600), DL.P, y + rowH / 2 + 9, 27, bold ? 900 : 600, DL_C.ink); if (it.v >= 0) { g.fillStyle = col; g.fillRect(mid + 2, y + 8, w, rowH - 16); } else { g.fillStyle = hp; g.fillRect(mid - 2 - w, y + 8, w, rowH - 16); } cText(g, fmt(it.v), DL.P + W, y + rowH / 2 + 9, 27, bold ? 900 : 700, bold ? col : DL_C.sub, "right"); });
@@ -154,7 +157,7 @@ function dlCard4(R) {
   var G = dlAmtGroup(R), S = G.list, tot = S.reduce(function (a, s) { return a + s.amt; }, 0); if (!tot || S.length < 8) return null;
   var top = S.slice().sort(function (a, b) { return b.amt - a.amt; }).slice(0, 10), c = dlNew(4, "거래 집중 종목", R), g = c.g, W = DL.W - DL.P * 2, nm = function (s) { return s.uni ? (/\.K[SQ]$/.test(s.sym) ? s.name : s.sym) : /\.K[SQ]$/.test(s.sym) && typeof briefName === "function" ? briefName(s) : s.sym; };
   var sh = top[0].amt / tot; dlHead(c, nm(top[0]) + " 거래대금이 집계 가능 " + G.label + S.length + "종목 전체의 " + (sh * 100).toFixed(1) + "%를 차지했습니다", "막대 길이 = 집계 가능 " + G.label + S.length + "종목 거래대금 합계(" + dlAmtT(tot, G.kr) + ") 중 점유율 · 거래대금은 방향 없는 거래 규모입니다");
-  cText(g, "순위  종목", DL.P, c.y + 20, 22, 700, DL_C.sub); cText(g, "거래대금 점유율", DL.P + 220, c.y + 20, 22, 700, DL_C.sub); cText(g, "1일", DL.P + W - 190, c.y + 20, 22, 700, DL_C.sub, "right"); cText(g, "평소 대비", DL.P + W, c.y + 20, 22, 700, DL_C.sub, "right"); c.y += 40;
+  cText(g, "순위  종목", DL.P, c.y + 20, 22, 700, DL_C.sub); cText(g, "거래대금 점유율", DL.P + 220, c.y + 20, 22, 700, DL_C.sub); cText(g, "1일", DL.P + W - 190, c.y + 20, 22, 700, DL_C.sub, "right"); cText(g, "평소 대비", DL.P + W, c.y + 20, 22, 700, DL_C.sub, "right"); c.y += dlS(40);
   var rowH = 62, mx = top[0].amt / tot;
   top.forEach(function (s, i) { var y = c.y + i * rowH, p = s.amt / tot; if (i < 3) { cRound(g, DL.P - 10, y + 4, W + 20, rowH - 8, 8, DL_C.tile); } cText(g, String(i + 1), DL.P + 4, y + 42, 26, 800, DL_C.sub); cText(g, cFit(g, nm(s), 150, 28, 900), DL.P + 48, y + 42, 28, 900, DL_C.ink); var bw = Math.max(6, p / mx * 360); g.fillStyle = i < 3 ? DL_C.ink : "#8a8577"; g.fillRect(DL.P + 220, y + 16, bw, rowH - 32); cText(g, (p * 100).toFixed(2) + "%", DL.P + 220 + bw + 12, y + 42, 22, 700, DL_C.sub); cText(g, dlPct(s.ret1), DL.P + W - 190, y + 42, 28, 800, dlCol(s.ret1), "right"); var x = s.amtX; cText(g, x != null ? x.toFixed(2) + "배" : "-", DL.P + W, y + 42, 28, x >= 1.5 ? 900 : 600, x >= 1.5 ? DL_C.ink : "#3b4256", "right"); });
   c.y += rowH * top.length + 10;
@@ -168,10 +171,10 @@ function dlCard5(R) {
   var L = Object.keys(agg).map(function (k) { return { n: k, sh: agg[k].a / tot, ty: agg[k].t / totT }; }).filter(function (x) { return x.n !== "기타"; }).sort(function (a, b) { return b.sh - a.sh; }); if (L.length < 4) return null;
   var c = dlNew(5, "업종 거래활동", R), g = c.g, W = DL.W - DL.P * 2, top = L[0], d0 = (top.sh - top.ty) * 100;
   dlHead(c, nbJosa(top.n, "이/가") + " 거래대금의 " + Math.round(top.sh * 100) + "%를 차지했" + (Math.abs(d0) >= 0.3 ? "지만 평소보다 " + Math.abs(d0).toFixed(1) + "%p " + (d0 > 0 ? "높았습니다" : "낮았습니다") : "습니다"), "거래대금 비중은 가장 컸" + (Math.abs(d0) >= 0.3 ? "지만, 직전 20일의 평소 비중보다는 " + Math.abs(d0).toFixed(1) + "%p " + (d0 > 0 ? "높았습니다" : "낮았습니다") : "고, 평소 비중과 비슷했습니다"));
-  cText(g, "오늘 거래대금 점유율", DL.P, c.y + 24, 26, 800, DL_C.ink); cText(g, "집계 가능 종목 합계 = 100%", DL.P + 270, c.y + 24, 20, 600, DL_C.sub); c.y += 40;
-  var x = DL.P, shades = ["#14161c", "#3a3426", "#6b5a2e", "#9a7f3e", "#b8913f", "#c9a24f", "#d8bd7e", "#e6d3a3", "#efe3c3", "#f4ecd8", "#f8f3e6"]; cRound(g, DL.P, c.y, W, 90, 12, DL_C.white, DL_C.line); L.forEach(function (t, i) { var w = W * t.sh; g.fillStyle = shades[Math.min(i, shades.length - 1)]; g.fillRect(x, c.y, w, 90); if (i === 0) { var lab = t.n + " " + Math.round(t.sh * 100) + "%", fs0 = 30; while (fs0 > 18 && cW(g, lab, fs0, 900) > w - 20) fs0 -= 2; if (cW(g, lab, fs0, 900) <= w - 20) cText(g, lab, x + w / 2, c.y + 45 + fs0 * 0.36, fs0, 900, DL_C.lime, "center"); } x += w; }); c.y += 106;
-  cWrap(g, "점유율: " + L.slice(0, 4).map(function (t) { return t.n + " " + (t.sh * 100).toFixed(1) + "%"; }).join(" · ") + " · 나머지 " + (L.length - 4) + "개 " + (L.slice(4).reduce(function (a, t) { return a + t.sh; }, 0) * 100).toFixed(1) + "%", DL.P, c.y + 22, W, 22, 600, "#3b4256", 30, 2); c.y += 70;
-  cText(g, "평소 대비 점유율 변화", DL.P, c.y + 24, 26, 800, DL_C.ink); cText(g, "직전 20거래일 평균과의 차이(%p)", DL.P + 270, c.y + 24, 20, 600, DL_C.sub); c.y += 36;
+  cText(g, "오늘 거래대금 점유율", DL.P, c.y + 24, 26, 800, DL_C.ink); cText(g, "집계 가능 종목 합계 = 100%", DL.P + 270, c.y + 24, 20, 600, DL_C.sub); c.y += dlS(40);
+  var x = DL.P, shades = ["#14161c", "#3a3426", "#6b5a2e", "#9a7f3e", "#b8913f", "#c9a24f", "#d8bd7e", "#e6d3a3", "#efe3c3", "#f4ecd8", "#f8f3e6"]; cRound(g, DL.P, c.y, W, 90, 12, DL_C.white, DL_C.line); L.forEach(function (t, i) { var w = W * t.sh; g.fillStyle = shades[Math.min(i, shades.length - 1)]; g.fillRect(x, c.y, w, 90); if (i === 0) { var lab = t.n + " " + Math.round(t.sh * 100) + "%", fs0 = 30; while (fs0 > 18 && cW(g, lab, fs0, 900) > w - 20) fs0 -= 2; if (cW(g, lab, fs0, 900) <= w - 20) cText(g, lab, x + w / 2, c.y + 45 + fs0 * 0.36, fs0, 900, DL_C.lime, "center"); } x += w; }); c.y += dlS(106);
+  cWrap(g, "점유율: " + L.slice(0, 4).map(function (t) { return t.n + " " + (t.sh * 100).toFixed(1) + "%"; }).join(" · ") + " · 나머지 " + (L.length - 4) + "개 " + (L.slice(4).reduce(function (a, t) { return a + t.sh; }, 0) * 100).toFixed(1) + "%", DL.P, c.y + 22, W, 22, 600, "#3b4256", 30, 2); c.y += dlS(70);
+  cText(g, "평소 대비 점유율 변화", DL.P, c.y + 24, 26, 800, DL_C.ink); cText(g, "직전 20거래일 평균과의 차이(%p)", DL.P + 270, c.y + 24, 20, 600, DL_C.sub); c.y += dlS(36);
   var D = L.map(function (t) { return { l: t.n, v: (t.sh - t.ty) * 100 }; }).sort(function (a, b) { return b.v - a.v; });
   dlDiverge(c, D.slice(0, 11), function (v) { return (v >= 0 ? "▲" : "▼") + Math.abs(v).toFixed(2) + "%p"; }, { maxH: 440, labW: 330, posColor: DL_C.gold, negColor: "#8a8577" });
   dlFoot(c, "거래 점유율 변화이며 자금 유입·이탈 방향이 아닙니다 · 점유율 분모 = 집계 가능 " + S.length + "종목 거래대금 합계 · 평소 = 종목별 직전 20일 거래대금 중앙값의 합 · 업종은 " + (dlUni(R) && dlUni(R).mkt === "us" ? "GICS 섹터" : "앱 테마 분류") + " · " + dlUniNote(R), "종목: 야후 파이낸스 종가·거래량 · 수정주가 기준");
@@ -183,8 +186,8 @@ function dlCard6(R) {
   var big = hi.length && lo.length ? "신고가 종목이 신저가 종목보다 " + (hi.length >= lo.length ? (hi.length / lo.length).toFixed(1) + "배 많았습니다" : (lo.length / hi.length).toFixed(1) + "배 적었습니다") : hi.length ? "신저가 없이 신고가 " + hi.length + "종목이 나왔습니다" : lo.length ? "신고가 없이 신저가 " + lo.length + "종목이 나왔습니다" : "52주 신고가·신저가가 없는 조용한 날이었습니다";
   dlHead(c, big, "52주 종가 기준 신고가 " + hi.length + "종목, 신저가 " + lo.length + "종목. 신고가 근처(3% 이내) " + nearHi + "개 · 신저가 근처 " + nearLo + "개입니다.");
   var hw = (W - 20) / 2; cRound(g, DL.P, c.y, hw, 250, 14, "#f6e3e1", DL_C.ink); cText(g, "▲ 52주 종가 신고가", DL.P + 24, c.y + 46, 26, 800, DL_C.ink); cText(g, String(hi.length), DL.P + 24, c.y + 170, 110, 900, DL_C.green); cText(g, "신고가 근접(3% 이내) " + nearHi, DL.P + 24, c.y + 222, 24, 700, DL_C.ink);
-  g.save(); cRound(g, DL.P + hw + 20, c.y, hw, 250, 14, "#e1eaf6", DL_C.ink); g.clip(); g.fillStyle = dlHatch(g, "#e1eaf6"); g.fillRect(DL.P + hw + 20, c.y, hw, 250); g.restore(); cRound(g, DL.P + hw + 20, c.y, hw, 250, 14, null, DL_C.ink); cText(g, "▼ 52주 종가 신저가", DL.P + hw + 44, c.y + 46, 26, 800, DL_C.ink); cText(g, String(lo.length), DL.P + hw + 44, c.y + 170, 110, 900, DL_C.red); cText(g, "신저가 근접(3% 이내) " + nearLo, DL.P + hw + 44, c.y + 222, 24, 700, DL_C.ink); c.y += 270;
-  var t = hi.length + lo.length; cRound(g, DL.P, c.y, W, 26, 8, DL_C.tile, DL_C.ink); if (t) { g.fillStyle = DL_C.green; g.fillRect(DL.P + 2, c.y + 2, (W - 4) * hi.length / t, 22); g.fillStyle = dlHatch(g, DL_C.red); g.fillRect(DL.P + 2 + (W - 4) * hi.length / t, c.y + 2, (W - 4) * lo.length / t, 22); } c.y += 46;
+  g.save(); cRound(g, DL.P + hw + 20, c.y, hw, 250, 14, "#e1eaf6", DL_C.ink); g.clip(); g.fillStyle = dlHatch(g, "#e1eaf6"); g.fillRect(DL.P + hw + 20, c.y, hw, 250); g.restore(); cRound(g, DL.P + hw + 20, c.y, hw, 250, 14, null, DL_C.ink); cText(g, "▼ 52주 종가 신저가", DL.P + hw + 44, c.y + 46, 26, 800, DL_C.ink); cText(g, String(lo.length), DL.P + hw + 44, c.y + 170, 110, 900, DL_C.red); cText(g, "신저가 근접(3% 이내) " + nearLo, DL.P + hw + 44, c.y + 222, 24, 700, DL_C.ink); c.y += dlS(270);
+  var t = hi.length + lo.length; cRound(g, DL.P, c.y, W, 26, 8, DL_C.tile, DL_C.ink); if (t) { g.fillStyle = DL_C.green; g.fillRect(DL.P + 2, c.y + 2, (W - 4) * hi.length / t, 22); g.fillStyle = dlHatch(g, DL_C.red); g.fillRect(DL.P + 2 + (W - 4) * hi.length / t, c.y + 2, (W - 4) * lo.length / t, 22); } c.y += dlS(46);
   var byAmt = function (a, b) { return (b.amt || 0) - (a.amt || 0); }, H5 = hi.slice().sort(byAmt).slice(0, 5), L5 = lo.slice().sort(byAmt).slice(0, 5), amtT = function (s) { return dlAmtT(s.amt || 0, /\.K[SQ]$/.test(s.sym)).replace("원", ""); }, px = function (v, s) { return /\.K[SQ]$/.test(s.sym) ? Math.round(v).toLocaleString("ko-KR") : v.toFixed(2); };
   function col(X, title, L, k) { cText(g, title, X, c.y + 24, 24, 800, DL_C.ink); g.fillStyle = DL_C.ink; g.fillRect(X, c.y + 36, hw, 2); cWrap(g, "종목 · 오늘 종가 / 직전 250일 " + (k === "hi" ? "최고가" : "최저가") + " · 거래대금", X, c.y + 64, hw, 19, 600, DL_C.sub, 24, 2); var y = c.y + 110; if (!L.length) cText(g, "해당 없음", X, y + 20, 22, 600, DL_C.sub); L.forEach(function (s, i) { var rt = px(s.last, s) + " / " + px(k === "hi" ? s.hi250 : s.lo250, s) + " · " + amtT(s), rf = 20; while (rf > 14 && cW(g, rt, rf, 700) > hw * 0.62) rf -= 1; var rw = cW(g, rt, rf, 700); cText(g, cFit(g, (i + 1) + ". " + nm(s), hw - rw - 16, 24, 900), X, y + 24, 24, 900, DL_C.ink); cText(g, rt, X + hw, y + 24, rf, 700, "#3b4256", "right"); g.strokeStyle = DL_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X, y + 40); g.lineTo(X + hw, y + 40); g.stroke(); y += 56; }); }
   col(DL.P, "▲ 신고가 주요 5 · 거래대금 순", H5, "hi"); col(DL.P + hw + 20, "▼ 신저가 주요 5 · 거래대금 순", L5, "lo");
@@ -198,11 +201,11 @@ function dlCard7(R) {
   dlHead(c, "자산 " + L.length + "종 중 " + up + "개 상승 · " + (L.length - up) + "개 하락했습니다", L.length + "종 · 상승 " + up + " · 하락 " + (L.length - up) + " · 1일 수익률");
   dlDiverge(c, L.map(function (x) { return { l: x.name + "  " + x.sym.replace(/^\^/, ""), v: x.v }; }), function (v) { return dlPct(v); }, { maxH: 330, labW: 330 });
   var pairs = R.market === "kr" ? [["^KS11", "KRW=X", "코스피 ↔ 달러/원"], ["^KS11", "GLD", "코스피 ↔ 금"], ["^KS11", "BTC-USD", "코스피 ↔ 비트코인"]] : [["SPY", "TLT", "S&P 500 ↔ 미국 장기채"], ["SPY", "GLD", "S&P 500 ↔ 금"], ["QQQ", "^KS11", "나스닥100 ↔ 코스피"]];
-  cText(g, "함께 움직였나", DL.P, c.y + 26, 28, 800, DL_C.ink); cText(g, "일간 수익률 상관계수 · 진할수록 관계가 강함", DL.P + 200, c.y + 26, 20, 600, DL_C.sub); c.y += 44;
-  var cols = [["20일", 20], ["60일 · 대표", 60], ["120일", 120]], cx = DL.P + 400, cw = (W - 400) / 3; cText(g, "짝", DL.P, c.y + 22, 22, 700, DL_C.sub); cols.forEach(function (k, i) { cText(g, k[0], cx + cw * i + cw / 2, c.y + 22, 22, i === 1 ? 900 : 700, i === 1 ? DL_C.ink : DL_C.sub, "center"); }); c.y += 36;
-  var any = false; pairs.forEach(function (p) { var vals = cols.map(function (k) { var a = k[1] <= 60 ? dlRets(p[0], k[1]) || dlRetsHist(p[0], k[1]) : dlRetsHist(p[0], k[1]), b = k[1] <= 60 ? dlRets(p[1], k[1]) || dlRetsHist(p[1], k[1]) : dlRetsHist(p[1], k[1]); return dlCorr(a, b); }); if (vals.every(function (v) { return v == null; })) return; any = true; cText(g, cFit(g, p[2], 380, 26, 800), DL.P, c.y + 44, 26, 800, DL_C.ink); vals.forEach(function (v, i) { var X = cx + cw * i; var bg = v == null ? DL_C.tile : Math.abs(v) >= 0.6 ? "#14161c" : Math.abs(v) >= 0.3 ? "#d8bd7e" : "#eeeae1"; g.fillStyle = bg; g.fillRect(X + 2, c.y + 4, cw - 4, 62); if (i === 1) { g.strokeStyle = DL_C.lime; g.lineWidth = 4; g.strokeRect(X + 2, c.y + 4, cw - 4, 62); } cText(g, v == null ? "-" : v.toFixed(2), X + cw / 2, c.y + 46, 28, 900, Math.abs(v || 0) >= 0.6 ? DL_C.lime : DL_C.ink, "center"); }); c.y += 70; });
+  cText(g, "함께 움직였나", DL.P, c.y + 26, 28, 800, DL_C.ink); cText(g, "일간 수익률 상관계수 · 진할수록 관계가 강함", DL.P + 200, c.y + 26, 20, 600, DL_C.sub); c.y += dlS(44);
+  var cols = [["20일", 20], ["60일 · 대표", 60], ["120일", 120]], cx = DL.P + 400, cw = (W - 400) / 3; cText(g, "짝", DL.P, c.y + 22, 22, 700, DL_C.sub); cols.forEach(function (k, i) { cText(g, k[0], cx + cw * i + cw / 2, c.y + 22, 22, i === 1 ? 900 : 700, i === 1 ? DL_C.ink : DL_C.sub, "center"); }); c.y += dlS(36);
+  var any = false; pairs.forEach(function (p) { var vals = cols.map(function (k) { var a = k[1] <= 60 ? dlRets(p[0], k[1]) || dlRetsHist(p[0], k[1]) : dlRetsHist(p[0], k[1]), b = k[1] <= 60 ? dlRets(p[1], k[1]) || dlRetsHist(p[1], k[1]) : dlRetsHist(p[1], k[1]); return dlCorr(a, b); }); if (vals.every(function (v) { return v == null; })) return; any = true; cText(g, cFit(g, p[2], 380, 26, 800), DL.P, c.y + 44, 26, 800, DL_C.ink); vals.forEach(function (v, i) { var X = cx + cw * i; var bg = v == null ? DL_C.tile : Math.abs(v) >= 0.6 ? "#14161c" : Math.abs(v) >= 0.3 ? "#d8bd7e" : "#eeeae1"; g.fillStyle = bg; g.fillRect(X + 2, c.y + 4, cw - 4, 62); if (i === 1) { g.strokeStyle = DL_C.lime; g.lineWidth = 4; g.strokeRect(X + 2, c.y + 4, cw - 4, 62); } cText(g, v == null ? "-" : v.toFixed(2), X + cw / 2, c.y + 46, 28, 900, Math.abs(v || 0) >= 0.6 ? DL_C.lime : DL_C.ink, "center"); }); c.y += dlS(70); });
   if (!any) cText(g, "상관계수를 계산할 자료가 아직 없어요", DL.P, c.y + 30, 22, 600, DL_C.sub);
-  c.y += 14; [["#eeeae1", "0.3 미만"], ["#d8bd7e", "0.3~0.6"], ["#14161c", "0.6 이상"]].forEach(function (k, i) { g.fillStyle = k[0]; g.fillRect(DL.P + i * 170, c.y + 6, 26, 22); cText(g, k[1], DL.P + i * 170 + 34, c.y + 24, 20, 600, DL_C.ink); }); c.y += 40; cText(g, "+1에 가까울수록 같은 방향 · 0은 관계 약함 · -1에 가까울수록 반대 방향", DL.P, c.y + 22, 20, 600, "#3b4256");
+  c.y += dlS(14); [["#eeeae1", "0.3 미만"], ["#d8bd7e", "0.3~0.6"], ["#14161c", "0.6 이상"]].forEach(function (k, i) { g.fillStyle = k[0]; g.fillRect(DL.P + i * 170, c.y + 6, 26, 22); cText(g, k[1], DL.P + i * 170 + 34, c.y + 24, 20, 600, DL_C.ink); }); c.y += dlS(40); cText(g, "+1에 가까울수록 같은 방향 · 0은 관계 약함 · -1에 가까울수록 반대 방향", DL.P, c.y + 22, 20, 600, "#3b4256");
   dlFoot(c, "ETF·지수 1일 수익률(수정주가) · 상관계수 = 공통 거래일 일간 수익률의 피어슨 계수 · 120일은 긴 역사가 있는 자산만 · 과거 동행 정도이며 인과관계나 미래 예측이 아닙니다", "지수·ETF: 야후 파이낸스 · 수정주가 기준");
   return c.cv;
 }
@@ -212,8 +215,8 @@ function dlCard8(R) {
   groups.forEach(function (gp) { var L = gp[1].map(function (w) { var st = dlYearStats(w[0]), s = by[w[0]]; if (!st && !s) return null; var r = { sym: w[0], name: w[1], d1: s && s.ret1 != null ? s.ret1 : st ? st.d1 : null, ytd: st ? st.ytd : null, up: st ? st.up : null, dn: st ? st.dn : null, years: st ? st.years : 0 }; if (r.ytd != null) { tot++; if (r.ytd > 0) upN++; if (!best || r.ytd > best.ytd) best = r; if (!worst || r.ytd < worst.ytd) worst = r; } return r; }).filter(Boolean); if (L.length) rows.push({ g: gp[0], L: L }); });
   if (!tot) return null; var c = dlNew(8, "주요 자산 성적표", R), g = c.g, W = DL.W - DL.P * 2;
   dlHead(c, tot + "개 자산 중 " + upN + "개 연초 대비 상승", "연초 대비 최고 " + best.name + " " + dlPct(best.ytd) + " · 최저 " + worst.name + " " + dlPct(worst.ytd));
-  var X = [DL.P, DL.P + 440, DL.P + 610, DL.P + 790, DL.P + W]; cText(g, "자산 · 표본", X[0], c.y + 20, 20, 700, DL_C.sub); cText(g, "전일 대비", X[1], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연초 대비", X[2], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연중 최고(평균)", X[3], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연중 최저(평균)", X[4], c.y + 20, 20, 700, DL_C.sub, "right"); c.y += 30; g.fillStyle = DL_C.ink; g.fillRect(DL.P, c.y, W, 2); c.y += 4;
-  var nAll = rows.reduce(function (a, gp) { return a + gp.L.length; }, 0), gH = 32, bottom = DL.H - 64 - 112 - 6, rowH = Math.max(34, Math.min(50, Math.floor((bottom - c.y - rows.length * gH) / Math.max(1, nAll)))), fs = rowH >= 44 ? 27 : rowH >= 38 ? 24 : 22, fs2 = rowH >= 44 ? 24 : 21, ty = Math.round(rowH * 0.72);
+  var X = [DL.P, DL.P + 440, DL.P + 610, DL.P + 790, DL.P + W]; cText(g, "자산 · 표본", X[0], c.y + 20, 20, 700, DL_C.sub); cText(g, "전일 대비", X[1], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연초 대비", X[2], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연중 최고(평균)", X[3], c.y + 20, 20, 700, DL_C.sub, "right"); cText(g, "연중 최저(평균)", X[4], c.y + 20, 20, 700, DL_C.sub, "right"); c.y += dlS(30); g.fillStyle = DL_C.ink; g.fillRect(DL.P, c.y, W, 2); c.y += dlS(4);
+  var nAll = rows.reduce(function (a, gp) { return a + gp.L.length; }, 0), gH = 32, bottom = DL.H - 64 - 112 - 6, rowH = Math.max(34, Math.min(Math.round(50 * (DL.R || 1)), Math.floor((bottom - c.y - rows.length * gH) / Math.max(1, nAll)))), fs = rowH >= 44 ? 27 : rowH >= 38 ? 24 : 22, fs2 = rowH >= 44 ? 24 : 21, ty = Math.round(rowH * 0.72);
   rows.forEach(function (gp) { cRound(g, DL.P, c.y + 3, W, gH - 6, 6, DL_C.tile); cText(g, gp.g, DL.P + 10, c.y + gH - 10, 19, 800, DL_C.ink); c.y += gH; gp.L.forEach(function (r) { cText(g, r.name, X[0], c.y + ty, fs, 800, DL_C.ink); cText(g, r.sym.replace(/^\^/, "") + (r.years ? " · " + r.years + "년" : ""), X[0] + cW(g, r.name, fs, 800) + 10, c.y + ty, 18, 600, DL_C.sub); cText(g, dlPct(r.d1), X[1], c.y + ty, fs, 800, dlCol(r.d1), "right"); cText(g, dlPct(r.ytd), X[2], c.y + ty, fs, 900, dlCol(r.ytd), "right"); cText(g, r.up != null ? "+" + (r.up * 100).toFixed(1) + "%" : "-", X[3], c.y + ty, fs2, 600, "#3b4256", "right"); cText(g, r.dn != null ? (r.dn * 100).toFixed(1) + "%" : "-", X[4], c.y + ty, fs2, 600, "#3b4256", "right"); g.strokeStyle = DL_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(DL.P, c.y + rowH); g.lineTo(DL.P + W, c.y + rowH); g.stroke(); c.y += rowH; }); });
   dlFoot(c, "연초 대비 = 전년 마지막 거래일 수정종가 대비(YTD) · 연중 최고·최저(평균) = 각 연도 전년 말 수정종가 대비 그해 최고·최저 종가 수익률의 평균(장중 고저 아님) · 상장 첫해 거래일 60일 미만이면 그해 제외 · 올해는 평균에서 제외 · 과거 통계이며 매수·매도 신호가 아닙니다", "지수·ETF·종목: 야후 파이낸스 · 수정주가(배당·분할 반영) 기준");
   return c.cv;
@@ -222,7 +225,7 @@ function dlCard9(R) {
   var items = typeof hubNewsItems === "function" ? hubNewsItems().slice(0, 5) : []; if (!items.length) return null;
   var c = dlNew(9, "시장 해설", R), g = c.g, W = DL.W - DL.P * 2;
   dlHead(c, "오늘 기사가 말한 것", "기사 제목과 요약을 그대로 옮겼습니다 · " + items.length + "건 · 앱이 원인을 추론하지 않습니다");
-  items.forEach(function (x, i) { var t = (i + 1) + ". " + x.t, n = cWrapCount(g, t, W, 28, 800); cWrap(g, t, DL.P, c.y + 30, W, 28, 800, DL_C.ink, 38, 2); c.y += Math.min(2, n) * 38 + 6; var d = (x.desc || "").split(/(?<=[다요]\.)\s+/)[0] || ""; if (d) { var m = cWrapCount(g, d, W, 23, 500); cWrap(g, d, DL.P, c.y + 24, W, 23, 500, "#3b4256", 32, 3); c.y += Math.min(3, m) * 32 + 4; } cText(g, (x.it && x.it.press ? x.it.press : "") + (x.it && x.it.time ? " · " + String(x.it.time).slice(0, 10) : ""), DL.P, c.y + 22, 19, 600, DL_C.sub); c.y += 44; if (c.y > DL.H - 220) return; });
+  items.forEach(function (x, i) { var t = (i + 1) + ". " + x.t, n = cWrapCount(g, t, W, 28, 800); cWrap(g, t, DL.P, c.y + 30, W, 28, 800, DL_C.ink, 38, 2); c.y += Math.min(2, n) * 38 + 6; var d = (x.desc || "").split(/(?<=[다요]\.)\s+/)[0] || ""; if (d) { var m = cWrapCount(g, d, W, 23, 500); cWrap(g, d, DL.P, c.y + 24, W, 23, 500, "#3b4256", 32, 3); c.y += Math.min(3, m) * 32 + 4; } cText(g, (x.it && x.it.press ? x.it.press : "") + (x.it && x.it.time ? " · " + String(x.it.time).slice(0, 10) : ""), DL.P, c.y + 22, 19, 600, DL_C.sub); c.y += dlS(44); if (c.y > DL.H - 220) return; });
   dlFoot(c, "기사 제목·요약을 문장 그대로 옮겼습니다(수정·요약 없음) · 해설과 인과 설명은 언론사 판단이며 앱이 원인을 추론하지 않습니다 · 투자 권유가 아닙니다", "기사: 네이버 뉴스 검색 · 원문은 각 언론사");
   return c.cv;
 }
@@ -240,6 +243,23 @@ function dlUniTemp(U) {
 function dlDeck() {
   var R = typeof hubR === "function" ? hubR() : null; if (!R) return []; DL.bigs = [];
   var list = [], defs = [["오늘시장", dlCard1], ["시장체력", dlCard2], ["업종성과", dlCard3], ["거래집중", dlCard4], ["업종거래", dlCard5], ["신고신저", dlCard6], ["자산군", dlCard7], ["성적표", dlCard8], ["시장해설", dlCard9]];
-  defs.forEach(function (d) { var cv = null; try { cv = d[1](R); } catch (e) { console.warn("daily " + d[0], e); } if (cv) list.push({ name: d[0], cv: cv }); });
+  defs.forEach(function (d) {
+    var cv = null;
+    try {
+      cv = d[1](R);
+      // v12.22 릴스형: 1차 렌더로 본문 끝 위치를 재고, 남는 세로를 블록 간격에 고르게 나눠 다시 그린다(글자 크기는 그대로)
+      if (DL.H > 1400 && DL._lastY) {
+        var top = 150, bottom = DL.H - 64 - 112 - 24, keep = DL.R, r = keep || 1, lo = r, hi = null;
+        for (var pass = 0; pass < 4; pass++) {   // 간격 배율을 이분 탐색: 본문 끝이 각주 바로 위에 오도록
+          var used = DL._lastY - top, need = bottom - top; if (Math.abs(need - used) < 24) break;
+          if (used < need) { lo = r; r = hi ? (r + hi) / 2 : Math.min(3, r * (1 + (need - used) / Math.max(used, 1))); } else { hi = r; r = (lo + r) / 2; }
+          DL.R = r; try { cv = d[1](R); } catch (e2) { break; }
+        }
+        if (DL._lastY - top > bottom - top + 24 && hi == null) { DL.R = lo; try { cv = d[1](R); } catch (e3) {} }
+        DL.R = keep;
+      }
+    } catch (e) { console.warn("daily " + d[0], e); }
+    if (cv) list.push({ name: d[0], cv: cv });
+  });
   return list;
 }

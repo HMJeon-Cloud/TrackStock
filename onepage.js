@@ -224,7 +224,6 @@ function onePageOpen(btn) {
     return fl.then(function () {
       var cv; try { cv = draw(); } finally { CARD_MKT = keep; }
       if (btn) btn.innerHTML = old;
-      if (typeof hubSize === "function" && hubSize() === "reel" && typeof hubReelWrap === "function") cv = hubReelWrap(cv);   // v12.21 릴스형
       var url = cv.toDataURL("image/png"), day = pubToday().replace(/-/g, ""), mk = cMktInfo(R), box = document.createElement("div");
       var file = "uphill.lab_오늘한장_" + (mk ? mk.name : "전체") + "_" + day + ".png";
       box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:10px"><button class="primary" data-act="save">⬇ 저장</button>' + (navigator.canShare ? '<button class="chip" data-act="share">↗ 공유</button>' : '') + '<span class="briefDim">1080×1350 · 게시물·릴스 표지로 · 선별 종목은 추세·RSI·대금·재무·기사를 겹쳐 고른 후보 · 판단과 책임은 본인에게</span></div><img alt="" style="width:100%;max-width:520px;border-radius:12px;display:block;margin:0 auto;box-shadow:0 4px 18px rgba(0,0,0,.2)">';

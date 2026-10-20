@@ -165,7 +165,12 @@ function aiCleanPlan(p) {
 
 /* ---------- ③ 그리기 (앱이 글자를 그림: 앱 카드 · 배경만 AI) ---------- */
 function aiHi(s) { return String(s).replace(/(?<![A-Za-z&\d.])([+\-]?\d[\d,]*(?:\.\d+)?%?)/g, "[[$1]]"); }
-function aiPlanCard(st) {
+/* v12.22 AI 카드도 고른 크기로 직접 그린다 — 게시형 1080×1350(위·아래 UI 덮개 없음) / 릴스형 1080×1920(위 260·아래 360 비움) */
+function aiGeo() { var reel = typeof hubSize === "function" ? hubSize() === "reel" : true; return reel ? { W: 1080, H: 1920, P: 84, TOP: 260, BOT: 1560 } : { W: 1080, H: 1350, P: 72, TOP: 70, BOT: 1250 }; }
+function aiWithGeo(fn) { var keep = { H: REEL.H, P: REEL.P, TOP: REEL.TOP, BOT: REEL.BOT }, G = aiGeo(); REEL.H = G.H; REEL.P = G.P; REEL.TOP = G.TOP; REEL.BOT = G.BOT; try { return fn(); } finally { REEL.H = keep.H; REEL.P = keep.P; REEL.TOP = keep.TOP; REEL.BOT = keep.BOT; } }
+function aiSizeTxt() { var G = aiGeo(); return G.W + "×" + G.H; }
+function aiPlanCard(st) { return aiWithGeo(function () { return aiPlanCard0(st); }); }
+function aiPlanCard0(st) {
   var p = st.plan, c = rNew(), g = c.g, P = REEL.P, W = REEL.W - P * 2, mk = st.mk;
   if (st.bgImg && st.mode === "bg" && OC_LAYER !== "text") {
     var im = st.bgImg, sc = Math.max(REEL.W / im.width, REEL.H / im.height), dw = im.width * sc, dh = im.height * sc;
@@ -197,18 +202,19 @@ function aiPlanCard(st) {
   var items = (p.items || []).filter(function (x) { return x.label || x.value; }), room = bottom - y, n = items.length;
   while (n > 1 && room / n < 104) n--;
   items = items.slice(0, n);
-  var ih = Math.min(170, Math.floor(room / Math.max(1, n)));
+  var ih = Math.min(260, Math.floor(room / Math.max(1, n)));   // v12.22 칸을 남은 높이만큼 키우고, 그래도 남으면 위아래 가운데로(빈 띠 없이)
+  y += Math.max(0, Math.floor((room - ih * n) / 2));
   items.forEach(function (it, i) {
     var yy = y + i * ih, bh = ih - 14, rank = p.layout !== "hero";
     cRound(g, P, yy, W, bh, 22, "rgba(255,255,255,0.08)", "rgba(241,212,138,0.18)");
     var x = P + 26;
     if (rank) { var r0 = Math.min(30, bh / 2 - 8); g.fillStyle = REEL_C.gold; g.beginPath(); g.arc(x + r0, yy + bh / 2, r0, 0, Math.PI * 2); g.fill(); cText(g, String(i + 1), x + r0, yy + bh / 2 + r0 * 0.42, r0 * 1.2, 900, "#141317", "center"); x += r0 * 2 + 22; }
-    var longV = it.value && it.value.length > 12, vw = it.value && !longV ? cW(g, it.value, 38, 900) + 44 : 0, mw = P + W - 22 - x - (vw ? vw + 14 : 0);
-    var ls = Math.min(40, Math.max(30, bh * 0.3)), hasSub = !!(it.sub || longV), ly = yy + bh / 2 + (hasSub ? -6 : ls * 0.36);
+    var vsz = Math.round(Math.min(56, Math.max(38, bh * 0.26))), longV = it.value && it.value.length > 12, vw = it.value && !longV ? cW(g, it.value, vsz, 900) + 44 : 0, mw = P + W - 22 - x - (vw ? vw + 14 : 0);
+    var ls = Math.min(50, Math.max(30, bh * 0.3)), hasSub = !!(it.sub || longV), ly = yy + bh / 2 + (hasSub ? -6 : ls * 0.36);
     cText(g, cFit(g, it.label, mw, ls, 800), x, ly, ls, 800, REEL_C.txt);
     if (longV) rWrap(g, it.value, x, ly + 40, P + W - 22 - x, 28, 800, REEL_C.gold2, 34, 1);
     else if (it.sub) cText(g, cFit(g, it.sub, mw, 25, 600), x, ly + 38, 25, 600, REEL_C.txt2);
-    if (vw) { var vx = P + W - 22 - vw, col = /^-/.test(it.value) ? REEL_C.down : /^\+/.test(it.value) ? REEL_C.up : REEL_C.gold2; cRound(g, vx, yy + bh / 2 - 32, vw, 64, 32, "rgba(0,0,0,0.35)", col); cText(g, it.value, vx + vw / 2, yy + bh / 2 + 13, 38, 900, col, "center"); }
+    if (vw) { var vx = P + W - 22 - vw, col = /^-/.test(it.value) ? REEL_C.down : /^\+/.test(it.value) ? REEL_C.up : REEL_C.gold2; var vh = vsz + 26; cRound(g, vx, yy + bh / 2 - vh / 2, vw, vh, vh / 2, "rgba(0,0,0,0.35)", col); cText(g, it.value, vx + vw / 2, yy + bh / 2 + vsz * 0.36, vsz, 900, col, "center"); }
   });
   if (deckOn) {
     var dy = REEL.BOT - 300; cText(g, "게시물 " + st.deckNames.length + "장 구성", P, dy, 26, 800, REEL_C.gold2);
@@ -220,11 +226,10 @@ function aiPlanCard(st) {
   if (st.src) rWrap(g, st.src, P, REEL.BOT + 20, W - 200, 20, 500, REEL_C.dim, 26, 2);
   return c.cv;
 }
-function aiFullCard(st) {   // 전부 AI: 받은 2:3 이미지를 9:16 안에 (위아래는 인스타 UI가 덮는 구역)
-  var cv = document.createElement("canvas"); cv.width = REEL.W; cv.height = REEL.H; var g = cv.getContext("2d"), im = st.fullImg;
-  g.fillStyle = "#000"; g.fillRect(0, 0, REEL.W, REEL.H);
-  if (im) { var sc = Math.max(REEL.W / im.width, REEL.H / im.height); g.save(); g.filter = "blur(30px) brightness(0.45)"; g.drawImage(im, (REEL.W - im.width * sc) / 2, (REEL.H - im.height * sc) / 2, im.width * sc, im.height * sc); g.restore();
-    var s2 = Math.min(REEL.W / im.width, REEL.H / im.height); g.drawImage(im, (REEL.W - im.width * s2) / 2, (REEL.H - im.height * s2) / 2, im.width * s2, im.height * s2); }
+function aiFullCard(st) {   // v12.22 전부 AI: 받은 2:3 이미지를 고른 크기에 꽉 채움(가운데 기준 잘라 맞춤 — 프롬프트가 글자를 안전 구역 안에 두게 요청)
+  var G = aiGeo(), cv = document.createElement("canvas"); cv.width = G.W; cv.height = G.H; var g = cv.getContext("2d"), im = st.fullImg;
+  g.fillStyle = "#14161c"; g.fillRect(0, 0, G.W, G.H);
+  if (im) { var sc = Math.max(G.W / im.width, G.H / im.height); g.drawImage(im, (G.W - im.width * sc) / 2, (G.H - im.height * sc) / 2, im.width * sc, im.height * sc); }
   return cv;
 }
 
@@ -277,7 +282,7 @@ function aiStudio(cfg) {
     '<div class="aiGrid2"><label class="aiLbl">주제(말머리)<input class="aiKick" placeholder="비우면 자동"></label><label class="aiLbl">목적<select class="aiGoal">' + GOALS.map(function (g) { return '<option>' + g + '</option>'; }).join("") + '</select></label></div>' +
     '<label class="aiLbl">원하는 카드 형태·의견<textarea class="aiReq" placeholder="예) 질문형 제목, 초보 관점, 급락 쪽 강조, 순위 대신 체크리스트 (Ctrl+Enter = 만들기)"></textarea></label>' +
     '<div class="aiLib"></div>' +
-    '<label class="aiLbl">카드 양식 <small>양식집 틀을 고르면 그 틀 안에 내용만 들어가요 (1080×1350)</small><select class="aiTpl"><option value="">릴스 기본 (9:16 · 자유 구성)</option>' + (typeof TPL_CAT !== "undefined" ? Object.keys(TPL_CAT).filter(function (k) { return k !== "calendar"; }).map(function (k) { return '<option value="' + k + '"' + (k === st.tpl ? ' selected' : '') + '>' + TPL_CAT[k].icon + ' ' + TPL_CAT[k].name + ' — ' + TPL_CAT[k].desc + '</option>'; }).join("") : "") + '</select></label>' +
+    '<label class="aiLbl">카드 양식 <small>양식집 틀을 고르면 그 틀 안에 내용만 들어가요 — 크기는 위 \'게시형/릴스형\' 선택을 따라요 (' + aiSizeTxt() + ')</small><select class="aiTpl"><option value="">기본 (자유 구성)</option>' + (typeof TPL_CAT !== "undefined" ? Object.keys(TPL_CAT).filter(function (k) { return k !== "calendar"; }).map(function (k) { return '<option value="' + k + '"' + (k === st.tpl ? ' selected' : '') + '>' + TPL_CAT[k].icon + ' ' + TPL_CAT[k].name + ' — ' + TPL_CAT[k].desc + '</option>'; }).join("") : "") + '</select></label>' +
     '<label class="aiLbl">AI 사용 범위</label><div class="aiModes">' + Object.keys(AI_MODE_NM).map(function (k) { return '<button data-mode="' + k + '"><b>' + AI_MODE_NM[k][0] + '</b><small>' + AI_MODE_NM[k][1] + '</small></button>'; }).join("") + '</div>' +
     '<button class="primary aiMake" data-plan>만들기</button><div class="aiCost"></div></div></div>' +
     '<div class="aiPanel aiRes" data-p="3"><h4><i>3</i>결과 · 검증 <small>왼쪽 재료와 가운데 카드, 오른쪽 숫자 검사를 함께 보세요</small></h4>' +
@@ -306,8 +311,8 @@ function aiStudio(cfg) {
     if (st.plan) render();
   }
   Array.prototype.forEach.call(el.querySelectorAll("[data-mode]"), function (b) { b.onclick = function () { setMode(b.getAttribute("data-mode")); }; });
-  $a(".aiTpl").onchange = function () { st.tpl = this.value; $a("[data-save]").textContent = st.tpl ? "카드 저장 (1080×1350)" : "카드 저장 (1080×1920)"; if (st.plan) render(); };
-  if (st.tpl) $a("[data-save]").textContent = "카드 저장 (1080×1350)";
+  $a(".aiTpl").onchange = function () { st.tpl = this.value; $a("[data-save]").textContent = "카드 저장 (" + aiSizeTxt() + ")"; if (st.plan) render(); };
+  $a("[data-save]").textContent = "카드 저장 (" + aiSizeTxt() + ")";
   // 참고 이미지 (+ 붙여넣기)
   function addFiles(files) { files = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type); }).slice(0, 3 - st.imgs.length); return Promise.all(files.map(ocImgShrink)).then(function (us) { us.filter(Boolean).forEach(function (u) { st.imgs.push(u); }); thumbs(); }); }
   $a(".aiImgAdd input").onchange = function () { var f = this.files; addFiles(f); this.value = ""; };
@@ -367,7 +372,7 @@ function aiStudio(cfg) {
     st.bgFixed = false;   // '다시'를 누르면 새로 생성
     var b = $a("[data-img]"), scope = st.mode === "bg" ? "bg" : "full"; b.hidden = false; b.disabled = true; b.textContent = "이미지 만드는 중… (20~90초)";
     banner("info", scope === "bg" ? "AI가 배경을 그리는 중이에요. 글·숫자는 앱이 그 위에 정확히 그려요." : "AI가 카드 전체를 그리는 중이에요. 다 되면 이미지 속 글자를 다시 읽어 원본과 대조해요.");
-    return aiCall({ mode: "image", scope: scope, plan: st.plan }).then(function (j) {
+    return aiCall({ mode: "image", scope: scope, plan: st.plan, aspect: typeof hubSize === "function" && hubSize() === "reel" ? "9:16" : "4:5" }).then(function (j) {
       if (!(j && j.ok && j.image)) throw new Error((j && (j.reason || "")) + (j && j.tries ? " [" + j.tries.join(" → ") + "]" : ""));
       st.imgModel = j.model;
       return aiLoadImg(j.image).then(function (im) {

@@ -77,7 +77,7 @@ function makerRender() {
     '<div class="mkTabs">' + MK_TABS.map(function (t) { return '<button data-mtab="' + t[0] + '"' + (t[0] === MK.tab ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join("") + '</div><div class="mkPane"></div>';
   root.innerHTML = top;
   Array.prototype.forEach.call(root.querySelectorAll("[data-mmk]"), function (b) { b.onclick = function () { MK.mk = b.getAttribute("data-mmk"); if (typeof switchBriefMarket === "function" && briefState.market !== MK.mk) switchBriefMarket(MK.mk); makerRender(); }; });
-  Array.prototype.forEach.call(root.querySelectorAll("[data-msize]"), function (b) { b.onclick = function () { MK.size = b.getAttribute("data-msize"); try { localStorage.setItem("sm.cardSize", MK.size); } catch (e) {} makerRender(); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-msize]"), function (b) { b.onclick = function () { MK.size = b.getAttribute("data-msize"); try { localStorage.setItem("sm.cardSize", MK.size); } catch (e) {} if (typeof cardSizeApply === "function") cardSizeApply(MK.size); makerRender(); }; });
   Array.prototype.forEach.call(root.querySelectorAll("[data-mtab]"), function (b) { b.onclick = function () { MK.tab = b.getAttribute("data-mtab"); makerRender(); }; });
   var pane = root.querySelector(".mkPane");
   if (MK.tab === "reels" || MK.tab === "decks" || MK.tab === "today") MK.tab = "work";
@@ -141,7 +141,6 @@ function mkPreview() {
       else { var m = MK.meta[cat] || {}, spec = MK_FMT[cat].from(MK.text[cat] != null ? MK.text[cat] : MK_FMT[cat].ex); cv = tplCard(cat, { title: m.title || TPL_CAT[cat].name, sub: m.sub, source: m.source, catName: m.catName || "" }, spec); }
     } catch (e) { console.warn(e); if (msg) msg.textContent = "그리지 못했어요: " + e.message; }
     if (!cv) { if (ph) ph.textContent = "이 내용은 아직 데이터가 없어요"; return; }
-    if (MK.size === "reel" && typeof hubReelWrap === "function") cv = hubReelWrap(cv);
     MK.url = cv.toDataURL("image/png"); img.src = MK.url; img.hidden = false; if (ph) ph.hidden = true;
     var sv = box.querySelector("[data-msave]"); if (sv) { sv.disabled = false; sv.textContent = "⬇ 저장 (" + (MK.size === "reel" ? "1080×1920" : "1080×1350") + ")"; } if (msg) msg.textContent = "";
     // v12.21 직접 쓰기도 인스타 캡션 + 스레드 글

@@ -610,7 +610,18 @@ function hubThreadsAuto(title, list, opts) {
   add("초보 질문형", name + ",\n숫자로 보면 어떨까요?"); add("반전형", name + ".\n생각과 다른 숫자가 있었어요."); add("정리형", name + " —\n오늘 숫자를 한 장에 정리했어요.");
   return out;
 }
-/* v12.21 릴스형(1080×1920): 게시형 카드를 검정 바탕 가운데에 두고(인스타 UI가 덮는 위 250·아래 350px은 비움) 위엔 채널명, 아래엔 저장 안내 */
+/* v12.22 카드 크기 — 게시형 1080×1350 / 릴스형 1080×1920. 모든 틀(연구노트 NB · 데일리 DL · 양식 TPL · 카드 CARD)의 높이 상수를 바꿔 '그 크기로 직접' 그린다.
+   채우기 함수들이 높이 상수를 기준으로 남은 칸을 나누므로 릴스형에선 줄·막대·표가 세로로 더 넉넉해진다(검정 여백 없음). */
+function cardSizeApply(size) {
+  var H = size === "reel" ? 1920 : 1350, r = H / 1350;
+  if (typeof NB !== "undefined") { NB.H = H; NB.SPLIT = Math.round(540 * r); if (typeof NB_RULE !== "undefined") NB_RULE = NB.SPLIT - 20; }
+  if (typeof DL !== "undefined") { DL.H = H; DL.R = r; }
+  if (typeof TPL !== "undefined") TPL.H = H;
+  if (typeof CARD !== "undefined") CARD.H = H;
+  return H;
+}
+try { cardSizeApply((function () { try { return localStorage.getItem("sm.cardSize") || "post"; } catch (e) { return "post"; } })()); } catch (e) {}
+/* (v12.21의 검정 바탕 가운데 배치는 폐기 — 아래 함수는 호환용으로만 남김) */
 function hubReelWrap(cv) {
   var out = document.createElement("canvas"); out.width = 1080; out.height = 1920; var g = out.getContext("2d");
   g.fillStyle = "#14161c"; g.fillRect(0, 0, 1080, 1920);
@@ -622,7 +633,6 @@ function hubReelWrap(cv) {
 function hubSize() { return (typeof MK !== "undefined" && MK.size) || (function () { try { return localStorage.getItem("sm.cardSize") || "post"; } catch (e) { return "post"; } })(); }
 function hubShow(title, list, opts) {
   opts = opts || {};
-  if (hubSize() === "reel") list.forEach(function (it) { if (it.cv && it.cv.height !== 1920) it.cv = hubReelWrap(it.cv); });
   if (!opts.thr || !opts.thr.length) opts.thr = hubThreadsAuto(title, list, opts);
   var day = typeof pubToday === "function" ? pubToday().replace(/-/g, "") : "", box = document.createElement("div"), slug = String(title).replace(/[^가-힣A-Za-z0-9]/g, "").slice(0, 14);
   box.innerHTML = (opts.note ? '<div class="briefDim" style="margin-bottom:8px">' + opts.note + '</div>' : '') + '<div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" data-act="all">⬇ 전부 저장</button></div>' + (opts.thr && typeof thrPanelHtml === "function" ? thrPanelHtml("주식") : "") + (opts.log ? '<details class="howto"><summary>숫자 확인 ' + opts.log.length + '줄</summary><div class="body"><ul>' + opts.log.map(function (l) { return '<li>' + hubEsc(l) + '</li>'; }).join("") + '</ul></div></details>' : '') + '<div class="cardsWrap"></div>';
@@ -689,7 +699,7 @@ function hubOneCard(sp) {
   if (sp.head2) { var hs = 30, nl = Math.min(2, cWrapCount(g, sp.head2, W - 40, hs, 800)), hh = nl * 40 + 34; cRound(g, P, y, W, hh, 12, TPL_C.black); cWrap(g, sp.head2, P + 20, y + 48, W - 40, hs, 800, TPL_C.gold, 40, 2); y += hh + 14; }
   var longV = F.some(function (f) { return String(f.value).length > 12; }), two = F.length > 6 && !longV, cols = two ? 2 : 1, rowsN = Math.ceil(F.length / cols) || 1;
   var B = sp.brief && (sp.brief.issue.length || sp.brief.exp) ? sp.brief : null, bh = B ? 150 : 0;   // v12.1 아래 '요즘 이슈 · 전문가' 띠
-  var avail = TPL.H - TPL.FOOT - 22 - y - bh, rh = Math.max(56, Math.min(two ? 230 : 200, Math.floor(avail / rowsN))), cw = (W - (cols - 1) * 14) / cols;
+  var avail = TPL.H - TPL.FOOT - 22 - y - bh, rh = Math.max(56, Math.min(Math.round((two ? 230 : 200) * TPL.H / 1350), Math.floor(avail / rowsN))), cw = (W - (cols - 1) * 14) / cols;
   if (rh * rowsN > avail) { F = F.slice(0, Math.floor(avail / rh) * cols); rowsN = Math.ceil(F.length / cols); }
   F.forEach(function (f, i) {
     var col = i % cols, row = Math.floor(i / cols), x = P + col * (cw + 14), yy = y + row * rh, h = rh - 10, v = String(f.value);
