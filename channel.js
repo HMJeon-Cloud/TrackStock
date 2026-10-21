@@ -16,7 +16,7 @@ var chState = { daily: null, mdd: null, mddPick: null, alloc: null, plan: null, 
 function chLoad(k, def) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch (e) { return def; } }
 function chSave(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function chName(sym) { return (typeof BRIEF_KO !== "undefined" && BRIEF_KO[sym]) ? BRIEF_KO[sym].replace(/\s*\(.*?\)\s*/g, "").trim() : sym; }
-function chPct(x, d) { if (x == null || !isFinite(x)) return "-"; d = d == null ? 1 : d; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
+function chPct(x, d) { if (x == null || !isFinite(x)) return "-"; d = d == null ? 2 : d; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
 function chCopy(text, btn) {
   function done(ok) { var old = btn.innerHTML; btn.textContent = ok ? "✓ 복사됨" : "복사 실패"; setTimeout(function () { btn.innerHTML = old; }, 1500); }
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });

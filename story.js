@@ -111,11 +111,28 @@ function nbCover(small, lines, sub, meta, items) {
   var room = bh - 250 - listH, fs = 28; while (fs < 36 && cWrapCount(g, sub, W, fs + 2, 600) * (fs + 2) * 1.5 <= room) fs += 2; while (fs > 22 && cWrapCount(g, sub, W, fs, 600) * fs * 1.5 > room) fs -= 2;
   var nl = cWrapCount(g, sub, W, fs, 600), ty = by + 60 + (items.length ? 0 : Math.max(0, (room - nl * fs * 1.5) / 2)) + fs;
   var ly = cWrap(g, sub, P, ty, W, fs, 600, "#f3efe6", fs * 1.5, 8);
-  if (items.length) {   // 이 묶음의 차례 (쪽 제목) — 빈 검정을 차례로 채운다
-    var top = Math.max(ly + 30, by + 60 + nl * fs * 1.5 + 30), gap = Math.min(44, Math.floor((NB.H - 150 - top) / items.length));
-    g.fillStyle = "rgba(255,255,255,0.18)"; g.fillRect(P, top, W, 1);
-    items.forEach(function (t, i) { var yy = top + 26 + i * gap + 18; cRound(g, P, yy - 22, 44, 28, 14, NB_C.gold); cText(g, String(i + 1).padStart(2, "0"), P + 22, yy - 2, 16, 900, NB_INK, "center"); cText(g, cFit(g, cPlain(t), W - 70, 22, 700), P + 60, yy, 22, 700, "#f3efe6"); });
+  if (items.length) {   // v12.24 '안에 든 숫자' 미리보기 — 가장 눈에 띄는 숫자 하나를 크게 먼저, 나머지는 몇 장에 숫자가 있는지만(넘기게)
+    var top = Math.max(ly + 30, by + 60 + nl * fs * 1.5 + 30);
+    g.fillStyle = "rgba(255,255,255,0.18)"; g.fillRect(P, top, W, 1); top += 24;
+    var norm = items.map(function (it, i) { return typeof it === "string" ? { t: it, v: "", i: i } : { t: it.t, v: it.v || "", q: it.q || "", strong: it.strong, i: i }; });
+    var ok = function (x) { return x.v && !/^[+\-−]?0(\.0+)?\s*%?$/.test(x.v.trim()); }, hero = norm.filter(function (x) { return ok(x) && x.strong; })[0];   // 단위가 있는 숫자(%·배·회·개·분수)만 — 기준선 같은 숫자는 크게 안 띄운다
+    if (hero) {
+      var hs = 92; while (hs > 50 && cW(g, hero.v, hs, 900) > W * 0.55) hs -= 4;
+      var lab = hero.q ? hero.q.replace(/□.*$/, "").replace(/[,·—\s]+$/, "") : cPlain(hero.t);   // 숫자 앞 문장(무엇의 숫자인지)
+      cText(g, cFit(g, (hero.i + 2) + "장 · " + (lab || cPlain(hero.t)), W, 24, 800), P, top + 26, 24, 800, "#f3efe6");
+      cText(g, hero.v, P, top + 34 + hs, hs, 900, NB_C.gold); g.fillStyle = NB_C.gold; g.fillRect(P, top + 50 + hs, Math.min(W * 0.55, cW(g, hero.v, hs, 900)), 6);
+      top += hs + 80;
+    }
+    var rest = norm.filter(function (x) { return !hero || x.i !== hero.i; }), gap = Math.max(36, Math.min(56, Math.floor((NB.H - 140 - top) / Math.max(1, rest.length))));
+    rest = rest.slice(0, Math.max(1, Math.floor((NB.H - 140 - top) / gap)));
+    rest.forEach(function (x, k) {
+      var yy = top + k * gap + gap / 2 + 6;
+      cRound(g, P, yy - 22, 44, 28, 14, NB_C.gold); cText(g, String(x.i + 2).padStart(2, "0"), P + 22, yy - 2, 16, 900, NB_INK, "center");
+      var vw = x.v ? 64 : 0; cText(g, cFit(g, cPlain(x.t), W - 80 - vw, 22, 700), P + 60, yy, 22, 700, "#f3efe6");
+      if (x.v) { cRound(g, P + W - vw, yy - 26, vw, 36, 8, "rgba(255,255,255,0.10)"); cText(g, "??", P + W - vw / 2, yy + 2, 22, 900, NB_C.gold, "center"); }
+    });
   }
+
   cText(g, "넘겨서 보기 →", P, NB.H - 110, 30, 900, NB_C.gold);
   cText(g, cFit(g, meta || cDate(Date.now()) + " 기준 · 과거 데이터 비교 자료 · 투자 권유 아님", W - 200, 16, 600), P, NB.H - 60, 16, 600, "#a9a291");
   if (typeof cMark === "function") cMark(g, NB.W - P, NB.H - 62);

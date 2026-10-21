@@ -13,7 +13,7 @@ var ISS_MACRO = [
 ];
 var ISS_MKT = { fx: ["all", "kr", "us", "coin", "stock"], vix: ["all", "us", "stock"], rate: ["all", "us", "stock"], gold: ["all", "us", "stock"], oil: ["all", "us", "stock"], btc: ["all", "coin"] };
 
-function issPct(x, d) { return (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 1 : d) + "%"; }
+function issPct(x, d) { return (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 2 : d) + "%"; }
 /* 기간: day(하루) · week(5거래일) · month(21거래일) — ISS_MODE에 따라 등락과 "평소 변동폭" 기준이 바뀐다 */
 var ISS_MODE = "day", ISS_BACK = { day: 1, week: 5, month: 21 }, ISS_LBL = { day: "오늘", week: "이번 주", month: "이번 달" };
 function issRet(s) { return ISS_MODE === "day" ? s.ret1 : s.ret; }

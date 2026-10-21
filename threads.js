@@ -6,7 +6,7 @@
    ============================================================ */
 var THR_TOPIC = { all: "주식", kr: "주식", us: "주식", coin: "코인", policy: "재테크", dca: "재테크" };
 var THR_TAGS = { all: ["우상향연구소", "주식초보", "재테크", "주식시황", "투자공부"], kr: ["우상향연구소", "국내주식", "코스피", "주식시황", "주식초보"], us: ["우상향연구소", "미국주식", "미국증시", "나스닥", "주식초보"], coin: ["우상향연구소", "비트코인", "코인", "가상자산", "코인시황"], policy: ["우상향연구소", "재테크", "내집마련", "대출금리"] };
-function thrPct(x, d) { return cPct(x, d == null ? 1 : d); }
+function thrPct(x, d) { return cPct(x, d == null ? 2 : d); }
 function thrSeed() { return Math.floor((Date.now() + 9 * 3600e3) / 86400e3); }
 function thrClean(s) { return thrNoEmoji(String(s).replace(/\s*[—-]\s*평소.*$/, "")).replace(/\s+/g, " ").trim(); }
 function thrNoEmoji(s) { return String(s).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{20E3}₿]/gu, "").replace(/^\s+/gm, function (m) { return m.replace(/ /g, ""); }).replace(/[ \t]+$/gm, ""); }

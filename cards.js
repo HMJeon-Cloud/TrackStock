@@ -34,7 +34,7 @@ CARD_C.accent = CARD_C.gold; CARD_C.warmTxt = "#8a6a1f"; CARD_C.warm = CARD_C.go
 var CARD_FONT = '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 var CARD_TXT = "";   // 그린 글자 모음 — 웹폰트가 필요한 글자만 내려받으므로, 한 번 그려 글자를 모은 뒤 폰트를 받고 다시 그린다
 
-function cPct(x, d) { if (x == null || !isFinite(x)) return "-"; d = d == null ? 1 : d; var v = (x * 100).toFixed(d); if (parseFloat(v) === 0) v = (0).toFixed(d); return (parseFloat(v) > 0 ? "+" : "") + v + "%"; }
+function cPct(x, d) { if (x == null || !isFinite(x)) return "-"; d = d == null ? 2 : d; var v = (x * 100).toFixed(d); if (parseFloat(v) === 0) v = (0).toFixed(d); return (parseFloat(v) > 0 ? "+" : "") + v + "%"; }
 function cCol(x) { return x > 0 ? CARD_C.up : x < 0 ? CARD_C.down : CARD_C.sub; }
 function cDate(ms) { var d = new Date((ms || Date.now()) + 9 * 3600 * 1000); return (d.getUTCMonth() + 1) + "." + d.getUTCDate() + "(" + "일월화수목금토"[d.getUTCDay()] + ")"; }   // 한국 시간 기준
 function cMan(v) {   // 원 → "3,120만원" / "1.24억원"

@@ -140,7 +140,7 @@ function briefStats(sym, d, mode) {
 var BRIEF_KO = {};
 if (typeof TICKER_DICT !== "undefined") TICKER_DICT.forEach(function (t) { BRIEF_KO[t[0]] = t[1]; });
 function briefName(s) { var n = BRIEF_KO[s.sym] || s.name || s.sym; return String(n).replace(/\s*\(.*?\)\s*/g, "").trim() || s.sym; }
-function briefPct(x, digits) { if (x == null || !isFinite(x)) return "-"; var d = digits == null ? 1 : digits; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
+function briefPct(x, digits) { if (x == null || !isFinite(x)) return "-"; var d = digits == null ? 2 : digits; return (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%"; }
 
 /* ---------- 데이터 점검 ----------
    ① 오래된 데이터: 같은 시장의 최신 기준일보다 4일 넘게 뒤처진 종목(수집 실패로 지난 값이 남은 것) → 순위에서 뺌

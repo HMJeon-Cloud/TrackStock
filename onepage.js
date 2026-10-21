@@ -42,7 +42,7 @@ var OP_TIPS = {
     ["코인엔 상한가·하한가가 없어요", "24시간 거래되고 하루 수십 %도 움직여요. 비중이 곧 위험이에요."]
   ]
 };
-function opPct(x, d) { return cPct(x, d == null ? 1 : d); }
+function opPct(x, d) { return cPct(x, d == null ? 2 : d); }
 function opCol(x) { return x > 0 ? OP_C.up : x < 0 ? OP_C.down : OP_C.ink2; }
 function opSeed() { return Math.floor((Date.now() + 9 * 3600e3) / 86400e3); }
 

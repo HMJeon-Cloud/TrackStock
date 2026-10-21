@@ -26,7 +26,9 @@ function hubDraw(spec) {
   HUB.lastSpec = spec; HUB.lastSpecAt = Date.now();
   spec.pages = (spec.pages || []).filter(Boolean);   // v12.18 조건부 페이지(null) 허용
   var out = [], total = spec.pages.length + 2, pg = 1;
-  out.push({ name: "표지", cv: nbCover(spec.small || cDate(Date.now()), spec.hook, spec.lead, spec.meta, spec.pages.map(function (p) { return p.title; })) });
+  // v12.24 표지 미리보기: 장마다 결론 줄의 [[강조 숫자]]를 같이 넘긴다(첫 숫자만 공개)
+  var teaser = spec.pages.map(function (p) { var j = (p.top || []).filter(Boolean).join(" "), m = j.match(/\[\[([^\]]{1,16})\]\]/), v = m && /\d/.test(m[1]) ? m[1] : ""; return { t: p.title, v: v, q: v ? cPlain(j.replace("[[" + v + "]]", "□")).replace(/\s{2,}/g, " ").trim() : "", strong: /[%/배회개]/.test(v) }; });
+  out.push({ name: "표지", cv: nbCover(spec.small || cDate(Date.now()), spec.hook, spec.lead, spec.meta, teaser) });
   spec.pages.forEach(function (p, i) {
     var c = nbNew(); pg++;
     nbTop(c, i + 1, p.top, pg, total);
@@ -204,7 +206,7 @@ function hubNewsDeck() {
   var date = cDate(Date.now()), pages = L.map(function (x, i) {
     var body = HUB_BODY[x.it.url] || null, sents = body ? body : hubSents(x.desc), paras = hubFitSents(sents, 520, 6);
     if (!paras.length) paras = x.desc ? [x.desc.replace(/(\.\.\.|…)$/, "").replace(/[^.!?]*$/, "").trim() || x.desc.replace(/(\.\.\.|…)$/, "") + "…"] : ["기사 요약이 제공되지 않은 기사예요. 제목과 아래 숫자를 함께 보세요."];
-    var tiles = x.syms.map(function (s) { var st = nbStat(s); return st ? { v: cPct(st.ret1, 1), l: hubName(s) + " 전일 · 1개월 " + cPct(st.m1, 0), color: hubPctTone(st.ret1) } : null; }).filter(Boolean).slice(0, 3);
+    var tiles = x.syms.map(function (s) { var st = nbStat(s); return st ? { v: cPct(st.ret1, 2), l: hubName(s) + " 전일 · 1개월 " + cPct(st.m1, 0), color: hubPctTone(st.ret1) } : null; }).filter(Boolean).slice(0, 3);
     var term = hubTerm(x.t + " " + x.desc);
     return { name: "기사" + (i + 1), top: ["\"" + x.t + "\""], title: (x.it.press || "언론사") + (x.it.time ? " · " + String(x.it.time).slice(0, 16) : ""), sub: "기사 요약 · 아래 숫자는 관련 자산의 전일 종가 등락(야후 파이낸스)", kind: "text",
       data: { paras: paras, tiles: tiles, after: term ? ["이 기사 속 단어 · " + term[0], term[1] + " — " + term[2]] : ["읽는 법", "기사는 이유를 말하고, 숫자는 크기를 말해요. 제목이 커도 실제 등락은 작을 수 있어요."] }, foot: "출처: 네이버 뉴스 검색(" + (x.it.press || "각 언론사") + ") · 숫자는 야후 파이낸스 종가 · 투자 권유 아님" };
@@ -346,8 +348,8 @@ function hubTodayDeck(kind) {
     var hi = S.filter(function (s) { return s.newHigh; }).sort(function (a, b) { return b.m1 - a.m1; }), lo = S.filter(function (s) { return s.newLow; }).sort(function (a, b) { return a.m1 - b.m1; }), near = S.filter(function (s) { return !s.newHigh && s.vsHi != null && s.vsHi >= -0.03 && s.longEnough; });
     if (hi.length + lo.length < 3) return [];
     var pages = [];
-    if (hi.length) pages.push({ top: ["오늘 52주 신고가 [[" + hi.length + "개]]", "가장 많이 오른 건 " + nm(hi[0]) + " (1개월 " + cPct(hi[0].m1, 0) + ")"], title: "52주 신고가 " + unit, sub: "오늘 종가가 지난 1년 중 가장 높았던 " + unit + " · 오른쪽 = 1개월 수익률", kind: "rows", data: hi.slice(0, 12).map(function (s) { return ["하루 " + cPct(s.ret1, 1), nm(s), cPct(s.m1, 0), hubPctTone(s.m1), "1년 최저가 대비 " + cPct(s.vsLo, 0)]; }), leftW: 190 });
-    if (lo.length) pages.push({ top: ["오늘 52주 신저가 [[" + lo.length + "개]]", "가장 많이 빠진 건 " + nm(lo[0]) + " (1개월 " + cPct(lo[0].m1, 0) + ")"], title: "52주 신저가 " + unit, sub: "오늘 종가가 지난 1년 중 가장 낮았던 " + unit + " · 오른쪽 = 1개월 수익률", kind: "rows", data: lo.slice(0, 12).map(function (s) { return ["하루 " + cPct(s.ret1, 1), nm(s), cPct(s.m1, 0), hubPctTone(s.m1), "1년 고점 대비 " + cPct(s.vsHi, 0)]; }), leftW: 190 });
+    if (hi.length) pages.push({ top: ["오늘 52주 신고가 [[" + hi.length + "개]]", "가장 많이 오른 건 " + nm(hi[0]) + " (1개월 " + cPct(hi[0].m1, 0) + ")"], title: "52주 신고가 " + unit, sub: "오늘 종가가 지난 1년 중 가장 높았던 " + unit + " · 오른쪽 = 1개월 수익률", kind: "rows", data: hi.slice(0, 12).map(function (s) { return ["하루 " + cPct(s.ret1, 2), nm(s), cPct(s.m1, 0), hubPctTone(s.m1), "1년 최저가 대비 " + cPct(s.vsLo, 0)]; }), leftW: 190 });
+    if (lo.length) pages.push({ top: ["오늘 52주 신저가 [[" + lo.length + "개]]", "가장 많이 빠진 건 " + nm(lo[0]) + " (1개월 " + cPct(lo[0].m1, 0) + ")"], title: "52주 신저가 " + unit, sub: "오늘 종가가 지난 1년 중 가장 낮았던 " + unit + " · 오른쪽 = 1개월 수익률", kind: "rows", data: lo.slice(0, 12).map(function (s) { return ["하루 " + cPct(s.ret1, 2), nm(s), cPct(s.m1, 0), hubPctTone(s.m1), "1년 고점 대비 " + cPct(s.vsHi, 0)]; }), leftW: 190 });
     pages.push({ top: ["신고가는 '비싸다'가 아니라", "[[파는 사람이 없다]]에 가깝다."], title: "오늘의 신고가 · 신저가 숫자", sub: "전체 " + S.length + "개 " + unit + " 중", kind: "tiles", data: { tiles: [{ v: hi.length + "개", l: "52주 신고가", color: NB_C.up }, { v: near.length + "개", l: "신고가까지 3% 안", color: NB_C.navy }, { v: lo.length + "개", l: "52주 신저가", color: NB_C.down }] }, note: "신고가 종목이 많아지는 날은 시장 전체의 힘이 강하다는 신호로 읽혀요. 반대로 신저가가 늘면 약해졌다는 뜻이에요. 신저가 종목은 '싸 보이지만' 바닥은 지나야 알 수 있어요.", gold: ["신고가 수 vs 신저가 수", "시장의 체온계"] });
     return hubDraw({ small: date, hook: ["오늘 [[52주 신고가]]는", "어떤 " + unit + "이었을까?"], lead: "지난 1년 중 가장 비싸게 끝난 " + unit + "과 가장 싸게 끝난 " + unit + "을 모았어요. 숫자는 종가 기준이에요.", pages: pages, close: ["신고가 종목, 사시나요 기다리시나요?", ["저장해 두고 1개월 뒤", "같은 목록을 다시 비교해 보세요."]], foot: foot });
   }
@@ -355,8 +357,8 @@ function hubTodayDeck(kind) {
     var T = (R.themes || []).filter(function (t) { return isFinite(t.ret); }); if (T.length < 4) return [];
     var top = T.slice(0, 6), bot = T.slice(-6).reverse();
     return hubDraw({ small: date, hook: ["오늘 [[가장 강한 업종]]과", "가장 약한 업종"], lead: "업종(테마)별로 대표 종목들의 평균 등락을 계산했어요. 같은 날에도 업종마다 방향이 달랐어요.", pages: [
-      { top: ["오늘 1등 업종 [[" + T[0].name + " " + cPct(T[0].ret, 1) + "]]", "꼴찌 " + T[T.length - 1].name + " " + cPct(T[T.length - 1].ret, 1)], title: "강한 업종 TOP6 · 약한 업종 TOP6", sub: "업종 평균 등락 · 왼쪽 = 오른 종목 수", kind: "rows", data: top.map(function (t) { return [t.up + "/" + t.n + " 상승", t.name, cPct(t.ret, 1), hubPctTone(t.ret), "가장 센 " + nm(t.best) + " " + cPct(t.best.ret, 1)]; }).concat(bot.map(function (t) { return [t.up + "/" + t.n + " 상승", t.name, cPct(t.ret, 1), hubPctTone(t.ret), "가장 약한 " + nm(t.worst) + " " + cPct(t.worst.ret, 1)]; })), leftW: 170 },
-      { top: ["업종 사이 차이", "[[" + cPct(T[0].ret - T[T.length - 1].ret, 1).replace("+", "") + "p]]"], title: "업종별 등락 한눈에", sub: "상위 3 · 하위 3", kind: "bars", data: T.slice(0, 3).concat(T.slice(-3)).map(function (t) { return { l: t.name, v: t.ret, color: hubPctTone(t.ret) }; }), note: "업종 차이가 큰 날은 '시장 전체'보다 '어디에 돈이 몰렸나'가 중요한 날이에요. 강한 업종이 며칠 이어지는지, 하루로 끝나는지를 같이 보세요.", gold: ["하루 1등이 1주 1등은 아니다", "며칠 이어지는지 확인"] }
+      { top: ["오늘 1등 업종 [[" + T[0].name + " " + cPct(T[0].ret, 2) + "]]", "꼴찌 " + T[T.length - 1].name + " " + cPct(T[T.length - 1].ret, 2)], title: "강한 업종 TOP6 · 약한 업종 TOP6", sub: "업종 평균 등락 · 왼쪽 = 오른 종목 수", kind: "rows", data: top.map(function (t) { return [t.up + "/" + t.n + " 상승", t.name, cPct(t.ret, 2), hubPctTone(t.ret), "가장 센 " + nm(t.best) + " " + cPct(t.best.ret, 2)]; }).concat(bot.map(function (t) { return [t.up + "/" + t.n + " 상승", t.name, cPct(t.ret, 2), hubPctTone(t.ret), "가장 약한 " + nm(t.worst) + " " + cPct(t.worst.ret, 2)]; })), leftW: 170 },
+      { top: ["업종 사이 차이", "[[" + cPct(T[0].ret - T[T.length - 1].ret, 2).replace("+", "") + "p]]"], title: "업종별 등락 한눈에", sub: "상위 3 · 하위 3", kind: "bars", data: T.slice(0, 3).concat(T.slice(-3)).map(function (t) { return { l: t.name, v: t.ret, color: hubPctTone(t.ret) }; }), note: "업종 차이가 큰 날은 '시장 전체'보다 '어디에 돈이 몰렸나'가 중요한 날이에요. 강한 업종이 며칠 이어지는지, 하루로 끝나는지를 같이 보세요.", gold: ["하루 1등이 1주 1등은 아니다", "며칠 이어지는지 확인"] }
     ], close: ["요즘 가장 관심 가는 업종은 어디인가요?", ["저장해 두고 일주일 뒤", "같은 순서인지 비교해 보세요."]], foot: foot });
   }
   if (kind === "sale") {
@@ -370,7 +372,7 @@ function hubTodayDeck(kind) {
   if (kind === "vol") {
     var V = S.filter(function (s) { return s.amtX != null && s.amtX >= 1.5; }).sort(function (a, b) { return b.amtX - a.amtX; }); if (V.length < 4) return [];
     return hubDraw({ small: date, hook: ["오늘 [[돈이 몰린]] " + unit, "평소보다 몇 배?"], lead: "오늘 거래대금이 최근 20일 평균의 몇 배였는지. 돈이 몰렸다는 건 관심이 커졌다는 뜻이지, 오른다는 뜻은 아니에요.", pages: [
-      { top: ["평소보다 거래대금이 가장 많이 늘어난 건", "[[" + nm(V[0]) + " " + V[0].amtX.toFixed(1) + "배]]", "", "그날 등락 " + cPct(V[0].ret1, 1)], title: "거래대금 급증 TOP12", sub: "오늘 거래대금 ÷ 최근 20일 평균 · 오른쪽 = 오늘 등락", kind: "rows", data: V.slice(0, 12).map(function (s) { return [s.amtX.toFixed(1) + "배", nm(s), cPct(s.ret1, 1), hubPctTone(s.ret1), "1개월 " + cPct(s.m1, 0) + " · 고점 대비 " + cPct(s.vsHi, 0)]; }), leftW: 140 },
+      { top: ["평소보다 거래대금이 가장 많이 늘어난 건", "[[" + nm(V[0]) + " " + V[0].amtX.toFixed(1) + "배]]", "", "그날 등락 " + cPct(V[0].ret1, 2)], title: "거래대금 급증 TOP12", sub: "오늘 거래대금 ÷ 최근 20일 평균 · 오른쪽 = 오늘 등락", kind: "rows", data: V.slice(0, 12).map(function (s) { return [s.amtX.toFixed(1) + "배", nm(s), cPct(s.ret1, 2), hubPctTone(s.ret1), "1개월 " + cPct(s.m1, 0) + " · 고점 대비 " + cPct(s.vsHi, 0)]; }), leftW: 140 },
       { top: ["돈이 몰린 " + V.length + "개 중", "오른 건 [[" + V.filter(function (s) { return s.ret1 > 0; }).length + "개]], 내린 건 " + V.filter(function (s) { return s.ret1 < 0; }).length + "개"], title: "거래대금이 늘어난 날의 방향", sub: "평소의 1.5배 이상 " + unit, kind: "bars", data: V.slice(0, 6).map(function (s) { return { l: nm(s), v: s.ret1, color: hubPctTone(s.ret1) }; }), note: "거래대금이 크게 늘면서 오르면 '새 돈이 들어왔다', 늘면서 내리면 '많이 팔았다'로 읽어요. 하루로 끝나는지, 다음 날도 이어지는지가 중요해요.", gold: ["대금 + 방향 + 지속", "셋을 같이 보기"] }
     ], close: ["오늘 돈이 몰린 곳 중 의외였던 건?", ["저장해 두고 다음 날", "이어졌는지 확인해 보세요."]], foot: foot });
   }
@@ -394,8 +396,8 @@ function hubFxDeck() {
 function hubIssuesList() { var R = hubR(); if (!R) return []; try { return (typeof chState !== "undefined" && chState.issues && chState.issues.length) ? chState.issues : issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular, now: typeof nbNow === "function" ? nbNow() : null }); } catch (e) { return []; } }
 function hubIssueWhy(it) {
   var R = hubR(), S = hubStocks(), st = it.sym && typeof nbStat === "function" ? nbStat(it.sym) : null, nm = function (s) { return typeof briefName === "function" ? briefName(s) : s.sym; }, rows = [], why = [];
-  if (st) { rows.push(["오늘", "전일 대비", cPct(st.ret1, 1), hubPctTone(st.ret1), "평소 하루 변동의 " + (st.sd > 0 ? (Math.abs(st.ret1) / st.sd).toFixed(1) : "-") + "배"]); rows.push(["1개월", "20거래일 수익률", cPct(st.m1, 0), hubPctTone(st.m1), st.above20 ? "20일선 위" : "20일선 아래"]); rows.push(["고점", "52주 고점 대비", cPct(st.vsHi, 0), hubPctTone(st.vsHi), st.newHigh ? "오늘 52주 신고가" : st.newLow ? "오늘 52주 신저가" : ""]); if (st.volX) rows.push(["거래량", "최근 5일 ÷ 20일", st.volX.toFixed(1) + "배", NB_C.navy, st.volX >= 1.5 ? "관심이 몰린 상태" : "평소 수준"]); }
-  if (/theme/.test(it.cat) && R && R.themes) { var t = R.themes.filter(function (x) { return it.title.indexOf(x.name) === 0; })[0]; if (t) { rows.push(["업종", t.name + " 평균", cPct(t.ret, 1), hubPctTone(t.ret), t.up + "/" + t.n + " 상승"]); rows.push(["가장 센", nm(t.best), cPct(t.best.ret, 1), hubPctTone(t.best.ret), ""]); rows.push(["가장 약한", nm(t.worst), cPct(t.worst.ret, 1), hubPctTone(t.worst.ret), ""]); why.push("업종 안에서 " + t.up + "/" + t.n + "개가 같은 방향 — 한 종목 뉴스가 아니라 업종 전체의 흐름"); } }
+  if (st) { rows.push(["오늘", "전일 대비", cPct(st.ret1, 2), hubPctTone(st.ret1), "평소 하루 변동의 " + (st.sd > 0 ? (Math.abs(st.ret1) / st.sd).toFixed(1) : "-") + "배"]); rows.push(["1개월", "20거래일 수익률", cPct(st.m1, 0), hubPctTone(st.m1), st.above20 ? "20일선 위" : "20일선 아래"]); rows.push(["고점", "52주 고점 대비", cPct(st.vsHi, 0), hubPctTone(st.vsHi), st.newHigh ? "오늘 52주 신고가" : st.newLow ? "오늘 52주 신저가" : ""]); if (st.volX) rows.push(["거래량", "최근 5일 ÷ 20일", st.volX.toFixed(1) + "배", NB_C.navy, st.volX >= 1.5 ? "관심이 몰린 상태" : "평소 수준"]); }
+  if (/theme/.test(it.cat) && R && R.themes) { var t = R.themes.filter(function (x) { return it.title.indexOf(x.name) === 0; })[0]; if (t) { rows.push(["업종", t.name + " 평균", cPct(t.ret, 2), hubPctTone(t.ret), t.up + "/" + t.n + " 상승"]); rows.push(["가장 센", nm(t.best), cPct(t.best.ret, 2), hubPctTone(t.best.ret), ""]); rows.push(["가장 약한", nm(t.worst), cPct(t.worst.ret, 2), hubPctTone(t.worst.ret), ""]); why.push("업종 안에서 " + t.up + "/" + t.n + "개가 같은 방향 — 한 종목 뉴스가 아니라 업종 전체의 흐름"); } }
   if (it.cat === "breadth" && R && R.temp) { rows.push(["폭", "오른 종목 비율", Math.round(R.temp.upPct * 100) + "%", NB_C.navy, R.temp.up + "/" + R.temp.total]); rows.push(["추세", "20일선 위 비율", Math.round(R.temp.abovePct * 100) + "%", NB_C.navy, ""]); rows.push(["신고가·신저가", S.filter(function (x) { return x.newHigh; }).length + " : " + S.filter(function (x) { return x.newLow; }).length, "", NB_C.navy, ""]); why.push(R.temp.upPct >= 0.75 || R.temp.upPct <= 0.25 ? "종목 대부분이 한 방향 — 개별 재료가 아니라 시장 전체(금리·환율·지수 선물)가 움직인 날" : "방향이 갈린 날 — 업종·종목 재료가 결과를 정했다"); }
   if (it.cat === "signal" && typeof nbNow === "function") nbNow().why.forEach(function (w) { var p = w.split("→"); rows.push(["신호", (p[0] || "").trim(), (p[1] || "").trim(), NB_C.up, ""]); });
   if (/mover/.test(it.cat) && st) why.push(st.amtX >= 1.5 ? "거래대금이 평소의 " + st.amtX.toFixed(1) + "배 — 새 돈이 들어오거나 빠지며 만든 움직임" : "거래대금은 평소 수준 — 수급보다 재료(뉴스)로 움직인 날일 가능성");
@@ -536,7 +538,7 @@ function hubTopics() {
       if (h.id === "daily") return { s: dow >= 1 && dow <= 5 ? 9.5 : 5, why: dow >= 1 && dow <= 5 ? "평일 아침 고정 — 9장 한 세트로 '오늘 시장'을 결론 문장 + 큰 숫자로 (한 장 = 01 한눈에)" : "주말엔 금요일 마감 기준으로" };
       if (h.id === "news") { var n = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).length; return { s: n ? 8 : 6, why: n ? "오늘 기사 " + n + "건 수집 — 기사 1건을 한 장에 풀어 주는 형식이 '저장'이 많아요" : "아침 기사로 하루를 여는 고정 형식 (기사는 만들 때 받아 와요)" }; }
       if (h.id === "hi52") return { s: hiN + loN >= 15 ? 8 : hiN + loN >= 6 ? 6 : 3, why: "오늘 52주 신고가 " + hiN + "개 · 신저가 " + loN + "개" + (hiN > loN * 2 ? " — 신고가가 압도적, 시장 힘이 센 날" : loN > hiN * 2 ? " — 신저가가 많아 약한 날" : "") };
-      if (h.id === "sector") { var sp = th.length >= 2 ? th[0].ret - th[th.length - 1].ret : 0; return { s: sp >= 0.04 ? 8 : sp >= 0.02 ? 6 : 3, why: th.length ? "업종 1등 " + th[0].name + " " + cPct(th[0].ret, 1) + " vs 꼴찌 " + th[th.length - 1].name + " " + cPct(th[th.length - 1].ret, 1) + " — 차이 " + cPct(sp, 1).replace("+", "") + "p" : "업종 데이터 준비 중" }; }
+      if (h.id === "sector") { var sp = th.length >= 2 ? th[0].ret - th[th.length - 1].ret : 0; return { s: sp >= 0.04 ? 8 : sp >= 0.02 ? 6 : 3, why: th.length ? "업종 1등 " + th[0].name + " " + cPct(th[0].ret, 2) + " vs 꼴찌 " + th[th.length - 1].name + " " + cPct(th[th.length - 1].ret, 2) + " — 차이 " + cPct(sp, 1).replace("+", "") + "p" : "업종 데이터 준비 중" }; }
       if (h.id === "sale") { var c20 = S.filter(function (s) { return s.vsHi != null && s.vsHi <= -0.2; }).length; return { s: S.length && c20 / S.length >= 0.3 ? 7 : 4, why: "고점 대비 -20% 이하 " + c20 + "개" + (S.length ? " (" + Math.round(c20 / S.length * 100) + "%)" : "") + " — " + (c20 / Math.max(1, S.length) >= 0.3 ? "세일 중인 종목이 많은 날" : "평소 수준") }; }
       if (h.id === "vol") return { s: hot && hot.amtX >= 3 ? 7 : 4, why: hot ? "거래대금 1위 " + briefName(hot) + " 평소의 " + hot.amtX.toFixed(1) + "배" : "거래대금 데이터 준비 중" };
       if (h.id === "season") return { s: dd <= 5 ? 9 : dd >= 26 ? 7 : 3, why: dd <= 5 ? mo + "월 초 — '이번 달은 과거에 어땠나'가 가장 많이 찾는 때" : dd >= 26 ? "월말 — 다음 달 미리보기로 쓰기 좋아요" : "월초·월말에 올리면 반응이 좋은 주제" };
@@ -661,7 +663,7 @@ function hubOpenList(ctx, btn) {
   var t = hubTopic(ctx), old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "만드는 중…"; btn.disabled = true; }
   var S = hubSrc(ctx); if (!S) { if (btn) { btn.innerHTML = old; btn.disabled = false; } return; }
   Promise.all([Promise.resolve(S.prep()).then(function () { return hubFonts(S.build); }), hubBrief(ctx).catch(function () { return null; })])
-    .then(function (r) { var list = r[0], B = r[1]; if (!list || !list.length) throw new Error("데이터가 아직 없어요"); if (B) { var bc = hubBriefCard(B, hubTitleOf(ctx), list.length + 1); if (bc) list.splice(list[0] && list[0].name === "표지" ? 1 : 0, 0, { name: "읽는요약", cv: bc }); } hubShow(t ? cPlain(t.t).replace(/^\S+\s/, "") : "카드", list, { ctx: ctx, brief: B, note: "위 검정 = 결론 먼저, 아래 종이 = 근거. 2번째 '읽는 요약' 장 = 숫자 + 요즘 이슈 + 전문가 의견을 한 장에. 나머지는 과거·오늘 숫자만.", thr: hubThreads(ctx, list, B) }); })
+    .then(function (r) { var list = r[0], B = r[1]; if (!list || !list.length) throw new Error("데이터가 아직 없어요"); /* v12.24 '읽는 요약' 장은 묶음에서 뺀다 — 표지 없는 묶음(데일리 9장 등)에선 첫 장이 돼 넘김을 막았다. 요약 내용은 업로드 글(캡션)과 작업대 패널에 그대로 */ hubShow(t ? cPlain(t.t).replace(/^\S+\s/, "") : "카드", list, { ctx: ctx, brief: B, note: "표지 = 질문 + 안에 든 숫자 미리보기, 다음 장부터 결론 숫자 → 근거. 요즘 이슈·전문가 의견은 아래 업로드 글에 들어가요.", thr: hubThreads(ctx, list, B) }); })
     .catch(function (e) { alert("만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 
@@ -794,7 +796,7 @@ function hubAiMulti(ctx, btn) {
   }).then(function (j) {
     if (!j || !j.ok) throw new Error((typeof OC_REASON !== "undefined" && OC_REASON[j && j.reason]) || (j && j.reason) || "AI 실패");
     var chk = hubAiCheck(j.out, lines);
-    return hubFonts(function () { var L = hubAiCards(j.out, chk, title); if (B) { var bc = hubBriefCard(B, title, L.length + 1); if (bc) L.splice(1, 0, { name: "읽는요약", cv: bc }); } return L; }).then(function (list) { hubShow(title + " · AI 여러 장", list, { ctx: ctx, brief: B, note: "AI(" + j.model + ")가 묶음 " + lines.length + "줄을 읽고 기획했어요. 숫자는 근거 줄에 있는 표기만 썼고, 근거와 다른 숫자 줄은 뺐어요.", log: chk.log, thr: hubAiThreads(j.out, title, list) }); });
+    return hubFonts(function () { var L = hubAiCards(j.out, chk, title); return L; /* v12.24 읽는 요약 장 제외 */ }).then(function (list) { hubShow(title + " · AI 여러 장", list, { ctx: ctx, brief: B, note: "AI(" + j.model + ")가 묶음 " + lines.length + "줄을 읽고 기획했어요. 숫자는 근거 줄에 있는 표기만 썼고, 근거와 다른 숫자 줄은 뺐어요.", log: chk.log, thr: hubAiThreads(j.out, title, list) }); });
   }).catch(function (e) { alert("AI 여러 장을 만들지 못했어요: " + e.message); }).then(function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 function hubNorm(s) { return String(s || "").replace(/[\s,]/g, "").replace(/[‐-―−]/g, "-"); }
@@ -882,8 +884,8 @@ function hubTplSpec(cat, src, mk) {
   var date = cDate(Date.now());
   if (/^hxNews/.test(src)) {
     var x = hubNewsItems()[+src.slice(6) - 1]; if (!x) return null;
-    var facts = x.syms.map(function (s) { var st = nbStat(s); return st ? [hubName(s), cPct(st.ret1, 1)] : null; }).filter(Boolean);
-    var R = hubR(); if (facts.length < 4 && R) R.indexRow.slice(0, 4 - facts.length).forEach(function (i) { facts.push([i.name, cPct(i.ret, 1)]); });
+    var facts = x.syms.map(function (s) { var st = nbStat(s); return st ? [hubName(s), cPct(st.ret1, 2)] : null; }).filter(Boolean);
+    var R = hubR(); if (facts.length < 4 && R) R.indexRow.slice(0, 4 - facts.length).forEach(function (i) { facts.push([i.name, cPct(i.ret, 2)]); });
     var paras = x.desc ? x.desc.split(/(?<=[다요]\.)\s+/).filter(Boolean).slice(0, 3) : ["기사 요약이 제공되지 않았어요 — 제목과 숫자를 같이 보세요."];
     return { meta: { title: "\"" + x.t + "\"", source: "네이버 뉴스 · " + (x.it.press || "") + " · " + date, source2: "숫자는 야후 파이낸스 종가(전일 등락)", catName: "오늘의 기사" }, spec: { tag: "오늘의 기사", person: { name: x.it.press || "기사", role: String(x.it.time || "").slice(0, 16), facts: facts.slice(0, 6) }, paras: paras } };
   }
@@ -992,7 +994,7 @@ function hubBrief(ctx) {
 function hubHead(ctx, nums, t) {
   var k = ctx.split(":")[0], a = ctx.split(":")[1], R = hubR();
   if (k === "hub" && a === "hi52") { var S = hubStocks(), hiN = S.filter(function (x) { return x.newHigh; }).length, loN = S.filter(function (x) { return x.newLow; }).length; return "오늘 52주 신고가 " + hiN + "개, 신저가 " + loN + "개 — " + (hiN > loN * 2 ? "시장 힘이 센 날이에요." : loN > hiN * 2 ? "약한 날이에요." : "힘이 팽팽한 날이에요."); }
-  if (k === "hub" && a === "sector" && R && R.themes && R.themes.length >= 2) { var th = R.themes; return "오늘은 " + th[0].name + "(" + cPct(th[0].ret, 1) + ") 쪽이 끌고 " + th[th.length - 1].name + "(" + cPct(th[th.length - 1].ret, 1) + ") 쪽이 처졌어요."; }
+  if (k === "hub" && a === "sector" && R && R.themes && R.themes.length >= 2) { var th = R.themes; return "오늘은 " + th[0].name + "(" + cPct(th[0].ret, 2) + ") 쪽이 끌고 " + th[th.length - 1].name + "(" + cPct(th[th.length - 1].ret, 2) + ") 쪽이 처졌어요."; }
   if (k === "issues" || k === "brief" || k === "onepage" || k === "channel") { var tp = R && R.temp; return tp ? "오늘 오른 종목이 " + Math.round(tp.upPct * 100) + "%" + (tp.upPct >= 0.65 ? " — 대부분 올랐어요." : tp.upPct <= 0.35 ? " — 대부분 내렸어요." : " — 반반이에요.") : (t ? hubStrip(t.d) : ""); }
   var N = nums.filter(function (f) { return f.label; });
   if (N.length >= 2) return nbJosa(N[0].label, "은/는") + " " + N[0].value + ", " + nbJosa(N[1].label, "은/는") + " " + N[1].value + "예요.";
