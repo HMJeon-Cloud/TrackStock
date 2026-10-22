@@ -43,7 +43,7 @@ function vsPrep() {
   VS.busy = Promise.all([vsKr(), vsUs()]).then(function (r) {
     VS.kr = r[0]; VS.us = r[1];
     var syms = VS.kr.concat(VS.us).concat(VS_COIN).map(function (p) { return p[0]; });
-    return Promise.all(syms.map(function (s) { return vsTo(getChartData(s, "5y").then(function (p) { VS.rows[s] = (p && p.rows || []).filter(function (x) { return x && x.c > 0; }); }).catch(function () {}), 15000); }));
+    return Promise.all(syms.map(function (s) { return vsTo(getChartData(s, "max").then(function (p) { VS.rows[s] = (p && p.rows || []).filter(function (x) { return x && x.c > 0; }); }).catch(function () {}), 15000); }));
   }).then(function () { VS.at = Date.now(); VS.busy = null; }, function (e) { VS.busy = null; throw e; });
   return VS.busy;
 }
@@ -52,15 +52,18 @@ function vsPrep() {
 function vsOff(sym) { return /\.K[SQ]$/.test(sym) ? 9 : /-USD$/.test(sym) ? 0 : -5; }
 function vsD(sym, ms) { return new Date(ms + vsOff(sym) * 3600e3).toISOString().slice(0, 10); }
 /* 올해: 작년 마지막 거래일 종가 → 마지막 종가 / 1년: 365일 전(그날 또는 그 전 마지막 거래일) 종가 → 마지막 종가 */
-function vsRet(sym, kind) {
+/* k: 몇 년 전 시점의 1년인가 (0 = 지금까지 1년, 1 = 1년 전 시점까지 1년(작년), 2 = 2년 전 …) */
+function vsRet(sym, kind, k) {
   var R = VS.rows[sym]; if (!R || R.length < 30) return null;
-  var last = R[R.length - 1], base = null, ld = vsD(sym, last.t);
+  var last = R[R.length - 1], base = null;
+  if (k) { var te = R[R.length - 1].t - k * 365.25 * 86400e3, e = null; for (var q = R.length - 1; q >= 0; q--) if (R[q].t <= te) { e = R[q]; break; } if (!e || te - e.t > 10 * 86400e3) return null; last = e; }
+  var ld = vsD(sym, last.t);
   if (kind === "ytd") { var y0 = ld.slice(0, 4) + "-01-01"; for (var i = R.length - 1; i >= 0; i--) if (vsD(sym, R[i].t) < y0) { base = R[i]; break; } }
-  else { var tg = last.t - 365 * 86400e3; for (var j = R.length - 1; j >= 0; j--) if (R[j].t <= tg) { base = R[j]; break; } if (base && tg - base.t > 10 * 86400e3) base = null; }
+  else { var tg = last.t - 365 * 86400e3, j0 = R.indexOf(last); for (var j = j0; j >= 0; j--) if (R[j].t <= tg) { base = R[j]; break; } if (base && tg - base.t > 10 * 86400e3) base = null; }
   if (!base || !(base.c > 0)) return null;
   return { r: last.c / base.c - 1, last: last, base: base, d: ld, bd: vsD(sym, base.t) };
 }
-function vsList(list, kind) { return list.map(function (p) { var x = vsRet(p[0], kind); return x ? { sym: p[0], name: vsKo(p[0], p[1]), r: x.r, d: x.d, bd: x.bd, a: x.base.c, b: x.last.c } : null; }).filter(Boolean); }
+function vsList(list, kind, k) { return list.map(function (p) { var x = vsRet(p[0], kind, k); return x ? { sym: p[0], name: vsKo(p[0], p[1]), r: x.r, d: x.d, bd: x.bd, a: x.base.c, b: x.last.c } : null; }).filter(Boolean); }
 function vsAvg(L) { return L.length ? L.reduce(function (a, x) { return a + x.r; }, 0) / L.length : null; }
 function vsPct(x) { return x == null ? "-" : (x > 0 ? "+" : "") + (Math.abs(x) >= 10 ? (x * 100).toFixed(0) : (x * 100).toFixed(1)) + "%"; }
 function vsCol(x) { return x > 0 ? TPL_C.red : x < 0 ? TPL_C.blue : TPL_C.ink2; }
@@ -112,19 +115,27 @@ function vsAxis(all) {
 function vsWin(Ms) { var s = Ms.slice().sort(function (a, b) { return (b.avg || -9) - (a.avg || -9); }); return s[0].label + (s.length > 2 ? " 1위 · " + s[s.length - 1].label + " 꼴찌" : " 승 (평균 " + vsPct(s[0].avg - s[1].avg).replace("+", "") + "p 차이)"); }
 
 /* 카드 하나 그리기 */
-function vsCard(kind, three) {
-  if (!VS.kr) return null;
-  var n = three ? 5 : 10, KL = kind === "ytd" ? "올해" : "1년";
-  var Ms = [{ key: "kr", label: "국장", flag: "kr", list: vsList(VS.kr.slice(0, n), kind) }, { key: "us", label: "미장", flag: "us", list: vsList(VS.us.slice(0, n), kind) }];
-  if (three) Ms.push({ key: "coin", label: "코인", list: vsList(VS_COIN, kind) });
+function vsKName(k) { return !k ? "최근" : k === 1 ? "작년" : k + "년 전"; }
+/* 이 k(몇 년 전)의 1년을 그릴 수 있나 — 시장마다 목록의 70% 이상(최소 3개) 값이 있어야 */
+function vsCan(three, kind, k) {
+  if (!VS.kr) return false; var n = three ? 5 : 10, L = [VS.kr.slice(0, n), VS.us.slice(0, n)]; if (three) L.push(VS_COIN);
+  return L.every(function (l) { var got = vsList(l, kind, k).length; return got >= Math.max(3, Math.ceil(l.length * 0.7)); });
+}
+function vsYears(three) { var out = []; for (var k = 0; k <= 15; k++) { if (!vsCan(three, "y1", k)) break; out.push(k); } return out; }
+function vsCard(kind, three, k) {
+  if (!VS.kr) return null; k = k || 0;
+  var n = three ? 5 : 10, KL = kind === "ytd" ? "올해" : k ? vsKName(k) + " 1년" : "최근 1년";
+  var Ms = [{ key: "kr", label: "국장", flag: "kr", list: vsList(VS.kr.slice(0, n), kind, k), all: n }, { key: "us", label: "미장", flag: "us", list: vsList(VS.us.slice(0, n), kind, k), all: n }];
+  if (three) Ms.push({ key: "coin", label: "코인", list: vsList(VS_COIN, kind, k), all: VS_COIN.length });
   Ms.forEach(function (M) { M.avg = vsAvg(M.list); });
   if (Ms.some(function (M) { return M.list.length < Math.min(3, n); })) return null;
+  var miss = Ms.reduce(function (a, M) { return a + (M.all - M.list.length); }, 0);
   var dk = Ms[0].list[0], du = Ms[1].list[0];
-  var range = kind === "ytd" ? "작년 마지막 종가 → " : "1년 전 종가 → ";
-  var title = (three ? "국장 vs 미장 vs 코인" : "국장 vs 미장") + "\n" + (kind === "ytd" ? "올해 성적표" : "1년 성적표");
-  var sub = (three ? "시총 상위 5 + 대표 코인 5" : "시가총액 상위 10") + " · " + range + "국내 " + vsMd(dk.d) + " · 미국 " + vsMd(du.d) + " 종가";
+  var range = kind === "ytd" ? "작년 마지막 종가 → " : k ? vsYmd(du.bd) + " → " + vsYmd(du.d) + " · " : "1년 전 종가 → ";
+  var title = (three ? "국장 vs 미장 vs 코인" : "국장 vs 미장") + "\n" + (kind === "ytd" ? "올해 성적표" : k ? vsKName(k) + " 1년 성적표" : "1년 성적표");
+  var sub = (three ? "시총 상위 5 + 대표 코인 5" : "시가총액 상위 10") + " · " + range + (k ? "지금 순위 기준" : "국내 " + vsMd(dk.d) + " · 미국 " + vsMd(du.d) + " 종가");
   var src = "야후 파이낸스 종가 · 순위: 국내 " + (VS.src.kr || "-") + " · 미국 " + (VS.src.us || "-");
-  var c = tplNew({ cat: "compare", catName: "국장 vs 미장", title: title, sub: sub, source: src });
+  var c = tplNew({ cat: "compare", catName: "국장 vs 미장" + (k ? " · " + vsKName(k) : ""), title: title, sub: sub, source: src });
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, all = []; Ms.forEach(function (M) { all = all.concat(M.list); });
   var ax = vsAxis(all), bandH = 66, noteH = 30, yEnd = TPL.H - TPL.FOOT - 22 - bandH - noteH, y = c.y;
   if (true) {   // 시장마다 한 열 (2열 · 3열)
@@ -136,20 +147,24 @@ function vsCard(kind, three) {
     Ms.forEach(function (M, k) { var yy = vsHead(g, P, y + k * secH, W, M, M.avg) + 6; M.list.forEach(function (it, i) { vsRow(g, P, yy + i * rh3, W, rh3, i, it, ax); }); });
     y += secH * 3;
   }
-  cText(g, cFit(g, "주가(종가) 기준 · 배당 미포함 · 각자 통화 기준(환율 미반영) · 평균은 단순 평균" + (ax.pos < Math.max.apply(null, all.map(function (x) { return x.r; })) ? " · 막대 끝이 넘치는 값은 축 상한" : ""), W, 15, 600), P, TPL.H - TPL.FOOT - 22 - bandH - 10, 15, 600, TPL_C.sub);
+  cText(g, cFit(g, "주가(종가) 기준 · 배당 미포함 · 각자 통화 기준(환율 미반영) · 평균은 단순 평균" + (k ? " · 종목은 지금 시총 순위(그때 순위와 다를 수 있음)" : "") + (miss ? " · " + miss + "개는 그때 상장 전이라 제외" : "") + (ax.pos < Math.max.apply(null, all.map(function (x) { return x.r; })) ? " · 막대 끝이 넘치는 값은 축 상한" : ""), W, 15, 600), P, TPL.H - TPL.FOOT - 22 - bandH - 10, 15, 600, TPL_C.sub);
   tplBand(g, P, TPL.H - TPL.FOOT - 16 - bandH, W, bandH - 6, KL + " 평균 · " + Ms.map(function (M) { return M.label + " " + vsPct(M.avg); }).join("  vs  ") + "  →  " + vsWin(Ms), 26);
   return tplFoot(c);
 }
-function vsDeck(three) {
-  var out = [], a = vsCard("ytd", three), b = vsCard("y1", three);
-  if (a) out.push({ name: (three ? "국장미장코인" : "국장미장") + "_올해", cv: a });
-  if (b) out.push({ name: (three ? "국장미장코인" : "국장미장") + "_1년", cv: b });
+/* 올해 = 한 장 · 1년 = 지금 + 작년 + 2년 전 … (데이터가 되는 해까지) */
+function vsDeck(three, kind) {
+  var base = three ? "국장미장코인" : "국장미장", out = [];
+  if (kind === "ytd") { var a = vsCard("ytd", three, 0); if (a) out.push({ name: base + "_올해", cv: a }); return out; }
+  vsYears(three).forEach(function (k) { var cv = vsCard("y1", three, k); if (cv) out.push({ name: base + "_1년_" + vsKName(k), cv: cv }); });
   return out;
 }
 /* 작업대 주제로 등록 (새 서버 함수 없음) */
 (function () {
   if (typeof HUB_NEW === "undefined") return;
-  HUB_NEW.push({ id: "vs2", t: "🆚 국장 vs 미장 — 시총 10 (올해 · 1년)", d: "국내·미국 시가총액 상위 10종목의 연초 대비 · 1년 전 대비 등락 비교 2장", g: "비교", need: "vs", fn: function () { return vsDeck(false); } });
-  HUB_NEW.push({ id: "vs3", t: "🆚 국장 vs 미장 vs 코인 — 5종목 (올해 · 1년)", d: "국내·미국 시총 상위 5 + 비트코인·이더리움·리플·솔라나·도지코인 비교 2장", g: "비교", need: "vs", fn: function () { return vsDeck(true); } });
+  /* v12.35 올해 · 1년을 따로. 1년은 '여러 장' = 최근 1년 + 작년 + 2년 전 … / '한 장' = 최근 1년 */
+  HUB_NEW.push({ id: "vs2y", t: "🆚 국장 vs 미장 — 시총 10 (올해)", d: "국내·미국 시가총액 상위 10종목 · 작년 마지막 종가 → 지금", g: "비교", need: "vs", fn: function () { return vsDeck(false, "ytd"); }, one: function () { return vsCard("ytd", false, 0); } });
+  HUB_NEW.push({ id: "vs2r", t: "🆚 국장 vs 미장 — 시총 10 (1년)", d: "한 장 = 최근 1년 · 여러 장 = 최근 1년 + 작년 + 2년 전 … (데이터가 되는 해까지)", g: "비교", need: "vs", fn: function () { return vsDeck(false, "y1"); }, one: function () { return vsCard("y1", false, 0); } });
+  HUB_NEW.push({ id: "vs3y", t: "🆚 국장 vs 미장 vs 코인 — 5종목 (올해)", d: "시총 상위 5 + 비트코인·이더리움·리플·솔라나·도지코인 · 작년 마지막 종가 → 지금", g: "비교", need: "vs", fn: function () { return vsDeck(true, "ytd"); }, one: function () { return vsCard("ytd", true, 0); } });
+  HUB_NEW.push({ id: "vs3r", t: "🆚 국장 vs 미장 vs 코인 — 5종목 (1년)", d: "한 장 = 최근 1년 · 여러 장 = 최근 1년 + 작년 + 2년 전 … (데이터가 되는 해까지)", g: "비교", need: "vs", fn: function () { return vsDeck(true, "y1"); }, one: function () { return vsCard("y1", true, 0); } });
   if (typeof hubPrep === "function") { var hp0 = hubPrep; hubPrep = function (need) { return need === "vs" ? Promise.all([typeof cLogoReady === "function" ? cLogoReady() : null, vsPrep()]) : hp0.apply(this, arguments); }; }
 })();

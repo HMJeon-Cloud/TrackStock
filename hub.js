@@ -734,7 +734,8 @@ function hubOneMake(ctx) {
   function one(cv) { return [{ name: "한장요약", cv: cv }]; }
   function viaSpec(prep, draw) { return Promise.resolve(prep()).then(function () { HUB.lastSpec = null; CARD_TXT = ""; var l = draw() || []; if (!HUB.lastSpec || !l.length) throw new Error("데이터가 아직 없어요"); var f = hubSpecFacts(HUB.lastSpec); return function () { return hubOneCard({ title: title, sub: f.head2 ? "" : f.head, head2: f.head2, facts: f.facts, src: f.src, n: l.length }); }; }); }
   if (kind === "hub" && arg === "daily") return hubPrep("daily").then(function () { return function () { var R = hubR(); return R ? dlCard1(R) : null; }; });
-  if (kind === "hub") { var x = HUB_NEW.filter(function (h) { return h.id === arg; })[0]; return viaSpec(function () { return hubPrep(x.need); }, x.fn); }
+  if (kind === "hub") { var x = HUB_NEW.filter(function (h) { return h.id === arg; })[0]; if (x && x.one) return Promise.resolve(hubPrep(x.need)).then(function () { return function () { var cv = x.one(); if (!cv) throw new Error("데이터가 아직 없어요"); return cv; }; });   /* v12.35 자체 '한 장'이 있는 주제 */
+    return viaSpec(function () { return hubPrep(x.need); }, x.fn); }
   if (kind === "reel") return (typeof nbLoad === "function" && REEL_DATA[arg] && arg !== "loss" ? nbLoad(REEL_HIST) : Promise.resolve()).then(function () {
     if (TPL_SOURCES.lines.some(function (z) { return z.id === "hxReel_" + arg; })) return function () { return tplBuild("lines", "hxReel_" + arg); };
     var r = reelGet(arg); if (!r) throw new Error("데이터가 아직 없어요");
