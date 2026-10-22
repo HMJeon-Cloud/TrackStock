@@ -271,7 +271,7 @@ function thrPart(cls, label, max, hint) {
   return '<div class="thrPart"><div class="thrLbl"><b>' + label + '</b>' + (hint ? '<em>' + hint + '</em>' : '') + '<span class="thrCnt" data-max="' + max + '"></span><button class="chip thrCopy">복사</button></div><textarea class="thrText ' + cls + '" spellcheck="false"></textarea></div>';
 }
 function thrPanelHtml(topic) {
-  return '<div class="thrPanel"><div class="thrHead"><b>업로드 글</b><small>스레드 토픽: <b>' + (topic || "주식") + '</b> · 본문 올린 뒤 답글 1·2를 이어서 달기</small></div>' +
+  return '<div class="thrPanel" data-topic="' + (topic || "주식") + '"><div class="thrHead"><b>업로드 글</b><small>스레드 토픽: <b>' + (topic || "주식") + '</b> · 본문 올린 뒤 답글 1·2를 이어서 달기</small><button class="chip thrAi" title="지금 글(우리 숫자)을 바탕으로 Claude가 다시 쓰고, 필요하면 최근 사실을 찾아 보완해요 · 누를 때만 비용이 들어요">✨ AI 문구 (Claude)</button></div><div class="thrAiOut briefDim"></div>' +
     '<div class="pills thrTabs"></div>' +
     '<div class="thrGrid"><div class="thrCol">' + thrPart("thrIg", "인스타 캡션", 2200) + '</div>' +
     '<div class="thrCol">' + thrPart("thrTh", "스레드 본문", 500, "첫 줄이 피드에 보임") + thrPart("thrR1 sm", "답글 1", 500, "반대 숫자·한계") + thrPart("thrR2 sm", "답글 2", 500, "질문 하나") + '</div></div></div>';
@@ -286,6 +286,32 @@ function thrBind(box, variants) {
   Array.prototype.forEach.call(tabs.children, function (b, i) { b.onclick = function () { show(i); }; });
   parts.forEach(function (pt) { var ta = pt.querySelector("textarea"); ta.oninput = upd; pt.querySelector(".thrCopy").onclick = function () { chCopy(ta.value, this); }; });
   show(thrSeed() % variants.length);
+  /* v12.38 ✨ AI 문구: 누를 때만 Claude API로 다시 쓴다(자동 생성 아님). 결과는 탭으로 앞에 붙이고, 우리 데이터에 없는 숫자는 표시만 */
+  var ab = p.querySelector(".thrAi"), ao = p.querySelector(".thrAiOut");
+  if (ab) ab.onclick = function () {
+    var base = variants.filter(function (v) { return !/^✨/.test(v.label); })[0] || variants[0];
+    var data = ["[인스타 규칙 글]", base.ig, "[스레드 본문]", base.th, "[답글1]", base.r1 || "", "[답글2]", base.r2 || ""].join("\n");
+    var ttl = (p.closest(".modalBox") && (p.closest(".modalBox").querySelector("h3, .modalTitle, .mTitle") || {}).textContent) || String(base.th || "").split("\n")[0];
+    var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
+    var old = ab.innerHTML; ab.disabled = true; ab.textContent = "쓰는 중… (10~40초)"; ao.textContent = "";
+    fetch("/api/channel?op=copy", { method: "POST", headers: { "content-type": "application/json", "x-owner": tok }, body: JSON.stringify({ title: ttl, topic: p.getAttribute("data-topic") || "", data: data, lines: typeof CARD_TXT === "string" ? CARD_TXT.slice(0, 2500) : "" }) })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        ab.disabled = false; ab.innerHTML = old;
+        if (!j || !j.ok) { ao.innerHTML = '<span style="color:#b45309">AI 문구 실패: ' + escapeHtml((j && (j.msg || j.reason)) || "응답 없음") + '</span>'; return; }
+        variants = j.variants.concat(variants.filter(function (v) { return !/^✨/.test(v.label); }));
+        tabs.innerHTML = variants.map(function (v) { return '<button>' + escapeHtml(v.label) + '</button>'; }).join("");
+        Array.prototype.forEach.call(tabs.children, function (b, i) { b.onclick = function () { show(i); }; });
+        show(0);
+        var nums = function (t) { return (String(t).match(/[+\-−]?\d[\d,]*(?:\.\d+)?%/g) || []).map(function (x) { return x.replace(/[−]/g, "-").replace(/,/g, ""); }); };
+        var have = {}; nums(data + "\n" + (typeof CARD_TXT === "string" ? CARD_TXT : "") + "\n" + (j.added || []).join("\n")).forEach(function (x) { have[x.replace(/^\+/, "")] = 1; });
+        var odd = []; j.variants.forEach(function (v) { nums([v.ig, v.th, v.r1, v.r2].join("\n")).forEach(function (x) { var k = x.replace(/^\+/, ""); if (!have[k] && odd.indexOf(x) < 0) odd.push(x); }); });
+        ao.innerHTML = '<b>✨ Claude 결과</b> · ' + escapeHtml(j.model || "") + ' · 오늘 ' + j.used + '/' + j.max + '회' + (j.searches && j.searches.length ? ' · 웹 검색 ' + j.searches.length + '회' : ' · 웹 검색 없음') +
+          (j.added && j.added.length ? '<div>보완한 사실: ' + j.added.map(escapeHtml).join(" / ") + '</div>' : '') +
+          (j.sources && j.sources.length ? '<div>출처: ' + j.sources.map(function (s) { return '<a href="' + escapeHtml(s.u) + '" target="_blank" rel="noopener">' + escapeHtml(s.t || s.u) + '</a>'; }).join(" · ") + '</div>' : '') +
+          (odd.length ? '<div style="color:#b45309">⚠️ 우리 데이터에서 못 찾은 숫자: ' + escapeHtml(odd.join(", ")) + ' — 올리기 전에 확인하세요</div>' : '<div style="color:var(--good)">✓ 글 속 % 숫자가 모두 우리 데이터·보완 사실과 일치</div>') +
+          (j.note ? '<div>편집 메모: ' + escapeHtml(j.note) + '</div>' : '');
+      }).catch(function (e) { ab.disabled = false; ab.innerHTML = old; ao.textContent = "AI 문구 실패: " + e.message; });
+  };
 }
 /* 변형이 하나도 안 나오면 기존 캡션을 이모지만 지워 기본형으로 쓴다 (스레드는 줄 단위로 500자 안에) */
 function thrOr(v, cap) {
