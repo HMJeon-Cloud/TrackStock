@@ -8,6 +8,7 @@
    수익률 = 종가(주가) 기준 · 배당 미포함 · 각 통화 기준(환율 미반영)
    ============================================================ */
 var VS = { at: 0, kr: null, us: null, src: {}, rows: {}, busy: null };
+var VS_COIN_MORE = [["BNB-USD", "BNB"], ["ADA-USD", "에이다"], ["TRX-USD", "트론"], ["LTC-USD", "라이트코인"], ["BCH-USD", "비트코인캐시"]];   // 대표 5개 중 그해 값이 없으면 이 순서로 채움
 var VS_COIN = [["BTC-USD", "비트코인"], ["ETH-USD", "이더리움"], ["XRP-USD", "리플"], ["SOL-USD", "솔라나"], ["DOGE-USD", "도지코인"]];
 var VS_KR_BASE = [["005930.KS", "삼성전자"], ["000660.KS", "SK하이닉스"], ["373220.KS", "LG에너지솔루션"], ["207940.KS", "삼성바이오로직스"], ["005380.KS", "현대차"], ["012450.KS", "한화에어로스페이스"], ["105560.KS", "KB금융"], ["000270.KS", "기아"], ["068270.KS", "셀트리온"], ["034020.KS", "두산에너빌리티"]];
 var VS_US_POOL = [["NVDA", "엔비디아"], ["MSFT", "마이크로소프트"], ["AAPL", "애플"], ["GOOGL", "알파벳"], ["AMZN", "아마존"], ["META", "메타"], ["AVGO", "브로드컴"], ["TSLA", "테슬라"], ["BRK-B", "버크셔 해서웨이"], ["LLY", "일라이 릴리"], ["JPM", "JP모건"], ["WMT", "월마트"], ["V", "비자"], ["ORCL", "오라클"], ["MA", "마스터카드"], ["XOM", "엑슨모빌"], ["NFLX", "넷플릭스"], ["COST", "코스트코"], ["MU", "마이크론"], ["AMD", "AMD"], ["PLTR", "팔란티어"], ["UNH", "유나이티드헬스"], ["JNJ", "존슨앤드존슨"]];
@@ -19,7 +20,7 @@ function vsKo(sym, fb) { var n = typeof BRIEF_KO !== "undefined" && BRIEF_KO[sym
 function vsKr() {
   var ld = typeof dlUniLoad === "function" ? dlUniLoad("kr") : Promise.resolve(null);
   return vsTo(ld, 8000).then(function (U) {
-    var L = U && U.rows ? U.rows.filter(function (r) { return r && r.s && r.n && !/우[BC]?$|우\(전환\)$|KODEX|TIGER|ETF/.test(r.n) && /0\.K[SQ]$/.test(r.s); })   /* 보통주만(코드 끝 0) */.slice(0, 10).map(function (r) { return [r.s, r.n]; }) : [];
+    var L = U && U.rows ? U.rows.filter(function (r) { return r && r.s && r.n && !/우[BC]?$|우\(전환\)$|KODEX|TIGER|ETF/.test(r.n) && /0\.K[SQ]$/.test(r.s); })   /* 보통주만(코드 끝 0) */.slice(0, 20).map(function (r) { return [r.s, r.n]; }) : [];
     if (L.length >= 10) { VS.src.kr = "네이버 시가총액 순"; return L; }
     VS.src.kr = "기준 목록(시총 순위를 못 받음)"; return VS_KR_BASE.slice();
   });
@@ -33,8 +34,8 @@ function vsUs() {
     }).catch(function () { return { p: p, v: null }; }), 9000).then(function (x) { return x || { p: p, v: null }; });
   })).then(function (A) {
     var got = A.filter(function (x) { return x.v; });
-    if (got.length >= 15) { VS.src.us = "네이버 시가총액 순(후보 " + VS_US_POOL.length + "개 중)"; return got.sort(function (a, b) { return b.v - a.v; }).slice(0, 10).map(function (x) { return x.p; }); }
-    VS.src.us = "기준 목록(시총을 못 받음)"; return VS_US_POOL.slice(0, 10);
+    if (got.length >= 15) { VS.src.us = "네이버 시가총액 순(후보 " + VS_US_POOL.length + "개 중)"; return got.sort(function (a, b) { return b.v - a.v; }).map(function (x) { return x.p; }).concat(A.filter(function (x) { return !x.v; }).map(function (x) { return x.p; })); }
+    VS.src.us = "기준 목록(시총을 못 받음)"; return VS_US_POOL.slice();
   });
 }
 function vsPrep() {
@@ -42,7 +43,7 @@ function vsPrep() {
   if (VS.kr && Date.now() - VS.at < 20 * 60e3) return Promise.resolve();
   VS.busy = Promise.all([vsKr(), vsUs()]).then(function (r) {
     VS.kr = r[0]; VS.us = r[1];
-    var syms = VS.kr.concat(VS.us).concat(VS_COIN).map(function (p) { return p[0]; });
+    var syms = VS.kr.concat(VS.us).concat(VS_COIN).concat(VS_COIN_MORE).map(function (p) { return p[0]; });
     return Promise.all(syms.map(function (s) { return vsTo(getChartData(s, "max").then(function (p) { VS.rows[s] = (p && p.rows || []).filter(function (x) { return x && x.c > 0; }); }).catch(function () {}), 15000); }));
   }).then(function () { VS.at = Date.now(); VS.busy = null; }, function (e) { VS.busy = null; throw e; });
   return VS.busy;
@@ -69,7 +70,8 @@ function vsRet(sym, kind, k) {
   if (!base || !(base.c > 0)) return null;
   return { r: last.c / base.c - 1, last: last, base: base, d: ld, bd: vsD(sym, base.t) };
 }
-function vsList(list, kind, k) { return list.map(function (p) { var x = vsRet(p[0], kind, k); return x ? { sym: p[0], name: vsKo(p[0], p[1]), r: x.r, d: x.d, bd: x.bd, a: x.base.c, b: x.last.c } : null; }).filter(Boolean); }
+/* 목록 순서대로 그 기간 값이 있는 종목을 n개까지 — 앞 순위에 값이 없으면(상장 전 등) 다음 순위로 채운다 (rank = 지금 순위) */
+function vsList(list, kind, k, n) { var out = []; for (var i = 0; i < list.length && out.length < (n || list.length); i++) { var p = list[i], x = vsRet(p[0], kind, k); if (x) out.push({ sym: p[0], name: vsKo(p[0], p[1]), r: x.r, d: x.d, bd: x.bd, a: x.base.c, b: x.last.c, rank: i + 1 }); } return out; }
 function vsAvg(L) { return L.length ? L.reduce(function (a, x) { return a + x.r; }, 0) / L.length : null; }
 function vsPct(x) { return x == null ? "-" : (x > 0 ? "+" : "") + (Math.abs(x) >= 10 ? (x * 100).toFixed(0) : (x * 100).toFixed(1)) + "%"; }
 function vsCol(x) { return x > 0 ? TPL_C.red : x < 0 ? TPL_C.blue : TPL_C.ink2; }
@@ -90,7 +92,7 @@ function vsHead(g, x, y, w, M, avg) {
 /* 한 줄: 순위 · 로고 · 이름 ······ 등락 / 아래 막대(공통 축) */
 function vsRow(g, x, y, w, h, i, it, ax) {
   var lz = Math.min(44, h - 22), cy = y + Math.min(30, h * 0.42);
-  cText(g, String(i + 1), x + 12, cy + 8, 20, 900, TPL_C.sub, "center");
+  var rk = it.rank || i + 1, filled = it.rank && it.rank !== i + 1 && it.rank > (ax.n || 99); cText(g, String(rk), x + 12, cy + 8, rk >= 10 ? 17 : 20, 900, filled ? TPL_C.gold2 : TPL_C.sub, "center");
   if (typeof cMono === "function") cMono(g, x + 28, cy - lz / 2, lz, it.sym, it.name);
   var nx = x + 28 + lz + 12, pt = vsPct(it.r), tall = h >= 110 && w < 400, ps = tall ? 38 : 28; while (ps > 20 && cW(g, pt, ps, 900) > (tall ? w - 40 : 140)) ps -= 2;
   var pw = cW(g, pt, ps, 900);
@@ -124,19 +126,19 @@ function vsWin(Ms) { var s = Ms.slice().sort(function (a, b) { return (b.avg || 
 function vsKName(k) { return !k ? "최근" : k === 1 ? "작년" : k + "년 전"; }
 /* 이 k(몇 년 전)의 1년을 그릴 수 있나 — 시장마다 목록의 70% 이상(최소 3개) 값이 있어야 */
 function vsCan(three, kind, k) {
-  if (!VS.kr) return false; var n = three ? 5 : 10, L = [VS.kr.slice(0, n), VS.us.slice(0, n)]; if (three) L.push(VS_COIN);
-  return L.every(function (l) { var got = vsList(l, kind, k).length; return got >= Math.max(3, Math.ceil(l.length * 0.7)); });
+  if (!VS.kr) return false; var n = three ? 5 : 10, L = [VS.kr, VS.us]; if (three) L.push(VS_COIN.concat(VS_COIN_MORE));
+  return L.every(function (l) { var got = vsList(l, kind, k, n).length; return got >= Math.max(3, Math.ceil(n * 0.7)); });
 }
 function vsYears(three, kind) { var out = []; for (var k = 0; k <= 15; k++) { if (!vsCan(three, kind || "y1", k)) break; out.push(k); } return out; }
 function vsYearOf(k) { var d = VS.us && VS.rows[VS.us[0][0]]; var y = d && d.length ? +vsD(VS.us[0][0], d[d.length - 1].t).slice(0, 4) : new Date().getUTCFullYear(); return y - (k || 0); }
 function vsCard(kind, three, k) {
   if (!VS.kr) return null; k = k || 0;
   var n = three ? 5 : 10, CY = kind === "cy" ? vsYearOf(k) : null, KL = kind === "ytd" ? "올해" : CY ? (k ? CY + "년" : "올해(" + CY + ")") : k ? vsKName(k) + " 1년" : "최근 1년";
-  var Ms = [{ key: "kr", label: "국장", flag: "kr", list: vsList(VS.kr.slice(0, n), kind, k), all: n }, { key: "us", label: "미장", flag: "us", list: vsList(VS.us.slice(0, n), kind, k), all: n }];
-  if (three) Ms.push({ key: "coin", label: "코인", list: vsList(VS_COIN, kind, k), all: VS_COIN.length });
+  var Ms = [{ key: "kr", label: "국장", flag: "kr", list: vsList(VS.kr, kind, k, n), all: n }, { key: "us", label: "미장", flag: "us", list: vsList(VS.us, kind, k, n), all: n }];
+  if (three) Ms.push({ key: "coin", label: "코인", list: vsList(VS_COIN.concat(VS_COIN_MORE), kind, k, 5), all: 5 });
   Ms.forEach(function (M) { M.avg = vsAvg(M.list); });
   if (Ms.some(function (M) { return M.list.length < Math.min(3, n); })) return null;
-  var miss = Ms.reduce(function (a, M) { return a + (M.all - M.list.length); }, 0);
+  var miss = Ms.reduce(function (a, M) { return a + (M.all - M.list.length); }, 0), fill = Ms.reduce(function (a, M) { return a + M.list.filter(function (it) { return it.rank > M.all; }).length; }, 0);
   var dk = Ms[0].list[0], du = Ms[1].list[0];
   var range = CY ? (CY - 1) + "년 마지막 종가 → " + (k ? CY + "년 마지막 종가" : "지금") + " · " : kind === "ytd" ? "작년 마지막 종가 → " : k ? vsYmd(du.bd) + " → " + vsYmd(du.d) + " · " : "1년 전 종가 → ";
   var title = (three ? "국장 vs 미장 vs 코인" : "국장 vs 미장") + "\n" + (CY ? (k ? CY + "년 성적표" : CY + "년(올해) 성적표") : kind === "ytd" ? "올해 성적표" : k ? vsKName(k) + " 1년 성적표" : "1년 성적표");
@@ -144,7 +146,7 @@ function vsCard(kind, three, k) {
   var src = "야후 파이낸스 종가 · 순위: 국내 " + (VS.src.kr || "-") + " · 미국 " + (VS.src.us || "-");
   var c = tplNew({ cat: "compare", catName: "국장 vs 미장" + (CY ? " · " + CY + "년" : k ? " · " + vsKName(k) : ""), title: title, sub: sub, source: src });
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, all = []; Ms.forEach(function (M) { all = all.concat(M.list); });
-  var ax = vsAxis(all), bandH = 66, noteH = 30, yEnd = TPL.H - TPL.FOOT - 22 - bandH - noteH, y = c.y;
+  var ax = vsAxis(all); ax.n = n; var bandH = 66, noteH = 30, yEnd = TPL.H - TPL.FOOT - 22 - bandH - noteH, y = c.y;
   if (true) {   // 시장마다 한 열 (2열 · 3열)
     var cols = Ms.length, gap = cols > 2 ? 16 : 22, cw = (W - gap * (cols - 1)) / cols, rh = Math.min(cols > 2 ? 200 : 150, (yEnd - y - 62) / n);
     Ms.forEach(function (M, k) { var x = P + k * (cw + gap), yy = vsHead(g, x, y, cw, M, M.avg) + 8; M.list.forEach(function (it, i) { vsRow(g, x, yy + i * rh, cw, rh, i, it, ax); }); });
@@ -154,7 +156,7 @@ function vsCard(kind, three, k) {
     Ms.forEach(function (M, k) { var yy = vsHead(g, P, y + k * secH, W, M, M.avg) + 6; M.list.forEach(function (it, i) { vsRow(g, P, yy + i * rh3, W, rh3, i, it, ax); }); });
     y += secH * 3;
   }
-  cText(g, cFit(g, "주가(종가) 기준 · 배당 미포함 · 각자 통화 기준(환율 미반영) · 평균은 단순 평균" + (k ? " · 종목은 지금 시총 순위(그때 순위와 다를 수 있음)" : "") + (miss ? " · " + miss + "개는 그때 상장 전이라 제외" : "") + (ax.pos < Math.max.apply(null, all.map(function (x) { return x.r; })) ? " · 막대 끝이 넘치는 값은 축 상한" : ""), W, 15, 600), P, TPL.H - TPL.FOOT - 22 - bandH - 10, 15, 600, TPL_C.sub);
+  cText(g, cFit(g, "종가 기준 · 배당 미포함 · 각 통화(환율 미반영) · 단순 평균" + (k ? " · 지금 시총 순위 기준" : "") + (fill ? " · 금색 순위 = 그해 값 없는 종목 대신 다음 순위" : "") + (miss ? " · " + miss + "자리는 채울 종목이 없어 비움" : "") + (ax.pos < Math.max.apply(null, all.map(function (x) { return x.r; })) ? " · 막대는 축 상한까지" : ""), W, 15, 600), P, TPL.H - TPL.FOOT - 22 - bandH - 10, 15, 600, TPL_C.sub);
   tplBand(g, P, TPL.H - TPL.FOOT - 16 - bandH, W, bandH - 6, KL + " 평균 · " + Ms.map(function (M) { return M.label + " " + vsPct(M.avg); }).join("  vs  ") + "  →  " + vsWin(Ms), 26);
   return tplFoot(c);
 }
