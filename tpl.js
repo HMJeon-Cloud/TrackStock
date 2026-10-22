@@ -158,7 +158,7 @@ function tplMarket2(c, s) {
   });
   y += nMid * mh + Math.round(24 * K);
   // ③ 시총 상위 8 — 4 × 2 타일
-  cText(g, "시가총액 상위 8", P, y + 24, 21, 800, TPL_C.sub); y += 36;
+  cText(g, "시가총액 상위 8", P, y + 24, 21, 800, TPL_C.sub); cText(g, "로고는 각 사의 상표", P + W, y + 24, 15, 600, TPL_C.sub, "right"); y += 36;
   var cols = 4, tg = 12, tw = (W - tg * (cols - 1)) / cols, th = Math.round(118 * K) - tg;
   cp.forEach(function (k, i) {
     var x = P + (i % cols) * (tw + tg), yy = y + Math.floor(i / cols) * (th + tg), col = tplCol(k.pct), bz = Math.min(60, th * 0.5);
@@ -462,7 +462,7 @@ function tplSpec(cat, srcId, mkSel) {
   return null;
 }
 function tplBuild(cat, srcId, mk) { var x = tplSpec(cat, srcId, mk); if (!x) return null; return tplCard(cat, x.meta, x.spec); }
-function tplPrep(cat, mk) { var R = tplR(mk); if (!R) return Promise.resolve(); return cat === "quote" && typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : cat === "table" && typeof pkEnsure === "function" ? pkEnsure(R).catch(function () { return null; }) : Promise.resolve(); }
+function tplPrep(cat, mk) { var R = tplR(mk); if (!R) return Promise.resolve(); var lp = typeof cLogoReady === "function" ? cLogoReady() : null; if (cat === "market" && lp) return lp; return cat === "quote" && typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : cat === "table" && typeof pkEnsure === "function" ? pkEnsure(R).catch(function () { return null; }) : Promise.resolve(); }
 
 /* ============================================================
    AI 기획(plan) → 양식 (같은 틀에 AI가 고른 내용만) — plan: {kicker,title,subtitle,layout,hero,items[{label,value,sub}],cta}

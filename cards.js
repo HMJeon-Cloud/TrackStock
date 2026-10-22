@@ -919,7 +919,20 @@ function cCap8(mk) {
 function cEtfPop(mk) { return (ETF_POP[mk] || []).map(function (p) { var st = cStatAny(p[0]); return st ? { sym: p[0], name: p[1], ret: st.ret1, last: st.last } : null; }).filter(Boolean); }
 /* 약자 배지: 미국 = 티커, 국내 = 영문 접두(SK·LG·KB) 또는 이름 첫 글자, 코인 = 티커 */
 function cMonoTxt(sym, name) { if (/-USD$/.test(sym)) return sym.replace(/-USD$/, "").slice(0, 4); if (!/\.K[SQ]$/.test(sym)) return sym.replace(/-.*/, "").slice(0, 4); var m = String(name).match(/^[A-Z&]{2,3}/); return m ? m[0] : String(name).slice(0, 1); }
+/* v12.30 회사 로고: icons/logo/<티커 또는 6자리 코드>.png (원형·바깥 투명). 있으면 로고, 없으면 약자 배지.
+   카드는 그림판에 바로 그리므로 미리 불러 둔다(같은 사이트 파일이라 저장이 막히지 않음). 새 로고는 폴더에 넣고 아래 목록에 이름만 추가 */
+var LOGO_HAVE = ["000270", "000660", "000810", "005380", "005930", "005935", "009150", "010120", "012330", "012450", "028260", "032830", "034020", "034730", "035420", "055550", "066570", "068270", "086790", "096770", "105560", "207940", "329180", "373220", "402340", "AAPL", "AMD", "AMZN", "AVGO", "BRK-B", "GOOG", "GOOGL", "JPM", "LLY", "META", "MSFT", "MU", "NVDA", "TSLA", "WMT"];
+var LOGO = {}, LOGO_P = null;
+function cLogoKey(sym) { return String(sym || "").replace(/\.K[SQ]$/, ""); }
+function cLogoReady() {
+  if (LOGO_P) return LOGO_P;
+  LOGO_P = Promise.all(LOGO_HAVE.map(function (k) { return new Promise(function (res) { var im = new Image(); im.onload = function () { LOGO[k] = im; res(); }; im.onerror = function () { res(); }; im.src = "icons/logo/" + encodeURIComponent(k) + ".png?v=" + (typeof SM_VER !== "undefined" ? SM_VER : "1"); }); }));
+  return LOGO_P;
+}
+if (typeof window !== "undefined") window.addEventListener("load", function () { setTimeout(cLogoReady, 1500); });
 function cMono(g, x, y, sz, sym, name) {
+  var im = LOGO[cLogoKey(sym)];
+  if (im && im.complete && im.naturalWidth) { g.drawImage(im, x, y, sz, sz); return; }   // 로고는 원형 그대로(배경 없음)
   cRound(g, x, y, sz, sz, sz * 0.24, "#14161c");
   var t = cMonoTxt(sym, name), fs = Math.round(sz * (t.length <= 1 ? 0.5 : t.length === 2 ? 0.42 : t.length === 3 ? 0.34 : 0.29));
   cText(g, t, x + sz / 2, y + sz / 2 + fs * 0.36, fs, 900, "#e6c57a", "center");

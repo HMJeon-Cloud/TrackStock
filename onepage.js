@@ -181,7 +181,7 @@ function onePageCard(R, iss, news) {
   hv.forEach(function (s, k) { var rx = L + 12 + k * ((colW - 24) / 3); cText(g, cFit(g, briefName(s), (colW - 24) / 3 - 8, 16, 700), rx, hy + 30, 16, 700, OP_C.ink); cText(g, s.amtX.toFixed(1) + "배 · " + opPct(r1(s)), rx, hy + 48, 13, 600, opCol(r1(s))); });
   // v12.25 8 = 시가총액 상위 8 (기사 칸을 대신) — 약자 배지 + 이름 + 하루 등락
   var cap = typeof cCap8 === "function" ? cCap8(R.market === "coin" ? "coin" : R.market === "kr" ? "kr" : "us") : { rows: [], src: "" };
-  var y8 = opBox(g, Rx, y, colW, h7, 8, "시가총액 상위 8", cap.src, mkc);
+  var y8 = opBox(g, Rx, y, colW, h7, 8, "시가총액 상위 8", cap.src + " · 로고는 각 사 상표", mkc);
   if (cap.rows.length) {
     var cc = 2, cwid = (colW - 24 - 10) / cc, rh8 = Math.min(34, Math.floor((h7 - 70) / Math.ceil(Math.min(8, cap.rows.length) / cc)));
     cap.rows.slice(0, 8).forEach(function (k, i) {
@@ -213,6 +213,7 @@ function onePageOpen(btn) {
   if (R.marketWideOff) { alert("오늘 한 장을 만들 수 없어요 — " + ((R.basis && R.basis.why) || "전체 시장 요약 준비 중") + ".\n틀린 숫자를 피하려고 전체 시장 숫자가 맞춰질 때까지 막아 두었어요."); return; }
   var old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+  if (typeof cLogoReady === "function") ready = Promise.all([ready, cLogoReady()]);   // v12.30 로고 먼저
   ready.then(function () { return Promise.all([typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : [], typeof pkEnsure === "function" ? pkEnsure(R).catch(function () { return null; }) : null]); }).then(function () {
     var iss = []; try { iss = issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }); } catch (e) {}
     var news = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items) || [];
