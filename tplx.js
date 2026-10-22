@@ -30,7 +30,18 @@ function tplYtd(sym) {
   if (i0 < 1) return null; var a = d.c[i0 - 1], b = d.c[d.c.length - 1]; return a > 0 && b > 0 ? { a: a, b: b, r: b / a - 1 } : null;
 }
 var tplSpec0 = tplSpec;
+/* v12.31 바깥 껍데기: ① 시장 전체 숫자를 못 쓰는 날(R.marketWideOff)엔 시장 전체를 말하는 카드는 만들지 않는다
+                     ② 1년치 시세가 필요한 순위·명단·체력은 대표 목록으로 계산하므로 부제에 '대표 N개 기준'을 붙인다 */
+var TPLX_WIDE = { "table:movers": 1, "table:hilo": 1, "grid:health": 1, "lines:today": 1 };
+var TPLX_APP = { "rank:y1": 1, "rank:rsiLow": 1, "rank:quiet": 1, "rank:tech": 1, "table:hilo": 1, "grid:health": 1 };
 tplSpec = function (cat, srcId, mkSel) {
+  var R = tplR(mkSel); if (!R) return null;
+  if (R.marketWideOff && TPLX_WIDE[cat + ":" + srcId]) return null;
+  var x = tplSpecX(cat, srcId, mkSel);
+  if (x && x.meta && TPLX_APP[cat + ":" + srcId]) { var n = (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); }).length; x.meta.sub = (x.meta.sub || "") + " · 대표 " + n + "개 중(전체 시장 아님)"; }
+  return x;
+};
+function tplSpecX(cat, srcId, mkSel) {
   var R = tplR(mkSel); if (!R) return null;
   var mk = typeof cMktInfo === "function" ? cMktInfo(R) : null, mkName = mk ? mk.name : "전체", unit = R.market === "coin" ? "코인" : "종목", date = tplDateTxt(R), src = tplSrc(R);
   var S = (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); });

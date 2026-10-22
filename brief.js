@@ -572,11 +572,12 @@ function renderBrief() {
     ].map(function (k) { return '<div class="kpi ' + k.cls + '"><div class="kl">' + k.l + '</div><div class="kv">' + k.v + '<small>' + k.s + '</small></div><div class="kb"><i style="width:' + Math.round((isFinite(k.p) ? k.p : 0) * 100) + '%"></i></div></div>'; }).join("");
   }
   if ($("briefTempBox")) $("briefTempBox").innerHTML = '<div class="briefTemp">' +
-    '<div class="briefTempMain"><div class="briefTempDesc">' + (R.marketWideOff ? '<b style="color:var(--accent)">' + L + ' ' + ML + '지수만 보여드려요</b> — 오른 종목·업종·급등락 같은 시장 전체 숫자는 숨겼어요(' + escapeHtml((R.basis && R.basis.why) || "준비 중") + '). 틀린 숫자를 보여주지 않으려는 조치예요.' : '<b style="color:var(--accent)">' + L + ' ' + ML + '시장은 ' + t.word + '</b> — ' + t.desc) + ' <span class="briefDim">(' + uniLab + ('') + ')</span></div></div>' +
+    '<div class="briefTempMain"><div class="briefTempDesc">' + (R.marketWideOff ? '<b style="color:var(--accent)">' + L + ' ' + ML + '지수만 보여드려요</b> — 오른 종목·업종·급등락 같은 시장 전체 숫자는 숨겼어요(' + escapeHtml((R.basis && R.basis.why) || "준비 중") + '). 틀린 숫자를 보여주지 않으려는 조치예요.' + (typeof isOwner === "function" && isOwner() && typeof chRunUniverse === "function" ? ' <button class="chip" data-uniheal="' + R.market + '">전체 시장 요약 지금 받기 (1~4분)</button>' : '') : '<b style="color:var(--accent)">' + L + ' ' + ML + '시장은 ' + t.word + '</b> — ' + t.desc) + ' <span class="briefDim">(' + uniLab + ('') + ')</span></div></div>' +
     '<div class="briefIdxRow">' + R.indexRow.map(function (x) {
       return '<div class="briefIdx"><span>' + x.name + '</span><b style="color:' + briefColor(x.ret) + '">' + briefPct(x.ret) + '</b></div>';
     }).join("") + '</div></div>';
 
+  var uh = document.querySelector("[data-uniheal]"); if (uh) uh.onclick = function () { uh.disabled = true; uh.textContent = "받는 중… (1~4분)"; var o = document.createElement("span"); chRunUniverse(uh.getAttribute("data-uniheal"), uh, o).then(function () { if (document.body.contains(uh)) { uh.disabled = false; uh.outerHTML = '<span class="briefDim">' + o.innerHTML + '</span>'; } }); };   // v12.31
   /* ①-2 시장 체력 · 신고가·신저가 (v8.9 — 한눈에 보는 판) */
   try { briefRenderHealth(R.uniTemp ? Object.assign({}, R, { temp: R.uniTemp }) : R); } catch (e) { console.warn(e); }
 

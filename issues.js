@@ -55,7 +55,7 @@ function issuesCompute(recent, opt) {
   // ③ 오른 종목 비율 (시장 전체가 같이 움직였나)
   var up = R.temp.upPct;
   C.push({ cat: "breadth", emoji: up >= 0.5 ? "🌡️" : "🥶", score: Math.abs(up - 0.5) * 8,
-    title: (up >= 0.5 ? "오른 종목 " + Math.round(up * 100) + "%" : "내린 종목 " + Math.round((1 - up) * 100) + "%") + " — " + (Math.abs(up - 0.5) >= 0.25 ? "시장 전체가 함께 움직인 날" : Math.abs(up - 0.5) >= 0.12 ? (up >= 0.5 ? "오른 쪽이 우세" : "내린 쪽이 우세") : "반반으로 갈린 날"),
+    title: (R.basis && R.basis.kind === "uni" ? "" : "대표 ") + (up >= 0.5 ? "오른 종목 " + Math.round(up * 100) + "%" : "내린 종목 " + Math.round((1 - up) * 100) + "%") + " — " + (Math.abs(up - 0.5) >= 0.25 ? (R.basis && R.basis.kind === "uni" ? "시장 전체가 함께 움직인 날" : "대표 종목 대부분이 같은 방향") : Math.abs(up - 0.5) >= 0.12 ? (up >= 0.5 ? "오른 쪽이 우세" : "내린 쪽이 우세") : "반반으로 갈린 날"),
     sub: R.temp.up + " / " + R.temp.total + "개 · 20일 평균선 위 " + Math.round(R.temp.abovePct * 100) + "%" });
   // ④ 테마 (가장 강한·약한 업종)
   var th = R.themes || [];
@@ -150,8 +150,9 @@ function issHeadline(list, R, news) {
   if (i0 && i0.ret > 0.002 && t.upPct < 0.45) add(5 + (0.45 - t.upPct) * 10, i0.name + " [[" + issPct(i0.ret) + "]]인데 10개 중 " + Math.round((1 - t.upPct) * 10) + "개는 내렸다", "지수를 올린 건 몇몇 큰 " + unit + " — 내 " + unit + "이 빠진 이유");
   if (i0 && i0.ret < -0.002 && t.upPct > 0.55) add(5 + (t.upPct - 0.55) * 10, i0.name + " [[" + issPct(i0.ret) + "]]인데 10개 중 " + Math.round(t.upPct * 10) + "개는 올랐다", "지수를 끌어내린 건 일부 대형 " + unit);
   // ② 시장 전체가 한 방향
-  if (t.upPct >= 0.7) add(4 + (t.upPct - 0.7) * 10, "10개 중 [[" + Math.round(t.upPct * 10) + "개]]가 오른 날" + (th[0] ? " — " + th[0].name + " " + issPct(th[0].ret) : ""), "오른 " + unit + " " + upP + "% · 20일선 위 " + Math.round(t.abovePct * 100) + "%");
-  if (t.upPct <= 0.3) add(4 + (0.3 - t.upPct) * 10, "10개 중 [[" + Math.round((1 - t.upPct) * 10) + "개]]가 내린 날" + (md ? " — 최대 " + briefName(md) + " " + issPct(r1(md)) : ""), "내린 " + unit + " " + dnP + "% · 개별 악재보다 시장 전체 분위기");
+  var pre10 = R.basis && R.basis.kind === "uni" ? "" : "대표 종목 ";   // v12.31 전체 시장이 아니면 그렇게 밝힌다
+  if (t.upPct >= 0.7) add(4 + (t.upPct - 0.7) * 10, pre10 + "10개 중 [[" + Math.round(t.upPct * 10) + "개]]가 오른 날" + (th[0] ? " — " + th[0].name + " " + issPct(th[0].ret) : ""), "오른 " + unit + " " + upP + "% · 20일선 위 " + Math.round(t.abovePct * 100) + "%");
+  if (t.upPct <= 0.3) add(4 + (0.3 - t.upPct) * 10, pre10 + "10개 중 [[" + Math.round((1 - t.upPct) * 10) + "개]]가 내린 날" + (md ? " — 최대 " + briefName(md) + " " + issPct(r1(md)) : ""), "내린 " + unit + " " + dnP + "% · 개별 악재보다 시장 전체 분위기");
   // ③ 거시 충격 (환율·금리·공포·금·원유·비트코인) — 평소의 N배일 때만
   if (/^(fx|rate|vix|gold|oil|btc)$/.test(top.cat) && times >= 2) {
     var nm = String(top.title).replace(/\s*[—(].*$/, "").replace(/\s*→.*$/, "");

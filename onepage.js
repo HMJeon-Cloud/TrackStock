@@ -65,7 +65,7 @@ function opScreens(R) {
   function pick(arr, n) { return arr.filter(function (x) { return x.list.length; }).slice(0, n || 2).map(function (x) { return { t: x.t, d: x.d, n: x.list.length, rows: x.list.slice(0, 3).map(function (s) { return { name: briefName(s), tag: x.tag(s), ret: s.ret1 }; }) }; }); }
   // v10.1: 복합 점수(추세·위치·RSI·대금 + 재무·수급·기사)로 고른 선별 종목이 준비돼 있으면 첫 줄은 그것, 둘째 줄은 하루 조건 스크린
   var pk = typeof pkReady === "function" ? pkReady(R) : null;
-  function pkGroup(list, side) { return { t: side === "buy" ? "복합 점수 매수 후보" : "복합 점수 주의 " + unit, d: "추세·RSI·대금·재무·기사", n: list.length, rows: list.slice(0, 3).map(function (x) { return { name: briefName(x.s), tag: (side === "buy" ? "+" + x.bs + "/-" + x.ws : "-" + x.ws + "/+" + x.bs) + " · " + pkTopReason(x, side).split(" · ")[0], ret: x.s.ret1 }; }) }; }
+  function pkGroup(list, side) { return { t: side === "buy" ? "복합 점수 매수 후보" : "복합 점수 주의 " + unit, d: "추세·RSI·대금·재무·기사", n: list.length, rows: list.slice(0, 3).map(function (x) { return { name: briefName(x.s), tag: (side === "buy" ? "+" + x.bs + (x.ws ? "/-" + x.ws : "") : "-" + x.ws + (x.bs ? "/+" + x.bs : "")) + " · " + pkTopReason(x, side).split(" · ")[0], ret: x.s.ret1 }; }) }; }
   if (pk && (pk.buy.length || pk.warn.length)) return { buy: (pk.buy.length ? [pkGroup(pk.buy, "buy")] : []).concat(pick(buy, 1)).slice(0, 2), warn: (pk.warn.length ? [pkGroup(pk.warn, "warn")] : []).concat(pick(warn, 1)).slice(0, 2) };
   return { buy: pick(buy), warn: pick(warn) };
 }
@@ -109,6 +109,7 @@ function opTile(g, x, y, w, h, label, val, vc, sub) {
   if (sub) cText(g, cFit(g, sub, w - 16, 13, 500), x + 10, y + 66, 13, 500, OP_C.sub);
 }
 function onePageCard(R, iss, news) {
+  if (R && R.marketWideOff) throw new Error("전체 시장 숫자가 아직 맞지 않아 오늘 한 장을 만들지 않았어요 — " + ((R.basis && R.basis.why) || ""));   // v12.31 모든 경로(AI·작업대·버튼) 공통
   var cv = document.createElement("canvas"); cv.width = CARD.W; cv.height = CARD.H; var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
   g.fillStyle = OP_C.bg; g.fillRect(0, 0, CARD.W, CARD.H);
   var P = 36, W = CARD.W - P * 2, mk = typeof cMktInfo === "function" ? cMktInfo(R) : null, unit = R.market === "coin" ? "코인" : "종목", sec = R.market === "coin" ? "테마" : "업종";
