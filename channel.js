@@ -104,8 +104,11 @@ function chRunSnapshot(btn) {
     btn.disabled = false; btn.innerHTML = old;
     if (j._st !== 200 || j.error) { out.innerHTML = '<span style="color:#b45309">실패: ' + escapeHtml(j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + '</span>'; return; }
     try { var dk = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("sm.chart.") === 0) dk.push(k); } dk.forEach(function (k) { localStorage.removeItem(k); }); } catch (e2) {}   // v12.26 이 기기의 종목 캐시 비우기
-    if (typeof DATA !== "undefined") { DATA.ready = null; DATA.recentPromise = null; }
-    out.innerHTML = '<span style="color:var(--good)">완료</span> · 과거 ' + (j.historyUpdated != null ? j.historyUpdated : "-") + '종목 · 최근 ' + (j.recentSymbols != null ? j.recentSymbols : "-") + '종목 · ' + Math.round((j.elapsedMs || 0) / 1000) + '초 — 화면은 새로고침 뒤 반영';
+    if (typeof DATA !== "undefined") { DATA.ready = null; DATA.recentPromise = null; DATA.recentData = null; }
+    try { if (typeof briefState !== "undefined") briefState.recent = null; if (typeof nbHist !== "undefined") Object.keys(nbHist).forEach(function (k) { delete nbHist[k]; }); } catch (e3) {}   // 이번 접속 안의 옛 값도 비운다
+    out.innerHTML = '<span style="color:var(--good)">완료</span> · 과거 ' + (j.historyUpdated != null ? j.historyUpdated : "-") + '종목 · 최근 ' + (j.recentSymbols != null ? j.recentSymbols : "-") + '종목 · ' + Math.round((j.elapsedMs || 0) / 1000) + '초 — 화면은 새로고침 뒤 반영'
+      + (j.bench ? '<br>마지막 거래일 · 미국 ' + escapeHtml(String(j.bench.us || "-").slice(5)) + ' · 국내 ' + escapeHtml(String(j.bench.kr || "-").slice(5)) : '')
+      + (j.behindN ? '<br><span style="color:#b45309">지수보다 하루 이상 늦은 종목 ' + j.behindN + '개: ' + escapeHtml((j.behind || []).slice(0, 12).join(", ")) + '</span>' : (j.bench ? ' · <span style="color:var(--good)">모든 종목이 지수와 같은 날까지 받아짐</span>' : ''));
   }).catch(function (e) { btn.disabled = false; btn.innerHTML = old; out.textContent = "실패: " + e.message; });
 }
 
@@ -129,7 +132,7 @@ function chDataGuide() {
     ['<b>OPENAI_API_KEY</b><br><small>OPENAI_MODEL · OPENAI_IMAGE_MODEL · AI_DAILY_MAX(기본 30)</small>', 'platform.openai.com → API keys (유료 · 사용량 과금)', 'AI 한 장 카드 · 내 글로 AI 카드 · 양식 아이콘 이미지 (애널리스트 AI 답변 기능은 없음 — 프롬프트 복사 방식)', '운영자가 버튼을 누를 때만 · 하루 호출 상한', on(K.openai)]
   ], ["무엇", "어디서 받나", "연동되는 데이터", "주기", "지금 상태"]);
   h += '<h4>② 키 없이 자동으로 오는 데이터</h4>' + tbl([
-    ['<b>야후 파이낸스 일봉</b> <small>/api/chart · 크론</small>', '전 관심 종목 ' + (C.symbols || "-") + '개의 과거 전체(수정주가·배당) + 최근 90일 · 화면에서 종목을 열면 그 종목은 실시간', '크론 매일 <b>07:00 · 09:00</b>(KST) — 과거는 실행당 40종목씩 순환, 최근 90일은 매번 전부 · 마지막 자동 수집 ' + escapeHtml(lrAt)],
+    ['<b>야후 파이낸스 일봉</b> <small>/api/chart · 크론</small>', '전 관심 종목 ' + (C.symbols || "-") + '개의 과거 전체(수정주가·배당) + 최근 400일 · 화면에서 종목을 열면 그 종목은 실시간', '크론 매일 <b>07:00 · 09:00</b>(KST) — 과거는 실행당 40종목씩 순환, 최근 400일은 매번 전부 · 마지막 수집 ' + escapeHtml(lrAt) + (lr.bench ? ' · 마지막 거래일 미국 ' + escapeHtml(String(lr.bench.us || "-").slice(5)) + ' / 국내 ' + escapeHtml(String(lr.bench.kr || "-").slice(5)) : '') + (lr.behindN ? ' · <span class="dgNo">늦은 종목 ' + lr.behindN + '개: ' + escapeHtml((lr.behind || []).slice(0, 8).join(", ")) + '</span>' : lr.bench ? ' · <span class="dgOk">✓ 전 종목 같은 날까지</span>' : '')],
     ['<b>전체 시장 요약</b> <small>S&P 500 · 코스피 시총상위 200</small>', '종목별 등락·이동평균 위치·52주 고저·거래대금 → 오늘 탭 온도·체력·신고가, 데일리 9장, 리포트 시장 폭', '07:00 크론 = S&P 500(위키피디아 구성표, 7일 캐시) · 09:00 크론 = 코스피(네이버 시총 순) · 구성 목록은 매달 보관'],
     ['<b>네이버 증권 공개 API</b> <small>/api/fund</small>', '투자지표(PER·PBR·EPS·배당) · 재무제표 · 투자자별 매매 · 목표주가 — 종목·애널리스트·선별 종목', '화면에서 요청할 때 실시간'],
     ['<b>야후 종목 검색</b> <small>/api/search</small>', '영문 종목 검색 (한글은 앱 사전이 먼저)', '검색할 때'],

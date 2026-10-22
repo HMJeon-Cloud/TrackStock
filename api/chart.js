@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       }
 
       // Vercel Edge 캐시: 1시간 캐싱, 하루까지 stale 허용 → Yahoo 호출 최소화
-      res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
+      res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
       return res.status(200).json(data);
     } catch (e) {
       lastErr = String(e);

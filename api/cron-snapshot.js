@@ -315,6 +315,18 @@ export default async function handler(req, res) {
       if (!recent.symbols[sym] && prevRecent.symbols[sym]) { recent.symbols[sym] = prevRecent.symbols[sym]; kept++; }
     }
   }
+  /* v12.26 뒤처진 종목 점검: 같은 시장 지수(미국 ^GSPC · 국내 ^KS11)의 마지막 거래일보다 하루라도 늦은 종목을 적어 둔다 (코인·환율 제외) */
+  const behind = [];
+  {
+    const dOf = (x) => { const v = recent.symbols[x]; return v && v.t && v.t.length ? new Date((v.t[v.t.length - 1] + (/\.K[SQ]$|^\^KS|^\^KQ/.test(x) ? 9 : -5) * 3600) * 1000).toISOString().slice(0, 10) : null; };   // 그 시장 현지 날짜
+    const bench = { us: dOf("^GSPC"), kr: dOf("^KS11") };
+    for (const sym of Object.keys(recent.symbols)) {
+      if (/-USD$|=X$|=F$|^\^/.test(sym)) continue;
+      const mk = /\.K[SQ]$/.test(sym) ? "kr" : "us", d = dOf(sym), b = bench[mk];
+      if (d && b && d < b) behind.push(sym + " " + d.slice(5) + (recent.flags[sym] ? " (" + recent.flags[sym] + ")" : ""));
+    }
+    recent.check = { bench, behind: behind.length };
+  }
   let recentSaved = null;
   if (recentOk > 0) {
     try {
@@ -390,7 +402,7 @@ export default async function handler(req, res) {
   /* ④ 실행 기록 — /api/config 에서 비밀값 없이 확인할 수 있게 남긴다 */
   const log = {
     at: new Date().toISOString(), elapsedMs: Date.now() - started,
-    symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, historyUpdated: done.length,
+    symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, bench: recent.check && recent.check.bench, behind: behind.slice(0, 30), behindN: behind.length, historyUpdated: done.length,
     historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
     universe: universe && { ok: universe.ok, mkt: universe.mkt, n: universe.n, fresh: universe.fresh, kept: universe.kept, failed: universe.failed, list: universe.list, h429: universe.stats && universe.stats.h429, skipped: universe.skipped, error: universe.error || universe.reason, elapsedMs: universe.elapsedMs },
     failedSample: failed.slice(0, 5), disc: disc && { dart: disc.dart && { ok: disc.dart.ok, added: disc.dart.added, reason: disc.dart.reason }, sec: disc.sec && { ok: disc.sec.ok, updated: disc.sec.updated }, skipped: disc.skipped }
@@ -405,7 +417,7 @@ export default async function handler(req, res) {
     redisWrites: writes,
     historyUpdated: done.length,
     historyRemaining: symbols.length - withHistory,
-    recentSymbols: recentOk, recentKept: kept,
+    recentSymbols: recentOk, recentKept: kept, bench: recent.check && recent.check.bench, behindN: behind.length, behind: behind.slice(0, 30),
     recentSaved, manifestOk, yahoo: yahooStats,
     failed: failed.slice(0, 10),
     disc, universe,
