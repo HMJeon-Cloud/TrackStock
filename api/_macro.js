@@ -62,12 +62,22 @@ export function parseFredCsv(t) {
 }
 async function fred(id, from, ms) {
   const k = process.env.FRED_API_KEY, d = from.slice(0, 4) + "-" + from.slice(4, 6) + "-" + from.slice(6, 8);
-  if (k) {
-    const j = JSON.parse(await getText(FRED_API + "?series_id=" + id + "&api_key=" + encodeURIComponent(k) + "&file_type=json&observation_start=" + d, ms));
+  const isHtml = (t) => /^\s*</.test(t || "");
+  const viaApi = async () => {
+    const t = await getText(FRED_API + "?series_id=" + id + "&api_key=" + encodeURIComponent(k) + "&file_type=json&observation_start=" + d, ms);
+    if (isHtml(t)) throw new Error("FRED API가 JSON 대신 웹페이지를 돌려줌(점검·차단)");
+    const j = JSON.parse(t);
     if (j.error_message) throw new Error("FRED " + id + ": " + j.error_message);
     return (j.observations || []).map((o) => [String(o.date).replace(/-/g, ""), num(o.value)]).filter((r) => r[1] != null);
-  }
-  return parseFredCsv(await getText(FRED_CSV + "?id=" + id + "&cosd=" + d, ms));
+  };
+  const viaCsv = async () => {
+    const t = await getText(FRED_CSV + "?id=" + id + "&cosd=" + d, ms);
+    if (isHtml(t)) throw new Error("FRED CSV가 웹페이지를 돌려줌(키 없는 다운로드 차단) — FRED_API_KEY 등록 권장");
+    return parseFredCsv(t);
+  };
+  /* v12.26 한쪽이 HTML(차단·점검)을 주면 다른 길로 한 번 더 */
+  if (k) { try { return await viaApi(); } catch (e) { try { return await viaCsv(); } catch (e2) { throw e; } } }
+  return viaCsv();
 }
 
 /* 계단 지표(기준금리)는 바뀐 날만 남긴다 */

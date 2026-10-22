@@ -2562,7 +2562,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.25"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.26"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -3332,7 +3332,8 @@ function kstToday() {
 /* 설정·manifest를 세션에 한 번만 읽는다 (둘 다 CDN 캐시) */
 function dataReady() {
   if (DATA.ready) return DATA.ready;
-  DATA.ready = fetch("/api/config").then(function (r) { return r.json(); })
+  var own = false; try { own = !!localStorage.getItem("sm.owner"); } catch (e0) {}
+  DATA.ready = fetch("/api/config" + (own ? "?fresh=" + Date.now() : "")).then(function (r) { return r.json(); })
     .then(function (cfg) {
       DATA.config = cfg || {};
       DATA.viaProxy = true;
@@ -3410,6 +3411,9 @@ function lsGet(symbol, range) {
     if (!raw) return null;
     var obj = JSON.parse(raw);
     if (!obj || obj.date !== kstToday()) return null;
+    // v12.26 같은 날이라도 서버 데이터가 새로 수집됐으면(수동 수집 등) 옛 캐시는 버린다
+    var gen = DATA.config && DATA.config.updated;
+    if (gen && obj.gen !== gen) return null;
     // 저장된 데이터가 요청 기간을 감당할 수 있어야 재사용한다.
     // (5년으로 받아둔 것을 10년 요청에 돌려주면 통계가 잘린 채 계산된다)
     var have = RANGE_RANK[obj.range] || (obj.wide ? 4 : 2);
@@ -3432,10 +3436,10 @@ function lsPut(symbol, snap, wide, range) {
     // 이미 더 넓은 기간이 저장돼 있으면 좁은 것으로 덮어쓰지 않는다
     var prev = null;
     try { prev = JSON.parse(localStorage.getItem(LS_PREFIX + symbol) || "null"); } catch (e2) {}
-    var prevRank = prev && prev.date === kstToday() ? (RANGE_RANK[prev.range] || (prev.wide ? 4 : 2)) : 0;
+    var prevRank = prev && prev.date === kstToday() && prev.gen === ((DATA.config && DATA.config.updated) || null) ? (RANGE_RANK[prev.range] || (prev.wide ? 4 : 2)) : 0;
     var newRank = RANGE_RANK[range] || (wide ? 4 : 2);
     if (prevRank > newRank) return;
-    localStorage.setItem(LS_PREFIX + symbol, JSON.stringify({ date: kstToday(), at: Date.now(), wide: !!wide, range: range || (wide ? "max" : "10y"), snap: snap }));
+    localStorage.setItem(LS_PREFIX + symbol, JSON.stringify({ date: kstToday(), gen: (DATA.config && DATA.config.updated) || null, at: Date.now(), wide: !!wide, range: range || (wide ? "max" : "10y"), snap: snap }));
   } catch (e) { /* 용량 초과 등은 무시 */ }
 }
 
@@ -3454,15 +3458,14 @@ function getChartData(symbol, range) {
   range = range || "10y";
   var wantWide = range === "20y" || range === "max";
 
-  // ① 브라우저 저장
-  var ls = lsGet(symbol, range);
-  if (ls) {
-    var p0 = snapshotToParsed(ls.snap, range);
-    p0.source = "local";
-    return Promise.resolve(p0);
-  }
-
   return dataReady().then(function (manifest) {
+    // ① 브라우저 저장 — v12.26 설정을 먼저 읽고, 서버 수집 시각이 같을 때만 재사용
+    var ls = lsGet(symbol, range);
+    if (ls) {
+      var p0 = snapshotToParsed(ls.snap, range);
+      p0.source = "local";
+      return p0;
+    }
     // ② 정적 스냅샷
     var entry = manifest && manifest.symbols && manifest.symbols[symbol];
     if (entry && entry.history) {

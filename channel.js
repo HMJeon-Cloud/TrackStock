@@ -103,6 +103,8 @@ function chRunSnapshot(btn) {
   fetch("/api/cron-snapshot?run=1&universe=0", { headers: { "x-owner": tok }, cache: "no-store" }).then(function (r) { return r.json().then(function (j) { j._st = r.status; return j; }); }).then(function (j) {
     btn.disabled = false; btn.innerHTML = old;
     if (j._st !== 200 || j.error) { out.innerHTML = '<span style="color:#b45309">실패: ' + escapeHtml(j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + '</span>'; return; }
+    try { var dk = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("sm.chart.") === 0) dk.push(k); } dk.forEach(function (k) { localStorage.removeItem(k); }); } catch (e2) {}   // v12.26 이 기기의 종목 캐시 비우기
+    if (typeof DATA !== "undefined") { DATA.ready = null; DATA.recentPromise = null; }
     out.innerHTML = '<span style="color:var(--good)">완료</span> · 과거 ' + (j.historyUpdated != null ? j.historyUpdated : "-") + '종목 · 최근 ' + (j.recentSymbols != null ? j.recentSymbols : "-") + '종목 · ' + Math.round((j.elapsedMs || 0) / 1000) + '초 — 화면은 새로고침 뒤 반영';
   }).catch(function (e) { btn.disabled = false; btn.innerHTML = old; out.textContent = "실패: " + e.message; });
 }
@@ -123,7 +125,7 @@ function chDataGuide() {
     ['<b>DART_API_KEY</b>', 'opendart.fss.or.kr → 인증키 신청 (무료 · 하루 2만 회)', '국내 공시(임원·대주주 지분 변동 · 5% 보유 · 자사주) · 공모주(증권신고서·청약 일정·경쟁률)', '매일 아침 크론 끝에서(남은 시간만큼) + 수동 "지금 수집"', on(K.dart)],
     ['<b>SEC_UA</b> <small>키 아님</small>', 'sec.gov 규칙: "StockMind 내이메일" 형식 (영문·이메일만)', '구루 13F 보유 내역 (버핏 등 주요 투자자)', '분기마다 새 13F가 올라오면 · 매일 확인', on(K.secUa, "설정됨", "없음 → SEC가 거절할 수 있음")],
     ['<b>ECOS_API_KEY</b>', 'ecos.bok.or.kr → 인증키 신청 (무료)', '원/달러 환율(매매기준율) · 한국은행 기준금리', '매일 아침 크론(지표마다 하루 1회) + 수동', on(K.ecos)],
-    ['<b>FRED_API_KEY</b> <small>선택</small>', 'fred.stlouisfed.org → API Keys (무료)', '미 기준금리 · 미 10년물 · M2 — 키가 없어도 공개 CSV로 받음', '매일 아침 크론 + 수동', on(K.fred, "API", "없음 → 공개 CSV")],
+    ['<b>FRED_API_KEY</b> <small>선택</small>', 'fred.stlouisfed.org → API Keys (무료)', '미 기준금리 · 미 10년물 · M2 — 키가 없으면 공개 CSV로 받지만 서버에서 막히는 날이 있어 <b>등록 권장</b>', '매일 아침 크론 + 수동', on(K.fred, "API", "없음 → 공개 CSV")],
     ['<b>OPENAI_API_KEY</b><br><small>OPENAI_MODEL · OPENAI_IMAGE_MODEL · AI_DAILY_MAX(기본 30)</small>', 'platform.openai.com → API keys (유료 · 사용량 과금)', 'AI 한 장 카드 · 내 글로 AI 카드 · 양식 아이콘 이미지 (애널리스트 AI 답변 기능은 없음 — 프롬프트 복사 방식)', '운영자가 버튼을 누를 때만 · 하루 호출 상한', on(K.openai)]
   ], ["무엇", "어디서 받나", "연동되는 데이터", "주기", "지금 상태"]);
   h += '<h4>② 키 없이 자동으로 오는 데이터</h4>' + tbl([
