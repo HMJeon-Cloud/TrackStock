@@ -921,9 +921,9 @@ function cEtfPop(mk) { return (ETF_POP[mk] || []).map(function (p) { var st = cS
 function cMonoTxt(sym, name) { if (/-USD$/.test(sym)) return sym.replace(/-USD$/, "").slice(0, 4); if (!/\.K[SQ]$/.test(sym)) return sym.replace(/-.*/, "").slice(0, 4); var m = String(name).match(/^[A-Z&]{2,3}/); return m ? m[0] : String(name).slice(0, 1); }
 /* v12.30 회사 로고: icons/logo/<티커 또는 6자리 코드>.png (원형·바깥 투명). 있으면 로고, 없으면 약자 배지.
    카드는 그림판에 바로 그리므로 미리 불러 둔다(같은 사이트 파일이라 저장이 막히지 않음). 새 로고는 폴더에 넣고 아래 목록에 이름만 추가 */
-var LOGO_HAVE = ["000270", "000660", "000810", "005380", "005930", "005935", "009150", "010120", "012330", "012450", "028260", "032830", "034020", "034730", "035420", "055550", "066570", "068270", "086790", "096770", "105560", "207940", "329180", "373220", "402340", "AAPL", "AMD", "AMZN", "AVGO", "BRK-B", "GOOG", "GOOGL", "JPM", "LLY", "META", "MSFT", "MU", "NVDA", "TSLA", "WMT"];
+var LOGO_HAVE = ["000270", "000660", "000810", "005380", "005930", "005935", "009150", "010120", "012330", "012450", "028260", "032830", "034020", "034730", "035420", "055550", "066570", "068270", "086790", "096770", "105560", "207940", "329180", "373220", "402340", "AAPL", "AMD", "AMZN", "AVGO", "BCH", "BNB", "BRK-B", "BTC", "DOGE", "ETH", "GOOG", "GOOGL", "JPM", "LLY", "META", "MSFT", "MU", "NVDA", "SOL", "TRX", "TSLA", "USDC", "USDT", "WMT", "XRP"];
 var LOGO = {}, LOGO_P = null;
-function cLogoKey(sym) { return String(sym || "").replace(/\.K[SQ]$/, ""); }
+function cLogoKey(sym) { return String(sym || "").replace(/\.K[SQ]$/, "").replace(/-USD$/, ""); }   // 코인: BTC-USD → BTC
 function cLogoReady() {
   if (LOGO_P) return LOGO_P;
   LOGO_P = Promise.all(LOGO_HAVE.map(function (k) { return new Promise(function (res) { var im = new Image(); im.onload = function () { LOGO[k] = im; res(); }; im.onerror = function () { res(); }; im.src = "icons/logo/" + encodeURIComponent(k) + ".png?v=" + (typeof SM_VER !== "undefined" ? SM_VER : "1"); }); }));
