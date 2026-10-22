@@ -27,6 +27,7 @@ function issuesCompute(recent, opt) {
   if (!recent || !recent.symbols) return [];
   var market = opt.market || "all"; ISS_MODE = opt.mode === "week" || opt.mode === "month" ? opt.mode : "day";
   var R = briefCompute(recent, { mode: ISS_MODE, market: market, popular: opt.popular });
+  if (R.marketWideOff) return [];   // v12.29 전체 시장 숫자를 못 쓰는 날엔 이슈를 뽑지 않는다
   function st(sym) { var d = recent.symbols[sym]; if (!d) return null; var s = briefStats(sym, d, ISS_MODE); return s && !(R.quality && R.quality.bad[sym]) ? s : null; }
   var C = [];
   // ① 증시 (미국·한국 각각 한 줄)
@@ -138,7 +139,7 @@ function issNewsHit(name, news) {
 function issShort(t, n) { t = String(t).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim(); if (t.length <= n) return t; var cut = t.slice(0, n + 6), sp = Math.max(cut.lastIndexOf(" "), cut.lastIndexOf("…"), cut.lastIndexOf(",")); return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,·…]+$/, ""); }   // v10.4: 말줄임 대신 단어 끝에서 끊기
 function issHeadline(list, R, news) {
   var out = [], seed = Math.floor((Date.now() + 9 * 3600e3) / 86400e3);
-  if (!R) return null;
+  if (!R || R.marketWideOff) return null;
   var t = R.temp, i0 = (R.indexRow || [])[0], th = R.themes || [], upP = Math.round(t.upPct * 100), dnP = 100 - upP;
   var unit = R.market === "coin" ? "코인" : "종목", sec = R.market === "coin" ? "테마" : "업종";
   var top = list[0] || {}, k = (top.sub || "").match(/평소[^0-9]*([0-9.]+)배/), times = k ? +k[1] : 0;

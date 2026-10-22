@@ -210,6 +210,7 @@ function onePageCard(R, iss, news) {
 /* ---------- 열기 ---------- */
 function onePageOpen(btn) {
   var R = briefState.result; if (!R) { alert("오늘의 브리핑 데이터를 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요."); return; }
+  if (R.marketWideOff) { alert("오늘 한 장을 만들 수 없어요 — " + ((R.basis && R.basis.why) || "전체 시장 요약 준비 중") + ".\n틀린 숫자를 피하려고 전체 시장 숫자가 맞춰질 때까지 막아 두었어요."); return; }
   var old = btn ? btn.innerHTML : ""; if (btn) btn.textContent = "만드는 중…";
   var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   ready.then(function () { return Promise.all([typeof cardsNewsFetch === "function" ? cardsNewsFetch(R).catch(function () { return []; }) : [], typeof pkEnsure === "function" ? pkEnsure(R).catch(function () { return null; }) : null]); }).then(function () {

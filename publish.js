@@ -127,7 +127,7 @@ function pubPlan() {
   plan.push({ id: "top5", t: "📌 오늘의 핵심 이슈 5", d: "매일 아침 고정 — 피드의 '오늘' 역할", kind: "issues" });
   if (R) {
     var vix = (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], v = vix ? parseFloat(vix.v) : 0;
-    if (Math.abs(R.temp.upPct - 0.5) >= 0.25) { plan.push({ id: "temp", t: "🌡️ 시장 온도 (" + R.temp.word + ")", d: "오늘은 시장 전체가 한 방향으로 움직인 날 — 온도 카드가 먹혀요", kind: "brief", pick: "1_시장온도" }); why.push("오른 종목 " + Math.round(R.temp.upPct * 100) + "%"); }
+    if (isFinite(R.temp.upPct) && Math.abs(R.temp.upPct - 0.5) >= 0.25) { plan.push({ id: "temp", t: "🌡️ 시장 온도 (" + R.temp.word + ")", d: "오늘은 시장 전체가 한 방향으로 움직인 날 — 온도 카드가 먹혀요", kind: "brief", pick: "1_시장온도" }); why.push("오른 종목 " + Math.round(R.temp.upPct * 100) + "%"); }
     if (v >= 25) { plan.push({ id: "fear", t: "😱 과거 공포 사례 카드", d: "VIX " + v.toFixed(0) + " — 불안한 날엔 '그때도 그랬다'가 가장 저장돼요", kind: "channel", pick: "5_과거사례" }); why.push("VIX " + v.toFixed(0)); }
     var hot = (R.hotVol || [])[0]; if (hot && hot.amtX >= 3) { plan.push({ id: "hot", t: "💰 돈이 몰린 곳 (" + briefName(hot) + " " + hot.amtX.toFixed(1) + "배)", d: "거래대금 급증 종목은 '왜?'라는 댓글을 부르는 소재", kind: "brief", pick: "4_인기종목" }); }
   }

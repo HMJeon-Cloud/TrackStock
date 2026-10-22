@@ -44,7 +44,7 @@ async function listKR(rc) {
       const r = await fetchT("https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=" + page + "&pageSize=100", { headers: { "User-Agent": UA, Accept: "application/json", Referer: "https://m.stock.naver.com/" } }, 10000);
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = await r.json(), L = (j && (j.stocks || j.items || j.result || j)) || [];
-      (Array.isArray(L) ? L : []).forEach((x) => { const code = String(x.itemCode || x.code || x.reutersCode || "").replace(/\D/g, ""); if (code.length === 6 && !seen[code]) { seen[code] = 1; items.push({ s: code + ".KS", n: String(x.stockName || x.name || code).slice(0, 30), sec: "" }); } });
+      (Array.isArray(L) ? L : []).forEach((x) => { const code = String(x.itemCode || x.code || x.reutersCode || "").replace(/\D/g, ""); if (code.length === 6 && !seen[code]) { seen[code] = 1; const it = x.industryCodeType || x.industry || {}; items.push({ s: code + ".KS", n: String(x.stockName || x.name || code).slice(0, 30), sec: String(it.industryGroupKor || it.name || x.industryName || "").slice(0, 30) }); } /* v12.29 업종 이름이 오면 같이 (없으면 빈칸 → 화면은 테마로 대신) */ });
       if (!(Array.isArray(L) && L.length)) break;
     }
     if (items.length < 150) throw new Error("종목 " + items.length + "개뿐");
@@ -58,10 +58,24 @@ async function listKR(rc) {
 }
 
 /* ---------- 종목 하나 → 요약 숫자 ---------- */
-function summarize(sym, res) {
+/* v12.29 그 시장 현지 날짜 (국내 +9h · 미국 -5h) */
+const locD = (sym, ts) => new Date((ts + (/\.K[SQ]$/.test(sym) ? 9 : -5) * 3600) * 1000).toISOString().slice(0, 10);
+export function summarize(sym, res) {
   const q = res.indicators.quote[0], T = res.timestamp, c = [], v = [], t = [];
   for (let i = 0; i < T.length; i++) { const x = q.close[i]; if (x == null || !isFinite(x) || x <= 0) continue; c.push(x); v.push(q.volume && q.volume[i] != null ? q.volume[i] : 0); t.push(T[i]); }
+  /* v12.29 ① 장중(아직 안 끝난) 봉은 뺀다 — 09시 국내 수집이 오늘 장중 가격을 '종가'로 담던 문제
+            ② 막 끝난 거래일 봉이 빈 값이면, 장이 끝난 뒤에만 야후 meta의 정규장 종가로 채운다 */
+  const nowS = Math.floor(Date.now() / 1000), m = res.meta || {}, ctp = m.currentTradingPeriod && m.currentTradingPeriod.regular;
+  const live = !!(ctp && ctp.start && ctp.end && nowS >= ctp.start - 3600 && nowS < ctp.end);
+  while (live && t.length > 1 && t[t.length - 1] >= ctp.start - 3600) { c.pop(); v.pop(); t.pop(); }
+  let fixed = 0;
+  if (!live && m.regularMarketTime && m.regularMarketPrice > 0 && t.length && m.regularMarketTime > t[t.length - 1] && locD(sym, m.regularMarketTime) > locD(sym, t[t.length - 1]) && Math.abs(m.regularMarketPrice / c[c.length - 1] - 1) < 0.4) {
+    c.push(m.regularMarketPrice); v.push(m.regularMarketVolume || 0); t.push(m.regularMarketTime); fixed = 1;
+  }
   const n = c.length; if (n < 25) return null;
+  /* 이번 주(지난주 마지막 종가 대비) · 이번 달(지난달 마지막 종가 대비) — 브리핑 '금주·이번 달'을 전체 시장으로 계산하려고 */
+  const dl = locD(sym, t[n - 1]), dd = new Date(dl + "T00:00:00Z"), wkStart = new Date(dd.getTime() - ((dd.getUTCDay() + 6) % 7) * 86400e3).toISOString().slice(0, 10), moStart = dl.slice(0, 8) + "01";
+  let iw = -1, im = -1; for (let i = n - 1; i >= 0; i--) { const d = locD(sym, t[i]); if (iw < 0 && d < wkStart) iw = i; if (im < 0 && d < moStart) { im = i; break; } }
   const last = c[n - 1], ma = (k) => n >= k ? c.slice(-k).reduce((a, x) => a + x, 0) / k : null;
   const m20 = ma(20), m50 = ma(50), m200 = ma(200);
   const prev = c.slice(Math.max(0, n - 251), n - 1), longEnough = prev.length >= 200, hi = longEnough ? Math.max(...prev) : null, lo = longEnough ? Math.min(...prev) : null;
@@ -70,7 +84,8 @@ function summarize(sym, res) {
   return { s: sym, c: Math.abs(last) >= 1 ? Math.round(last * 100) / 100 : Number(last.toPrecision(5)), r1: rr(last / c[n - 2] - 1), r5: n > 5 ? rr(last / c[n - 6] - 1) : null, m1: n > 21 ? rr(last / c[n - 22] - 1) : null,
     a20: m20 != null ? last >= m20 : null, a50: m50 != null ? last >= m50 : null, a200: m200 != null ? last >= m200 : null,
     hi, lo, vh: hi ? rr(last / hi - 1) : null, vl: lo ? rr(last / lo - 1) : null, nh: longEnough && last >= hi, nl: longEnough && last <= lo,
-    amt: Math.round(amt), ax: med > 0 ? Math.round(amt / med * 100) / 100 : null, t: t[n - 1] * 1000, nd: n };
+    amt: Math.round(amt), ax: med > 0 ? Math.round(amt / med * 100) / 100 : null, t: t[n - 1] * 1000, nd: n,
+    d: dl, wk: iw >= 0 ? rr(last / c[iw] - 1) : null, mo: im >= 0 ? rr(last / c[im] - 1) : null, fx: fixed || undefined };
 }
 async function fetchOne(sym, stats) {
   const now = Math.floor(Date.now() / 1000), path = "/v8/finance/chart/" + encodeURIComponent(sym) + "?period1=" + (now - 400 * 86400) + "&period2=" + now + "&interval=1d";
@@ -118,8 +133,9 @@ export async function collectUniverse(rc, mkt, budgetMs) {
   let kept = 0; list.items.forEach((it) => { if (!rows[it.s] && prevBy[it.s]) { rows[it.s] = { ...prevBy[it.s], stale: true }; kept++; } });
   const all = list.items.map((it) => rows[it.s]).filter(Boolean), fresh = all.filter((r) => !r.stale);
   if (!fresh.length) return { ok: false, reason: "야후에서 한 종목도 받지 못함 — 지난 요약 유지", mkt, list: list.source, stats, elapsedMs: Date.now() - t0 };
-  const asOf = Math.max(...fresh.map((r) => r.t || 0));
-  const doc = { ver: 1, mkt, generated: new Date().toISOString(), asOf, n: all.length, fresh: fresh.length, kept, listSource: list.source, listAt: list.at, rows: all };
+  const asOf = Math.max(...fresh.map((r) => r.t || 0)), asOfD = fresh.reduce((a, r) => (r.d && r.d > a ? r.d : a), "");
+  const lagN = fresh.filter((r) => r.d && r.d < asOfD).length;   // 마지막 거래일보다 늦은 종목 수(화면에서 집계 제외)
+  const doc = { ver: 2, mkt, asOfD, lagN, generated: new Date().toISOString(), asOf, n: all.length, fresh: fresh.length, kept, listSource: list.source, listAt: list.at, rows: all };
   const bytes = await setJsonGz(rc, KEYS.data(mkt), doc, 10 * 86400);
-  return { ok: true, mkt, n: all.length, fresh: fresh.length, kept, failed: failed.length, failedSample: failed.slice(0, 8), list: list.source, listN: list.items.length, bytes, stats, stopped: stop, elapsedMs: Date.now() - t0 };
+  return { ok: true, mkt, n: all.length, fresh: fresh.length, kept, asOfD, lagN, failed: failed.length, failedSample: failed.slice(0, 8), list: list.source, listN: list.items.length, bytes, stats, stopped: stop, elapsedMs: Date.now() - t0 };
 }

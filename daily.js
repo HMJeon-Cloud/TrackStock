@@ -66,17 +66,20 @@ var DL_UNI = {};
 function dlUniLoad(mkt) {
   if (mkt !== "us" && mkt !== "kr") return Promise.resolve(null);
   var c = DL_UNI[mkt]; if (c && c.at && Date.now() - c.at < 30 * 60e3) return Promise.resolve(c.doc);
-  return fetch("/api/snap?universe=" + mkt).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { var doc = d && d.rows && d.rows.length >= 50 ? d : null; DL_UNI[mkt] = { at: Date.now(), doc: doc }; return doc; }).catch(function () { DL_UNI[mkt] = { at: Date.now(), doc: null }; return null; });
+  var own = false; try { own = !!localStorage.getItem("sm.owner"); } catch (e) {}
+  var cfgV = typeof DATA !== "undefined" && DATA.config && DATA.config.updated;   // v12.29 새로 수집되면 주소가 바뀌어 CDN 옛 사본을 건너뛴다
+  return fetch("/api/snap?universe=" + mkt + (own ? "&fresh=" + Date.now() : cfgV ? "&v=" + encodeURIComponent(cfgV) : "")).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { var doc = d && d.rows && d.rows.length >= 50 ? d : null; DL_UNI[mkt] = { at: Date.now(), doc: doc }; return doc; }).catch(function () { DL_UNI[mkt] = { at: Date.now(), doc: null }; return null; });
 }
-function dlUni(R) { var c = DL_UNI[R && R.market]; return c && c.doc ? c.doc : null; }
+function dlUni(R) { return R && R.basis && R.basis.kind === "uni" ? R.uni : null; }   // v12.29 날짜·완성도 검증을 통과한 요약만
 function dlUniStocks(U) { return U.rows.filter(function (r) { return r && isFinite(r.r1) && r.c > 0; }).map(function (r) { return { sym: r.s, name: r.n || r.s, sec: r.sec || "", last: r.c, ret1: r.r1, ret: r.r1, m1: r.m1, above20: r.a20, above50: r.a50, above200: r.a200, newHigh: !!r.nh, newLow: !!r.nl, vsHi: r.vh, vsLo: r.vl, hi250: r.hi, lo250: r.lo, longEnough: r.hi != null, amt: r.amt, amtX: r.ax, stale: !!r.stale, uni: true }; }); }
 function dlUniName(U) { return U.mkt === "us" ? "S&P 500 구성 " + U.n + "종목" : "코스피 시총상위 " + U.n + "종목"; }
 function dlUniNote(R) { var U = dlUni(R); if (!U) return "앱 관심 종목 집계(전체 시장이 아님)"; var st = U.rows.filter(function (r) { return r.stale; }).length; return dlUniName(U) + " 집계(" + (U.mkt === "us" ? "위키피디아 구성표" : "네이버 시가총액 순 · KOSPI200 지수 구성과 다름") + ")" + (st ? " · " + st + "종목은 전일 값" : "") + " · 현재 구성 종목의 과거 단면(생존 편향 가능)"; }
-function dlStocks(R) { var U = dlUni(R); if (U) return dlUniStocks(U); return (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$|-USD$/.test(s.sym) && isFinite(s.ret1); }); }
+function dlStocks(R) { if (R && R.marketWideOff) return []; if (R && R.uniStocks) return R.uniStocks; var U = dlUni(R); if (U) return dlUniStocks(U); return (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$|-USD$/.test(s.sym) && isFinite(s.ret1); }); }
 /* 거래대금은 통화가 같은 묶음 안에서만 비교한다 (국내 원 · 해외 달러) */
 function dlAmtGroup(R) { var S = dlStocks(R).filter(function (s) { return s.amt > 0; }), kr = S.filter(function (s) { return /\.K[SQ]$/.test(s.sym); }), us = S.filter(function (s) { return !/\.K[SQ]$/.test(s.sym); }); var useKr = R.market === "kr" || (R.market !== "us" && kr.length >= us.length); if (dlUni(R)) { useKr = dlUni(R).mkt === "kr"; } return { list: useKr ? kr : us, kr: useKr, label: useKr ? "국내 " : "해외 " }; }
 function dlAmtT(v, kr) { return kr ? Math.round(v / 1e8).toLocaleString("ko-KR") + "억원" : "$" + (v >= 1e9 ? (v / 1e9).toFixed(2) + "B" : (v / 1e6).toFixed(1) + "M"); }
 function dlThemes(R) {
+  if (R && R.basis && R.basis.kind === "uni") return (R.themes || []).filter(function (t) { return t && isFinite(t.ret) && t.n >= 2; });
   var U = dlUni(R);
   if (U && U.mkt === "us") { var by = {}; dlUniStocks(U).forEach(function (s) { if (!s.sec) return; var o = by[s.sec] = by[s.sec] || { name: dlSecKo(s.sec), ret: 0, n: 0, up: 0 }; o.ret += s.ret1; o.n++; if (s.ret1 > 0) o.up++; }); return Object.keys(by).map(function (k) { var o = by[k]; o.ret /= o.n; return o; }).filter(function (o) { return o.n >= 2; }).sort(function (a, b) { return b.ret - a.ret; }); }
   if (U && U.mkt === "kr") { var map = {}; (typeof BRIEF_THEMES !== "undefined" ? BRIEF_THEMES : []).forEach(function (t) { t[1].forEach(function (sym) { map[sym] = map[sym] || t[0]; }); }); var by2 = {}; dlUniStocks(U).forEach(function (s) { var k = map[s.sym]; if (!k) return; var o = by2[k] = by2[k] || { name: k, ret: 0, n: 0, up: 0 }; o.ret += s.ret1; o.n++; if (s.ret1 > 0) o.up++; }); var L = Object.keys(by2).map(function (k) { var o = by2[k]; o.ret /= o.n; return o; }).filter(function (o) { return o.n >= 2; }).sort(function (a, b) { return b.ret - a.ret; }); if (L.length >= 4) return L; }
@@ -241,7 +244,7 @@ function dlUniTemp(U) {
   return t;
 }
 function dlDeck() {
-  var R = typeof hubR === "function" ? hubR() : null; if (!R) return []; DL.bigs = [];
+  var R = typeof hubR === "function" ? hubR() : null; if (!R || R.marketWideOff) return []; DL.bigs = [];
   var list = [], defs = [["오늘시장", dlCard1], ["시장체력", dlCard2], ["업종성과", dlCard3], ["거래집중", dlCard4], ["업종거래", dlCard5], ["신고신저", dlCard6], ["자산군", dlCard7], ["성적표", dlCard8], ["시장해설", dlCard9]];
   defs.forEach(function (d) {
     var cv = null;

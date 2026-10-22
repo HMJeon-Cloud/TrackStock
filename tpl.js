@@ -395,7 +395,7 @@ function tplR(mk) {
   return TPL_RC[key];
 }
 function tplSpec(cat, srcId, mkSel) {
-  var R = tplR(mkSel); if (!R) return null;
+  var R = tplR(mkSel); if (!R || R.marketWideOff) return null;   // v12.29 전체 시장 숫자를 못 쓰는 날은 앱 데이터 카드를 만들지 않는다
   var mk = typeof cMktInfo === "function" ? cMktInfo(R) : null, mkName = mk ? mk.name : "전체", unit = R.market === "coin" ? "코인" : "종목", date = tplDateTxt(R), src = tplSrc(R);
   var S = (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); });
   function r1(s) { return s.ret1 != null ? s.ret1 : s.ret; }

@@ -34,7 +34,7 @@ function ocSpec(k) {
   function f(label, value, tone, note) { id++; F.push({ id: "f" + id, label: ocClean(label), value: ocClean(value), tone: tone || "", note: note || "" }); return "f" + id; }
   var sp = { k: k, title: (OC_ITEMS.filter(function (x) { return x.k === k; })[0] || {}).t, mk: null, facts: F, n: OC_N, kicker: "", hook: "", hero: "", rows: [], teaser: "" };
   if (/today|issues|themes|movers|money|sale|hilo|news/.test(k)) {
-    if (!R) return null;
+    if (!R || R.marketWideOff) return null;   // v12.29 전체 시장 숫자를 못 쓰는 날은 만들지 않는다
     sp.mk = mk; var srcDate = mk ? mk.date : "";
     var t = R.temp, i0 = R.indexRow[0], i1 = R.indexRow[1], th = R.themes || [], up = R.movers.up, dn = R.movers.down;
     function r1(s) { return s.ret1 != null && R.mode !== "week" && R.mode !== "month" ? s.ret1 : s.ret; }   // 금주 모드면 한 주 수익률
@@ -431,7 +431,7 @@ function ocDeckSpec(ctx, names, opt) {
         rows.slice(0, 3).forEach(function (x, i) { ocAdd(sp, (i + 1) + "위 " + x.name, ocPct(x.ret), ocTone(x.ret), "구간 첫 종가 → 마지막 종가"); });
         if (rows.length > 3) ocAdd(sp, "꼴찌 " + rows[rows.length - 1].name, ocPct(rows[rows.length - 1].ret), ocTone(rows[rows.length - 1].ret), "구간 첫 종가 → 마지막 종가");
         if (R2.themes && R2.themes.length) ocAdd(sp, "1등 업종 " + R2.themes[0].name, ocPct(R2.themes[0].ret), ocTone(R2.themes[0].ret), "업종 평균");
-        ocAdd(sp, "오른 종목 비율", Math.round(R2.temp.upPct * 100) + "%", "", R2.temp.up + " / " + R2.temp.total);
+        if (R2.temp && isFinite(R2.temp.upPct)) ocAdd(sp, "오른 종목 비율", Math.round(R2.temp.upPct * 100) + "%", "", R2.temp.up + " / " + R2.temp.total);
       } finally { BRIEF_WIN = null; }
       sp.hero = "f1"; sp.rows = ["f2", "f3", "f4", "f5"].filter(function (id) { return ocFact(sp, id); });
       sp.hook = "이번 " + unit + " 1등 자산,\n예상하셨나요?"; sp.teaser = "업종·급등락·날짜별 흐름까지 {n}장";

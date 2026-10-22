@@ -99,7 +99,19 @@ async function fetchYahoo5d(symbol) {
 }
 /* 그 시장 현지 날짜 (미국 -5h · 국내 +9h · 코인 UTC) */
 function localDate(sym, t) { const off = /\.K[SQ]$|^\^KS|^\^KQ/.test(sym) ? 9 : /-USD$/.test(sym) ? 0 : -5; return new Date((t + off * 3600) * 1000).toISOString().slice(0, 10); }
-function mktOf(sym) { return /-USD$/.test(sym) ? "coin" : /=X$|=F$/.test(sym) ? "fx" : /\.K[SQ]$|^\^KS|^\^KQ/.test(sym) ? "kr" : "us"; }
+function mktOf(sym) { return /-USD$/.test(sym) ? "coin" : /=X$|=F$/.test(sym) ? "fx" : /\.K[SQ]$|^\^KS|^\^KQ/.test(sym) ? "kr" : /^\^(N225|HSI|STOXX50E|FTSE|GDAXI|SSEC)$|^DX-Y/.test(sym) ? "other" : "us"; }   // 해외 지수·달러지수는 거래 시간이 달라 미국 기준일과 비교하지 않는다
+/* v12.29 장중엔 '어제 종가'가 기간·5일 응답 모두에서 빠지는 지수가 있다(10/22 코스피·코스닥). range=1d 응답의 chartPreviousClose = 직전 거래일 종가 */
+async function fetchPrevClose(symbol) {
+  for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
+    try {
+      const r = await fetchT("https://" + host + "/v8/finance/chart/" + encodeURIComponent(symbol) + "?range=1d&interval=1d", { headers: { "User-Agent": UA, Accept: "application/json" } });
+      if (!r.ok) continue;
+      const j = await r.json(), m = j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
+      if (m && m.chartPreviousClose > 0) return m;
+    } catch (e) {}
+  }
+  return null;
+}
 
 function toSnapshot(symbol, r, maxYears) {
   const q = r.indicators.quote[0];
@@ -340,6 +352,8 @@ export default async function handler(req, res) {
   const bench = { us: null, kr: null };
   for (const x of Object.keys(recent.symbols)) { const m = mktOf(x), d = lastD(x); if ((m === "us" || m === "kr") && d && (!bench[m] || d > bench[m])) bench[m] = d; }
   let repaired = 0;
+  const refPrev = {};   // 기준일 바로 전 거래일 (기준일까지 받은 종목에서)
+  for (const x of Object.keys(recent.symbols)) { const m = mktOf(x), v = recent.symbols[x]; if (refPrev[m] || !(m === "us" || m === "kr") || !v.t || v.t.length < 2 || lastD(x) !== bench[m]) continue; refPrev[m] = localDate(x, v.t[v.t.length - 2]); }
   {
     const todo = Object.keys(recent.symbols).filter((x) => { const m = mktOf(x), d = lastD(x); return (m === "us" || m === "kr") && d && bench[m] && d < bench[m]; });
     const nowS = Math.floor(Date.now() / 1000);
@@ -363,9 +377,19 @@ export default async function handler(req, res) {
           if (closed && rmt && rmp > 0 && rmt > lt2 && localDate(sym, rmt) > localDate(sym, lt2) && localDate(sym, rmt) <= bench[mktOf(sym)]) {
             out.t.push(rmt); out.c.push(rmp); out.o.push(m.regularMarketOpen || rmp); out.h.push(m.regularMarketDayHigh || rmp); out.l.push(m.regularMarketDayLow || rmp); out.v.push(m.regularMarketVolume || 0); if (out.a) out.a.push(rmp); viaMeta = 1;
           }
+          /* 장중이라 meta 종가를 못 쓰는 경우: 오늘 장이 이미 열렸고(정규장 시각이 기준일 다음 날) 빠진 날이 기준일 '하루'뿐일 때만 직전 종가로 채운다 */
+          const lt3 = out.t[out.t.length - 1], bd = bench[mktOf(sym)];
+          if (!closed && rmt && localDate(sym, rmt) > bd && localDate(sym, lt3) < bd) {
+            const pm = await fetchPrevClose(sym), pc = pm && pm.chartPreviousClose;
+            const between = add.t.filter((x) => localDate(sym, x) > localDate(sym, lt3) && localDate(sym, x) < bd).length;   // 기준일 앞에 또 빈 날이 있으면 확신할 수 없어 안 채운다
+            if (pc > 0 && !between && refPrev[mktOf(sym)] === localDate(sym, lt3) && Math.abs(pc / out.c[out.c.length - 1] - 1) < 0.4) {
+              const ts = Math.floor(Date.parse(bd + (mktOf(sym) === "kr" ? "T00:00:00Z" : "T13:30:00Z")) / 1000);
+              out.t.push(ts); out.c.push(pc); out.o.push(pc); out.h.push(pc); out.l.push(pc); out.v.push(0); if (out.a) out.a.push(pc); viaMeta = 2;
+            }
+          }
           if (out.t.length > cur.t.length) {
             const prevC = cur.c[cur.c.length - 1], newC = out.c[out.c.length - 1];
-            if (!(prevC > 0) || Math.abs(newC / prevC - 1) < 0.4) { recent.symbols[sym] = out; repaired++; if (viaMeta) recent.flags[sym] = (recent.flags[sym] ? recent.flags[sym] + "," : "") + "metaClose"; }
+            if (!(prevC > 0) || Math.abs(newC / prevC - 1) < 0.4) { recent.symbols[sym] = out; repaired++; if (viaMeta) recent.flags[sym] = (recent.flags[sym] ? recent.flags[sym] + "," : "") + (viaMeta === 2 ? "prevClose" : "metaClose"); }
           }
         } catch (e) { /* 그대로 둔다 */ }
       }));
@@ -428,12 +452,17 @@ export default async function handler(req, res) {
      기존 작업(52초) 뒤에 남는 시간을 쓴다 (함수 제한 300초). 야후가 막히면 받은 만큼만 갱신하고 나머지는 지난 요약 유지. */
   let universe = null;
   {
+    /* v12.29 07시(KST) 실행: 국내(어제 마감 확정) → 미국(새벽 마감 확정) 순서로 둘 다, 09시 실행: 미국에서 못 받은 종목 마저.
+       예전엔 07시 미국 · 09시 국내였는데, 09시 국내는 장중이라 전날 종가 확정본과 시차가 생겼다. */
     const q = String(req.query.universe || ""), h = new Date().getUTCHours();
-    const mkt = q === "0" ? null : (q === "us" || q === "kr") ? q : h >= 12 ? "us" : "kr";   // 22 UTC(07시 KST) → 미국 · 0 UTC(09시 KST) → 한국
-    const uniBudget = UNIVERSE_BUDGET_MS - (Date.now() - started);
-    if (!mkt) universe = { skipped: "universe=0" };
-    else if (uniBudget < 30000) universe = { skipped: "시간 부족 (" + Math.round(uniBudget / 1000) + "초 남음)" };
-    else { try { universe = await collectUniverse(redis, mkt, uniBudget); } catch (e) { universe = { ok: false, mkt, error: String(e.message).slice(0, 160) }; } }
+    const mkts = q === "0" ? [] : (q === "us" || q === "kr") ? [q] : h >= 12 ? ["kr", "us"] : ["us"];
+    const res2 = [];
+    for (const mkt of mkts) {
+      const uniBudget = UNIVERSE_BUDGET_MS - (Date.now() - started);
+      if (uniBudget < 30000) { res2.push({ skipped: "시간 부족 (" + Math.round(uniBudget / 1000) + "초 남음)", mkt }); continue; }
+      try { res2.push(await collectUniverse(redis, mkt, uniBudget)); } catch (e) { res2.push({ ok: false, mkt, error: String(e.message).slice(0, 160) }); }
+    }
+    universe = !mkts.length ? { skipped: "universe=0" } : res2.length === 1 ? res2[0] : { ok: res2.every((x) => x.ok), mkt: mkts.join("+"), n: res2.map((x) => x.n || 0).join("+"), fresh: res2.map((x) => x.fresh || 0).join("+"), kept: res2.map((x) => x.kept || 0).join("+"), list: res2.map((x) => x.list || x.skipped || "").join(" | "), elapsedMs: res2.reduce((a, x) => a + (x.elapsedMs || 0), 0), parts: res2 };
   }
 
   /* ③ 목록 */

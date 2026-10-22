@@ -504,7 +504,7 @@ function cGauge(c, score, word) {
 
 /* ---------- 오늘의 브리핑 카드 (8장) ---------- */
 function cardsBrief() {
-  var R = briefState.result; if (!R) return [];
+  var R = briefState.result; if (!R || R.marketWideOff) return [];
   var M = R.market || "all", MN = M !== "all" ? R.mktName + " " : "";
   var out = [], T = 9, date = cDate(M === "kr" ? R.asOfKr : (R.asOfUs || R.asOf)), L = R.label, P = CARD.PAD;
   var TG = function (s) { return s + (MN ? " · " + MN.trim() : "") + " · " + date; };
@@ -905,7 +905,7 @@ function cStatAny(sym) {
   var r = typeof briefState !== "undefined" && briefState.recent, d = r && r.symbols && r.symbols[sym];
   if (d && typeof briefStats === "function") { var st = briefStats(sym, d, "day"); if (st && isFinite(st.ret1)) return { last: st.last, ret1: st.ret1 }; }
   var mk = /\.K[SQ]$/.test(sym) ? "kr" : "us", U = typeof DL_UNI !== "undefined" && DL_UNI[mk] && DL_UNI[mk].doc;
-  if (U) { var row = U.rows.filter(function (x) { return x.s === sym; })[0]; if (row && isFinite(row.r1)) return { last: row.c, ret1: row.r1 }; }
+  if (U) { var row = U.rows.filter(function (x) { return x.s === sym; })[0]; if (row && isFinite(row.r1) && !row.stale && row.d && U.asOfD && row.d === U.asOfD) return { last: row.c, ret1: row.r1 }; }   // v12.29 마지막 거래일 값일 때만
   return null;
 }
 /* 시총 상위 8: 국내는 전체 시장 요약(네이버 시총 순, 우선주 제외)이 있으면 그 순서, 없으면 기준 목록. 미국·코인은 기준 목록 */

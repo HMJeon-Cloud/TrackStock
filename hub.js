@@ -340,7 +340,7 @@ function hubMa200Deck() {
   ], close: ["여러분은 선 위에서 사는 편인가요, 아래에서 사는 편인가요?", ["저장해 두고 다음에 선을 깰 때 꺼내 보세요.", "지수 이야기예요 — 개별 종목은 0이 될 수도 있어요."]], foot: "야후 파이낸스 종가 · 200일 단순이동평균 · S&P500은 SPY(ETF) 기준 · 과거 자료이며 투자 권유 아님" });
 }
 /* ⑦~⑩ 오늘 데이터: 52주 신고가·신저가 / 업종 / 고점 대비 할인 / 돈이 몰린 곳 */
-function hubStocks() { var R = hubR(); return R ? (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); }) : []; }
+function hubStocks() { var R = hubR(); if (R && R.marketWideOff) return []; if (R && R.uniStocks) return R.uniStocks; return R ? (R.stocks || []).filter(function (s) { return !/^\^|=X$|=F$/.test(s.sym); }) : []; }
 function hubTodayDeck(kind) {
   var R = hubR(); if (!R) return []; var S = hubStocks(), date = typeof tplDateTxt === "function" ? tplDateTxt(R) : cDate(Date.now()), unit = R.market === "coin" ? "코인" : "종목", nm = function (s) { return typeof briefName === "function" ? briefName(s) : s.sym; };
   var foot = "야후 파이낸스 종가 · " + date + " 기준 · StockMind 자동 집계 · 투자 권유 아님";
@@ -995,7 +995,7 @@ function hubHead(ctx, nums, t) {
   var k = ctx.split(":")[0], a = ctx.split(":")[1], R = hubR();
   if (k === "hub" && a === "hi52") { var S = hubStocks(), hiN = S.filter(function (x) { return x.newHigh; }).length, loN = S.filter(function (x) { return x.newLow; }).length; return "오늘 52주 신고가 " + hiN + "개, 신저가 " + loN + "개 — " + (hiN > loN * 2 ? "시장 힘이 센 날이에요." : loN > hiN * 2 ? "약한 날이에요." : "힘이 팽팽한 날이에요."); }
   if (k === "hub" && a === "sector" && R && R.themes && R.themes.length >= 2) { var th = R.themes; return "오늘은 " + th[0].name + "(" + cPct(th[0].ret, 2) + ") 쪽이 끌고 " + th[th.length - 1].name + "(" + cPct(th[th.length - 1].ret, 2) + ") 쪽이 처졌어요."; }
-  if (k === "issues" || k === "brief" || k === "onepage" || k === "channel") { var tp = R && R.temp; return tp ? "오늘 오른 종목이 " + Math.round(tp.upPct * 100) + "%" + (tp.upPct >= 0.65 ? " — 대부분 올랐어요." : tp.upPct <= 0.35 ? " — 대부분 내렸어요." : " — 반반이에요.") : (t ? hubStrip(t.d) : ""); }
+  if (k === "issues" || k === "brief" || k === "onepage" || k === "channel") { var tp = R && R.temp; return tp && isFinite(tp.upPct) ? "오늘 오른 종목이 " + Math.round(tp.upPct * 100) + "%" + (tp.upPct >= 0.65 ? " — 대부분 올랐어요." : tp.upPct <= 0.35 ? " — 대부분 내렸어요." : " — 반반이에요.") : (t ? hubStrip(t.d) : ""); }
   var N = nums.filter(function (f) { return f.label; });
   if (N.length >= 2) return nbJosa(N[0].label, "은/는") + " " + N[0].value + ", " + nbJosa(N[1].label, "은/는") + " " + N[1].value + "예요.";
   if (N.length === 1) return N[0].label + " " + N[0].value + "예요.";

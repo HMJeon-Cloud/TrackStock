@@ -140,7 +140,7 @@ function mkPreview() {
       if (MK.mode === "app") cv = tplBuild(cat, MK.src, MK.mk);
       else { var m = MK.meta[cat] || {}, spec = MK_FMT[cat].from(MK.text[cat] != null ? MK.text[cat] : MK_FMT[cat].ex); cv = tplCard(cat, { title: m.title || TPL_CAT[cat].name, sub: m.sub, source: m.source, catName: m.catName || "" }, spec); }
     } catch (e) { console.warn(e); if (msg) msg.textContent = "그리지 못했어요: " + e.message; }
-    if (!cv) { if (ph) ph.textContent = "이 내용은 아직 데이터가 없어요"; return; }
+    if (!cv) { var Rq = MK.mode === "app" && typeof tplR === "function" ? tplR(MK.mk) : null; if (ph) ph.textContent = Rq && Rq.marketWideOff ? "전체 시장 숫자가 맞춰질 때까지 만들지 않아요 — " + ((Rq.basis && Rq.basis.why) || "") : "이 내용은 아직 데이터가 없어요"; return; }   /* v12.29 */
     MK.url = cv.toDataURL("image/png"); img.src = MK.url; img.hidden = false; if (ph) ph.hidden = true;
     var sv = box.querySelector("[data-msave]"); if (sv) { sv.disabled = false; sv.textContent = "⬇ 저장 (" + (MK.size === "reel" ? "1080×1920" : "1080×1350") + ")"; } if (msg) msg.textContent = "";
     // v12.21 직접 쓰기도 인스타 캡션 + 스레드 글
@@ -157,7 +157,7 @@ function mkWorkHtml() {
   // ① 오늘 상태
   var kpi = function (l, v, c) { return '<div class="wbKpi"><small>' + l + '</small><b' + (c ? ' class="' + c + '"' : '') + '>' + v + '</b></div>'; };
   var h = '<div class="wbStep"><b>1</b> 오늘 상태 <small>' + (kst.getUTCMonth() + 1) + '.' + kst.getUTCDate() + '(' + dow + ') · ' + ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[MK.mk] + ' 시장 기준</small></div><div class="wbKpis">' +
-    kpi(R && R.uniTemp ? "오른 종목(전체 시장)" : "오른 종목", temp ? Math.round(temp.upPct * 100) + "%" : "-", temp ? (temp.upPct >= 0.6 ? "pos" : temp.upPct <= 0.4 ? "neg" : "") : "") + kpi("VIX", vix ? parseFloat(vix.v).toFixed(0) : "-", vix && parseFloat(vix.v) >= 25 ? "neg" : "") + kpi("오늘 기사", newsN ? newsN + "건" : "수집 전") + kpi("시장 신호", now.why.length ? now.why.length + "개" : "없음", now.why.length ? "pos" : "") + kpi("정기 발행", per.length ? per.map(function (k) { return cPlain(PER_SETS[k].t).replace(/^\S+\s/, ""); }).join(", ") : "없음", per.length ? "pos" : "") + kpi("오늘 만든 카드", done.length + "건") +
+    kpi(R && R.uniTemp ? "오른 종목(전체 시장)" : "오른 종목", temp && isFinite(temp.upPct) ? Math.round(temp.upPct * 100) + "%" : "-", temp ? (temp.upPct >= 0.6 ? "pos" : temp.upPct <= 0.4 ? "neg" : "") : "") + kpi("VIX", vix ? parseFloat(vix.v).toFixed(0) : "-", vix && parseFloat(vix.v) >= 25 ? "neg" : "") + kpi("오늘 기사", newsN ? newsN + "건" : "수집 전") + kpi("시장 신호", now.why.length ? now.why.length + "개" : "없음", now.why.length ? "pos" : "") + kpi("정기 발행", per.length ? per.map(function (k) { return cPlain(PER_SETS[k].t).replace(/^\S+\s/, ""); }).join(", ") : "없음", per.length ? "pos" : "") + kpi("오늘 만든 카드", done.length + "건") +
     '</div>' + (now.why.length ? '<div class="wbSig">지금 신호 · ' + now.why.map(escapeHtml).join(" / ") + '</div>' : '') +
     '<details class="hubCk wbCk"' + (bad.length ? ' open' : '') + '><summary>발행 전 점검 ' + (bad.length ? '<b class="rbWarn">확인 ' + bad.length + '건</b>' : '<b style="color:#2e7d4f">이상 없음</b>') + ' <small class="briefDim">· 데이터 기준일 · 휴장 · 오류 종목</small></summary><div class="pubCk">' + ck.map(function (c) { return '<div class="pubCkRow ' + (c.ok ? "ok" : c.w ? "bad" : "warn") + '"><span>' + (c.ok ? "✅" : c.w ? "⛔" : "⚠️") + '</span><span>' + escapeHtml(c.t) + '</span></div>'; }).join("") + '</div></details>';
   // ② 주제 고르기

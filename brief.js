@@ -167,6 +167,86 @@ function briefQuality(rows) {
   return { stale: stale, spike: spike, bad: bad, total: rows.length, lagN: lagN, cnt: cnt };
 }
 
+/* ============ v12.29 전체 시장 기준으로 통일 ============
+   미국·국내 화면의 '시장 전체' 숫자(오른 종목·20일선·신고가·업종 순위·급등락·거래대금·세일 중)는 대표 목록(142·76개)이 아니라
+   전체 시장 요약(S&P 500 · 코스피 시총상위 200)으로 계산한다. 아래 조건을 하나라도 못 맞추면 전체 시장 숫자를 쓰지 않고 basis에 이유를 남긴다:
+   ① 요약이 있다 ② 요약의 거래일 = 대표 목록(지수)의 거래일 ③ 그날 값이 있는 종목이 80% 이상 ④ 금주·이번 달은 해당 값(wk·mo)이 있다
+   종목별 사실(차트·낙폭·참고 종목 규칙)은 1년치 시세가 필요해 대표 목록을 그대로 쓴다. */
+var BRIEF_UNI_PENDING = {};
+function briefLocD(mk, ms) { return new Date(ms + (mk === "kr" ? 9 : -5) * 3600e3).toISOString().slice(0, 10); }
+function briefUniOverlay(R, opts) {
+  var mk = R.market;
+  if (mk !== "us" && mk !== "kr") { R.basis = { kind: "app", n: R.count }; return; }
+  if (typeof BRIEF_WIN !== "undefined" && BRIEF_WIN) { R.basis = { kind: "none", why: "직접 고른 기간은 전체 시장 값이 없어요" }; briefHideMarketWide(R); return; }
+  var U = typeof DL_UNI !== "undefined" && DL_UNI[mk] && DL_UNI[mk].doc;
+  if (!U) {
+    R.basis = { kind: "none", why: "전체 시장 요약을 불러오는 중" };
+    if (typeof dlUniLoad === "function" && !BRIEF_UNI_PENDING[mk]) {
+      BRIEF_UNI_PENDING[mk] = 1;
+      dlUniLoad(mk).then(function (doc) {
+        if (!doc) { BRIEF_UNI_PENDING[mk] = 2; return; }
+        if (typeof briefState !== "undefined" && briefState.recent && briefState.result && briefState.result.market === mk) { briefState.result = briefCompute(briefState.recent, { mode: briefState.mode, market: mk, popular: briefState.popular }); if (typeof renderBrief === "function") renderBrief(); }
+        if (typeof TPL_RC !== "undefined") Object.keys(TPL_RC).forEach(function (k) { delete TPL_RC[k]; });
+      });
+    }
+    if (BRIEF_UNI_PENDING[mk] === 2) R.basis.why = "전체 시장 요약을 받지 못함";
+    briefHideMarketWide(R); return;
+  }
+  var mDate = briefLocD(mk, mk === "kr" ? R.asOfKr : R.asOfUs), uDate = U.asOfD || briefLocD(mk, U.asOf || 0);
+  var fld = R.mode === "week" ? "wk" : R.mode === "month" ? "mo" : "r1";
+  var name = typeof dlUniName === "function" ? dlUniName(U) : (U.n + "종목");
+  if (uDate !== mDate) { R.basis = { kind: "none", why: name + " 요약이 " + uDate.slice(5).replace("-", "/") + " 기준이라 지수(" + mDate.slice(5).replace("-", "/") + ")와 날짜가 달라요" }; briefHideMarketWide(R); return; }
+  var rows = U.rows.filter(function (r) { return r && r.c > 0 && !r.stale && (r.d ? r.d === uDate : briefLocD(mk, r.t || 0) === uDate) && r[fld] != null && isFinite(r[fld]); });
+  if (rows.length < U.n * 0.8) { R.basis = { kind: "none", why: name + " 중 " + uDate.slice(5).replace("-", "/") + " " + (fld === "r1" ? "" : fld === "wk" ? "주간 " : "월간 ") + "값이 있는 종목이 " + rows.length + "개뿐" + (fld !== "r1" && !rows.length ? " (다음 수집부터 계산)" : "") }; briefHideMarketWide(R); return; }
+  var cur = mk === "kr" ? "KRW" : "USD";
+  var S = rows.map(function (r) { return { sym: r.s, name: r.n || r.s, sec: r.sec || "", cur: cur, last: r.c, ret: r[fld], ret1: r.r1, ret5: r.r5, m1: r.m1, above20: r.a20, above50: r.a50, above200: r.a200, newHigh: !!r.nh, newLow: !!r.nl, vsHi: r.vh, vsLo: r.vl, hi250: r.hi, lo250: r.lo, longEnough: r.hi != null, amt: r.amt, amtX: r.ax, lastT: r.t, uni: true }; });
+  /* 온도계 */
+  var up = 0, ab = 0, a50 = 0, n50 = 0, a200 = 0, n200 = 0, nh = [], nl = [], nearH = [], nearL = [];
+  S.forEach(function (s) { if (s.ret > 0) up++; if (s.above20) ab++; if (s.above50 != null) { n50++; if (s.above50) a50++; } if (s.above200 != null) { n200++; if (s.above200) a200++; }
+    if (s.newHigh) nh.push(s); else if (s.vsHi != null && s.longEnough && s.vsHi >= -0.03) nearH.push(s);
+    if (s.newLow) nl.push(s); else if (s.vsLo != null && s.vsLo <= 0.03) nearL.push(s); });
+  var byAmt = function (a, b) { return (b.amt || 0) - (a.amt || 0); }; nh.sort(byAmt); nl.sort(byAmt); nearH.sort(byAmt); nearL.sort(byAmt);
+  var t = { total: S.length, up: up, upPct: up / S.length, above20: ab, abovePct: ab / S.length, above50: a50, n50: n50, above50Pct: n50 ? a50 / n50 : null, above200: a200, n200: n200, above200Pct: n200 ? a200 / n200 : null, newHigh: nh, newLow: nl, nearHigh: nearH, nearLow: nearL, uni: name, asOf: U.asOf, n200x: S.filter(function (s) { return s.longEnough; }).length };
+  t.word = t.upPct >= 0.65 ? "훈풍" : t.upPct >= 0.5 ? "미지근" : t.upPct >= 0.35 ? "쌀쌀" : "한파";
+  t.desc = R.temp && R.temp.word === t.word ? R.temp.desc : (t.upPct >= 0.65 ? "대부분이 올랐어요. 이런 날엔 '나만 못 번 것 같은' 조급함을 조심하세요." : t.upPct >= 0.5 ? "오른 종목과 내린 종목이 반반이에요. 종목별 이유가 갈리는 장이에요." : t.upPct >= 0.35 ? "내린 종목이 더 많아요. 개별 악재보다 시장 전체 분위기일 가능성이 커요." : "거의 다 내렸어요. 이런 날은 내 종목만의 문제가 아니에요. 과거 기록을 보고 판단하세요.");
+  t.n200 = n200;
+  /* 업종: 업종 정보가 80% 이상이면 업종(미국 GICS · 네이버 업종), 아니면 우리 테마 분류를 전체 시장 종목에 적용 */
+  var secN = S.filter(function (s) { return s.sec; }).length, useSec = secN >= S.length * 0.8, keyOf;
+  if (useSec) keyOf = function (s) { return typeof dlSecKo === "function" ? dlSecKo(s.sec) : s.sec; };
+  else { var map = {}; (typeof BRIEF_THEMES !== "undefined" ? BRIEF_THEMES : []).forEach(function (th) { th[1].forEach(function (sym) { map[sym] = map[sym] || th[0]; }); }); keyOf = function (s) { return map[s.sym] || null; }; }
+  var g = {};
+  S.forEach(function (s) { var k = keyOf(s); if (!k) return; (g[k] = g[k] || []).push(s); });
+  var themes = Object.keys(g).map(function (k) { var L = g[k]; if (L.length < (useSec ? 3 : 2)) return null; var avg = L.reduce(function (a, s) { return a + s.ret; }, 0) / L.length; var so = L.slice().sort(function (a, b) { return b.ret - a.ret; }); return { name: k, ret: avg, n: L.length, up: L.filter(function (s) { return s.ret > 0; }).length, best: so[0], worst: so[so.length - 1] }; })
+    .filter(function (x) { return x && isFinite(x.ret); }).sort(function (a, b) { return b.ret - a.ret; });
+  /* 급등락 · 거래대금 · 세일 중 */
+  var sorted = S.slice().sort(function (a, b) { return b.ret - a.ret; });
+  var movers = { up: sorted.filter(function (s) { return s.ret > 0; }).slice(0, BRIEF_MAX.movers), down: sorted.filter(function (s) { return s.ret < 0; }).slice(-BRIEF_MAX.movers).reverse() };
+  var withAmt = S.filter(function (s) { return s.amt > 0; });
+  var turn = withAmt.slice().sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover);
+  var hotVol = withAmt.filter(function (s) { return s.amtX != null && s.amtX >= 1.8; }).sort(function (a, b) { return b.amtX - a.amtX; }).slice(0, BRIEF_MAX.turnover);
+  var saleList = S.filter(function (s) { return s.vsHi != null && s.vsHi <= -0.2; }).sort(function (a, b) { return a.vsHi - b.vsHi; });
+  var athList = S.filter(function (s) { return s.vsHi != null && s.vsHi >= -0.02; }).sort(function (a, b) { return b.vsHi - a.vsHi; });
+  var aboveList = S.filter(function (s) { return s.above20; }), belowList = S.filter(function (s) { return !s.above20; });
+  R.tempApp = R.temp; R.themesApp = R.themes; R.moversApp = R.movers;
+  R.temp = t; R.uniTemp = t; R.uni = U; R.uniStocks = S; R.themes = themes; R.movers = movers; R.hotVol = hotVol;
+  R.turnover = Object.assign({}, R.turnover); R.turnover[mk] = turn;
+  if (R.numbers && R.numbers.length >= 3) {
+    R.numbers[0] = Object.assign({}, R.numbers[0], { v: saleList.length + "개", n: S.length + "개 중", list: saleList });
+    R.numbers[1] = Object.assign({}, R.numbers[1], { v: athList.length + "개", list: athList });
+    R.numbers[2] = Object.assign({}, R.numbers[2], { v: Math.round(t.abovePct * 100) + "%", n: t.abovePct >= 0.6 ? "상승 추세 우세" : t.abovePct <= 0.4 ? "하락 추세 우세" : "혼조", list: aboveList, list2: belowList, title: "20일 평균선 위 " + aboveList.length + "개 · 아래 " + belowList.length + "개" });
+  }
+  R.basis = { kind: "uni", name: name, n: S.length, total: U.n, date: uDate, excluded: U.n - S.length, themeKind: useSec ? "업종" : "테마" };
+}
+/* 전체 시장 숫자를 쓸 수 없을 때: 대표 목록 숫자를 '시장'처럼 보여주지 않는다 (빈 칸 + 이유) */
+function briefHideMarketWide(R) {
+  R.tempApp = R.temp; R.themesApp = R.themes; R.moversApp = R.movers;
+  R.marketWideOff = true;
+  R.themes = []; R.movers = { up: [], down: [] }; R.hotVol = [];
+  R.turnover = Object.assign({}, R.turnover); R.turnover[R.market] = [];
+  if (R.numbers) R.numbers = R.numbers.filter(function (n, i) { return i > 2; });
+  R.temp = Object.assign({}, R.temp, { off: true, total: 0, up: 0, upPct: NaN, abovePct: NaN, above50Pct: null, above200Pct: null, newHigh: [], newLow: [], nearHigh: [], nearLow: [], n200: 0, word: "–", desc: (R.basis && R.basis.why) || "" });
+}
+
 function briefCompute(recent, opts) {
   opts = opts || {};
   var mode = opts.mode === "week" ? "week" : opts.mode === "month" ? "month" : "day";
@@ -328,7 +408,9 @@ function briefCompute(recent, opts) {
       if (diff <= 14 && d.getFullYear() < now.getFullYear()) hist.push({ date: e.date, name: e.name, type: e.type, years: now.getFullYear() - d.getFullYear() });
     });
   }
-  return { quality: quality, mode: mode, market: market, mktName: market === "stock" ? "주식" : BRIEF_MKT[market], label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "", stocks: stocks };
+  var OUT = { quality: quality, mode: mode, market: market, mktName: market === "stock" ? "주식" : BRIEF_MKT[market], label: label, asOf: asOf, asOfKr: asOfKr, asOfUs: asOfUs, fx: fx, popular: popular, popSrc: popSrc, popScore: popScore, popTotal: popTotal, turnover: turnover, hotVol: hotVol, amtKrw: amtKrw, temp: temp, indexRow: indexRow, themes: themes, movers: movers, picks: picks, numbers: numbers, history: hist, count: stocks.length, generated: recent.generated || "", stocks: stocks };
+  briefUniOverlay(OUT, opts);
+  return OUT;
 }
 
 /* 뉴스 제목 묶음 → 키워드 순위 (NEWS_TAGS 재사용) */
@@ -361,7 +443,7 @@ function briefFmtAmt(krw) {
   return Math.round(krw / 1e4).toLocaleString() + "만원";
 }
 
-function briefFmtDate(ms) { if (!ms) return ""; var d = new Date(ms + 9 * 3600 * 1000); return d.getUTCFullYear() + "." + String(d.getUTCMonth() + 1).padStart(2, "0") + "." + String(d.getUTCDate()).padStart(2, "0"); }   // 한국 시간 기준
+function briefFmtDate(ms, off) { if (!ms) return ""; var d = new Date(ms + (off == null ? 9 : off) * 3600 * 1000); /* v12.29 off: 시장 현지 시차(미국 -5) */ return d.getUTCFullYear() + "." + String(d.getUTCMonth() + 1).padStart(2, "0") + "." + String(d.getUTCDate()).padStart(2, "0"); }   // 한국 시간 기준
 function briefColor(x) { return x > 0 ? "var(--up)" : x < 0 ? "var(--down)" : "var(--sub)"; }
 function briefSymLink(s) {
   return '<button class="linkBtn briefSym" data-sym="' + s.sym + '" title="종목 탭에서 보기">' + escapeHtml(briefName(s)) + '</button>';
@@ -417,6 +499,7 @@ function briefHealthFinding(t) {
 }
 function briefRenderHealth(R) {
   var t = R.temp, box = $("briefHealth"), hl = $("briefHiLo"); if (!box || !t) return;
+  if (R.marketWideOff) { var off = '<div class="briefDim" style="font-size:13px;padding:6px 0">전체 시장 기준 값이 준비되지 않아 표시하지 않아요 — ' + escapeHtml((R.basis && R.basis.why) || "") + '</div>'; box.innerHTML = '<h3>시장 체력</h3>' + off; if (hl) hl.innerHTML = '<h3>신고가·신저가</h3>' + off; return; }
   var h = '<h3>시장 체력 <small>이동평균선 위 종목 비율</small></h3>' +
     '<div class="fdTitle">' + briefHealthFinding(t) + '</div>' +
     '<div class="fdBars">' + briefBarHtml("20일선 위", "단기", t.abovePct, 50, "50%") +
@@ -459,6 +542,7 @@ function briefCoinAsOf() {
 /* v12.12 전체 시장 요약을 결과 객체에 붙이는 단 하나의 자리 — R.temp(앱 관심 종목 집계)를 R.uniTemp(전체 시장)로 바꾸고 원본은 R.tempApp 에 보관.
    모든 화면(3초 요약·핵심 이슈·카드·작업대·리포트)이 R.temp 를 읽으므로 여기서 한 번만 바꾸면 숫자가 통일된다. 한 결과 객체당 한 번만 시도. */
 function briefApplyUniverse(R) {
+  return;   // v12.29 briefCompute 안의 briefUniOverlay 로 옮김
   if (!R || typeof dlUniLoad !== "function" || !(R.market === "us" || R.market === "kr") || R._uniTried) return;
   R._uniTried = 1;
   dlUniLoad(R.market).then(function (U) { if (U && U.rows && U.rows.length >= 100 && briefState.result === R) { R.uni = U; R.uniTemp = dlUniTemp(U); R.tempApp = R.tempApp || R.temp; R.temp = R.uniTemp; renderBrief(); } }).catch(function () {});
@@ -471,24 +555,24 @@ function renderBrief() {
   if (typeof slBrief === "function") setTimeout(function () { try { slBrief(); } catch (e) { console.warn(e); } }, 0);
   var L = R.label;
   var qn = R.quality ? R.quality.stale.length + R.quality.spike.length : 0;
-  $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs) : R.market === "coin" ? briefCoinAsOf() : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +
-    " · " + (R.market !== "all" ? R.mktName + " " : "") + (R.uni && R.uni.rows ? "전체 " + R.uni.rows.length + "종목(오른 종목·업종) · 대표 " + R.count + "개(지수·ETF·종목 상세)" : R.count + "개 자산") + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "") + (R.quality && R.quality.lagN && (R.market === "us" || R.market === "kr") && (R.quality.lagN[R.market] || 0) * 2 > (R.quality.cnt[R.market] || 0) ? " · ⚠️ 종목 " + R.quality.lagN[R.market] + "개가 마지막 거래일보다 하루 늦어요(아침 수집 다시 실행)" : "");
+  $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs, -5) : R.market === "coin" ? briefCoinAsOf() : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +
+    " · " + (R.market !== "all" ? R.mktName + " " : "") + (R.basis && R.basis.kind === "uni" ? "시장 숫자 " + R.basis.name + " 중 " + R.basis.n + "개" + (R.basis.excluded ? "(전일값 등 " + R.basis.excluded + "개 제외)" : "") + " · 종목 상세 대표 " + R.count + "개" : R.basis && R.basis.kind === "none" ? "⚠️ 전체 시장 숫자 숨김 — " + R.basis.why : R.count + "개 자산") + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "") + (R.quality && R.quality.lagN && (R.market === "us" || R.market === "kr") && (R.quality.lagN[R.market] || 0) * 2 > (R.quality.cnt[R.market] || 0) ? " · ⚠️ 종목 " + R.quality.lagN[R.market] + "개가 마지막 거래일보다 하루 늦어요(아침 수집 다시 실행)" : "");
   var ML = R.market !== "all" ? R.mktName + " " : "";
   /* v12.11 전체 시장(S&P 500 · 코스피 200) 요약이 있으면 오늘 탭의 온도·체력·신고가도 그 기준으로 — 카드(데일리 9장)와 같은 숫자 */
   briefApplyUniverse(R);   // 3초 요약·핵심 이슈·카드·작업대가 읽는 R.temp 도 전체 시장 기준으로 바꿔 모든 화면의 숫자를 맞춘다
-  var t = R.uniTemp || R.temp, uniLab = R.uniTemp ? R.uniTemp.uni + (R.uniTemp.asOf ? " · " + new Date(R.uniTemp.asOf + 9 * 3600e3).toISOString().slice(5, 10).replace("-", "/") + " 마감" : "") + " 기준" : "앱 관심 종목 " + R.temp.total + "개 기준";
+  var t = R.uniTemp || R.temp, uniLab = R.marketWideOff ? "전체 시장 값 준비 중" : R.uniTemp ? R.uniTemp.uni + (R.basis && R.basis.date ? " · " + R.basis.date.slice(5).replace("-", "/") + " 마감" : "") + " 기준" : "대표 자산 " + R.temp.total + "개 기준";
   if ($("briefKpi")) {
     var vixN = (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], nh = (t.newHigh || []).length, nl = (t.newLow || []).length;
     var idx0 = R.indexRow[0];
     $("briefKpi").innerHTML = [
-      { l: "오른 종목", v: Math.round(t.upPct * 100) + "%", s: t.up + "/" + t.total, p: t.upPct, cls: t.upPct >= 0.5 ? "up" : "down" },
-      { l: "20일선 위", v: Math.round(t.abovePct * 100) + "%", s: t.abovePct >= 0.6 ? "상승 우세" : t.abovePct <= 0.4 ? "하락 우세" : "반반", p: t.abovePct, cls: t.abovePct >= 0.5 ? "up" : "down" },
-      { l: "신고가 : 신저가", v: t.n200 ? nh + " : " + nl : "–", s: t.n200 ? "52주 종가 기준" + (t.stale ? " · " + t.stale + "개 전일값" : "") : "1년치 후", p: t.n200 ? nh / Math.max(1, nh + nl) : 0, cls: nh > nl ? "up" : nl > nh ? "down" : "" },
+      { l: "오른 종목", v: isFinite(t.upPct) ? Math.round(t.upPct * 100) + "%" : "–", s: isFinite(t.upPct) ? t.up + "/" + t.total : "준비 중", p: t.upPct, cls: t.upPct >= 0.5 ? "up" : "down" },
+      { l: "20일선 위", v: isFinite(t.abovePct) ? Math.round(t.abovePct * 100) + "%" : "–", s: !isFinite(t.abovePct) ? "준비 중" : t.abovePct >= 0.6 ? "상승 우세" : t.abovePct <= 0.4 ? "하락 우세" : "반반", p: t.abovePct, cls: t.abovePct >= 0.5 ? "up" : "down" },
+      { l: "신고가 : 신저가", v: t.n200 ? nh + " : " + nl : "–", s: R.marketWideOff ? "준비 중" : t.n200 ? "52주 종가 기준" + (t.stale ? " · " + t.stale + "개 전일값" : "") : "1년치 후", p: t.n200 ? nh / Math.max(1, nh + nl) : 0, cls: nh > nl ? "up" : nl > nh ? "down" : "" },
       { l: vixN ? "공포지수" : (idx0 ? idx0.name : "지수"), v: vixN ? vixN.v : (idx0 ? briefPct(idx0.ret) : "–"), s: vixN ? (parseFloat(vixN.v) >= 25 ? "공포" : parseFloat(vixN.v) >= 20 ? "불안" : "평온") : "", p: vixN ? Math.min(1, parseFloat(vixN.v) / 40) : 0.5, cls: vixN ? (parseFloat(vixN.v) >= 25 ? "down" : "") : (idx0 && idx0.ret < 0 ? "down" : "up") }
-    ].map(function (k) { return '<div class="kpi ' + k.cls + '"><div class="kl">' + k.l + '</div><div class="kv">' + k.v + '<small>' + k.s + '</small></div><div class="kb"><i style="width:' + Math.round(k.p * 100) + '%"></i></div></div>'; }).join("");
+    ].map(function (k) { return '<div class="kpi ' + k.cls + '"><div class="kl">' + k.l + '</div><div class="kv">' + k.v + '<small>' + k.s + '</small></div><div class="kb"><i style="width:' + Math.round((isFinite(k.p) ? k.p : 0) * 100) + '%"></i></div></div>'; }).join("");
   }
   if ($("briefTempBox")) $("briefTempBox").innerHTML = '<div class="briefTemp">' +
-    '<div class="briefTempMain"><div class="briefTempDesc"><b style="color:var(--accent)">' + L + ' ' + ML + '시장은 ' + t.word + '</b> — ' + t.desc + ' <span class="briefDim">(' + uniLab + (R.uniTemp && R.tempApp ? ' · 앱 관심 종목 ' + R.tempApp.total + '개 기준 ' + Math.round(R.tempApp.upPct * 100) + '%' : '') + ')</span></div></div>' +
+    '<div class="briefTempMain"><div class="briefTempDesc">' + (R.marketWideOff ? '<b style="color:var(--accent)">' + L + ' ' + ML + '지수만 보여드려요</b> — 오른 종목·업종·급등락 같은 시장 전체 숫자는 숨겼어요(' + escapeHtml((R.basis && R.basis.why) || "준비 중") + '). 틀린 숫자를 보여주지 않으려는 조치예요.' : '<b style="color:var(--accent)">' + L + ' ' + ML + '시장은 ' + t.word + '</b> — ' + t.desc) + ' <span class="briefDim">(' + uniLab + ('') + ')</span></div></div>' +
     '<div class="briefIdxRow">' + R.indexRow.map(function (x) {
       return '<div class="briefIdx"><span>' + x.name + '</span><b style="color:' + briefColor(x.ret) + '">' + briefPct(x.ret) + '</b></div>';
     }).join("") + '</div></div>';
@@ -507,7 +591,7 @@ function renderBrief() {
       '<div class="briefThemeBest">' + briefSymLink(th.best) + ' <span style="color:' + briefColor(th.best.ret) + '">' + briefPct(th.best.ret) + '</span></div>' +
       '</div>';
   });
-  $("briefThemes").innerHTML = briefCollapsible("themes", themeRows, 6, "개 업종");
+  $("briefThemes").innerHTML = R.marketWideOff ? '<div class="briefDim" style="font-size:13px">전체 시장 기준 값이 준비되면 보여드려요</div>' : briefCollapsible("themes", themeRows, 6, "개 " + ((R.basis && R.basis.themeKind) || "업종")) + (R.basis && R.basis.kind === "uni" ? '<div class="briefDim" style="font-size:12px;margin-top:6px">' + escapeHtml(R.basis.name) + ' 기준 · ' + (R.basis.themeKind === "업종" ? (R.market === "us" ? "GICS 업종" : "네이버 업종") : "업종 정보가 없어 우리 테마 분류에 속한 종목만") + ' 평균</div>' : "");
 
   /* ③ 급등·급락 — 종목당 한 줄 + 기사 1줄 */
   function moverRows(list, kind) {
@@ -522,7 +606,7 @@ function renderBrief() {
         '</div>';
     }), BRIEF_SHOW.movers, "개");
   }
-  $("briefUp").innerHTML = moverRows(R.movers.up, "up");
+  $("briefUp").innerHTML = R.marketWideOff ? '<div class="briefDim" style="font-size:13px">전체 시장 기준 값이 준비되면 보여드려요</div>' : moverRows(R.movers.up, "up");
   $("briefDown").innerHTML = moverRows(R.movers.down, "down");
 
   /* ④ 돈이 몰린 곳 — 인기 / 한국 / 미국 / 코인 / 급증을 탭 하나로 */
@@ -567,7 +651,7 @@ function renderBrief() {
   }).join("");
   Array.prototype.forEach.call($("briefPickTabs").querySelectorAll("[data-pk]"), function (b) { b.onclick = function () { briefState.pickTab = b.getAttribute("data-pk"); renderBrief(); }; });
   var P = R.picks.filter(function (p) { return p.id === pk; })[0];
-  $("briefPicks").innerHTML = '<div class="briefPickIntro">' + P.sub + '</div>' +
+  $("briefPicks").innerHTML = '<div class="briefPickIntro">' + P.sub + ' <span class="briefDim">· 1년치 시세가 있는 대표 ' + R.count + '개 중에서 찾음(전체 시장 아님)</span></div>' +
     (P.items.length ? briefCollapsible("pk-" + P.id, P.items.map(function (it) {
       return '<div class="briefPickItem"><div class="briefPickName">' + briefSymLink(it.s) +
         '<span style="color:' + briefColor(it.s.ret) + '">' + briefPct(it.s.ret) + '</span>' +
