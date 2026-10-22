@@ -98,7 +98,7 @@ async function fetchYahoo5d(symbol) {
   return null;
 }
 /* 그 시장 현지 날짜 (미국 -5h · 국내 +9h · 코인 UTC) */
-function localDate(sym, t) { const off = /\.K[SQ]$|^\^KS|^\^KQ/.test(sym) ? 9 : /-USD$/.test(sym) ? 0 : -5; return new Date((t + off * 3600) * 1000).toISOString().slice(0, 10); }
+function localDate(sym, t) { const off = /\.K[SQ]$|^\^KS|^\^KQ|^\^N225$/.test(sym) ? 9 : /^\^HSI$/.test(sym) ? 8 : /-USD$/.test(sym) ? 0 : -5; return new Date((t + off * 3600) * 1000).toISOString().slice(0, 10); }
 function mktOf(sym) { return /-USD$/.test(sym) ? "coin" : /=X$|=F$/.test(sym) ? "fx" : /\.K[SQ]$|^\^KS|^\^KQ/.test(sym) ? "kr" : /^\^(N225|HSI|STOXX50E|FTSE|GDAXI|SSEC)$|^DX-Y/.test(sym) ? "other" : "us"; }   // 해외 지수·달러지수는 거래 시간이 달라 미국 기준일과 비교하지 않는다
 /* v12.29 장중엔 '어제 종가'가 기간·5일 응답 모두에서 빠지는 지수가 있다(10/22 코스피·코스닥). range=1d 응답의 chartPreviousClose = 직전 거래일 종가 */
 async function fetchPrevClose(symbol) {
@@ -394,6 +394,22 @@ export default async function handler(req, res) {
         } catch (e) { /* 그대로 둔다 */ }
       }));
     }
+  }
+  /* v12.32 해외 지수(니케이·항셍): 기준 시장이 없으니 '오늘 장이 열렸는데 바로 전 평일 봉이 비었나'로 판단해 직전 종가로 채운다.
+     직전 종가가 마지막 저장 종가와 같으면(그 평일이 휴장) 채우지 않는다. 24시간 거래되는 달러지수는 진행 중인 하루가 정상이라 손대지 않는다 */
+  const prevWk = (d) => { const x = new Date(d + "T00:00:00Z"); do { x.setUTCDate(x.getUTCDate() - 1); } while (x.getUTCDay() === 0 || x.getUTCDay() === 6); return x.toISOString().slice(0, 10); };
+  for (const sym of ["^N225", "^HSI"]) {
+    const cur = recent.symbols[sym]; if (!cur || !cur.t || !cur.t.length || Date.now() - started > RECENT_BUDGET_MS + 16000) continue;
+    try {
+      const pm = await fetchPrevClose(sym); if (!pm || !pm.regularMarketTime) continue;
+      const lt = cur.t[cur.t.length - 1], lastD0 = localDate(sym, lt), today = localDate(sym, pm.regularMarketTime), want = prevWk(today), pc = pm.chartPreviousClose, lc = cur.c[cur.c.length - 1];
+      if (today > lastD0 && want > lastD0 && prevWk(want) === lastD0 && pc > 0 && Math.abs(pc / lc - 1) > 1e-6 && Math.abs(pc / lc - 1) < 0.2) {
+        const out = { ...cur }; ["t", "o", "h", "l", "c", "v"].forEach((f) => { out[f] = (cur[f] || []).slice(); }); if (cur.a) out.a = cur.a.slice();
+        const ts = Math.floor(Date.parse(want + "T00:00:00Z") / 1000);
+        out.t.push(ts); out.c.push(pc); out.o.push(pc); out.h.push(pc); out.l.push(pc); out.v.push(0); if (out.a) out.a.push(pc);
+        recent.symbols[sym] = out; repaired++; recent.flags[sym] = (recent.flags[sym] ? recent.flags[sym] + "," : "") + "prevClose";
+      }
+    } catch (e) {}
   }
   const behind = [];
   for (const sym of Object.keys(recent.symbols)) {

@@ -148,7 +148,7 @@ function briefPct(x, digits) { if (x == null || !isFinite(x)) return "-"; var d 
    ③ 같은 회사 중복: GOOG/GOOGL, BRK-A/BRK-B, 삼성전자/삼성전자우, 같은 지수 ETF(SPY/VOO) → 하나만 순위에 */
 var BRIEF_DUP = { GOOG: "GOOGL", "BRK-A": "BRK-B", "005935.KS": "005930.KS", VOO: "SPY", "GC=F": "GLD" };
 function briefQuality(rows) {
-  var mk = function (s) { return /\.K[SQ]$|^\^KS|^\^KQ/.test(s.sym) ? "kr" : /-USD$/.test(s.sym) ? "coin" : /=X$|=F$/.test(s.sym) ? "fx" : "us"; };
+  var mk = function (s) { return /\.K[SQ]$|^\^KS|^\^KQ/.test(s.sym) ? "kr" : /-USD$/.test(s.sym) ? "coin" : /=X$|=F$/.test(s.sym) ? "fx" : /^\^(N225|HSI|STOXX50E|FTSE|GDAXI|SSEC)$|^DX-Y/.test(s.sym) ? "other" : "us"; };   // v12.32 해외 지수·달러지수는 거래 시간이 달라 미국 날짜와 비교하지 않음(4일 기준만)
   var newest = {};
   rows.forEach(function (s) { var k = mk(s); if (s.lastT && (!newest[k] || s.lastT > newest[k])) newest[k] = s.lastT; });
   var stale = [], spike = [], bad = {};

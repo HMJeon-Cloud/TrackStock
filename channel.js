@@ -82,7 +82,7 @@ var CH_AUDIT_WORD = { order: "날짜 순서", dup: "중복 날짜", value: "0·�
 function chUniStatus() {
   var out = $("chUniOut"); if (!out) return;
   Promise.all(["us", "kr"].map(function (m) { return fetch("/api/snap?universe=" + m + "&fresh=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); })).then(function (D) {
-    out.innerHTML = D.map(function (d, i) { var m = i ? "코스피 시총상위 200" : "S&P 500"; if (!d || !d.rows) return m + ": 아직 없음"; var st = d.rows.filter(function (r) { return r.stale; }).length, dt = new Date(d.asOf + 9 * 3600e3); return m + ": " + d.n + "종목 · 거래일 " + dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0") + (st ? " · 전일 값 " + st : "") + " · 목록 " + escapeHtml(String(d.listSource || "")); }).join(" &nbsp;|&nbsp; ");
+    out.innerHTML = D.map(function (d, i) { var m = i ? "코스피 시총상위 200" : "S&P 500"; if (!d || !d.rows) return m + ": 아직 없음"; var st = d.rows.filter(function (r) { return r.stale; }).length, dt = new Date(d.asOf + 9 * 3600e3); return m + ": " + d.n + "종목" + (d.ver === 2 ? (d.lagN ? ' · <span style="color:#b45309">하루 늦은 ' + d.lagN + '개(집계 제외)</span>' : "") : ' · <span style="color:#b45309">옛 방식 요약 — 다시 받기 필요</span>') + " · 거래일 " + (d.asOfD || (dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0"))) + (st ? " · 전일 값 " + st : "") + " · 목록 " + escapeHtml(String(d.listSource || "")); }).join(" &nbsp;|&nbsp; ");
   });
 }
 function chRunUniverse(mkt, btn, outEl) {
@@ -126,7 +126,8 @@ function chUniHeal(bench, out) {
     ["kr", "us"].forEach(function (m, i) { var d = D[i], want = bench[m]; if (!want) return; if (!d || !d.rows || (d.asOfD || "") !== want || (d.lagN || 0) > d.rows.length * 0.2 || d.ver !== 2) todo.push(m); });
     if (!todo.length) { line.innerHTML = '전체 시장 요약: <span style="color:var(--good)">국내·미국 모두 마지막 거래일과 같음</span>'; return; }
     var nm = { kr: "코스피 시총상위 200", us: "S&P 500" };
-    return todo.reduce(function (p, m) { return p.then(function () { line.textContent = "전체 시장 요약 다시 받는 중… " + nm[m] + " (1~4분)"; var o = document.createElement("div"); return chRunUniverse(m, document.createElement("button"), o).then(function () { line.innerHTML = nm[m] + ": " + o.innerHTML; }); }); }, Promise.resolve());
+    line.textContent = "전체 시장 요약 다시 받기: " + todo.map(function (m) { return nm[m]; }).join(" → ");
+    return todo.reduce(function (p, m) { return p.then(function () { var ln = document.createElement("div"); ln.className = "briefDim"; ln.textContent = "⏳ " + nm[m] + " 받는 중… (1~4분)"; line.appendChild(ln); var o = document.createElement("span"); return chRunUniverse(m, document.createElement("button"), o).then(function () { ln.innerHTML = "✓ " + o.innerHTML; }); }); }, Promise.resolve()).then(function () { var d = document.createElement("div"); d.innerHTML = '<b style="color:var(--good)">끝 — 새로고침하면 브리핑·카드에 반영돼요</b>'; line.appendChild(d); });
   });
 }
 function chDataGuide() {
