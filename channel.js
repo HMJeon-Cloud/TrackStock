@@ -107,7 +107,7 @@ function chRunSnapshot(btn) {
     if (typeof DATA !== "undefined") { DATA.ready = null; DATA.recentPromise = null; DATA.recentData = null; }
     try { if (typeof briefState !== "undefined") briefState.recent = null; if (typeof nbHist !== "undefined") Object.keys(nbHist).forEach(function (k) { delete nbHist[k]; }); } catch (e3) {}   // 이번 접속 안의 옛 값도 비운다
     out.innerHTML = '<span style="color:var(--good)">완료</span> · 과거 ' + (j.historyUpdated != null ? j.historyUpdated : "-") + '종목 · 최근 ' + (j.recentSymbols != null ? j.recentSymbols : "-") + '종목 · ' + Math.round((j.elapsedMs || 0) / 1000) + '초 — 화면은 새로고침 뒤 반영'
-      + (j.bench ? '<br>마지막 거래일 · 미국 ' + escapeHtml(String(j.bench.us || "-").slice(5)) + ' · 국내 ' + escapeHtml(String(j.bench.kr || "-").slice(5)) : '')
+      + (j.bench ? '<br>마지막 거래일 · 미국 ' + escapeHtml(String(j.bench.us || "-").slice(5)) + ' · 국내 ' + escapeHtml(String(j.bench.kr || "-").slice(5)) + (j.repaired ? ' · 빈 날 메운 종목 ' + j.repaired + '개' : '') : '')
       + (j.behindN ? '<br><span style="color:#b45309">지수보다 하루 이상 늦은 종목 ' + j.behindN + '개: ' + escapeHtml((j.behind || []).slice(0, 12).join(", ")) + '</span>' : (j.bench ? ' · <span style="color:var(--good)">모든 종목이 지수와 같은 날까지 받아짐</span>' : ''));
   }).catch(function (e) { btn.disabled = false; btn.innerHTML = old; out.textContent = "실패: " + e.message; });
 }

@@ -84,6 +84,23 @@ async function fetchYahoo(symbol, days) {
   return null;
 }
 
+/* v12.27 최근 5일만 range 방식으로 — 기간(period1/2) 방식 응답이 마지막 거래일 봉을 빈 값(null)으로 주는 종목을 메우는 데 쓴다 */
+async function fetchYahoo5d(symbol) {
+  const path = "/v8/finance/chart/" + encodeURIComponent(symbol) + "?range=5d&interval=1d";
+  for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
+    try {
+      const r = await fetchT("https://" + host + path, { headers: { "User-Agent": UA, Accept: "application/json" } });
+      if (!r.ok) continue;
+      const j = await r.json(), res = j && j.chart && j.chart.result && j.chart.result[0];
+      if (res && res.timestamp && res.timestamp.length) return res;
+    } catch (e) { /* 다음 호스트 */ }
+  }
+  return null;
+}
+/* 그 시장 현지 날짜 (미국 -5h · 국내 +9h · 코인 UTC) */
+function localDate(sym, t) { const off = /\.K[SQ]$|^\^KS|^\^KQ/.test(sym) ? 9 : /-USD$/.test(sym) ? 0 : -5; return new Date((t + off * 3600) * 1000).toISOString().slice(0, 10); }
+function mktOf(sym) { return /-USD$/.test(sym) ? "coin" : /=X$|=F$/.test(sym) ? "fx" : /\.K[SQ]$|^\^KS|^\^KQ/.test(sym) ? "kr" : "us"; }
+
 function toSnapshot(symbol, r, maxYears) {
   const q = r.indicators.quote[0];
   const adj = (r.indicators.adjclose && r.indicators.adjclose[0] && r.indicators.adjclose[0].adjclose) || null;
@@ -315,18 +332,51 @@ export default async function handler(req, res) {
       if (!recent.symbols[sym] && prevRecent.symbols[sym]) { recent.symbols[sym] = prevRecent.symbols[sym]; kept++; }
     }
   }
-  /* v12.26 뒤처진 종목 점검: 같은 시장 지수(미국 ^GSPC · 국내 ^KS11)의 마지막 거래일보다 하루라도 늦은 종목을 적어 둔다 (코인·환율 제외) */
-  const behind = [];
+  /* v12.27 뒤처진 종목 메우기 + 점검.
+     야후 기간(period1/2) 응답은 막 끝난 거래일 봉을 한동안 빈 값으로 주는 종목이 있다(10/22 미국 142개가 하루 늦게 저장됨).
+     → 시장별로 가장 늦은 날짜(=마지막 거래일)를 구하고, 그보다 늦은 종목은 최근 5일(range) 방식으로 다시 받아 빈 날만 이어 붙인다.
+        그래도 비면, 장이 끝난 상태일 때만 야후 meta의 정규장 종가(regularMarketPrice)로 그날 봉을 만든다(장중 값은 절대 안 씀). */
+  const lastD = (x) => { const v = recent.symbols[x]; return v && v.t && v.t.length ? localDate(x, v.t[v.t.length - 1]) : null; };
+  const bench = { us: null, kr: null };
+  for (const x of Object.keys(recent.symbols)) { const m = mktOf(x), d = lastD(x); if ((m === "us" || m === "kr") && d && (!bench[m] || d > bench[m])) bench[m] = d; }
+  let repaired = 0;
   {
-    const dOf = (x) => { const v = recent.symbols[x]; return v && v.t && v.t.length ? new Date((v.t[v.t.length - 1] + (/\.K[SQ]$|^\^KS|^\^KQ/.test(x) ? 9 : -5) * 3600) * 1000).toISOString().slice(0, 10) : null; };   // 그 시장 현지 날짜
-    const bench = { us: dOf("^GSPC"), kr: dOf("^KS11") };
-    for (const sym of Object.keys(recent.symbols)) {
-      if (/-USD$|=X$|=F$|^\^/.test(sym)) continue;
-      const mk = /\.K[SQ]$/.test(sym) ? "kr" : "us", d = dOf(sym), b = bench[mk];
-      if (d && b && d < b) behind.push(sym + " " + d.slice(5) + (recent.flags[sym] ? " (" + recent.flags[sym] + ")" : ""));
+    const todo = Object.keys(recent.symbols).filter((x) => { const m = mktOf(x), d = lastD(x); return (m === "us" || m === "kr") && d && bench[m] && d < bench[m]; });
+    const nowS = Math.floor(Date.now() / 1000);
+    for (let i = 0; i < todo.length; i += RECENT_CONCURRENCY) {
+      if (Date.now() - started > RECENT_BUDGET_MS + 12000) break;   // 메우기는 최대 12초 더
+      await Promise.all(todo.slice(i, i + RECENT_CONCURRENCY).map(async (sym) => {
+        try {
+          const r = await fetchYahoo5d(sym); if (!r) return;
+          const add = toSnapshot(sym, r, 1), cur = recent.symbols[sym], lt = cur.t[cur.t.length - 1];
+          const rows = [];
+          for (let k = 0; k < add.t.length; k++) if (add.t[k] > lt && localDate(sym, add.t[k]) > localDate(sym, lt)) rows.push(k);
+          const m = r.meta || {}, ctp = m.currentTradingPeriod && m.currentTradingPeriod.regular;
+          const closed = !(ctp && ctp.start && ctp.end && nowS >= ctp.start - 3600 && nowS < ctp.end);
+          const rmt = m.regularMarketTime, rmp = m.regularMarketPrice;
+          const out = { ...cur };
+          ["t", "o", "h", "l", "c", "v"].forEach((f) => { out[f] = (cur[f] || []).slice(); });
+          if (cur.a) out.a = cur.a.slice();
+          rows.forEach((k) => { out.t.push(add.t[k]); out.o.push(add.o[k]); out.h.push(add.h[k]); out.l.push(add.l[k]); out.c.push(add.c[k]); out.v.push(add.v[k]); if (out.a) out.a.push(add.a[k]); });
+          let viaMeta = 0;
+          const lt2 = out.t[out.t.length - 1];
+          if (closed && rmt && rmp > 0 && rmt > lt2 && localDate(sym, rmt) > localDate(sym, lt2) && localDate(sym, rmt) <= bench[mktOf(sym)]) {
+            out.t.push(rmt); out.c.push(rmp); out.o.push(m.regularMarketOpen || rmp); out.h.push(m.regularMarketDayHigh || rmp); out.l.push(m.regularMarketDayLow || rmp); out.v.push(m.regularMarketVolume || 0); if (out.a) out.a.push(rmp); viaMeta = 1;
+          }
+          if (out.t.length > cur.t.length) {
+            const prevC = cur.c[cur.c.length - 1], newC = out.c[out.c.length - 1];
+            if (!(prevC > 0) || Math.abs(newC / prevC - 1) < 0.4) { recent.symbols[sym] = out; repaired++; if (viaMeta) recent.flags[sym] = (recent.flags[sym] ? recent.flags[sym] + "," : "") + "metaClose"; }
+          }
+        } catch (e) { /* 그대로 둔다 */ }
+      }));
     }
-    recent.check = { bench, behind: behind.length };
   }
+  const behind = [];
+  for (const sym of Object.keys(recent.symbols)) {
+    const m = mktOf(sym), d = lastD(sym), b = bench[m];
+    if ((m === "us" || m === "kr") && d && b && d < b) behind.push(sym + " " + d.slice(5) + (recent.flags[sym] ? " (" + recent.flags[sym] + ")" : ""));
+  }
+  recent.check = { bench, behind: behind.length, repaired };
   let recentSaved = null;
   if (recentOk > 0) {
     try {
@@ -402,7 +452,7 @@ export default async function handler(req, res) {
   /* ④ 실행 기록 — /api/config 에서 비밀값 없이 확인할 수 있게 남긴다 */
   const log = {
     at: new Date().toISOString(), elapsedMs: Date.now() - started,
-    symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, bench: recent.check && recent.check.bench, behind: behind.slice(0, 30), behindN: behind.length, historyUpdated: done.length,
+    symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, bench: recent.check && recent.check.bench, behind: behind.slice(0, 30), behindN: behind.length, repaired, historyUpdated: done.length,
     historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
     universe: universe && { ok: universe.ok, mkt: universe.mkt, n: universe.n, fresh: universe.fresh, kept: universe.kept, failed: universe.failed, list: universe.list, h429: universe.stats && universe.stats.h429, skipped: universe.skipped, error: universe.error || universe.reason, elapsedMs: universe.elapsedMs },
     failedSample: failed.slice(0, 5), disc: disc && { dart: disc.dart && { ok: disc.dart.ok, added: disc.dart.added, reason: disc.dart.reason }, sec: disc.sec && { ok: disc.sec.ok, updated: disc.sec.updated }, skipped: disc.skipped }
@@ -417,7 +467,7 @@ export default async function handler(req, res) {
     redisWrites: writes,
     historyUpdated: done.length,
     historyRemaining: symbols.length - withHistory,
-    recentSymbols: recentOk, recentKept: kept, bench: recent.check && recent.check.bench, behindN: behind.length, behind: behind.slice(0, 30),
+    recentSymbols: recentOk, recentKept: kept, bench: recent.check && recent.check.bench, behindN: behind.length, behind: behind.slice(0, 30), repaired,
     recentSaved, manifestOk, yahoo: yahooStats,
     failed: failed.slice(0, 10),
     disc, universe,

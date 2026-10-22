@@ -115,7 +115,7 @@ function issuesRender(boxId, list) {
         (it.sym ? '<button class="linkBtn issGo" data-sym="' + it.sym + '" title="종목 탭에서 보기">›</button>' : '') + '</li>';
     }).join("") + '</ol>';
   box.querySelector('[data-act="copy"]').onclick = function () { (typeof chCopy === "function" ? chCopy : issCopy)(issuesText(list), this); };
-  box.querySelector('[data-act="card"]').onclick = function () { issuesCardOpen(list); };
+  var cb = box.querySelector('[data-act="card"]'); if (cb) cb.onclick = function () { issuesCardOpen(list); };   // v12.27 카드 버튼이 없는 화면에서 오류 나던 것
   Array.prototype.forEach.call(box.querySelectorAll(".issGo"), function (b) {
     b.onclick = function () { $("searchInput").value = b.getAttribute("data-sym"); navTo("single", "chart"); if (typeof load === "function") load(); };
   });

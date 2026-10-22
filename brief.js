@@ -152,13 +152,19 @@ function briefQuality(rows) {
   var newest = {};
   rows.forEach(function (s) { var k = mk(s); if (s.lastT && (!newest[k] || s.lastT > newest[k])) newest[k] = s.lastT; });
   var stale = [], spike = [], bad = {};
+  /* v12.27 주식 시장(미국·국내)은 '하루라도' 늦으면 그날 등락에서 뺀다 (전날 값이 오늘 값처럼 섞이던 문제).
+     단, 절반 넘게 늦으면 가장 늦은 날짜 쪽이 이상한 것일 수 있어 예전 기준(4일)으로 돌아간다 */
+  var ld = function (k, t) { return new Date(t + (k === "kr" ? 9 : -5) * 3600e3).toISOString().slice(0, 10); };
+  var lagN = {}, cnt = {};
+  rows.forEach(function (s) { var k = mk(s); if (!s.lastT || !newest[k] || (k !== "us" && k !== "kr")) return; cnt[k] = (cnt[k] || 0) + 1; if (ld(k, s.lastT) < ld(k, newest[k])) lagN[k] = (lagN[k] || 0) + 1; });
   rows.forEach(function (s) {
     var k = mk(s);
-    if (s.lastT && newest[k] && newest[k] - s.lastT > 4 * 86400000) { stale.push(s); bad[s.sym] = "stale"; }
+    var strict = (k === "us" || k === "kr") && (lagN[k] || 0) * 2 <= (cnt[k] || 0);
+    if (s.lastT && newest[k] && (strict ? ld(k, s.lastT) < ld(k, newest[k]) : newest[k] - s.lastT > 4 * 86400000)) { stale.push(s); bad[s.sym] = "stale"; }
     var lim = k === "coin" ? 0.6 : 0.4;
     if (Math.abs(s.ret1) > lim) { spike.push(s); bad[s.sym] = "spike"; }
   });
-  return { stale: stale, spike: spike, bad: bad, total: rows.length };
+  return { stale: stale, spike: spike, bad: bad, total: rows.length, lagN: lagN, cnt: cnt };
 }
 
 function briefCompute(recent, opts) {
@@ -466,7 +472,7 @@ function renderBrief() {
   var L = R.label;
   var qn = R.quality ? R.quality.stale.length + R.quality.spike.length : 0;
   $("briefAsOf").textContent = "종가 기준 — " + (R.market === "kr" ? "한국 " + briefFmtDate(R.asOfKr) : R.market === "us" ? "미국 " + briefFmtDate(R.asOfUs) : R.market === "coin" ? briefCoinAsOf() : "한국 " + briefFmtDate(R.asOfKr) + " · 미국 " + briefFmtDate(R.asOfUs)) +
-    " · " + (R.market !== "all" ? R.mktName + " " : "") + R.count + "개 자산" + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "");
+    " · " + (R.market !== "all" ? R.mktName + " " : "") + (R.uni && R.uni.rows ? "전체 " + R.uni.rows.length + "종목(오른 종목·업종) · 대표 " + R.count + "개(지수·ETF·종목 상세)" : R.count + "개 자산") + (qn ? " (데이터 확인 필요 " + qn + "개 제외)" : "") + (R.quality && R.quality.lagN && (R.market === "us" || R.market === "kr") && (R.quality.lagN[R.market] || 0) * 2 > (R.quality.cnt[R.market] || 0) ? " · ⚠️ 종목 " + R.quality.lagN[R.market] + "개가 마지막 거래일보다 하루 늦어요(아침 수집 다시 실행)" : "");
   var ML = R.market !== "all" ? R.mktName + " " : "";
   /* v12.11 전체 시장(S&P 500 · 코스피 200) 요약이 있으면 오늘 탭의 온도·체력·신고가도 그 기준으로 — 카드(데일리 9장)와 같은 숫자 */
   briefApplyUniverse(R);   // 3초 요약·핵심 이슈·카드·작업대가 읽는 R.temp 도 전체 시장 기준으로 바꿔 모든 화면의 숫자를 맞춘다
