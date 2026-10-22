@@ -874,6 +874,24 @@
     #chAlloc td:first-child, #chAlloc th:first-child { padding-left: 6px; }
     #chAlloc .briefDim { font-size: 10px; }
   }
+  /* v12.33 데이터 센터 */
+  .dhTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; background: var(--soft); border-radius: 12px; padding: 10px 14px; }
+  .dhH { margin: 22px 0 10px; font-size: 16px; } .dhH small { color: var(--sub); font-weight: 500; font-size: 12px; margin-left: 6px; }
+  .dhMks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } @media (max-width: 900px) { .dhMks { grid-template-columns: 1fr; } }
+  .dhMk { border: 1px solid var(--line, #e5e7eb); border-radius: 14px; padding: 14px; background: var(--card, #fff); }
+  .dhMkHead { display: flex; justify-content: space-between; align-items: center; } .dhMkHead h4 { margin: 0; font-size: 15px; }
+  .dhBig { font-size: 20px; font-weight: 800; margin: 8px 0 4px; } .dhBig small { display: block; font-size: 11.5px; font-weight: 500; color: var(--sub); }
+  .dhIdx { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; margin-bottom: 8px; }
+  .dhT { width: 100%; border-collapse: collapse; font-size: 12.5px; } .dhT th { text-align: left; vertical-align: top; width: 38%; padding: 6px 6px 6px 0; color: var(--sub); font-weight: 600; border-top: 1px solid var(--line, #eee); } .dhT td { padding: 6px 0; border-top: 1px solid var(--line, #eee); } .dhT td small { display: block; color: var(--sub); font-size: 11px; margin-top: 2px; }
+  .dhRows { border-top: 1px solid var(--line, #eee); } .dhRow { padding: 7px 0; border-bottom: 1px solid var(--line, #eee); min-width: 0; } .dhRowL { font-size: 11.5px; color: var(--sub); font-weight: 600; } .dhRowV { font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; word-break: keep-all; } .dhRowS { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .dhMk, .dhBtn { min-width: 0; } #dataHubBody .dgT td { overflow-wrap: anywhere; }
+  .dhHow { margin-top: 8px; font-size: 11.5px; color: var(--sub); line-height: 1.5; }
+  .dhBadge { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #eef0f3; color: #475569; } .dhBadge.ok { background: #e7f6ec; color: #1f7a45; } .dhBadge.warn { background: #fff4e0; color: #9a5b00; } .dhBadge.bad { background: #fde8e8; color: #b42318; }
+  .dhOk { color: #1f7a45; } .dhWarn { color: #b45309; }
+  .dhBtns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } @media (max-width: 760px) { .dhBtns { grid-template-columns: 1fr; } }
+  .dhBtn { border: 1px solid var(--line, #e5e7eb); border-radius: 12px; padding: 12px; background: var(--card, #fff); } .dhBtn .chip { font-weight: 700; }
+  .dhBtnTxt { font-size: 12.5px; line-height: 1.55; margin-top: 6px; } .dhBtnTxt small { display: block; color: var(--sub); margin-top: 4px; } .dhOut { font-size: 12px; margin-top: 6px; }
+  .dhGuide summary { cursor: pointer; font-size: 13px; color: var(--sub); padding: 6px 0; }
   .chQuality { background: var(--soft); border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-top: 10px; line-height: 1.6; }
   /* 투자 마음 테스트 */
   .mindProg { height: 6px; background: #eef1f4; border-radius: 3px; overflow: hidden; }
@@ -2279,7 +2297,7 @@
 <div id="tab-channel" class="hidden">
 <div class="card" id="channelCard">
   <div class="pgHead"><h2>채널 브리핑 <small>오늘 쓸 글 · 근거 자료 (데일리 글 · MDD · 자산배분 · 과거 사례) · 운영자용</small></h2><button class="chip" id="ownerLock" title="이 기기에서 운영자 모드 끄기">🔒 운영자 모드 끄기</button></div>
-  <div class="toolbar"><div class="tbActions" style="margin-left:0"><button class="primary" onclick="makerGo('today')">🃏 카드 만들기 ›</button><button class="chip" id="chFullCopy">📋 전체 글 복사</button><button class="chip" id="chShortCopy">스레드용(500자) 복사</button><button class="chip" id="chDataGuide" title="API 키 · 자동 수집 · 수동 작업을 한 장에">🔌 데이터 연동 안내</button><span id="chCount" class="briefDim"></span></div></div>
+  <div class="toolbar"><div class="tbActions" style="margin-left:0"><button class="primary" onclick="makerGo('today')">🃏 카드 만들기 ›</button><button class="chip" id="chFullCopy">📋 전체 글 복사</button><button class="chip" id="chShortCopy">스레드용(500자) 복사</button><button class="chip" onclick="navTo('data')" title="데이터 상태 · 최신화 버튼 · 연동 안내">🔌 데이터 센터</button><span id="chCount" class="briefDim"></span></div></div>
 
   <section class="briefSec slHero" id="chHero"></section>
   <div class="chCols"><div class="chColL">
@@ -2288,8 +2306,8 @@
     <div id="pubBox"></div>
   </section>
   </div><div class="chColR">
-  <div class="colLabel">근거 자료 <small>데이터 점검 → 핵심 이슈 → ①~④</small></div>
-  <div id="chQuality" class="chQuality"></div>
+  <div class="colLabel">근거 자료 <small>핵심 이슈 → ①~④</small></div>
+  <div class="chQuality"><span id="chQualityLine"></span> <button class="chip" onclick="navTo('data')">🔌 데이터 센터 ›</button></div>
   <div id="chTop5" class="issBox" style="margin-top:12px"></div>
 
   <section class="briefSec snapTarget" data-snap-title="미국 증시 데일리 브리핑">
@@ -2328,6 +2346,13 @@
 </div>
 </div><!-- /tab-channel -->
 
+<div id="tab-data" class="hidden">
+<div class="card" id="dataHubCard">
+  <div class="pgHead"><h2>🔌 데이터 센터 <small>지금 무엇을 보여주고 있나 · 무엇을 언제 어떻게 최신화하나 · 운영자용</small></h2></div>
+  <div id="dataHubBody"></div>
+</div>
+</div><!-- /tab-data -->
+
 <div id="tab-home">
   <section class="hero">
     <div class="heroEmoji">📈</div>
@@ -2358,6 +2383,11 @@
     <button class="startCard ownerOnly" id="startBrief">
       <span class="startIcon" style="background:#eefbf3">📰</span>
       <span class="startText"><b>오늘의 브리핑</b><small>시장 온도 · 뜨거운 테마 · 급등락 이유 · 참고 종목</small></span>
+      <span class="startArrow">›</span>
+    </button>
+    <button class="startCard ownerOnly" id="startData">
+      <span class="startIcon" style="background:#eef4ff">🔌</span>
+      <span class="startText"><b>데이터 센터</b><small>국내·미국·코인 데이터 상태 · 최신화 버튼 · 연동 안내</small></span>
       <span class="startArrow">›</span>
     </button>
   </div>
@@ -2562,7 +2592,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.32"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.33"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -4143,7 +4173,7 @@ function renderRecent() {
 renderRecent();
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "report", "analyst"];   // v11.6 배당(div)은 관심 탭 안으로
+var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "report", "analyst", "data"];   // v11.6 배당(div)은 관심 탭 안으로
 var currentTab = "home";
 
 var SUBS = ["chart", "history", "insight", "tech", "company"];
@@ -4182,7 +4212,7 @@ function refreshSubPanes() {
 function switchTab(target, sub, noScroll) {
   if (target === "div") { target = "watch"; setTimeout(function () { if (typeof switchWatchPane === "function") switchWatchPane("div"); }, 0); }   // v11.6 배당은 관심 탭 안
   if (TABS.indexOf(target) < 0) target = "home";
-  if ((target === "brief" || target === "channel" || target === "onecard" || target === "report" || target === "analyst") && !isOwner()) { if (typeof OWNER !== "undefined" && OWNER.token && !OWNER.checked) OWNER.want = target; target = "home"; }   // 운영자 전용 화면
+  if ((target === "brief" || target === "channel" || target === "onecard" || target === "report" || target === "analyst" || target === "data") && !isOwner()) { if (typeof OWNER !== "undefined" && OWNER.token && !OWNER.checked) OWNER.want = target; target = "home"; }   // 운영자 전용 화면
   currentTab = target;
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-tab") === target);
@@ -4197,6 +4227,7 @@ function switchTab(target, sub, noScroll) {
   if (target === "watch" && typeof renderWatchTab === "function") renderWatchTab(false);
   if (target === "brief" && typeof loadBrief === "function") loadBrief(false);
   if (target === "channel" && typeof renderChannel === "function") renderChannel();
+  if (target === "data" && typeof renderDataHub === "function") renderDataHub();   // v12.33 데이터 센터
   if (target === "mind" && typeof renderMind === "function") renderMind();
   if (target === "onecard" && typeof makerRender === "function") makerRender();   // v10.5 카드 만들기 화면
   if (target === "report" && typeof renderReport === "function") renderReport();   // v11.7 리포트(인사이트)
@@ -4233,7 +4264,7 @@ function pushPaneState(patch) {
 /* ---------- 운영자 전용 화면 ('오늘의 브리핑'·'채널 브리핑 자료') ----------
    운영자 키를 한 번 넣으면 이 기기에 토큰이 저장되어 계속 보인다. 다른 사람에겐 진입 버튼이 아예 보이지 않고,
    주소로 직접 들어와도 홈으로 돌아간다. 잠금 해제: 주소 끝에 ?owner 를 붙여 접속 → 운영자 키 입력. */
-var OWNER_TABS = ["brief", "channel", "onecard", "report", "analyst"];
+var OWNER_TABS = ["brief", "channel", "onecard", "report", "analyst", "data"];
 var OWNER = { token: (function () { try { return localStorage.getItem("sm.owner") || ""; } catch (e) { return ""; } })(), ok: false, want: null };
 OWNER.ok = !!OWNER.token;   // v12.7 저장된 토큰은 일단 믿고 운영자 화면을 바로 그린다(서버 확인이 끝나면 틀린 토큰은 즉시 해제). 홈이 먼저 보였다가 바뀌는 깜빡임 방지 — 데이터 자체는 서버가 토큰으로 다시 검사한다
 /* v10.8 운영자 = 기기에 토큰이 있고 + 이번 접속에서 서버가 그 토큰을 확인한 경우만 (기기 저장소를 고쳐도 열리지 않음) */
@@ -4373,6 +4404,7 @@ $("startBrief").onclick = function () { navTo("brief"); };
 $("footChannel").onclick = function () { navTo("channel"); };
 $("ownerLock").onclick = function () { ownerSet(""); };
 $("startChannel").onclick = function () { navTo("channel"); };
+$("startData").onclick = function () { navTo("data"); };
 $("startMind").onclick = function () { navTo("mind"); };
 $("briefToChannel").onclick = function () { navTo("channel"); };
 
@@ -4958,7 +4990,7 @@ setTimeout(smBootDone, 3000);
 <!-- v12.13 앱 스크립트 한 곳에서 로드 — 버전은 SM_VER 하나만 올리면 전 파일 캐시가 같이 갱신된다(파일마다 ?v= 손으로 올리던 실수 방지). 순서는 의존 관계 그대로 -->
 <script>
 (function () {
-  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","report.js","archive.js","analyst.js"];
+  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","report.js","archive.js","analyst.js"];
   document.write(files.map(function (f) { return '<script src="' + f + '?v=' + SM_VER + '"><\/script>'; }).join(""));
 })();
 </script>

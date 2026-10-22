@@ -59,21 +59,10 @@ function chPrepare() {
   });
 }
 /* 데이터 점검 결과 표시 */
-function chRenderQuality() {
-  var R = chState.brief, box = $("chQuality"); if (!R || !box) return;
-  var q = R.quality, n = q.stale.length + q.spike.length;
-  var gen = chState.recent && chState.recent.generated ? kstFmt(chState.recent.generated) + " (한국 시간)" : "-";
-  box.innerHTML = '<b>🩺 데이터 점검</b> 수집 ' + gen + ' · ' + q.total + '개 자산 · ' +
-    (n ? '<span style="color:#b45309">확인 필요 ' + n + '개 — 순위·카드에서 제외했어요</span>' : '<span style="color:var(--good)">이상 없음</span>') +
-    (n ? '<div class="briefDim" style="margin-top:4px">' +
-      (q.stale.length ? '오래된 데이터(수집 실패로 지난 값): ' + q.stale.map(function (s) { return briefName(s) + " " + kstFmt(new Date(s.lastT).toISOString(), false).slice(5); }).join(", ") + '<br>' : '') +
-      (q.spike.length ? '하루 ±40% 넘는 급변(오류 의심): ' + q.spike.map(function (s) { return briefName(s) + " " + chPct(s.ret1); }).join(", ") : '') + '</div>' : '') +
-    '<div class="row" style="gap:6px;margin-top:6px"><button class="chip" id="chSnapBtn" title="크론과 같은 전체 수집(과거 순환 40종목 + 최근 90일 + 공시·구루·매크로·공모주)">☀️ 아침 수집 지금 실행</button><span id="chSnapOut" class="briefDim" style="font-size:11.5px"></span><button class="chip" id="chAuditBtn">과거 데이터까지 전체 점검</button><span class="briefDim" style="font-size:11.5px">25년치 · 9가지 방법으로 교차 확인 · 30~50초</span></div><div id="chAuditOut"></div>' +
-    '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><b style="font-size:13px">전체 시장 요약</b><button class="chip" data-uni="us">🇺🇸 S&P 500 지금 받기</button><button class="chip" data-uni="kr">🇰🇷 코스피 시총상위 200 지금 받기</button><span class="briefDim" style="font-size:11.5px">크론이 매일 07시(국내 → 미국)에 받고 09시에 미국 나머지를 채워요 · 수동은 1~4분</span></div><div id="chUniOut" class="briefDim" style="font-size:12px;margin-top:4px"></div>';
-  var ab = $("chAuditBtn"); if (ab) ab.onclick = chRunAudit;
-  var sb = $("chSnapBtn"); if (sb) sb.onclick = function () { chRunSnapshot(sb); };
-  Array.prototype.forEach.call(document.querySelectorAll("[data-uni]"), function (b) { b.onclick = function () { chRunUniverse(b.getAttribute("data-uni"), b); }; });
-  chUniStatus();
+function chRenderQuality() {   // v12.33 점검·수집 버튼은 데이터 센터로 옮기고, 채널엔 한 줄 상태만
+  var R = chState.brief, el = $("chQualityLine"); if (!R || !el) return;
+  var q = R.quality, n = q.stale.length + q.spike.length, gen = chState.recent && chState.recent.generated ? kstFmt(chState.recent.generated) : "-";
+  el.innerHTML = '🩺 수집 ' + gen + ' · ' + (n ? '<span style="color:#b45309">확인 필요 ' + n + '개(' + escapeHtml(q.stale.concat(q.spike).slice(0, 3).map(function (s) { return briefName(s); }).join(", ")) + ') — 순위·카드에서 제외</span>' : '<span style="color:var(--good)">이상 없음</span>');
 }
 /* v9.4 — 과거 데이터 전체 점검: 서버(/api/cron-snapshot?audit=1)가 저장된 모든 종목을 순서·중복·0/음수·자릿수·튀었다 돌아온 값·유지된 급변·
    수정주가 비율·과거파일↔최근값 불일치·52주 최고가 교차확인·갱신 지연으로 검사한다. 운영자 토큰으로 실행(CRON_SECRET 불필요) */
@@ -130,7 +119,8 @@ function chUniHeal(bench, out) {
     return todo.reduce(function (p, m) { return p.then(function () { var ln = document.createElement("div"); ln.className = "briefDim"; ln.textContent = "⏳ " + nm[m] + " 받는 중… (1~4분)"; line.appendChild(ln); var o = document.createElement("span"); return chRunUniverse(m, document.createElement("button"), o).then(function () { ln.innerHTML = "✓ " + o.innerHTML; }); }); }, Promise.resolve()).then(function () { var d = document.createElement("div"); d.innerHTML = '<b style="color:var(--good)">끝 — 새로고침하면 브리핑·카드에 반영돼요</b>'; line.appendChild(d); });
   });
 }
-function chDataGuide() {
+function chDataGuide() { var el = document.createElement("div"); el.className = "dgWrap"; el.innerHTML = chDataGuideHtml(); infoModal.open("🔌 데이터 연동 안내 — 무엇이 어디서 언제 오나", el); }
+function chDataGuideHtml() {
   var K = (typeof DATA !== "undefined" && DATA.config && DATA.config.keys) || {}, C = (typeof DATA !== "undefined" && DATA.config) || {};
   var on = function (b, t, f) { return b == null ? '<span class="dgNa">확인 불가</span>' : b ? '<span class="dgOk">✓ ' + (t || "설정됨") + '</span>' : '<span class="dgNo">✗ ' + (f || "없음") + '</span>'; };
   var lr = C.lastRun || {}, lrAt = lr.at ? String(lr.at).slice(0, 16) : "-";
@@ -150,7 +140,7 @@ function chDataGuide() {
   ], ["무엇", "어디서 받나", "연동되는 데이터", "주기", "지금 상태"]);
   h += '<h4>② 키 없이 자동으로 오는 데이터</h4>' + tbl([
     ['<b>야후 파이낸스 일봉</b> <small>/api/chart · 크론</small>', '전 관심 종목 ' + (C.symbols || "-") + '개의 과거 전체(수정주가·배당) + 최근 400일 · 화면에서 종목을 열면 그 종목은 실시간', '크론 매일 <b>07:00 · 09:00</b>(KST) — 과거는 실행당 40종목씩 순환, 최근 400일은 매번 전부 · 마지막 수집 ' + escapeHtml(lrAt) + (lr.bench ? ' · 마지막 거래일 미국 ' + escapeHtml(String(lr.bench.us || "-").slice(5)) + ' / 국내 ' + escapeHtml(String(lr.bench.kr || "-").slice(5)) : '') + (lr.behindN ? ' · <span class="dgNo">늦은 종목 ' + lr.behindN + '개: ' + escapeHtml((lr.behind || []).slice(0, 8).join(", ")) + '</span>' : lr.bench ? ' · <span class="dgOk">✓ 전 종목 같은 날까지</span>' : '')],
-    ['<b>전체 시장 요약</b> <small>S&P 500 · 코스피 시총상위 200</small>', '종목별 등락·이동평균 위치·52주 고저·거래대금 → 오늘 탭 온도·체력·신고가, 데일리 9장, 리포트 시장 폭', '07:00 크론 = S&P 500(위키피디아 구성표, 7일 캐시) · 09:00 크론 = 코스피(네이버 시총 순) · 구성 목록은 매달 보관'],
+    ['<b>전체 시장 요약</b> <small>S&P 500 · 코스피 시총상위 200</small>', '종목별 등락·이동평균 위치·52주 고저·거래대금 → 오늘 탭 온도·체력·신고가, 데일리 9장, 리포트 시장 폭', '07:00 크론 = 코스피(어제 마감) → S&P 500 · 09:00 크론 = S&P 500 나머지 · 구성 목록은 매달 보관'],
     ['<b>네이버 증권 공개 API</b> <small>/api/fund</small>', '투자지표(PER·PBR·EPS·배당) · 재무제표 · 투자자별 매매 · 목표주가 — 종목·애널리스트·선별 종목', '화면에서 요청할 때 실시간'],
     ['<b>야후 종목 검색</b> <small>/api/search</small>', '영문 종목 검색 (한글은 앱 사전이 먼저)', '검색할 때'],
     ['<b>SEC EDGAR</b>', '13F 원문 — 위 SEC_UA만 있으면 키 없이', '매일 아침 크론'],
@@ -158,18 +148,17 @@ function chDataGuide() {
     ['<b>사용자 행동 집계</b> <small>/api/hit · /api/poll</small>', '인기 종목(조회·관심 횟수, 개인정보 없음) · 투자 마음 테스트 응답 수', '사용자가 쓸 때 · 주 단위 키, 3주 뒤 삭제']
   ], ["무엇", "어떤 데이터", "주기"]);
   h += '<h4>③ 운영자가 손으로 해야 하는 일</h4>' + tbl([
-    ['<b>아침 수집 지금 실행</b>', '채널 운영 → 데이터 점검 → ☀️ 버튼', '휴일 다음 날·크론 실패·코인 09:00 마감분이 안 들어왔을 때 (오늘 탭에 ⚠️ 표시)'],
-    ['<b>전체 시장 요약 지금 받기</b>', '채널 운영 → 전체 시장 요약 → 🇺🇸/🇰🇷 버튼 (1~4분)', '크론이 시간 부족으로 중단됐거나 "전일 값 N개"가 많을 때'],
-    ['<b>공시·구루·공모주·매크로 지금 수집</b>', '관심 탭 → 공시/구루/공모주/매크로 하위탭의 "지금 수집"', '크론 끝에 시간이 모자라 건너뛴 날 · 처음 키를 넣은 날(과거분 받기)'],
-    ['<b>과거 데이터 전체 점검</b>', '채널 운영 → 데이터 점검 → "과거 데이터까지 전체 점검" (30~50초)', '월 1회 또는 차트가 이상해 보일 때 — serious 종목만 확인'],
+    ['<b>아침 수집 지금 실행</b>', '데이터 센터 → ② ☀️ 아침 수집 지금 실행', '휴일 다음 날·크론 실패·코인 09:00 마감분이 안 들어왔을 때 (오늘 탭에 ⚠️ 표시)'],
+    ['<b>전체 시장 요약 지금 받기</b>', '데이터 센터 → ② 🇺🇸/🇰🇷 요약 지금 받기 (1~4분) · 아침 수집 뒤 자동으로도 받음', '크론이 시간 부족으로 중단됐거나 "전일 값 N개"가 많을 때'],
+    ['<b>공시·구루·공모주·매크로 지금 수집</b>', '데이터 센터 → ② 매크로·공시·구루·공모주 지금 수집', '크론 끝에 시간이 모자라 건너뛴 날 · 처음 키를 넣은 날(과거분 받기)'],
+    ['<b>과거 데이터 전체 점검</b>', '데이터 센터 → ② 🔍 과거 데이터 전체 점검 (30~50초)', '월 1회 또는 차트가 이상해 보일 때 — serious 종목만 확인'],
     ['<b>애널리스트 답변 저장</b>', '분석 탭 → 프롬프트 복사 → AI 답변 붙여넣기 → 저장', '분석할 때마다 — 쌓일수록 과거 기록·적중률·보정이 정확해짐'],
     ['<b>분석 기록 백업</b>', '분석 탭 ⑥ → 백업 내려받기(JSON)', '월 1회 권장 (서버 최대 500건)'],
     ['<b>글·주제·일정·정책 데이터</b>', '채널 운영 → 글·참고 (주제 은행 · 일정 목록 · 정책 데이터 편집)', '정책·일정이 바뀔 때'],
     ['<b>Vercel 환경변수·키 갱신</b>', 'Vercel → Settings → Environment Variables → Redeploy', '네이버 구 키 2027-06 만료 · OpenAI 잔액 · DART/ECOS 키는 만료 없음']
   ], ["작업", "어디서", "언제"]);
   h += '<div class="dgIntro" style="margin-top:10px"><b>연동하지 않는 것(의도적)</b>: 미국 10-Q/10-K 원문·실적 발표 PDF·컨퍼런스콜 — 무료 연동이 없거나 용량이 커서 제외. 애널리스트 프롬프트에 "첨부 자료가 있으면 같이 보라"는 문구만 넣어요. 텔레그램·푸시 알림 없음.</div>';
-  var el = document.createElement("div"); el.className = "dgWrap"; el.innerHTML = h;
-  infoModal.open("🔌 데이터 연동 안내 — 무엇이 어디서 언제 오나", el);
+  return h;
 }
 function chRunAudit() {
   var out = $("chAuditOut"), btn = $("chAuditBtn"); if (!out) return;
