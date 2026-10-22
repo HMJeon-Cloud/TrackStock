@@ -888,3 +888,68 @@ function cardsDownload(it) { var a = document.createElement("a"); a.href = it.ur
   var b = document.getElementById("briefCards"); if (b) b.onclick = function () { cardsOpen("brief"); };
   var c = document.getElementById("chCards"); if (c) c.onclick = function () { cardsOpen("channel"); };
 })();
+
+/* ============================================================ v12.25 시장 국기 · 모노그램 배지 · 시총 상위 8 · 인기 ETF (마감 브리핑 · 오늘 한 장 공용) ============================================================
+   로고는 각 회사의 상표라 그리지 않는다 — 우리 색(먹색 바탕 + 금색 글자)의 약자 배지로 통일한다. 국기는 단순화한 도형으로 직접 그린다(이모지 국기는 윈도에서 글자로 보임). */
+var CAP8 = {
+  us: [["NVDA", "엔비디아"], ["MSFT", "마이크로소프트"], ["AAPL", "애플"], ["GOOGL", "알파벳"], ["AMZN", "아마존"], ["META", "메타"], ["AVGO", "브로드컴"], ["TSLA", "테슬라"]],
+  kr: [["005930.KS", "삼성전자"], ["000660.KS", "SK하이닉스"], ["373220.KS", "LG에너지솔루션"], ["207940.KS", "삼성바이오로직스"], ["005380.KS", "현대차"], ["012450.KS", "한화에어로스페이스"], ["105560.KS", "KB금융"], ["000270.KS", "기아"]],
+  coin: [["BTC-USD", "비트코인"], ["ETH-USD", "이더리움"], ["XRP-USD", "리플"], ["BNB-USD", "BNB"], ["SOL-USD", "솔라나"], ["DOGE-USD", "도지코인"], ["ADA-USD", "에이다"], ["TRX-USD", "트론"]]
+};
+var ETF_POP = {
+  us: [["SPY", "S&P500 ETF"], ["QQQ", "나스닥100 ETF"], ["SCHD", "미국 배당 ETF"], ["SOXX", "반도체 ETF"], ["TQQQ", "나스닥100 3배"], ["JEPI", "커버드콜 ETF"]],
+  kr: [["069500.KS", "KODEX 200"], ["122630.KS", "KODEX 레버리지"], ["114800.KS", "KODEX 인버스"], ["360750.KS", "TIGER 미국S&P500"], ["133690.KS", "TIGER 미국나스닥100"]]
+};
+/* 종목 하루 숫자: 앱 스냅샷(다른 카드와 같은 출처) → 없으면 전체 시장 요약 */
+function cStatAny(sym) {
+  var r = typeof briefState !== "undefined" && briefState.recent, d = r && r.symbols && r.symbols[sym];
+  if (d && typeof briefStats === "function") { var st = briefStats(sym, d, "day"); if (st && isFinite(st.ret1)) return { last: st.last, ret1: st.ret1 }; }
+  var mk = /\.K[SQ]$/.test(sym) ? "kr" : "us", U = typeof DL_UNI !== "undefined" && DL_UNI[mk] && DL_UNI[mk].doc;
+  if (U) { var row = U.rows.filter(function (x) { return x.s === sym; })[0]; if (row && isFinite(row.r1)) return { last: row.c, ret1: row.r1 }; }
+  return null;
+}
+/* 시총 상위 8: 국내는 전체 시장 요약(네이버 시총 순, 우선주 제외)이 있으면 그 순서, 없으면 기준 목록. 미국·코인은 기준 목록 */
+function cCap8(mk) {
+  var base = CAP8[mk] || [], out = [];
+  var U = mk === "kr" && typeof DL_UNI !== "undefined" && DL_UNI.kr && DL_UNI.kr.doc;
+  var list = U ? U.rows.filter(function (x) { return x && x.n && !/우[BC]?$|우\(전환\)$/.test(x.n); }).slice(0, 8).map(function (x) { return [x.s, x.n]; }) : base;
+  list.forEach(function (p) { var st = cStatAny(p[0]); if (st) out.push({ sym: p[0], name: p[1], ret: st.ret1, last: st.last }); });
+  return { rows: out, src: U ? "네이버 시총 순" : "기준 목록" };
+}
+function cEtfPop(mk) { return (ETF_POP[mk] || []).map(function (p) { var st = cStatAny(p[0]); return st ? { sym: p[0], name: p[1], ret: st.ret1, last: st.last } : null; }).filter(Boolean); }
+/* 약자 배지: 미국 = 티커, 국내 = 영문 접두(SK·LG·KB) 또는 이름 첫 글자, 코인 = 티커 */
+function cMonoTxt(sym, name) { if (/-USD$/.test(sym)) return sym.replace(/-USD$/, "").slice(0, 4); if (!/\.K[SQ]$/.test(sym)) return sym.replace(/-.*/, "").slice(0, 4); var m = String(name).match(/^[A-Z&]{2,3}/); return m ? m[0] : String(name).slice(0, 1); }
+function cMono(g, x, y, sz, sym, name) {
+  cRound(g, x, y, sz, sz, sz * 0.24, "#14161c");
+  var t = cMonoTxt(sym, name), fs = Math.round(sz * (t.length <= 1 ? 0.5 : t.length === 2 ? 0.42 : t.length === 3 ? 0.34 : 0.29));
+  cText(g, t, x + sz / 2, y + sz / 2 + fs * 0.36, fs, 900, "#e6c57a", "center");
+}
+/* 국기 (h = 높이). us: 13줄 + 파란 칸, kr: 태극 + 네 괘(단순화) */
+function cFlag(g, x, y, h, k) {
+  if (k === "us") {
+    var w = Math.round(h * 1.9); g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+    for (var i = 0; i < 13; i++) { g.fillStyle = i % 2 ? "#ffffff" : "#b22234"; g.fillRect(x, y + h * i / 13, w, h / 13 + 0.6); }
+    var cw = w * 0.4, ch = h * 7 / 13; g.fillStyle = "#3c3b6e"; g.fillRect(x, y, cw, ch);
+    g.fillStyle = "#ffffff"; for (var r = 0; r < 5; r++) for (var c2 = 0; c2 < 6; c2++) { var px = x + cw * (c2 + 0.5 + (r % 2) * 0.25) / 6.3, py = y + ch * (r + 0.6) / 5.4; g.beginPath(); g.arc(px, py, Math.max(0.8, h * 0.022), 0, Math.PI * 2); g.fill(); }
+    g.restore(); g.strokeStyle = "rgba(0,0,0,0.25)"; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); return w;
+  }
+  if (k === "kr") {
+    var w2 = Math.round(h * 1.5), cx = x + w2 / 2, cy = y + h / 2, R2 = h * 0.25, ang = Math.atan2(2, 3);
+    g.fillStyle = "#ffffff"; g.fillRect(x, y, w2, h); g.strokeStyle = "rgba(0,0,0,0.25)"; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w2 - 1, h - 1);
+    g.save(); g.translate(cx, cy); g.rotate(ang);
+    g.fillStyle = "#cd2e3a"; g.beginPath(); g.arc(0, 0, R2, Math.PI, 0); g.fill();
+    g.fillStyle = "#0047a0"; g.beginPath(); g.arc(0, 0, R2, 0, Math.PI); g.fill();
+    g.fillStyle = "#cd2e3a"; g.beginPath(); g.arc(R2 / 2, 0, R2 / 2, 0, Math.PI); g.fill();
+    g.fillStyle = "#0047a0"; g.beginPath(); g.arc(-R2 / 2, 0, R2 / 2, Math.PI, 0); g.fill();
+    g.restore();
+    // 괘: [각도, 패턴(1=이어진 막대, 0=끊긴 막대) 바깥→안]
+    var bw = h * 0.25, bh = h * 0.04, gap = h * 0.025, dist = h * 0.38;
+    [[Math.PI + ang, [1, 1, 1]], [-ang, [0, 1, 0]], [ang, [0, 0, 0]], [Math.PI - ang, [1, 0, 1]]].forEach(function (q) {
+      g.save(); g.translate(cx + Math.cos(q[0]) * dist, cy + Math.sin(q[0]) * dist); g.rotate(q[0] + Math.PI / 2); g.fillStyle = "#111111";
+      q[1].forEach(function (solid, j) { var yy = (j - 1) * (bh + gap) - bh / 2; if (solid) g.fillRect(-bw / 2, yy, bw, bh); else { g.fillRect(-bw / 2, yy, bw * 0.45, bh); g.fillRect(bw * 0.05, yy, bw * 0.45, bh); } });
+      g.restore();
+    });
+    return w2;
+  }
+  return 0;
+}

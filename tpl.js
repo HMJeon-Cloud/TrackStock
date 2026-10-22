@@ -57,6 +57,7 @@ function tplNew(meta) {
   var ty = sy + 8 + size * 0.86;
   if (ic) { var isz = 100, ix = TPL.W - P - isz, iy = sy + 2; g.save(); cRound(g, ix, iy, isz, isz, 22, null); g.clip(); g.drawImage(ic, ix, iy, isz, isz); g.restore(); cRound(g, ix, iy, isz, isz, 22, null); g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.stroke(); }
   lines.forEach(function (l, i) { cRich(g, l, P, ty + i * size * 1.1, size, 900, TPL_C.ink, TPL_C.gold2); });
+  if (meta.flag && typeof cFlag === "function") { var fh = Math.round(size * 0.62), fx = P + cW(g, cPlain(lines[0] || ""), size, 900) + 22; if (fx + fh * 1.9 < TPL.W - P - (ic ? 118 : 0)) cFlag(g, fx, ty - size * 0.72, fh, meta.flag); }   // v12.25 제목 옆 국기
   var y = ty + (lines.length - 1) * size * 1.1 + 30;
   if (cW(g, cPlain(lines[lines.length - 1] || ""), size, 900) > W - 170) y += 30;   // 제목 끝이 화살표와 겹치지 않게
   tplUphill(g, P, y, W); y += 14;
@@ -81,6 +82,7 @@ function tplBand(g, x, y, w, h, text, size, bg, color) { cRound(g, x, y, w, h, 8
 /* ---------- ① 마감 브리핑 v12.19 (우상향연구소 고유 배치): 지수 2줄(이름 · 큰 값 · 등락 알약) → 주요 움직임 3개는 가로 막대 순위 → 관심 8개는 2×4 타일 → 결론 띠
    {indexes:[{name,val,chg,pct}] ×2, features:[{name,pct,sub}] ×3, chips:[{name,pct}] ≤8, foot} ---------- */
 function tplMarket(c, s) {
+  if (s.caps && s.etfs) return tplMarket2(c, s);   // v12.25 국내·미국: 지수 → (왼쪽 급등락 | 오른쪽 인기 ETF) → 시총 상위 8
   var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y;
   var pv = function (t) { var m = String(t || "").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) * (/^[-▼]/.test(String(t)) ? -1 : 1) : 0; };
   // ① 지수 2줄
@@ -118,6 +120,55 @@ function tplMarket(c, s) {
   });
   y += Math.ceil(ch.length / cols) * (th + gap) + 10;
   if (s.foot) tplBand(g, P, Math.min(y + 10, TPL.H - 164), W, 70, s.foot, 28);
+  return tplFoot(c);
+}
+/* v12.25 마감 브리핑(국내·미국): 위 지수 2줄 · 가운데 왼쪽 '가장 크게 움직인 종목' 막대 + 오른쪽 '인기 ETF' · 아래 시총 상위 8(약자 배지 + 이름 + 등락) · 결론 띠 */
+function tplMarket2(c, s) {
+  var g = c.g, P = TPL.P, W = TPL.W - P * 2, y = c.y;
+  var pv = function (t) { var m = String(t || "").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) * (/^[-▼]/.test(String(t)) ? -1 : 1) : 0; };
+  var ix = (s.indexes || []).slice(0, 2), ft = (s.features || []).slice(0, tplN(4, 6)), et = (s.etfs || []).slice(0, tplN(5, 6)), cp = (s.caps || []).slice(0, 8);
+  // 세로 배분: 필요한 높이를 먼저 재고 남는 세로는 칸에 고르게(내용 우선)
+  var nMid = Math.max(ft.length, et.length), base = ix.length * 96 + 20 + 36 + nMid * 64 + 24 + 36 + 2 * 118 + 12 + (s.foot ? 84 : 0), room = TPL.H - TPL.FOOT - 16 - y, K = Math.max(1, Math.min(1.5, room / base));
+  // ① 지수
+  var rh = Math.round(96 * K);
+  ix.forEach(function (it, i) {
+    var yy = y + i * rh + (rh - 96) / 2, col = tplCol(it.pct);
+    cText(g, it.name, P, yy + 58, 34, 900, TPL_C.ink);
+    var pct = String(it.pct || ""), pw = cW(g, pct, 26, 900) + 28; cRound(g, P + W - pw, yy + 22, pw, 44, 10, col); cText(g, pct, P + W - pw / 2, yy + 54, 26, 900, "#ffffff", "center");
+    var vs = 58; while (vs > 34 && cW(g, it.val, vs, 900) > W - pw - 24 - cW(g, it.name, 34, 900) - 40) vs -= 4;
+    cText(g, it.val, P + W - pw - 24, yy + 62, vs, 900, TPL_C.ink, "right");
+    if (it.chg) cText(g, "전일 대비 " + it.chg, P + W - pw - 24, yy + 88, 17, 600, TPL_C.sub, "right");
+    g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.beginPath(); g.moveTo(P, y + (i + 1) * rh); g.lineTo(P + W, y + (i + 1) * rh); g.stroke();
+  });
+  y += ix.length * rh + Math.round(20 * K);
+  // ② 가운데: 왼쪽 급등락 막대 · 오른쪽 인기 ETF
+  var gapC = 24, cw = (W - gapC) / 2, mh = Math.round(64 * K), lx = P, rx = P + cw + gapC;
+  cText(g, "가장 크게 움직인 종목", lx, y + 24, 21, 800, TPL_C.sub); cText(g, "인기 ETF", rx, y + 24, 21, 800, TPL_C.sub); y += 36;
+  g.fillStyle = TPL_C.soft; g.fillRect(P + cw + gapC / 2 - 1, y - 6, 2, nMid * mh);
+  var mx = Math.max.apply(null, ft.map(function (f) { return Math.abs(pv(f.pct)); }).concat([0.01]));
+  ft.forEach(function (f, i) {
+    var yy = y + i * mh, mid = yy + mh / 2, col = tplCol(f.pct), nmW = 150, vW = cW(g, f.pct, 26, 900) + 10, bw = Math.max(10, Math.abs(pv(f.pct)) / mx * (cw - nmW - vW - 16));
+    cText(g, cFit(g, f.name, nmW - 10, 22, 800), lx, mid + 8, 22, 800, TPL_C.ink);
+    cRound(g, lx + nmW, mid - 13, bw, 26, 6, col); cText(g, f.pct, lx + nmW + bw + 8, mid + 9, 26, 900, col);
+  });
+  et.forEach(function (e, i) {
+    var yy = y + i * mh, mid = yy + mh / 2, col = tplCol(e.pct);
+    cRound(g, rx, yy + 6, cw, mh - 12, 10, i % 2 ? "#ffffff" : TPL_C.box); g.fillStyle = col; g.fillRect(rx, yy + 14, 5, mh - 28);
+    cText(g, cFit(g, e.name, cw - 150, 22, 800), rx + 18, mid + 8, 22, 800, TPL_C.ink); cText(g, e.pct, rx + cw - 14, mid + 10, 28, 900, col, "right");
+  });
+  y += nMid * mh + Math.round(24 * K);
+  // ③ 시총 상위 8 — 4 × 2 타일
+  cText(g, "시가총액 상위 8", P, y + 24, 21, 800, TPL_C.sub); y += 36;
+  var cols = 4, tg = 12, tw = (W - tg * (cols - 1)) / cols, th = Math.round(118 * K) - tg;
+  cp.forEach(function (k, i) {
+    var x = P + (i % cols) * (tw + tg), yy = y + Math.floor(i / cols) * (th + tg), col = tplCol(k.pct), bz = Math.min(60, th * 0.5);
+    cRound(g, x, yy, tw, th, 12, "#ffffff"); g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.stroke();
+    if (typeof cMono === "function") cMono(g, x + 12, yy + 12, bz, k.sym, k.name);
+    cText(g, cFit(g, k.name, tw - bz - 34, 20, 800), x + bz + 22, yy + 12 + bz / 2 + 7, 20, 800, TPL_C.ink);
+    var ps = 32; while (ps > 20 && cW(g, k.pct, ps, 900) > tw - 24) ps -= 2; cText(g, k.pct, x + tw - 12, yy + th - 14, ps, 900, col, "right");
+  });
+  y += Math.ceil(cp.length / cols) * (th + tg);
+  if (s.foot) tplBand(g, P, Math.min(y + 10, TPL.H - TPL.FOOT - 84), W, 70, s.foot, 28);
   return tplFoot(c);
 }
 /* ---------- ② 순위 12칸: {items:[{rank,tag,name,value,sub}]} ---------- */
@@ -350,11 +401,13 @@ function tplSpec(cat, srcId, mkSel) {
   function r1(s) { return s.ret1 != null ? s.ret1 : s.ret; }
   if (cat === "market") {
     var ix = R.indexRow.slice(0, 2).map(function (i) { var st = tplStat(i.sym); var chg = st ? st.last - st.last / (1 + st.ret1) : null; return { name: i.name, val: tplFmt(i.sym, i.last).replace(/원$|\$/g, function (m) { return m; }), chg: chg != null ? (chg >= 0 ? "▲ " : "▼ ") + Math.abs(chg).toFixed(2) : "", pct: tplPct(i.ret) }; });
-    var mv = R.movers.up.slice(0, tplN(2, 3)).concat(R.movers.down.slice(0, tplN(1, 2))).sort(function (a, b) { return Math.abs(r1(b)) - Math.abs(r1(a)); });
+    var mv = R.movers.up.slice(0, tplN(2, 3) + (R.market === "us" || R.market === "kr" ? 1 : 0)).concat(R.movers.down.slice(0, tplN(1, 2) + (R.market === "us" || R.market === "kr" ? 1 : 0))).sort(function (a, b) { return Math.abs(r1(b)) - Math.abs(r1(a)); });
     var ft = mv.slice(0, tplN(3, 5)).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
     var pop = (R.popular || []).filter(function (s) { return mv.indexOf(s) < 0; }).slice(0, tplN(8, 12)).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
     var hiN0 = S.filter(function (s) { return s.newHigh; }).length;
-    return { meta: { title: mkName === "미국" ? "새벽의 미장" : mkName === "코인" ? "오늘의 코인" : mkName === "국내" ? "오늘의 국장" : "오늘의 시장", sub: date + " · 전일 대비", source: src, catName: mkName + " 마감" }, spec: { indexes: ix, features: ft, chips: pop, foot: "오른 " + unit + " " + Math.round(R.temp.upPct * 100) + "%  ·  20일선 위 " + Math.round(R.temp.abovePct * 100) + "%  ·  52주 신고가 " + hiN0 + "개" } };
+    var flag = R.market === "us" || R.market === "kr" ? R.market : null, caps = flag && typeof cCap8 === "function" ? cCap8(R.market) : null, etf = flag && typeof cEtfPop === "function" ? cEtfPop(R.market) : null;
+    if (flag) ft = mv.slice(0, tplN(4, 6)).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
+    return { meta: { title: mkName === "미국" ? "새벽의 미장" : mkName === "코인" ? "오늘의 코인" : mkName === "국내" ? "오늘의 국장" : "오늘의 시장", sub: date + " · 전일 대비" + (caps ? " · 시총 상위 8: " + caps.src : ""), source: src, catName: mkName + " 마감", flag: flag }, spec: { indexes: ix, features: ft, chips: pop, caps: caps && caps.rows.length >= 4 ? caps.rows.map(function (c) { return { sym: c.sym, name: c.name, pct: tplPct(c.ret) }; }) : null, etfs: etf && etf.length ? etf.map(function (e) { return { name: e.name, pct: tplPct(e.ret) }; }) : null, foot: "오른 " + unit + " " + Math.round(R.temp.upPct * 100) + "%  ·  20일선 위 " + Math.round(R.temp.abovePct * 100) + "%  ·  52주 신고가 " + hiN0 + "개" } };
   }
   if (cat === "rank") {
     var list, title, val, tag;

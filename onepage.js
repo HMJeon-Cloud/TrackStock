@@ -3,7 +3,7 @@
    그날 데이터 + 기사 + 일정 + 스크린(매수 후보·주의 종목) + 상식 한 줄을 한 장(1080×1350)에 번호 칸으로 정리.
    시장(국내·미국·코인)별로 한 장. 모든 숫자는 종가 기준 자동 집계. 스크린은 '조건에 걸린 종목'이지 추천이 아님.
    ============================================================ */
-var OP_C = { bg: "#f6f1e7", paper: "#ffffff", ink: "#1c2333", ink2: "#4c5566", sub: "#8a92a3", line: "#e4ddcf", navy: "#1f2a44", gold: "#c9a24f", gold2: "#e6c57a", goldBg: "#fff4d6", up: "#d9342b", down: "#2f6fd6", upBg: "#fdeeec", downBg: "#eaf1fc", green: "#2e8b57", greenBg: "#e8f5ec", warn: "#b45309", warnBg: "#fff1e0" };
+var OP_C = { bg: "#fbf8f1", paper: "#ffffff", ink: "#14161c", ink2: "#3b4256", sub: "#7a7468", line: "#e4dfd3", navy: "#14161c", head: "#14161c", gold: "#c9a24f", gold2: "#e6c57a", goldBg: "#fff4d6", up: "#d9342b", down: "#2f6fd6", upBg: "#fdeeec", downBg: "#eaf1fc", green: "#2e8b57", greenBg: "#e8f5ec", warn: "#b45309", warnBg: "#fff1e0" };
 /* 매일 돌아가는 '오늘의 한 줄' — 세금·계좌·실무 상식 (바뀔 수 있는 숫자는 기준을 적음) */
 var OP_TIPS = {
   common: [
@@ -91,7 +91,8 @@ function opBox(g, x, y, w, h, no, title, sub, col) {
   g.fillStyle = OP_C.gold; g.beginPath(); g.arc(x + 28, y + 23, 15, 0, Math.PI * 2); g.fill();
   cText(g, String(no), x + 28, y + 31, 21, 900, "#1c2333", "center");
   cText(g, title, x + 52, y + 31, 24, 800, "#ffffff");
-  if (sub) cText(g, cFit(g, sub, w - 52 - cW(g, title, 24, 800) - 36, 17, 600), x + 52 + cW(g, title, 24, 800) + 14, y + 31, 17, 600, "rgba(255,255,255,0.75)");
+  if (sub) cText(g, cFit(g, sub, w - 52 - cW(g, title, 24, 800) - 36, 17, 600), x + 52 + cW(g, title, 24, 800) + 14, y + 31, 17, 600, "#c9b98f");
+  g.fillStyle = OP_C.gold; g.fillRect(x, y + 44, w, 2);   // v12.25 우상향연구소 색: 먹색 머리 + 금색 선
   return y + 60;
 }
 function opRow(g, x, y, w, name, right, rc, sub, fs) {
@@ -111,18 +112,19 @@ function onePageCard(R, iss, news) {
   var cv = document.createElement("canvas"); cv.width = CARD.W; cv.height = CARD.H; var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
   g.fillStyle = OP_C.bg; g.fillRect(0, 0, CARD.W, CARD.H);
   var P = 36, W = CARD.W - P * 2, mk = typeof cMktInfo === "function" ? cMktInfo(R) : null, unit = R.market === "coin" ? "코인" : "종목", sec = R.market === "coin" ? "테마" : "업종";
-  var mkName = mk ? mk.name : "전체", mkc = mk ? mk.c : OP_C.navy, t = R.temp, rec = briefState.recent && briefState.recent.symbols;
+  var mkName = mk ? mk.name : "전체", mkc = OP_C.head, t = R.temp, rec = briefState.recent && briefState.recent.symbols, flag = R.market === "us" || R.market === "kr" ? R.market : null;   // v12.25 칸 머리는 모두 먹색(시장 구분은 국기로)
   function st(sym) { var d = rec && rec[sym]; return d ? briefStats(sym, d, "day") : null; }
   // ── 머리
-  g.fillStyle = mkc; g.fillRect(0, 0, CARD.W, 10);
-  cRound(g, P, 28, cW(g, mkName + " 주식", 20, 800) + 30, 36, 8, mkc); cText(g, R.market === "coin" ? "코인" : mkName + " 주식", P + 15, 53, 20, 800, "#fff");
-  cText(g, "매일 한 장 · 우상향연구소", P + cW(g, mkName + " 주식", 20, 800) + 44, 53, 18, 700, OP_C.sub);
+  g.fillStyle = OP_C.head; g.fillRect(0, 0, CARD.W, 10); g.fillStyle = OP_C.gold; g.fillRect(0, 10, CARD.W, 3);
+  var tagTxt = R.market === "coin" ? "코인" : mkName + " 주식", fw = flag && typeof cFlag === "function" ? Math.round(22 * (flag === "us" ? 1.9 : 1.5)) + 10 : 0, tagW = cW(g, tagTxt, 20, 800) + 30 + fw;
+  cRound(g, P, 26, tagW, 40, 8, OP_C.head); if (fw) cFlag(g, P + 12, 35, 22, flag); cText(g, tagTxt, P + 15 + fw, 53, 20, 800, OP_C.gold2);
+  cText(g, "매일 한 장 · 우상향연구소", P + tagW + 14, 53, 18, 700, OP_C.sub);
   cText(g, (mk ? mk.date : cDate(Date.now())), CARD.W - P, 53, 22, 800, OP_C.ink, "right");
   var hl = null; try { hl = typeof issHeadline === "function" ? issHeadline(iss || [], R, news || []) : null; } catch (e) {}
   var title = hl ? cPlain(hl.hook).replace(/\[\[|\]\]/g, "") : "오늘 " + mkName + " 시장 한 장";
   var ts = 50; while (ts > 34 && cWrapCount(g, title, W, ts, 900) > 2) ts -= 2;
   var ty = cWrap(g, title, P, 112, W, ts, 900, OP_C.ink, ts * 1.18, 2);
-  cText(g, cFit(g, (hl && hl.sub ? hl.sub : "") + (hl && hl.sub ? "  ·  " : "") + "시장 · " + sec + " · 급등락 · 스크린 · 일정 · 기사 · 상식을 한 장에", W, 18, 600), P, ty + 8, 18, 600, OP_C.ink2);
+  cText(g, cFit(g, (hl && hl.sub ? hl.sub : "") + (hl && hl.sub ? "  ·  " : "") + "시장 · " + sec + " · 급등락 · 스크린 · 일정 · 시총 상위 · 상식을 한 장에", W, 18, 600), P, ty + 8, 18, 600, OP_C.ink2);
   var y = ty + 34, gap = 14, colW = (W - gap) / 2, L = P, Rx = P + colW + gap;
   // ── 1 시장 한눈에 (왼쪽, 지수 2 + 타일 6)
   var i0 = (R.indexRow || [])[0], i1 = (R.indexRow || [])[1];
@@ -156,7 +158,7 @@ function onePageCard(R, iss, news) {
   // ── 5 매수 후보 스크린 (왼쪽) / 6 주의 스크린 (오른쪽)
   var sc = opScreens(R), h5 = 226;
   function drawScreen(x, no, title, groups, col, bg) {
-    var yb = opBox(g, x, y, colW, h5, no, title, "복합 점수 + 하루 조건 · 판단은 본인", col);
+    var yb = opBox(g, x, y, colW, h5, no, title, "복합 점수 + 하루 조건 · 판단은 본인", mkc);   // v12.25 머리는 먹색 통일, 안쪽 색으로 구분
     if (!groups.length) { cText(g, "오늘은 조건에 걸린 " + unit + "이 없어요", x + 12, yb + 30, 17, 600, OP_C.sub); return; }
     var gh = (h5 - 70) / groups.length;
     groups.forEach(function (gp, k) {
@@ -165,8 +167,8 @@ function onePageCard(R, iss, news) {
       gp.rows.forEach(function (r, j) { var rx = x + 24 + j * ((colW - 48) / 3), rw = (colW - 48) / 3 - 6; cText(g, cFit(g, r.name, rw, 16, 700), rx, gy + 50, 16, 700, OP_C.ink); cText(g, cFit(g, r.tag, rw, 13, 600), rx, gy + 68, 13, 600, OP_C.sub); });
     });
   }
-  drawScreen(L, 5, "매수 후보 스크린", sc.buy, OP_C.green, OP_C.greenBg);
-  drawScreen(Rx, 6, "주의 " + unit + " 스크린", sc.warn, OP_C.warn, OP_C.warnBg);
+  drawScreen(L, 5, "매수 후보 스크린", sc.buy, OP_C.up, OP_C.upBg);
+  drawScreen(Rx, 6, "주의 " + unit + " 스크린", sc.warn, OP_C.down, OP_C.downBg);
   y += h5 + gap;
   // ── 7 오늘 일정 + 돈 몰린 곳 (왼쪽) / 8 오늘의 기사 (오른쪽)
   var h7 = 200, y7 = opBox(g, L, y, colW, h7, 7, "오늘 일정 · 돈 몰린 곳", "", mkc);
@@ -177,22 +179,19 @@ function onePageCard(R, iss, news) {
   g.fillStyle = OP_C.line; g.fillRect(L + 12, hy - 14, colW - 24, 1);
   cText(g, "💰 거래대금 평소 대비", L + 12, hy + 6, 14, 800, OP_C.sub);
   hv.forEach(function (s, k) { var rx = L + 12 + k * ((colW - 24) / 3); cText(g, cFit(g, briefName(s), (colW - 24) / 3 - 8, 16, 700), rx, hy + 30, 16, 700, OP_C.ink); cText(g, s.amtX.toFixed(1) + "배 · " + opPct(r1(s)), rx, hy + 48, 13, 600, opCol(r1(s))); });
-  var lead = typeof cNewsLead === "function" ? cNewsLead(news || [], R) : null;
-  var ranks = lead ? null : opRanks(R);   // v10.0: 기사가 없으면 순위를 더 보여준다
-  var y8 = opBox(g, Rx, y, colW, h7, 8, lead ? "오늘의 기사" : "순위 더 보기", lead ? "네이버 뉴스 · 제목 원문" : "기사 대신 · " + unit + " 순위 2가지", mkc);
-  if (!lead && ranks.length) {
-    var rw8 = (colW - 36) / 2;
-    ranks.slice(0, 2).forEach(function (rk, k) {
-      var rx = Rx + 12 + k * (rw8 + 12);
-      cText(g, cFit(g, rk.t, rw8, 14, 800), rx, y8 + 6, 14, 800, OP_C.sub);
-      rk.rows.forEach(function (r, j) { opRow(g, rx, y8 + 30 + j * 24, rw8, (j + 1) + " " + r.name, r.val, r.col, null, 15); });
+  // v12.25 8 = 시가총액 상위 8 (기사 칸을 대신) — 약자 배지 + 이름 + 하루 등락
+  var cap = typeof cCap8 === "function" ? cCap8(R.market === "coin" ? "coin" : R.market === "kr" ? "kr" : "us") : { rows: [], src: "" };
+  var y8 = opBox(g, Rx, y, colW, h7, 8, "시가총액 상위 8", cap.src, mkc);
+  if (cap.rows.length) {
+    var cc = 2, cwid = (colW - 24 - 10) / cc, rh8 = Math.min(34, Math.floor((h7 - 70) / Math.ceil(Math.min(8, cap.rows.length) / cc)));
+    cap.rows.slice(0, 8).forEach(function (k, i) {
+      var cx = Rx + 12 + (i % cc) * (cwid + 10), cy = y8 - 10 + Math.floor(i / cc) * rh8, bz = rh8 - 6;
+      if (typeof cMono === "function") cMono(g, cx, cy, bz, k.sym, k.name);
+      var pc = opPct(k.ret), pw = cW(g, pc, 17, 800);
+      cText(g, cFit(g, k.name, cwid - bz - pw - 20, 16, 700), cx + bz + 8, cy + bz / 2 + 6, 16, 700, OP_C.ink);
+      cText(g, pc, cx + cwid, cy + bz / 2 + 6, 17, 800, opCol(k.ret), "right");
     });
-  } else if (lead) {
-    var ly = cWrap(g, cNewsClean(lead.it.title), Rx + 12, y8 + 24, colW - 24, 19, 800, OP_C.ink, 25, 2);
-    if (lead.it.desc) ly = cWrap(g, cNewsClean(lead.it.desc), Rx + 12, ly + 2, colW - 24, 14, 500, OP_C.ink2, 19, 2);
-    var oth = (news || []).filter(function (x) { return x !== lead.it; }).slice(0, Math.max(0, Math.floor((y + h7 - 14 - ly - 12) / 20)));
-    oth.forEach(function (o, k) { cText(g, cFit(g, "· " + cNewsClean(o.title), colW - 24, 14, 600), Rx + 12, ly + 18 + k * 20, 14, 600, OP_C.sub); });
-  } else cText(g, "기사와 순위 자료가 아직 없어요", Rx + 12, y8 + 24, 16, 600, OP_C.sub);
+  } else cText(g, "시가총액 상위 종목 숫자가 아직 없어요", Rx + 12, y8 + 24, 16, 600, OP_C.sub);
   y += h7 + gap;
   // ── 9 오늘의 한 줄 상식 (가로 전체)
   var tips = OP_TIPS.common.concat(OP_TIPS[R.market === "coin" ? "coin" : R.market === "us" ? "us" : "kr"] || []), tip = tips[opSeed() % tips.length];
