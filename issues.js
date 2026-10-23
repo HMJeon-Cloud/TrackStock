@@ -101,7 +101,7 @@ function issuesCompute(recent, opt) {
 function issuesText(list) {
   var d = typeof cDate === "function" ? cDate(list.asOf) : "";
   return "📌 " + (ISS_LBL[list.mode] || "오늘") + "의 핵심 이슈 5" + (list.market && list.market !== "all" ? " (" + list.mktName + ")" : "") + " — " + d + "\n\n" +
-    list.map(function (it, i) { return (i + 1) + ". " + it.emoji + " " + it.title + "\n   " + it.sub; }).join("\n") +
+    list.map(function (it, i) { var w = typeof ISS_WHY !== "undefined" && ISS_WHY[it.title]; return (i + 1) + ". " + it.emoji + " " + it.title + "\n   " + it.sub + (w && w.why ? "\n   → 왜: " + w.why + (w.so ? "\n   → 그래서: " + w.so : "") : ""); }).join("\n") +
     "\n\n※ 종가 기준 자동 집계 · 평소 대비 이례적인 순 · 투자 조언 아님\n@uphill.lab";
 }
 
@@ -110,7 +110,7 @@ function issuesRender(boxId, list) {
   var box = $(boxId); if (!box) return;
   if (!list || !list.length) { box.innerHTML = ""; return; }
   box.innerHTML = '<div class="issHead"><b>📌 ' + (ISS_LBL[list.mode] || "오늘") + '의 핵심 이슈 5</b><small>' + (list.market && list.market !== "all" ? list.mktName + " · " : "") + '자료 전체에서 평소보다 이례적인 순</small>' +
-    '<span class="issBtns"><button class="chip" data-act="copy">복사</button>' + (typeof smClaude === "function" && typeof isOwner === "function" && isOwner() ? '<button class="chip" data-act="why" title="Claude가 기사·웹을 보고 이슈마다 이유 한 줄(출처 포함)">✨ 이유 찾기</button>' : '') + '</span></div>' +
+    '<span class="issBtns"><button class="chip" data-act="copy">복사</button>' + (typeof smClaude === "function" && typeof isOwner === "function" && isOwner() ? '<button class="chip" data-act="why" title="Claude가 기사·웹을 보고 이슈마다 왜·그래서·볼 것(출처 포함)">✨ 왜·그래서·볼 것</button>' : '') + '</span></div>' +
     '<ol class="issList">' + list.map(function (it, i) {
       return '<li><span class="issNo">' + (i + 1) + '</span><span class="issEmo">' + it.emoji + '</span><div><b>' + escapeHtml(it.title) + '</b><small>' + escapeHtml(it.sub) + '</small></div>' +
         (it.sym ? '<button class="linkBtn issGo" data-sym="' + it.sym + '" title="종목 탭에서 보기">›</button>' : '') + '</li>';
@@ -207,7 +207,8 @@ function issuesCard(list, page, total) {
   // v12.23 릴스형(세로가 긴 한 장): 칸을 늘리기 전에 이슈마다 관련 기사 제목 한 줄을 더 담는다(있을 때만)
   var reel = CARD.H > 1500, newsAll = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items) || [];
   function newsFor(it) { var key = String(it.title || "").replace(/^[^가-힣A-Za-z0-9]+/, "").split(/[ +\-—(]/)[0]; if (!key || key.length < 1) return null; var hit = newsAll.filter(function (n) { return String(n.title || "").indexOf(key) >= 0; })[0]; return hit ? (typeof cNewsClean === "function" ? cNewsClean(hit.title) : String(hit.title)) + (hit.press ? " · " + hit.press : "") : null; }
-  var extra = reel ? list.map(newsFor) : list.map(function () { return null; }), anyExtra = extra.some(Boolean);
+  function whyFor(it) { var w = typeof ISS_WHY !== "undefined" && ISS_WHY[it.title]; return w && w.why && w.conf !== "하" ? "왜? " + String(w.why).replace(/\s+/g, " ") : null; }   /* v12.42 Claude가 찾은 이유(확신 상·중만) 우선 */
+  var extra = list.map(function (it) { return whyFor(it) || (reel ? newsFor(it) : null); }), anyExtra = extra.some(Boolean);
   var per = reel && anyExtra ? Math.floor((CARD.H - 110 - c.y) / list.length) : Math.min(Math.round(150 * (reel ? CARD.H / 1350 : 1)), Math.floor((CARD.H - 110 - c.y) / list.length));
   list.forEach(function (it, i) {
     var y = c.y, bh = per - 12, ex = extra[i], mid = y + bh / 2 - (ex ? 22 : 0);

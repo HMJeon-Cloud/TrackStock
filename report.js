@@ -408,8 +408,10 @@ function rpAiLines(rp) {
   rp.scen.forEach(function (s) { add("시나리오 " + s.name + " " + Math.round(s.p * 100) + "% " + s.range + " " + s.txt); }); add("규칙 의견: " + rp.view.stance + " — " + rp.view.txt); rp.view.why.forEach(function (w) { add("근거 " + w); });
   return L;
 }
-function rpAiWrite(rp) {
-  return fetch("/api/channel?op=ai", { method: "POST", headers: { "x-owner": typeof ocTok === "function" ? ocTok() : "", "Content-Type": "application/json" }, body: JSON.stringify({ mode: "insight", title: rp.title, lines: rpAiLines(rp), stance: rp.view.stance, draft: (function () { try { var N = rpNarrative(rp); return [N.one, N.numbers, N.story, N.both, N.so].join("\n\n"); } catch (e) { return ""; } })() }) }).then(function (r) { return r.json(); });
+function rpAiWrite(rp) {   // v12.42 OpenAI → Claude (웹 검색 없이 앱 근거만으로 빠르게 다시 쓰기) · 결과 모양은 그대로
+  var draft = ""; try { var N = rpNarrative(rp); draft = [N.one, N.numbers, N.story, N.both, N.so].join("\n\n"); } catch (e) {}
+  var inp = "질문: " + rp.title + "\n리포트 종류: " + rp.kind + (rp.sym ? " · " + rp.name + "(" + rp.sym + ")" : "") + " · 기준 " + rp.asOf + "\n규칙 기반 의견: " + rp.view.stance + " — " + rp.view.txt + "\n\n[근거 줄 — 앱 계산값]\n" + rpAiLines(rp).map(function (l) { return l.id + " | " + l.text; }).join("\n") + (draft ? "\n\n[규칙으로 쓴 초안]\n" + draft : "") + "\n\n(이번엔 웹 검색 없이 위 근거만으로 써 줘)";
+  return smClaude("report", inp, { json: true, web: false }).then(function (j) { return { ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, j.data || {}), model: j.model, claude: true, sources: [], searches: [] }; });
 }
 
 /* ============================================================ 카드 덱 (Exhibit 카드) ============================================================ */
@@ -463,7 +465,7 @@ function rpExhibitHtml(e) {
 }
 function rpShow(pane, rp) {
   var ai = RP.ai, V = ai && ai.ok ? ai.out : null;
-  var h = '<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="chip" data-rpa="back">‹ 다른 질문</button><button class="chip" data-rpa="save">💾 저장(검증용)</button>' + (typeof smClaude === "function" ? '<button class="chip" data-rpa="claude" title="Claude가 증거·기사(+최근 웹)를 읽고 리서치 노트처럼 다시 쓰고, 이 결론이 나온 생각의 흐름을 밝혀요">✨ Claude 서술</button>' : '') + '<button class="chip" data-rpa="deck">🃏 Exhibit 카드 덱</button><button class="chip" data-rpa="thread">🧵 스레드 연재 글</button><button class="chip aiBtn" data-rpa="ai">' + (V ? "✨ AI 서술 다시" : "✨ AI가 다시 쓰기") + '</button></div>';
+  var h = '<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="chip" data-rpa="back">‹ 다른 질문</button><button class="chip" data-rpa="save">💾 저장(검증용)</button>' + (typeof smClaude === "function" ? '<button class="chip" data-rpa="claude" title="Claude가 증거·기사(+최근 웹)를 읽고 리서치 노트처럼 다시 쓰고, 이 결론이 나온 생각의 흐름을 밝혀요">✨ Claude 서술(웹 검색)</button>' : '') + '<button class="chip" data-rpa="deck">🃏 Exhibit 카드 덱</button><button class="chip" data-rpa="thread">🧵 스레드 연재 글</button><button class="chip aiBtn" data-rpa="ai" title="웹 검색 없이 앱 근거만으로 Claude가 빠르게 다시 써요">' + (V ? "✨ 빠르게 다시" : "✨ 빠르게 다시 쓰기") + '</button></div>';
   h += '<div class="rpHead"><div class="rpKicker">' + rpEsc(rp.asOf) + ' 기준 · ' + ({ stock: "종목", market: "시장", macro: "매크로", timing: "시점" })[rp.kind] + ' 리포트</div><h3>' + rpEsc(V && V.headline || rp.title) + '</h3><div class="rpSit">' + (V && V.situation ? rpEsc(V.situation) : rp.situation.map(function (s) { return '<div>· ' + rpEsc(s) + '</div>'; }).join("")) + '</div></div>';
   var NR = null; try { NR = rpNarrative(rp); } catch (e) { console.warn(e); }
   if (V && V.narrative) h += '<div class="rpNar"><div class="rpNarT">종합 해석 <small>AI 서술 · 숫자는 근거 줄 그대로</small></div>' + V.narrative.split(/\n{2,}/).map(function (p) { return '<div class="rpNarS"><p>' + rpEsc(p) + '</p></div>'; }).join("") + '</div>';
@@ -499,7 +501,42 @@ function rpAction(a, btn) {
   if (a === "ai") { var o2 = btn.textContent; btn.textContent = "AI 쓰는 중…"; btn.disabled = true; rpAiWrite(rp).then(function (j) { RP.ai = j; renderReport(); }).catch(function (e) { RP.ai = { ok: false, reason: e.message }; renderReport(); }); return; }
 }
 /* 오늘의 리포트 — 시장 상황으로 질문을 자동 고르고(점수), 하루 한 번 계산 · 상황이 바뀌면 다음 날 자동으로 다른 리포트 */
+/* v12.41 Claude가 고른 오늘의 리포트 — 오늘 이슈·기사(+웹)로 3~6개. 하루 동안 유지, '규칙으로 되돌리기' 가능 */
+RP.ai2 = (function () { try { var j = JSON.parse(localStorage.getItem("sm.rpAi") || "null"); return j && j.day === new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) ? j : null; } catch (e) { return null; } })();
+function rpAiPicks() {
+  if (!RP.ai2 || !RP.ai2.picks) return null;
+  var Q = rpQuestions(), by = {}; Q.forEach(function (q) { by[q.id] = q; });
+  var out = [], seen = {};
+  RP.ai2.picks.forEach(function (p) {
+    var q = p.id && by[p.id] ? Object.assign({}, by[p.id]) : null;
+    if (!q && p.kind === "stock" && (p.ticker || p.name)) {
+      var t = String(p.ticker || "").trim().toUpperCase(), sym = null;
+      if (/^\d{6}$/.test(t)) sym = t + ".KS"; else if (/^[A-Z.\-]{1,6}$/.test(t)) sym = t.replace(".", "-");
+      if (typeof searchDict === "function" && typeof TICKER_DICT !== "undefined") { var hit = searchDict(TICKER_DICT, p.name || t)[0]; if (hit && (!sym || /\.K[SQ]$/.test(hit.symbol) === /\.K[SQ]$/.test(sym))) sym = hit.symbol; }
+      if (sym) q = { id: "stock:" + sym, kind: "stock", sym: sym, t: rpName(sym) + ", 기회인가 위기인가", d: "오늘 화제 종목", why: "" };
+    }
+    if (!q || seen[q.id]) return; seen[q.id] = 1; q.pickWhy = "✨ " + (p.why || ""); out.push(q);
+  });
+  return out.length ? out : null;
+}
+function rpAiPickRun(btn) {
+  var Q = rpQuestions(), L = ["[리포트 후보] — id | 종류 | 질문 | 앱이 본 이유"];
+  Q.forEach(function (q) { L.push("- " + q.id + " | " + q.kind + " | " + q.t + " | " + (q.why || q.d || "")); });
+  var iss = []; try { iss = (typeof chState !== "undefined" && chState.issues && chState.issues.length) ? chState.issues : issuesCompute(briefState.recent, { market: "all", popular: briefState.popular }); } catch (e) {}
+  if (iss.length) { L.push("", "[오늘 이슈 — 앱 계산]"); iss.slice(0, 10).forEach(function (it) { L.push("- " + it.title + " · " + (it.sub || "")); }); }
+  var news = []; try { news = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).map(function (n) { return "- " + (n.title || "") + (n.press ? " (" + n.press + ")" : ""); }); } catch (e) {}
+  if (news.length) { L.push("", "[오늘 기사 제목]"); L = L.concat(news.slice(0, 30)); }
+  var R = briefState.result; if (R) L.push("", "[시장] " + (R.indexRow || []).slice(0, 4).map(function (x) { return x.name + " " + rpPct(x.ret, 2); }).join(" · "));
+  var old = btn.innerHTML; btn.disabled = true; btn.textContent = "Claude가 오늘 이슈를 보고 고르는 중… (30초~1분)";
+  var prep = typeof cardsNewsFetch === "function" && R ? cardsNewsFetch(R).catch(function () { return []; }) : Promise.resolve();
+  Promise.resolve(prep).then(function () { return smClaude("rpick", L.join("\n"), { json: true }); }).then(function (j) {
+    RP.ai2 = { day: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), picks: (j.data && j.data.picks) || [], summary: j.data && j.data.summary || "", sources: j.sources || [], model: j.model };
+    try { localStorage.setItem("sm.rpAi", JSON.stringify(RP.ai2)); } catch (e) {}
+    RP.today = null; renderReport();
+  }).catch(function (e) { alert("Claude 선정 실패: " + e.message); }).then(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; } });
+}
 function rpTodayPicks() {
+  var AI = rpAiPicks(); if (AI) return AI;   // v12.41 Claude 선정이 있으면 그걸 쓴다
   var Q = rpQuestions(), R = typeof briefState !== "undefined" && briefState.result, now = typeof nbNow === "function" ? nbNow() : { match: {}, why: [] };
   var vix = R && (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], v = vix ? parseFloat(vix.v) : 0, ks = typeof nbStat === "function" ? nbStat("^KS11") : null, sp = typeof nbStat === "function" ? nbStat("SPY") : null, dd = new Date(Date.now() + 9 * 3600e3).getUTCDate();
   Q.forEach(function (q) {
@@ -518,11 +555,14 @@ function rpTodayRender(pane) {
   var day = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), R = typeof briefState !== "undefined" && briefState.result;
   if (!R) { pane.innerHTML = '<div class="dvEmpty sm">시장 데이터를 불러오는 중… 잠시 뒤 다시 열어 주세요.</div>'; return; }
   var picks = rpTodayPicks(), ready = RP.today && RP.today.day === day && RP.today.list.length;
-  var h = '<div class="briefDim" style="margin-bottom:8px">오늘 시장 신호로 고른 질문 ' + picks.length + '개 — 시장이 바뀌면 질문도 바뀌어요.</div>';
+  var isAi = !!rpAiPicks();
+  var h = '<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' + (typeof smClaude === "function" ? '<button class="chip" id="rpAiPick" title="오늘 이슈·기사(+웹 검색)를 보고 투자자가 가장 궁금해할 리포트 3~6개를 골라요">✨ Claude로 오늘 리포트 고르기' + (isAi ? ' (다시)' : '') + '</button>' + (isAi ? '<button class="chip" id="rpAiOff">규칙으로 되돌리기</button>' : '') : '') + '<span class="briefDim">' + (isAi ? 'Claude가 오늘 이슈로 고른 리포트 ' + picks.length + '개' : '오늘 시장 신호(규칙)로 고른 질문 ' + picks.length + '개 — 시장이 바뀌면 질문도 바뀌어요') + '</span></div>' + (isAi && RP.ai2.summary ? '<div class="rpAiBox" style="margin-bottom:8px"><b>오늘 투자자가 궁금한 것</b> ' + rpEsc(RP.ai2.summary) + (typeof smSrcHtml === "function" ? smSrcHtml(RP.ai2.sources) : '') + '</div>' : '');
   h += '<div class="hubList">' + picks.map(function (q, i) { var r = ready ? RP.today.list[i] : null; return '<div class="hubItem"><div class="hubRank">' + (i + 1) + '</div><div class="hubMain"><b>' + rpEsc(q.t) + '</b><small>' + rpEsc(q.d) + ' · <i>' + rpEsc(q.pickWhy) + '</i></small>' + (r ? '<div class="rpTdV ' + (r.view.score >= 3 ? "good" : r.view.score >= 1 ? "mid" : "low") + '"><b>' + rpEsc(r.view.stance) + '</b>' + (r.hz ? ' · 단기 ' + rpEsc(r.hz.s.stance) + ' · 장기 ' + rpEsc(r.hz.l.stance) : '') + '<div>' + rpEsc(r.view.txt) + '</div></div>' : '') + '<div class="hubActs"><button class="chip" data-rpq="' + q.id + '" data-kind="' + q.kind + '" data-sym="' + (q.sym || "") + '" data-arg="' + (q.arg || "") + '">' + (r ? "자세히 보기" : "리포트 만들기") + '</button></div></div></div>'; }).join("") + '</div>';
   if (!ready) h += '<div class="row" style="gap:8px;margin-top:6px"><button class="primary" id="rpTodayAll">오늘의 리포트 ' + picks.length + '개 한 번에 계산</button><span class="briefDim">종목 과거 주가·투자지표를 받아 10~30초 걸려요</span></div>';
   pane.innerHTML = h;
   Array.prototype.forEach.call(pane.querySelectorAll("[data-rpq]"), function (b) { b.onclick = function () { rpGo({ id: b.getAttribute("data-rpq"), kind: b.getAttribute("data-kind"), sym: b.getAttribute("data-sym") || null, arg: b.getAttribute("data-arg") || null }, b); }; });
+  var aip = document.getElementById("rpAiPick"); if (aip) aip.onclick = function () { rpAiPickRun(aip); };
+  var aio = document.getElementById("rpAiOff"); if (aio) aio.onclick = function () { RP.ai2 = null; try { localStorage.removeItem("sm.rpAi"); } catch (e) {} RP.today = null; renderReport(); };
   var all = document.getElementById("rpTodayAll"); if (all) all.onclick = function () { all.disabled = true; all.textContent = "계산 중…"; Promise.all(picks.map(function (q) { return rpBuild(q).catch(function () { return null; }); })).then(function (L) { RP.today = { day: day, list: L.map(function (r, i) { return r || { view: { stance: "데이터 부족", txt: "", score: 0 } }; }) }; renderReport(); }); };
 }
 /* 회상 · 검증 */
