@@ -333,6 +333,7 @@ function anPromptModule(m, out, opts) {
   L.push(""); L.push("아래 체크리스트 " + m.ck.length + "개를 항목마다 따로 답한 뒤, 내 결론에 반박하는 근거를 최소 3개 찾아 '반론' 문단을 쓰고(반대편 애널리스트·기사·숫자), 그 반론을 반영해 빠진 부분을 보완한 다음 최종 판단을 내려줘. 반론이 더 강하면 판단을 바꿔도 돼."); m.ck.forEach(function (c, i) { L.push((i + 1) + ". " + c); });
   if (out) { L.push(""); L.push("[내 앱(StockMind)이 계산한 데이터 — 이 숫자를 근거로 쓰고, '데이터 없음' 항목은 최신 공시·자료로 보완해줘. 숫자를 지어내지 말고 출처를 붙여줘.]"); anLines(out).forEach(function (l) { L.push("- " + l.text); }); }
   if (typeof arcCalibLines === "function" && AN.calib !== false) { var CL = arcCalibLines(m.id); if (CL.length) { L.push(""); CL.forEach(function (x) { L.push(x); }); } }
+  var RL = anRetroLines(); if (RL.length) { L.push(""); RL.forEach(function (x) { L.push(x); }); }   // v12.40 Claude 회고 주의점
   if (!opts.noFormat) L.push(AN_FORMAT);
   return L.join("\n");
 }
@@ -342,6 +343,7 @@ function anPromptFull(outs) {
   L.push("너는 글로벌 증권사의 리서치 팀장이다. " + name + "을(를) 네 가지 틀(기업 · 차트 · 실적 · 재무제표)로 차례로 분석하고, 마지막에 네 분석을 종합해 최종 투자 판단을 내려줘. 독자는 한국 개인투자자 초보. 숫자는 출처와 함께, 지어내지 말 것.");
   mods.forEach(function (m, i) { L.push(""); L.push("### " + m.no + " " + m.t + " — " + m.sub); L.push(m.prompt.replace(/\[기업명\/티커\]/g, name)); m.ck.forEach(function (c, k) { L.push("  " + (k + 1) + ") " + c); }); var o = outs && outs[m.id]; if (o) { L.push("  [앱 데이터]"); anLines(o).forEach(function (l) { L.push("  - " + l.text); }); } if (typeof arcCalibLines === "function" && AN.calib !== false) arcCalibLines(m.id).forEach(function (x) { L.push("  " + x); }); });
   if (outs && outs._ctx) { L.push(""); L.push(outs._ctx); }
+  var RL2 = anRetroLines(); if (RL2.length) { L.push(""); RL2.forEach(function (x) { L.push(x); }); }   // v12.40
   L.push(""); L.push("### 최종 종합"); L.push("네 틀의 결과를 겹쳐서: 서로 같은 방향을 가리키는 것 / 엇갈리는 것 / 내 결론에 반박하는 가장 강한 근거 3개와 그에 대한 답 / 그래서 지금 어떤 행동(검토·관망·나눠서 등)이 맞는지 / 생각을 바꿀 조건 3개." + (outs && outs._ctx ? " 과거 기록이 있으면 '그때 대비 무엇이 달라졌고 판단을 어떻게 조정하는지'도." : ""));
   L.push(AN_FORMAT.replace("(항목 줄은 체크리스트 수만큼 반복)", "(항목 줄은 네 틀 각각 1줄 = 4줄: 이름은 '기업' '차트' '실적' '재무')"));
   return L.join("\n");
@@ -485,6 +487,52 @@ function anAutoRun(prompt, O) {
   }).catch(function (e) { anAutoSet({ busy: false, err: "자동 분석 실패: " + e.message + (t1 ? " — 분석 원문은 ④ 입력칸에 넣어 두었어요" : "") }); if (t1) { var ta = document.getElementById("anAnsMain"); if (ta) ta.value = t1; } });
 }
 
+/* ============================================================ v12.40 Claude 회고 · 검토 바로 실행
+   회고: 저장된 분석 + 그 뒤 실제 결과(가격·적중) → 우리가 자주 틀리는 패턴 · 계속 지킬 패턴 · 다음 프롬프트에 넣을 주의 문장(sm.retroRules)
+   검토: 팩트체크·검사관·실패 시나리오·아침 브리핑 프롬프트를 복사 대신 Claude로 바로 → 결과 보기 · ④에 저장
+   ============================================================ */
+var AN_RETRO = (function () { try { return JSON.parse(localStorage.getItem("sm.retroRules") || "null"); } catch (e) { return null; } })();
+function anRetroLines() { return AN_RETRO && AN_RETRO.rules && AN_RETRO.rules.length ? ["[과거 회고에서 나온 주의점 — " + new Date(AN_RETRO.at + 9 * 3600e3).toISOString().slice(0, 10) + " Claude 회고, 이번 분석에서 같은 실수를 피할 것]"].concat(AN_RETRO.rules.map(function (r) { return "- " + r; })) : []; }
+function anRetroInput() {
+  var items = anAnsLoad().slice().sort(function (a, b) { return a.at - b.at; }), pv = {}; (AN.arcPairs || []).forEach(function (x) { if (x && x.it) pv[x.it.id] = x.v; });
+  var st = { ok: "긍정✓", mid: "중립△", bad: "부정✗" }, L = ["[저장된 분석과 그 뒤 결과] — 날짜 | 틀 | 대상 | 우리 판정 | 한 줄 결론 | 리스크 | 결과(지금까지 가격 변화 · 경과일 · 적중)"];
+  items.slice(-80).forEach(function (it) {
+    var P = it.p || {}, v = pv[it.id];
+    L.push("- " + arcD(it.at) + " | " + (it.modName || it.mod || "") + " | " + (it.name || it.sym || "") + " | " + (st[P.verdictSt] || "-") + " | " + String(P.one || P.verdict || it.title || "").slice(0, 80) + " | " + (P.risks || []).slice(0, 2).join(" / ").slice(0, 60) + " | " + (v ? anPct(v.since, 1) + " · " + v.days + "일 · 기간 중 최저 " + anPct(v.lo, 0) + " 최고 " + anPct(v.hi, 0) + " · " + (v.hit == null ? "검증 전(20일 미만)" : v.hit ? "적중" : "빗나감") : "결과 없음(종목 아님 또는 가격 없음)"));
+  });
+  if (typeof arcScore === "function" && AN.arcPairs) { var S = arcScore(AN.arcPairs); if (S._all) L.push("", "[전체 적중] " + S._all.hit + "/" + S._all.n); }
+  return L.join("\n");
+}
+function anRetroRun(btn) {
+  var old = btn.innerHTML; btn.disabled = true; btn.textContent = "회고 중… (30초~2분)";
+  smClaude("retro", anRetroInput(), { json: true, web: false }).then(function (j) {
+    AN_RETRO = Object.assign({ at: Date.now(), model: j.model }, j.data || {}); try { localStorage.setItem("sm.retroRules", JSON.stringify(AN_RETRO)); } catch (e) {}
+    renderAnalyst(); var el = document.getElementById("anRetro"); if (el) try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
+  }).catch(function (e) { alert("회고 실패: " + e.message); }).then(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; } });
+}
+function anRetroHtml() {
+  var R = AN_RETRO, n = anAnsLoad().length;
+  var h = '<section class="anSec" id="anRetro"><div class="mkStep"><b>8</b> 회고 <small class="briefDim">' + (R ? new Date(R.at + 9 * 3600e3).toISOString().slice(0, 10) + ' · ' + anEsc(R.stats || "") : '저장된 분석 ' + n + '건과 실제 결과를 Claude가 읽고 우리가 자주 틀리는 패턴을 찾아요') + '</small>' + (typeof smClaude === "function" ? '<button class="chip" data-anretro style="margin-left:auto"' + (n ? '' : ' disabled') + '>🧭 Claude 회고' + (R ? ' 다시' : '') + '</button>' : '') + '</div>';
+  if (R) {
+    h += (R.summary ? '<div class="anRetroSum">' + anEsc(R.summary) + '</div>' : '');
+    if ((R.miss || []).length) h += '<div class="anSubH">자주 틀린 패턴</div><ul class="anRetroL">' + R.miss.map(function (x) { return '<li><b>' + anEsc(x.pattern) + '</b><small>근거: ' + anEsc(x.evidence || "") + '</small><i>→ ' + anEsc(x.fix || "") + '</i></li>'; }).join("") + '</ul>';
+    if ((R.keep || []).length) h += '<div class="anSubH">계속 지킬 패턴</div><ul class="anRetroL">' + R.keep.map(function (x) { return '<li><b>' + anEsc(x.pattern) + '</b><small>' + anEsc(x.evidence || "") + '</small></li>'; }).join("") + '</ul>';
+    if ((R.rules || []).length) h += '<div class="anSubH">다음 분석 프롬프트에 자동으로 넣는 주의점 <small class="briefDim">(③ 프롬프트 · 🤖 자동 분석 모두)</small></div><ol class="anRetroR">' + R.rules.map(function (r) { return '<li>' + anEsc(r) + '</li>'; }).join("") + '</ol><button class="chip" data-anretrooff>주의점 빼기</button>';
+  }
+  return h + '</section>';
+}
+var AN_REV_OUT = null;
+function anRevRun(kind, prompt, btn) {
+  var old = btn.innerHTML; btn.disabled = true; btn.textContent = "Claude 실행 중… (30초~2분)";
+  var nm = { pre: "실패 시나리오", fact: "팩트체크", insp: "검사관", morn: "아침 브리핑" }[kind] || "검토";
+  smClaude("review", prompt).then(function (j) { AN_REV_OUT = { kind: kind, name: nm, text: j.text || "", sources: j.sources || [], model: j.model, searches: (j.searches || []).length }; renderAnalyst(); })
+    .catch(function (e) { alert(nm + " 실패: " + e.message); }).then(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; } });
+}
+function anRevOutHtml() {
+  var R = AN_REV_OUT; if (!R) return "";
+  return '<div class="anRevOut"><div class="anSubH">🤖 ' + anEsc(R.name) + ' 결과 <small class="briefDim">' + anEsc(R.model || "") + ' · 웹 검색 ' + R.searches + '회</small><span style="margin-left:auto;display:inline-flex;gap:6px"><button class="chip" data-anrevsave>④에 저장</button><button class="chip" data-anrevcp>복사</button><button class="chip" data-anrevx>닫기</button></span></div><div class="anRevTxt">' + anEsc(R.text).replace(/\n/g, "<br>") + '</div>' + (typeof smSrcHtml === "function" ? smSrcHtml(R.sources) : '') + '</div>';
+}
+
 /* ============================================================ 답변 → 카드 (서술형 · 카드형) ============================================================ */
 function anCardsFrom(it, kind) {
   var P = anParse(it.text || ""), m = AN_MODS.filter(function (x) { return x.id === it.mod; })[0] || anMod(), title = P.title || it.title, day = cDate(Date.now()), foot = "AI 분석(" + day + ") · " + (P.srcs || "출처는 답변 참고") + " · 투자 권유 아님", list = [];
@@ -560,7 +608,8 @@ function renderAnalyst() {
     '<button class="wbAct" data-anrev="fact"' + (ready ? '' : ' disabled') + '><b>🔍 팩트체크</b><small>리포트·커뮤니티 글을 붙여넣으면 주장별로 앱 숫자와 대조</small></button>' +
     '<button class="wbAct" data-anrev="insp"' + (ready ? '' : ' disabled') + '><b>🧐 검사관 모드</b><small>받은 답변의 숫자·출처·논리 재검토 → 수정표 + 카드형 다시</small></button>' +
     '<button class="wbAct" data-anrev="morn"><b>☕ 아침 3분 브리핑</b><small>내 자산 보유 종목 + 오늘 기사 → 종목별 2~3줄</small></button></div>' +
-    '<div class="anRevIn" hidden><textarea class="anAnsIn" rows="6" placeholder=""></textarea><div class="anActs"><button class="primary" data-anrevcopy>📋 프롬프트 복사</button><button class="chip" data-anrevclose>닫기</button></div></div></section>';
+    (typeof smClaude === "function" ? '<div class="anRevAi"><small class="briefDim">Claude로 바로:</small><button class="chip" data-anrevai="pre"' + (ready ? '' : ' disabled') + '>⚠️ 실패 시나리오</button><button class="chip" data-anrevai="morn">☕ 아침 브리핑</button><small class="briefDim">· 팩트체크·검사관은 글을 넣고 아래 🤖 버튼</small></div>' : '') +
+    '<div class="anRevIn" hidden><textarea class="anAnsIn" rows="6" placeholder=""></textarea><div class="anActs"><button class="primary" data-anrevcopy>📋 프롬프트 복사</button>' + (typeof smClaude === "function" ? '<button class="primary" data-anrevgo>🤖 Claude로 바로</button>' : '') + '<button class="chip" data-anrevclose>닫기</button></div></div>' + anRevOutHtml() + '</section>';
   // ④ 답변
   h += '<section class="anSec"><div class="mkStep"><b>4</b> 받은 답변 붙여넣기 · 저장 <small class="briefDim">' + (mine.length ? '이 틀 ' + mine.length + '건 저장됨' : '서버에 쌓여 자산이 돼요 · 그때 가격·숫자도 같이 저장') + '</small></div>';
   h += '<textarea class="anAnsIn" id="anAnsMain" rows="7" placeholder="AI 답변 전체를 여기에 붙여넣고 [저장]을 누르세요. (## 서술형 / ## 카드형 블록이 있으면 항목·판정·리스크를 자동으로 읽어요)"></textarea><div class="anActs"><button class="primary" data-ansave>💾 저장</button><button class="chip" data-anclear>비우기</button></div>';
@@ -574,6 +623,7 @@ function renderAnalyst() {
   // ⑥ 분석 자산
   h += '<section class="anSec" id="anArc"><div class="mkStep"><b>6</b> 분석 자산 <small class="briefDim">' + (ans.length ? ans.length + '건 · 다음 프롬프트의 문맥 · 적중률 · 백업' : '저장한 답변이 여기에 쌓여요') + '</small></div>' + (ans.length ? (typeof arcHtml === "function" ? arcHtml(ans, AN.arcPairs || [], AN.ansId) : '') : '<div class="briefDim" style="font-size:12.5px">아직 기록이 없어요 — ④에서 답변을 저장하면 종목별 기록·그때 vs 지금·적중률이 여기에 생겨요.' + (typeof arcHtml === "function" ? ' <button class="chip" data-arcimp>백업 가져오기</button>' : '') + '</div>') + '</section>';
   h += '<section class="anSec" id="anCal"><div class="mkStep"><b>7</b> 보정 <small class="briefDim">' + (ARC_CAL.data && ARC_CAL.data.n ? '검증 ' + ARC_CAL.data.n + '건 기준' : '검증된 기록이 20일 이상 쌓이면 자동') + '</small><label class="chip anTg" style="margin-left:auto"><input type="checkbox" data-ancal' + (AN.calib !== false ? ' checked' : '') + '> 보정 적용</label></div>' + (ARC_CAL.data && ARC_CAL.data.n ? (typeof arcCalibHtml === "function" ? arcCalibHtml() : '') + '<details class="fdHow"><summary>보정이 하는 일</summary><div>적중률이 낮은 체크리스트 항목의 규칙 가중치를 낮추고(✓/✗→△, ×½) 프롬프트에 메모해요. 기록이 쌓일수록 정확해져요.</div></details>' : '') + '</section>';
+  h += anRetroHtml();   // v12.40
   root.innerHTML = h;
   // bind
   Array.prototype.forEach.call(root.querySelectorAll("[data-anmod]"), function (b) { b.onclick = function () { AN.mod = b.getAttribute("data-anmod"); AN.out = null; AN.err = null; AN.ansId = null; AN.step = 1; renderAnalyst(); var mm = anMod(); if (mm.need !== "stock" || AN.sym) anRun(); }; });
@@ -593,6 +643,13 @@ function renderAnalyst() {
     revIn.hidden = false; revTa.value = revKind === "insp" && cur && cur.text ? cur.text : ""; revTa.placeholder = revKind === "fact" ? "검증할 리포트·커뮤니티 글·기사를 여기에 붙여넣고 [프롬프트 복사]" : "재검토할 AI 답변을 여기에 붙여넣고 [프롬프트 복사] (④에서 고른 답변이 있으면 자동으로 들어가요)"; revTa.focus();
   }; });
   var rc = root.querySelector("[data-anrevcopy]"); if (rc) rc.onclick = function () { anCopy(revKind === "fact" ? anPromptFactcheck(O, revTa.value.trim()) : anPromptInspector(O, revTa.value.trim()), rc); };
+  var rg = root.querySelector("[data-anrevgo]"); if (rg) rg.onclick = function () { if (!revKind) return; anRevRun(revKind, revKind === "fact" ? anPromptFactcheck(O, revTa.value.trim()) : anPromptInspector(O, revTa.value.trim()), rg); };   // v12.40
+  Array.prototype.forEach.call(root.querySelectorAll("[data-anrevai]"), function (b) { b.onclick = function () { var k = b.getAttribute("data-anrevai"); anRevRun(k, k === "pre" ? anPromptPremortem(O) : anPromptMorning(), b); }; });
+  var rvs = root.querySelector("[data-anrevsave]"); if (rvs) rvs.onclick = function () { rvs.disabled = true; anAnsAdd(AN_REV_OUT.text + (AN_REV_OUT.sources.length ? "\n\n## 참고 링크\n" + AN_REV_OUT.sources.map(function (s) { return "- " + s.t + " " + s.u; }).join("\n") : "")).then(function () { AN.step = 5; AN_REV_OUT = null; AN.arcPairs = null; renderAnalyst(); }); };
+  var rvc = root.querySelector("[data-anrevcp]"); if (rvc) rvc.onclick = function () { anCopy(AN_REV_OUT.text, rvc); };
+  var rvx = root.querySelector("[data-anrevx]"); if (rvx) rvx.onclick = function () { AN_REV_OUT = null; renderAnalyst(); };
+  var rtb = root.querySelector("[data-anretro]"); if (rtb) rtb.onclick = function () { anRetroRun(rtb); };
+  var rto = root.querySelector("[data-anretrooff]"); if (rto) rto.onclick = function () { if (!confirm("다음 분석 프롬프트에서 회고 주의점을 뺄까요?")) return; AN_RETRO = null; try { localStorage.removeItem("sm.retroRules"); } catch (e) {} renderAnalyst(); };
   var rx = root.querySelector("[data-anrevclose]"); if (rx) rx.onclick = function () { revIn.hidden = true; };
   Array.prototype.forEach.call(root.querySelectorAll('input[name="anScope"]'), function (r) { r.onchange = function () { AN.pScope = r.value; renderAnalyst(); }; });
   function buildPrompt(cb) {

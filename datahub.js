@@ -56,6 +56,7 @@ function dhMarketCard(M) {
     rows.push(["화면의 시장 숫자", b.kind === "uni" ? '<span class="dhOk">전체 시장 기준 (' + b.n + '/' + b.total + '종목)</span>' : '<span class="dhWarn">숨김 — ' + dhEsc(b.why || "준비 중") + '</span>', "오른 종목·20일선·신고가·업종·급등락·거래대금"]);
   } else rows.push(["화면의 시장 숫자", "코인 목록 " + M.count + "개 기준 (전체 코인 시장 아님)", "오른 코인·테마·급등락"]);
   h += '<div class="dhRows">' + rows.map(function (r) { return '<div class="dhRow"><div class="dhRowL">' + r[0] + '</div><div class="dhRowV">' + r[1] + '</div><div class="dhRowS">' + r[2] + '</div></div>'; }).join("") + '</div>';
+  if ((M.stale.length || M.spike.length || M.coinLate) && typeof smClaude === "function") h += '<div style="margin-top:8px"><button class="chip" data-dhanom="' + M.mk + '" title="휴장·분할·상장폐지·심볼 변경·야후 지연·실제 급변 중 무엇인지 웹으로 확인">✨ 원인 확인 (Claude)</button><div class="dhAnom" id="dhAnom-' + M.mk + '">' + (DH.anom && DH.anom[M.mk] ? DH.anom[M.mk] : '') + '</div></div>';   // v12.40
   h += '<div class="dhHow">' + (M.mk === "coin" ? "자동: 매일 07:00·09:00 (09:00 실행에서 코인을 먼저 받음) · 09:20 이후에도 전날 마감분이 없으면 ☀️ 아침 수집" : M.mk === "us" ? "자동: 07:00 대표 목록 + 전체 요약, 09:00 요약 나머지 · 늦거나 숨김이면 ☀️ 아침 수집 (요약도 자동으로 이어 받음)" : "자동: 07:00 대표 목록 + 전체 요약(어제 마감 확정분) · 늦거나 숨김이면 ☀️ 아침 수집") + '</div>';
   return h + '</div>';
 }
@@ -136,7 +137,7 @@ function renderDataHub(force, quiet) {
     if (recent && recent.symbols && typeof briefState !== "undefined" && briefState.recent && briefState.recent !== recent && typeof briefCompute === "function") { briefState.recent = recent; try { briefState.result = briefCompute(recent, { mode: briefState.mode, market: briefState.market, popular: briefState.popular }); } catch (e) {} if (typeof TPL_RC !== "undefined") Object.keys(TPL_RC).forEach(function (k) { delete TPL_RC[k]; }); }   // 다른 화면도 새 값으로
     var C = (typeof DATA !== "undefined" && DATA.config) || {}, lr = C.lastRun || {};
     if (!recent || !recent.symbols) { box.innerHTML = '<div class="dhWarn">시세 데이터를 불러오지 못했어요 — ' + dhEsc(DATA.reason || "") + '</div>'; return; }
-    var Ms = ["kr", "us", "coin"].map(function (m) { return dhMarket(m, recent); }), bad = Ms.filter(function (m) { return m.level !== "ok"; }).length;
+    var Ms = ["kr", "us", "coin"].map(function (m) { return dhMarket(m, recent); }); DH.Ms = Ms; DH.recent = recent; var bad = Ms.filter(function (m) { return m.level !== "ok"; }).length;
     var h = '<div class="dhTop"><div><b>마지막 수집</b> ' + dhKst(recent.generated) + ' <span class="briefDim">(' + dhAgo(recent.generated) + ')</span> · <b>다음 자동 수집</b> ' + dhNextCron() + ' · <b>전체</b> ' + (bad ? dhBadge("warn", "확인 필요 " + bad + "곳") : dhBadge("ok", "정상")) + '</div><button class="chip" id="dhReload">🔄 다시 확인</button></div>';
     if (lr.at) h += '<div class="briefDim" style="margin:4px 0 0">마지막 서버 실행 ' + dhEsc(String(lr.at).slice(0, 16)) + (lr.repaired ? ' · 빈 날 메운 종목 ' + lr.repaired + '개' : '') + (lr.behindN ? ' · <span class="dhWarn">늦은 종목 ' + lr.behindN + '개</span>' : '') + (lr.yahoo ? ' · 야후 성공 ' + (lr.yahoo.ok || 0) + '회' : '') + '</div>';
     h += '<h3 class="dhH">① 시장별로 지금 보여주는 데이터</h3><div class="dhMks">' + Ms.map(dhMarketCard).join("") + '</div>';
@@ -146,6 +147,25 @@ function renderDataHub(force, quiet) {
     box.innerHTML = h;
     $("dhReload").onclick = function () { dhRefresh(false); };
     dhBind(box);
+    Array.prototype.forEach.call(box.querySelectorAll("[data-dhanom]"), function (b) { b.onclick = function () { dhAnomRun(b.getAttribute("data-dhanom"), b); }; });
     if (typeof chUniStatus === "function") chUniStatus();
   }).catch(function (e) { DH.busy = false; box.innerHTML = '<div class="dhWarn">불러오지 못했어요: ' + dhEsc(e.message) + '</div>'; });
+}
+
+/* v12.40 데이터 이상 원인 확인 (Claude + 웹) — 늦은 종목·급변 종목이 왜 그런지 */
+function dhAnomRun(mk, btn) {
+  var M = (DH.Ms || []).filter(function (x) { return x.mk === mk; })[0], rec = DH.recent || {}, C = (typeof DATA !== "undefined" && DATA.config) || {}, lr = C.lastRun || {};
+  if (!M) return;
+  var L = ["[데이터 점검에서 걸린 종목 — " + ({ kr: "국내", us: "미국", coin: "코인" })[mk] + " 시장, 이 시장 마지막 거래일 " + (M.date || "-") + "]"];
+  M.stale.forEach(function (s) { L.push("- 늦음 | " + s.sym + " | " + briefName(s) + " | 마지막 값 날짜 " + (s.lastT ? new Date(s.lastT + 9 * 3600e3).toISOString().slice(0, 10) : "-") + " | 수집 표시 " + ((rec.flags || {})[s.sym] || "-")); });
+  M.spike.forEach(function (s) { L.push("- 급변 | " + s.sym + " | " + briefName(s) + " | 하루 " + (s.ret1 * 100).toFixed(1) + "% | 수집 표시 " + ((rec.flags || {})[s.sym] || "-")); });
+  if (M.coinLate) L.push("- 코인 전날 마감분(한국 오전 9시)이 아직 안 들어옴");
+  if (lr.behind && lr.behind.length) L.push("", "[서버 마지막 실행의 늦은 종목] " + lr.behind.slice(0, 20).join(", "));
+  L.push("", "데이터 출처: 야후 파이낸스 일봉(크론 07:00·09:00 KST 수집).");
+  var out = document.getElementById("dhAnom-" + mk), old = btn.innerHTML; btn.disabled = true; btn.textContent = "확인 중… (20초~1분)";
+  smClaude("anomaly", L.join("\n"), { json: true }).then(function (j) {
+    var I = (j.data && j.data.items) || [];
+    var html = '<div class="dhAnomBox">' + (j.data && j.data.note ? '<div><b>' + dhEsc(j.data.note) + '</b></div>' : '') + I.map(function (x) { return '<div class="dhAnomRow"><b>' + dhEsc(x.sym) + '</b> <span class="dhBadge ' + (/실제급변|휴장|분할/.test(x.kind || "") ? "ok" : /확인못함/.test(x.kind || "") ? "" : "warn") + '">' + dhEsc(x.kind || "") + '</span> ' + dhEsc(x.cause || "") + '<div class="briefDim">할 일: ' + dhEsc(x.action || "-") + (x.src ? ' · ' + (x.url ? '<a href="' + dhEsc(x.url) + '" target="_blank" rel="noopener">' + dhEsc(x.src) + '</a>' : dhEsc(x.src)) : '') + (x.conf ? ' · 확신 ' + dhEsc(x.conf) : '') + '</div></div>'; }).join("") + (typeof smSrcHtml === "function" ? smSrcHtml(j.sources) : '') + '</div>';
+    DH.anom = DH.anom || {}; DH.anom[mk] = html; if (out) out.innerHTML = html;
+  }).catch(function (e) { if (out) out.innerHTML = '<div class="dhWarn">원인 확인 실패: ' + dhEsc(e.message) + '</div>'; }).then(function () { btn.disabled = false; btn.innerHTML = old; });
 }
