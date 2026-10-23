@@ -516,7 +516,7 @@ function rpAiPicks() {
       var t = String(p.ticker || "").trim().toUpperCase(), sym = null;
       if (/^\d{6}$/.test(t)) sym = t + ".KS"; else if (/^[A-Z.\-]{1,6}$/.test(t)) sym = t.replace(".", "-");
       if (typeof searchDict === "function" && typeof TICKER_DICT !== "undefined") { var hit = searchDict(TICKER_DICT, p.name || t)[0]; if (hit && (!sym || /\.K[SQ]$/.test(hit.symbol) === /\.K[SQ]$/.test(sym))) sym = hit.symbol; }
-      if (sym) q = { id: "stock:" + sym, kind: "stock", sym: sym, t: rpName(sym) + ", 기회인가 위기인가", d: "오늘 화제 종목", why: "" };
+      if (sym) { var nm0 = rpName(sym); q = { id: "stock:" + sym, kind: "stock", sym: sym, t: (nm0 === sym && p.name ? p.name : nm0) + ", 기회인가 위기인가", d: "오늘 화제 종목", why: "" }; }
     }
     if (!q || seen[q.id]) return; seen[q.id] = 1; q.pickWhy = "✨ " + (p.why || ""); out.push(q);
   });

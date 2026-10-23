@@ -513,3 +513,8 @@ function smDailyFetch() {
 }
 (function () { var a0 = smDailyApply; smDailyApply = function () { var r = a0.apply(this, arguments); try { smDailyShare(); } catch (e) {} return r; }; })();
 (function () { var tries = 0, go = function () { if (typeof isOwner === "function" && isOwner()) { smDailyFetch(); return; } if (++tries < 10) setTimeout(go, 1500); }; setTimeout(go, 2500); })();
+
+/* v12.54 저장된 오늘 결과를 켤 때마다 다시 나눈다 — 나누는 규칙이 바뀌어도(리포트 시장 분류 등) 다시 돌릴 필요 없음 */
+(function () { try { var f = smDailyFull(); if (f && f.day === smKstDay()) { smDailyDistribute(f); SM_DAILY.full = f; } } catch (e) { console.warn(e); } })();
+/* 리포트 탭 '오늘의 리포트' 규칙 선정도 보는 시장에 맞춘다 (Claude 선정이 없을 때) */
+(function () { if (typeof rpTodayPicks !== "function") return; var t0 = rpTodayPicks; rpTodayPicks = function () { var L = t0.apply(this, arguments), mk = smMk(); if (mk === "all" || !L) return L; var F = L.filter(function (q) { return q.kind === "macro" || q.kind === "timing" || !q.sym || smSymMk(q.sym) === mk; }); return F.length ? F : L; }; })();

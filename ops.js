@@ -42,6 +42,12 @@ function opsCompute() {
 function opsStep(i, k, st, title, what, body, acts) {
   return '<article class="opsStep ' + st + '" data-step="' + k + '"><header><span class="opsNode">' + (st === "done" ? "✓" : i) + '</span><div><h3>' + title + '</h3><p>' + what + '</p></div></header><div class="opsStepBody">' + body + '</div><footer>' + acts + '</footer></article>';
 }
+/* 볼 리포트 — 리포트 탭의 '오늘의 리포트'와 같은 목록(rpAiPicks: 후보 밖 종목도 이름으로) */
+function opsReps(plan, qb) {
+  var ai = null; try { ai = typeof rpAiPicks === "function" ? rpAiPicks() : null; } catch (e) {}
+  if (ai && ai.length) return ai.map(function (q) { return { id: q.id, t: q.t, why: String(q.pickWhy || "").replace(/^✨ /, "") }; });
+  return plan ? (plan.reports || []).map(function (r) { return qb[r.id] ? { id: r.id, t: qb[r.id].t, why: r.why } : r.name ? { id: "", t: r.name + ", 기회인가 위기인가", why: r.why } : null; }).filter(Boolean) : [];
+}
 function opsSteps() {
   var mk = smMk(), D = smFlowDone(mk), next = SM_FLOW.filter(function (s) { return !D[s.k]; })[0], st = function (k) { return D[k] ? "done" : next && next.k === k ? "now" : "wait"; };
   var R = briefState.result, A = opsBrAi(), P = smPlanFor(mk), plan = P ? P.data : null, made = smDoneFor(mk), busy = typeof SM_DAILY !== "undefined" && SM_DAILY.busy;
@@ -55,7 +61,7 @@ function opsSteps() {
     '<button class="opsBtn" data-ops="recheck">다시 확인</button><button class="opsLink" data-ops="go:data">데이터 센터</button>' + (D.data ? '' : '<button class="opsLink" data-ops="mark:data">확인했어요</button>')));
   // ② 오늘 브리핑 (Claude 한 번)
   var nIss = A ? (A.data.issues || []).filter(function (x) { return x.why; }).length : 0;
-  var b2 = A ? '<p class="opsLead">' + opsEsc((A.data.story || [])[0] || A.data.note || "") + '</p><ul class="opsGot"><li>해설 ' + (A.data.story || []).filter(Boolean).length + '줄</li><li>이슈 이유 ' + nIss + '/' + (A.iss || []).length + '</li><li>급등락 이유 ' + (A.data.movers || []).filter(function (m) { return m.why; }).length + '</li><li>내일 볼 것 ' + (A.data.tomorrow || []).length + '</li><li>카드 편성 ' + (plan ? (plan.picks || []).length : 0) + '</li><li>리포트 ' + (plan ? (plan.reports || []).length : 0) + '</li></ul><div class="opsMuted">' + opsHM(A.at) + ' · 웹 검색 ' + (A.searches || 0) + '회' + (A.repaired ? ' · 형식 자동 복구' : '') + (A.truncated ? ' · <span class="opsHot">답이 길어 뒷부분이 잘림 — 다시 만들면 대개 전부 나와요</span>' : '') + (A.stop && A.stop !== "end_turn" ? ' · 멈춤 ' + opsEsc(A.stop) : '') + (A.shared ? ' · 국내·미국·코인 공통' : '') + '</div>' + (A.raw ? '<button class="opsLink" data-ops="raw">Claude 원문 보기</button>' : '') + ''
+  var b2 = A ? '<p class="opsLead">' + opsEsc((A.data.story || [])[0] || A.data.note || "") + '</p><ul class="opsGot"><li>해설 ' + (A.data.story || []).filter(Boolean).length + '줄</li><li>이슈 이유 ' + nIss + '/' + (A.iss || []).length + '</li><li>급등락 이유 ' + (A.data.movers || []).filter(function (m) { return m.why; }).length + '</li><li>내일 볼 것 ' + (A.data.tomorrow || []).length + '</li><li>카드 편성 ' + (plan ? (plan.picks || []).length : 0) + '</li><li>리포트 ' + opsReps(plan, {}).length + '</li></ul><div class="opsMuted">' + opsHM(A.at) + ' · 웹 검색 ' + (A.searches || 0) + '회' + (A.repaired ? ' · 형식 자동 복구' : '') + (A.truncated ? ' · <span class="opsHot">답이 길어 뒷부분이 잘림 — 다시 만들면 대개 전부 나와요</span>' : '') + (A.stop && A.stop !== "end_turn" ? ' · 멈춤 ' + opsEsc(A.stop) : '') + (A.shared ? ' · 국내·미국·코인 공통' : '') + '</div>' + (A.raw ? '<button class="opsLink" data-ops="raw">Claude 원문 보기</button>' : '') + ''
     : R ? '<div class="opsMuted">Claude 호출 한 번으로 국내·미국·코인을 함께 읽고 여섯 가지를 채워요: 시장 해설 3줄 · 핵심 이슈 왜/그래서/볼 것 · 급등락 이유 · 내일 볼 것 · 오늘 카드 편성 · 볼 리포트</div>' : '<div class="opsMuted">브리핑 계산 중…</div>';
   if (typeof SM_DAILY !== "undefined" && SM_DAILY.last && !A) b2 += '<div class="opsErr">마지막 시도 실패 ' + opsHM(SM_DAILY.last.at) + ' — ' + opsEsc(String(SM_DAILY.last.msg || "").split("\n")[0]) + (SM_DAILY.last.raw ? ' <button class="opsLink" data-ops="rawerr">원문 보기</button>' : '') + '</div>';
   h.push(opsStep(2, "brief", st("brief"), "오늘 브리핑", "Claude 한 번으로 세 시장 — 보는 시장에 맞춰 해설 · 편성 · 일정이 나뉘어요", b2,
@@ -64,9 +70,9 @@ function opsSteps() {
   var doneCtx = {}; made.forEach(function (d) { doneCtx[d.ctx] = 1; });
   var picks = plan ? (typeof mkAiList === "function" && typeof mkTopicsScored === "function" ? (function () { try { return mkAiList(mkTopicsScored()); } catch (e) { return []; } })() : []) : [];
   var Q = []; try { Q = typeof rpQuestions === "function" ? rpQuestions() : []; } catch (e) {} var qb = {}; Q.forEach(function (q) { qb[q.id] = q; });
-  var reps = plan ? (plan.reports || []).map(function (r) { return qb[r.id] ? { id: r.id, t: qb[r.id].t, why: r.why } : r.name ? { id: "", t: r.name + ", 기회인가 위기인가", why: r.why } : null; }).filter(Boolean) : [];
+  var reps = opsReps(plan, qb);
   var b3 = picks.length || reps.length ? (picks.length ? '<div class="opsSubH">카드 ' + picks.length + '</div><ol class="opsPicks">' + picks.slice(0, 5).map(function (x) { return '<li class="' + (doneCtx[x.ctx] ? "done" : "") + '"><button data-ops="make:' + opsEsc(x.ctx) + '"><span>' + opsEsc(cPlain(x.t)) + '</span><small>' + (doneCtx[x.ctx] ? "만듦" : opsEsc((x.why || "").match(/^\[(.+?)\]/) ? x.why.match(/^\[(.+?)\]/)[1] : "")) + '</small></button></li>'; }).join("") + '</ol>' + (picks.length > 5 ? '<div class="opsMuted">외 ' + (picks.length - 5) + '개는 카드 작업대에서</div>' : '') : '') +
-    (reps.length ? '<div class="opsSubH">리포트 ' + reps.length + '</div><ul class="opsMade">' + reps.slice(0, 3).map(function (r) { return '<li><button data-ops="report:' + opsEsc(r.id) + '">' + opsEsc(r.t) + '</button></li>'; }).join("") + '</ul>' : '')
+    (reps.length ? '<div class="opsSubH">리포트 ' + reps.length + '</div><ul class="opsMade">' + reps.slice(0, 4).map(function (r) { return '<li><button data-ops="report:' + opsEsc(r.id) + '">' + opsEsc(r.t) + '</button></li>'; }).join("") + '</ul>' : '')
     : '<div class="opsMuted">② 브리핑을 만들면 오늘 만들 카드와 볼 리포트가 순서대로 나와요. 편성 없이도 아래 링크로 바로 만들 수 있어요.</div>';
   h.push(opsStep(3, "make", st("make"), "만들기", "편성 순서대로 카드 · 리포트 · 분석", b3,
     '<button class="opsLink" data-ops="go:work">카드 작업대</button><button class="opsLink" data-ops="go:report">리포트</button><button class="opsLink" data-ops="go:analyst">분석</button>'));
@@ -166,7 +172,7 @@ function opsBoard() {
   if (!R) return '<p class="opsEmpty">시장 데이터를 준비하는 중이에요…</p>';
   var picks = plan ? (function () { try { return mkAiList(mkTopicsScored()); } catch (e) { return []; } })() : [];
   var Q = []; try { Q = typeof rpQuestions === "function" ? rpQuestions() : []; } catch (e) {} var qb = {}; Q.forEach(function (q) { qb[q.id] = q; });
-  var reps = plan ? (plan.reports || []).map(function (r) { return qb[r.id] ? { t: qb[r.id].t, why: r.why } : r.name ? { t: r.name, why: r.why } : null; }).filter(Boolean) : [];
+  var reps = opsReps(plan, qb);
   var made = smDoneFor(mk), inMk = function (sym) { return mk === "all" || !sym || smSymMk(sym) === mk; };
   var rps = (typeof RP !== "undefined" && RP.saved || []).filter(function (r) { return r.made && String(r.made).slice(0, 10) === smKstDay() && inMk(r.sym); });
   var ans = (typeof arcItems === "function" ? arcItems() : []).filter(function (a) { return opsToday(a.at) && inMk(a.sym); });
@@ -238,7 +244,7 @@ function opsAct(a, btn) {
   if (a.indexOf("mark:") === 0) { smFlowMark(a.slice(5)); renderOps(); return; }
   if (a.indexOf("go:") === 0) { var g = a.slice(3); if (g === "work") { if (typeof MK !== "undefined") { MK.tab = "work"; MK.mk = smMk(); if (smPlanFor(smMk())) MK.filt = "ai"; } return navTo("onecard"); } if (g === "report" && typeof RP !== "undefined") { RP.tab = "today"; RP.cur = null; } return navTo(g); }
   if (a.indexOf("make:") === 0) { if (typeof MK !== "undefined") { MK.tab = "work"; MK.sel = a.slice(5); MK.mk = smMk(); if (smPlanFor(smMk())) MK.filt = "ai"; } navTo("onecard"); setTimeout(function () { var r = document.querySelector("#mkBody .wbRight"); if (r) try { r.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 300); return; }
-  if (a.indexOf("report:") === 0) { var id = a.slice(7), q = (typeof rpQuestions === "function" ? rpQuestions() : []).filter(function (z) { return z.id === id; })[0]; if (typeof RP !== "undefined") { RP.tab = "today"; RP.cur = null; } navTo("report"); if (q) setTimeout(function () { if (typeof rpGo === "function") rpGo({ id: q.id, kind: q.kind, sym: q.sym || null, arg: q.arg || null }); }, 250); return; }
+  if (a.indexOf("report:") === 0) { var id = a.slice(7), q = (typeof rpQuestions === "function" ? rpQuestions() : []).filter(function (z) { return z.id === id; })[0]; if (!q && /^stock:/.test(id)) q = { id: id, kind: "stock", sym: id.slice(6) }; if (typeof RP !== "undefined") { RP.tab = "today"; RP.cur = null; } navTo("report"); if (q) setTimeout(function () { if (typeof rpGo === "function") rpGo({ id: q.id, kind: q.kind, sym: q.sym || null, arg: q.arg || null }); }, 250); return; }
   if (a === "raw" || a === "rawerr") { var A = a === "raw" ? opsBrAi() : null, txt = A ? A.raw : (SM_DAILY.last && SM_DAILY.last.raw) || ""; var box = document.createElement("div"); box.innerHTML = '<div class="briefDim" style="margin-bottom:8px">' + (A ? 'Claude 원문 (앞 6,000자) · 멈춘 이유 ' + opsEsc(A.stop || "-") + (A.usage ? ' · 출력 토큰 ' + (A.usage.output_tokens || "-") : '') : '실패한 호출의 원문 — ' + opsEsc(SM_DAILY.last && SM_DAILY.last.msg || "")) + '</div><textarea class="thrText" rows="18" readonly style="width:100%"></textarea>'; box.querySelector("textarea").value = txt || "(원문 없음)"; if (typeof infoModal !== "undefined") infoModal.open("Claude 원문", box); else alert(txt.slice(0, 2000)); return; }
   if (a === "daily") { if (!briefState.result || (typeof SM_DAILY !== "undefined" && SM_DAILY.busy)) return; renderOps(); var b = document.querySelector('#opsBody [data-ops="daily"]'); smDailyRun(b).then(function () { if (currentTab === "ops") renderOps(); }); return; }
 }
