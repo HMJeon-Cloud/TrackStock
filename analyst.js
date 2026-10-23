@@ -443,6 +443,48 @@ function anAnsAdd(text) {
   return arcSave(rec).then(function (it) { AN.ansId = it.id; return it; });
 }
 
+/* ============================================================ v12.39 Claude 자동 분석 — 프롬프트 → 분석(웹 보완) → 검사관 재검토 → 저장 → 카드
+   허술함 방지: 분석 시스템 지시(서버)가 '출발 가설·무게 둔 근거·생각이 바뀐 지점'(【사고 과정】), 반론 3개 정면 답변, 실패 시나리오, 생각을 바꿀 조건을 강제한다.
+   검사관이 숫자·출처를 다시 확인해 카드형 블록을 고친다. 결과는 ④ 저장(분석 자산)에 쌓여 다음 분석의 문맥·적중률 보정에 쓰인다.
+   ============================================================ */
+var AN_AUTO_STEPS = ["앱 데이터", "Claude 분석 · 웹 보완", "검사관 재검토", "저장", "카드"];
+function anAutoHtml() {
+  var A = AN.auto; if (!A) return "";
+  return '<div class="anAuto"><b>🤖 자동 분석</b> <small class="briefDim">' + anEsc(A.label || "") + '</small><div class="anAutoSteps">' + AN_AUTO_STEPS.map(function (t, i) { return '<span class="' + (i < A.step ? "done" : i === A.step && A.busy ? "on" : "") + '">' + (i < A.step ? "✓ " : "") + t + '</span>'; }).join("") + '</div>' +
+    (A.msg ? '<div>' + anEsc(A.msg) + '</div>' : '') + (A.err ? '<div class="rbWarn">' + anEsc(A.err) + '</div>' : '') + (A.src && A.src.length && typeof smSrcHtml === "function" ? smSrcHtml(A.src) : '') + '</div>';
+}
+function anAutoSet(o) { AN.auto = Object.assign(AN.auto || {}, o); if (typeof currentTab === "undefined" || currentTab === "analyst") renderAnalyst(); }
+function anAutoMerge(t1, t2, src) {
+  var out = t1, card2 = "", review = "";
+  if (t2) { var ci = t2.search(/^\s*#{1,4}\s*카드형/m), ri = t2.search(/^\s*#{1,4}\s*검토 결과/m); if (ci >= 0) card2 = t2.slice(ci).trim(); if (ri >= 0) review = t2.slice(ri, ci > ri ? ci : undefined).replace(/^\s*#{1,4}\s*검토 결과\s*/m, "").trim(); }
+  if (card2) { var c1 = out.search(/^\s*#{1,4}\s*카드형/m); out = (c1 >= 0 ? out.slice(0, c1) : out + "\n\n") + card2; }
+  if (review) out += "\n\n## 검토 결과 (검사관)\n" + review;
+  if (src && src.length) out += "\n\n## 참고 링크\n" + src.map(function (s) { return "- " + (s.t || "") + " " + s.u; }).join("\n");
+  return out;
+}
+function anAutoRun(prompt, O) {
+  var m = anMod(), label = m.no + " " + m.t + (AN.sym && m.need === "stock" ? " · " + anName(AN.sym) : "") + " · " + ({ module: "이 틀만", full: "종목 풀세트", all: "전체 6틀" })[AN.pScope || "module"], src = [];
+  AN.auto = null; anAutoSet({ busy: true, step: 1, label: label, msg: "Claude가 앱 데이터를 읽고, 빈칸은 최신 공시·기사로 보완하며 분석 중이에요 (1~4분)…", err: null, src: [] });
+  var t0 = Date.now(), t1 = "";
+  smClaude("analyst", prompt).then(function (j) {
+    t1 = j.text || ""; src = j.sources || [];
+    if (!/##\s*카드형/.test(t1) && !/##\s*서술형/.test(t1)) throw new Error("분석 형식이 맞지 않아요 — 다시 시도해 주세요");
+    anAutoSet({ step: 2, src: src, msg: "검사관이 숫자·출처·논리를 다시 확인하는 중… (분석에서 웹 검색 " + (j.searches || []).length + "회 사용)" });
+    return smClaude("inspect", anPromptInspector(O && AN.pScope === "module" ? O : null, t1)).then(function (k) { (k.sources || []).forEach(function (s) { if (!src.some(function (x) { return x.u === s.u; })) src.push(s); }); return k.text || ""; }).catch(function (e) { AN.auto.msg = "검사관 단계 실패(" + e.message + ") — 분석 원문으로 저장해요"; return ""; });
+  }).then(function (t2) {
+    anAutoSet({ step: 3, msg: "저장 중…" });
+    var finalText = anAutoMerge(t1, t2, src);
+    return anAnsAdd(finalText);
+  }).then(function (it) {
+    if (!it) throw new Error("저장하지 못했어요");
+    AN.arcPairs = null; AN.step = 5;
+    anAutoSet({ step: 4, msg: "카드를 만드는 중…" });
+    var P = anParse(it.text || ""), kind = P.items.length ? "card" : "narr";
+    anMakeCards(it, kind, null);
+    anAutoSet({ busy: false, step: 5, msg: "완료 · " + Math.round((Date.now() - t0) / 1000) + "초 · ④에 저장됨 · " + (kind === "card" ? "카드형" : "서술형") + " 카드를 열었어요(다른 형태는 ⑤에서)" });
+  }).catch(function (e) { anAutoSet({ busy: false, err: "자동 분석 실패: " + e.message + (t1 ? " — 분석 원문은 ④ 입력칸에 넣어 두었어요" : "") }); if (t1) { var ta = document.getElementById("anAnsMain"); if (ta) ta.value = t1; } });
+}
+
 /* ============================================================ 답변 → 카드 (서술형 · 카드형) ============================================================ */
 function anCardsFrom(it, kind) {
   var P = anParse(it.text || ""), m = AN_MODS.filter(function (x) { return x.id === it.mod; })[0] || anMod(), title = P.title || it.title, day = cDate(Date.now()), foot = "AI 분석(" + day + ") · " + (P.srcs || "출처는 답변 참고") + " · 투자 권유 아님", list = [];
@@ -511,7 +553,7 @@ function renderAnalyst() {
   h += '<section class="anSec' + (ready ? '' : ' dim') + '"><div class="mkStep"><b>3</b> 프롬프트 복사 <small class="briefDim">AI에 붙여넣으면 항목별 답 → 종합이 서술형 + 카드형으로 돌아와요</small></div>';
   h += '<div class="anPrOpts">' + [["module", "이 틀만", m.no + " " + m.t + " · 체크리스트 " + m.ck.length + "개 + 앱 데이터"], ["full", "종목 풀세트", "01~04 네 틀 한 번에 → 틀별 종합 → 최종 투자 판단" + (m.need === "stock" ? "" : " (종목 선택 필요)")], ["all", "전체 6틀", "종목 4 + 포트폴리오 + 매크로 → 최종 판단·비중 제안"]].map(function (o) { return '<label class="anPrOpt' + (AN.pScope === o[0] ? ' on' : '') + '"><input type="radio" name="anScope" value="' + o[0] + '"' + (AN.pScope === o[0] ? ' checked' : '') + '><b>' + o[1] + '</b><small>' + o[2] + '</small></label>'; }).join("") + '</div>';
   h += '<label class="anCtxOpt"><input type="checkbox" data-anctx' + (AN.useCtx !== false ? ' checked' : '') + '> 과거 분석 기록 넣기 <small class="briefDim">' + (past.length ? "이 " + (m.need === "stock" ? "종목" : "틀") + " 기록 " + past.length + "건 중 최근 3건 → '그때 vs 지금 · 판단 조정' 문단을 요청" : "아직 기록 없음 — 저장이 쌓이면 자동으로 들어가요") + '</small></label>';
-  h += '<div class="anActs"><button class="primary" data-ancopy' + (ready || AN.pScope !== "module" ? '' : ' disabled') + '>📋 프롬프트 복사</button><button class="chip" data-anprev>프롬프트 보기</button><span class="briefDim anPrMsg"></span></div><div class="anPrBox" hidden><textarea class="thrText" rows="14" spellcheck="false" readonly></textarea></div>';
+  h += '<div class="anActs"><button class="primary" data-ancopy' + (ready || AN.pScope !== "module" ? '' : ' disabled') + '>📋 프롬프트 복사</button><button class="chip" data-anprev>프롬프트 보기</button>' + (typeof smClaude === "function" ? '<button class="primary anAutoBtn" data-anauto' + (ready || AN.pScope !== "module" ? '' : ' disabled') + ' title="프롬프트 → Claude 분석(웹으로 빈칸 보완) → 검사관 재검토 → 저장 → 카드까지 자동">🤖 Claude가 끝까지 분석</button>' : '') + '<span class="briefDim anPrMsg"></span></div>' + anAutoHtml() + '<div class="anPrBox" hidden><textarea class="thrText" rows="14" spellcheck="false" readonly></textarea></div>';
   // v12.15 검토 프롬프트 — 틀 분석과 별개로 한 번에 복사해 쓰는 4가지 (앱 숫자 포함)
   h += '<div class="anRevH">검토 프롬프트 <small class="briefDim">틀 분석과 별개 · 앱 숫자를 근거로 넣어요 · 답변은 ④에 저장</small></div><div class="anRev">' +
     '<button class="wbAct" data-anrev="pre"' + (ready ? '' : ' disabled') + '><b>⚠️ 실패 시나리오</b><small>6개월 뒤 -30% 가정 → 원인 3 · 경고 신호 · 가설 폐기 조건</small></button>' +
@@ -521,7 +563,7 @@ function renderAnalyst() {
     '<div class="anRevIn" hidden><textarea class="anAnsIn" rows="6" placeholder=""></textarea><div class="anActs"><button class="primary" data-anrevcopy>📋 프롬프트 복사</button><button class="chip" data-anrevclose>닫기</button></div></div></section>';
   // ④ 답변
   h += '<section class="anSec"><div class="mkStep"><b>4</b> 받은 답변 붙여넣기 · 저장 <small class="briefDim">' + (mine.length ? '이 틀 ' + mine.length + '건 저장됨' : '서버에 쌓여 자산이 돼요 · 그때 가격·숫자도 같이 저장') + '</small></div>';
-  h += '<textarea class="anAnsIn" rows="7" placeholder="AI 답변 전체를 여기에 붙여넣고 [저장]을 누르세요. (## 서술형 / ## 카드형 블록이 있으면 항목·판정·리스크를 자동으로 읽어요)"></textarea><div class="anActs"><button class="primary" data-ansave>💾 저장</button><button class="chip" data-anclear>비우기</button></div>';
+  h += '<textarea class="anAnsIn" id="anAnsMain" rows="7" placeholder="AI 답변 전체를 여기에 붙여넣고 [저장]을 누르세요. (## 서술형 / ## 카드형 블록이 있으면 항목·판정·리스크를 자동으로 읽어요)"></textarea><div class="anActs"><button class="primary" data-ansave>💾 저장</button><button class="chip" data-anclear>비우기</button></div>';
   if (mine.length) h += '<div class="anAnsList">' + mine.slice(0, 8).map(function (a) { var P = a.text ? anParse(a.text) : Object.assign({ items: [], risks: [], watch: [], paras: [] }, a.p || {}); return '<div class="anAns' + (cur && cur.id === a.id ? ' on' : '') + '" data-anpick="' + a.id + '"><div class="anAnsMain"><b>' + anEsc(a.title) + '</b><small>' + arcD(a.at) + ' · ' + (P.items.length ? "항목 " + P.items.length + "개 · " : "") + (P.paras.length ? "문단 " + P.paras.length + "개" : "서술 없음") + (P.verdict ? ' · 종합 ' + ({ ok: "✓", mid: "△", bad: "✗" })[P.verdictSt || "mid"] : "") + '</small></div><div class="anAnsActs"><button class="chip" data-ancp="' + a.id + '">복사</button><button class="chip" data-andel="' + a.id + '">삭제</button></div></div>'; }).join("") + '</div>';
   h += '</section>';
   // ⑤ 카드
@@ -564,8 +606,9 @@ function renderAnalyst() {
   var cal = root.querySelector("[data-ancal]"); if (cal) cal.onchange = function () { AN.calib = cal.checked; renderAnalyst(); };
   var cp = root.querySelector("[data-ancopy]"); if (cp) cp.onclick = function () { buildPrompt(function (t) { anCopy(t, cp); AN.step = Math.max(AN.step, 4); var box = root.querySelector(".anPrBox"); if (box && !box.hidden) box.querySelector("textarea").value = t; }); };
   var pv = root.querySelector("[data-anprev]"); if (pv) pv.onclick = function () { var box = root.querySelector(".anPrBox"); if (!box.hidden) { box.hidden = true; return; } buildPrompt(function (t) { box.hidden = false; box.querySelector("textarea").value = t; }); };
-  var sv = root.querySelector("[data-ansave]"); if (sv) sv.onclick = function () { var ta = root.querySelector(".anAnsIn"); if (!ta.value.trim()) { alert("붙여넣은 답변이 비어 있어요."); return; } sv.textContent = "저장 중…"; sv.disabled = true; anAnsAdd(ta.value).then(function () { AN.step = 5; AN.arcPairs = null; renderAnalyst(); var sec = document.querySelectorAll("#anBody .anSec")[4]; if (sec) try { sec.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }); };
-  var cl = root.querySelector("[data-anclear]"); if (cl) cl.onclick = function () { root.querySelector(".anAnsIn").value = ""; };
+  var au = root.querySelector("[data-anauto]"); if (au) au.onclick = function () { if (AN.auto && AN.auto.busy) return; buildPrompt(function (t) { anAutoRun(t, O); }); };   // v12.39
+  var sv = root.querySelector("[data-ansave]"); if (sv) sv.onclick = function () { var ta = document.getElementById("anAnsMain"); if (!ta.value.trim()) { alert("붙여넣은 답변이 비어 있어요."); return; } sv.textContent = "저장 중…"; sv.disabled = true; anAnsAdd(ta.value).then(function () { AN.step = 5; AN.arcPairs = null; renderAnalyst(); var sec = document.querySelectorAll("#anBody .anSec")[4]; if (sec) try { sec.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }); };
+  var cl = root.querySelector("[data-anclear]"); if (cl) cl.onclick = function () { document.getElementById("anAnsMain").value = ""; };   // v12.39 ③ 검토 입력칸과 헷갈리던 것
   Array.prototype.forEach.call(root.querySelectorAll("[data-anpick]"), function (b) { b.onclick = function (e) { if (e.target.closest("button")) return; AN.ansId = b.getAttribute("data-anpick"); AN.step = 5; renderAnalyst(); }; });
   Array.prototype.forEach.call(root.querySelectorAll("[data-ancp]"), function (b) { b.onclick = function () { arcText(b.getAttribute("data-ancp")).then(function (t) { anCopy(t, b); }); }; });
   Array.prototype.forEach.call(root.querySelectorAll("[data-andel]"), function (b) { b.onclick = function () { if (!confirm("이 기록을 지울까요? (서버에서도 지워져요)")) return; var id = b.getAttribute("data-andel"); arcDel(id); if (AN.ansId === id) AN.ansId = null; AN.arcPairs = null; renderAnalyst(); }; });

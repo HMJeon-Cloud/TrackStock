@@ -110,12 +110,14 @@ function issuesRender(boxId, list) {
   var box = $(boxId); if (!box) return;
   if (!list || !list.length) { box.innerHTML = ""; return; }
   box.innerHTML = '<div class="issHead"><b>📌 ' + (ISS_LBL[list.mode] || "오늘") + '의 핵심 이슈 5</b><small>' + (list.market && list.market !== "all" ? list.mktName + " · " : "") + '자료 전체에서 평소보다 이례적인 순</small>' +
-    '<span class="issBtns"><button class="chip" data-act="copy">복사</button></span></div>' +
+    '<span class="issBtns"><button class="chip" data-act="copy">복사</button>' + (typeof smClaude === "function" && typeof isOwner === "function" && isOwner() ? '<button class="chip" data-act="why" title="Claude가 기사·웹을 보고 이슈마다 이유 한 줄(출처 포함)">✨ 이유 찾기</button>' : '') + '</span></div>' +
     '<ol class="issList">' + list.map(function (it, i) {
       return '<li><span class="issNo">' + (i + 1) + '</span><span class="issEmo">' + it.emoji + '</span><div><b>' + escapeHtml(it.title) + '</b><small>' + escapeHtml(it.sub) + '</small></div>' +
         (it.sym ? '<button class="linkBtn issGo" data-sym="' + it.sym + '" title="종목 탭에서 보기">›</button>' : '') + '</li>';
     }).join("") + '</ol>';
   box.querySelector('[data-act="copy"]').onclick = function () { (typeof chCopy === "function" ? chCopy : issCopy)(issuesText(list), this); };
+  var wb = box.querySelector('[data-act="why"]'); if (wb) wb.onclick = function () { issWhyRun(list, box, wb); };   // v12.39
+  if (typeof issWhyPaint === "function") issWhyPaint(list, box);
   var cb = box.querySelector('[data-act="card"]'); if (cb) cb.onclick = function () { issuesCardOpen(list); };   // v12.27 카드 버튼이 없는 화면에서 오류 나던 것
   Array.prototype.forEach.call(box.querySelectorAll(".issGo"), function (b) {
     b.onclick = function () { $("searchInput").value = b.getAttribute("data-sym"); navTo("single", "chart"); if (typeof load === "function") load(); };

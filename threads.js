@@ -271,7 +271,7 @@ function thrPart(cls, label, max, hint) {
   return '<div class="thrPart"><div class="thrLbl"><b>' + label + '</b>' + (hint ? '<em>' + hint + '</em>' : '') + '<span class="thrCnt" data-max="' + max + '"></span><button class="chip thrCopy">복사</button></div><textarea class="thrText ' + cls + '" spellcheck="false"></textarea></div>';
 }
 function thrPanelHtml(topic) {
-  return '<div class="thrPanel" data-topic="' + (topic || "주식") + '"><div class="thrHead"><b>업로드 글</b><small>스레드 토픽: <b>' + (topic || "주식") + '</b> · 본문 올린 뒤 답글 1·2를 이어서 달기</small><button class="chip thrAi" title="지금 글(우리 숫자)을 바탕으로 Claude가 다시 쓰고, 필요하면 최근 사실을 찾아 보완해요 · 누를 때만 비용이 들어요">✨ AI 문구 (Claude)</button></div><div class="thrAiOut briefDim"></div>' +
+  return '<div class="thrPanel" data-topic="' + (topic || "주식") + '"><div class="thrHead"><b>업로드 글</b><small>스레드 토픽: <b>' + (topic || "주식") + '</b> · 본문 올린 뒤 답글 1·2를 이어서 달기</small><span class="thrAiBtns"><button class="chip thrAi" title="지금 글(우리 숫자)을 바탕으로 Claude가 다시 쓰고, 필요하면 최근 사실을 찾아 보완해요 · 누를 때만 비용이 들어요">✨ AI 문구 (Claude)</button><button class="chip thrChkBtn" title="올리기 직전: 카드 글자와 캡션의 숫자 불일치·권유처럼 읽히는 문장·과장·오탈자를 찾아요">🧐 발행 전 검수</button></span></div><div class="thrAiOut briefDim"></div>' +
     '<div class="pills thrTabs"></div>' +
     '<div class="thrGrid"><div class="thrCol">' + thrPart("thrIg", "인스타 캡션", 2200) + '</div>' +
     '<div class="thrCol">' + thrPart("thrTh", "스레드 본문", 500, "첫 줄이 피드에 보임") + thrPart("thrR1 sm", "답글 1", 500, "반대 숫자·한계") + thrPart("thrR2 sm", "답글 2", 500, "질문 하나") + '</div></div></div>';
@@ -287,7 +287,8 @@ function thrBind(box, variants) {
   parts.forEach(function (pt) { var ta = pt.querySelector("textarea"); ta.oninput = upd; pt.querySelector(".thrCopy").onclick = function () { chCopy(ta.value, this); }; });
   show(thrSeed() % variants.length);
   /* v12.38 ✨ AI 문구: 누를 때만 Claude API로 다시 쓴다(자동 생성 아님). 결과는 탭으로 앞에 붙이고, 우리 데이터에 없는 숫자는 표시만 */
-  var ab = p.querySelector(".thrAi"), ao = p.querySelector(".thrAiOut");
+  var ab = p.querySelector(".thrAi"), ao = p.querySelector(".thrAiOut"), cbk = p.querySelector(".thrChkBtn");
+  if (cbk) cbk.onclick = function () { if (typeof thrCheckRun === "function") thrCheckRun(p, cbk, ao); };   // v12.39 발행 전 검수
   if (ab) ab.onclick = function () {
     var base = variants.filter(function (v) { return !/^✨/.test(v.label); })[0] || variants[0];
     var data = ["[인스타 규칙 글]", base.ig, "[스레드 본문]", base.th, "[답글1]", base.r1 || "", "[답글2]", base.r2 || ""].join("\n");

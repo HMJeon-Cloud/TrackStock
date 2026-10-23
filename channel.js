@@ -136,7 +136,7 @@ function chDataGuideHtml() {
     ['<b>SEC_UA</b> <small>키 아님</small>', 'sec.gov 규칙: "StockMind 내이메일" 형식 (영문·이메일만)', '구루 13F 보유 내역 (버핏 등 주요 투자자)', '분기마다 새 13F가 올라오면 · 매일 확인', on(K.secUa, "설정됨", "없음 → SEC가 거절할 수 있음")],
     ['<b>ECOS_API_KEY</b>', 'ecos.bok.or.kr → 인증키 신청 (무료)', '원/달러 환율(매매기준율) · 한국은행 기준금리', '매일 아침 크론(지표마다 하루 1회) + 수동', on(K.ecos)],
     ['<b>FRED_API_KEY</b> <small>선택</small>', 'fred.stlouisfed.org → API Keys (무료)', '미 기준금리 · 미 10년물 · M2 — 키가 없으면 공개 CSV로 받지만 서버에서 막히는 날이 있어 <b>등록 권장</b>', '매일 아침 크론 + 수동', on(K.fred, "API", "없음 → 공개 CSV")],
-    ['<b>ANTHROPIC_API_KEY</b><br><small>ANTHROPIC_MODEL(기본 claude-sonnet-5-5) · COPY_DAILY_MAX(기본 40) · COPY_WEB(0이면 웹 검색 끔)</small>', 'platform.claude.com → API Keys (유료 · 사용량 과금)', '업로드 글(인스타·스레드) ✨ AI 문구 — 우리 숫자 기준으로 다시 쓰고, 필요하면 최근 사실을 웹 검색(최대 3회)으로 보완', '운영자가 ✨ 버튼을 누를 때만 · 하루 상한', on(K.anthropic)]
+    ['<b>ANTHROPIC_API_KEY</b><br><small>ANTHROPIC_MODEL(기본 claude-sonnet-5-5) · ANTHROPIC_FAST_MODEL(기본 claude-haiku-5-5, 검수용) · COPY_DAILY_MAX(글, 기본 40) · CLAUDE_DAILY_MAX(분석·편성·이유·검수, 기본 60) · COPY_WEB(0이면 웹 검색 끔)</small>', 'platform.claude.com → API Keys (유료 · 사용량 과금)', '✨ AI 문구 · 🧐 발행 전 검수 · ✨ 이유 찾기(핵심 이슈) · ✨ Claude 편성(작업대) · 🤖 애널리스트 자동 분석(분석 → 검사관 → 저장 → 카드)', '운영자가 ✨ 버튼을 누를 때만 · 하루 상한', on(K.anthropic)]
     ['<b>OPENAI_API_KEY</b><br><small>OPENAI_MODEL · OPENAI_IMAGE_MODEL · AI_DAILY_MAX(기본 30)</small>', 'platform.openai.com → API keys (유료 · 사용량 과금)', 'AI 한 장 카드 · 내 글로 AI 카드 · 양식 아이콘 이미지 (애널리스트 AI 답변 기능은 없음 — 프롬프트 복사 방식)', '운영자가 버튼을 누를 때만 · 하루 호출 상한', on(K.openai)]
   ], ["무엇", "어디서 받나", "연동되는 데이터", "주기", "지금 상태"]);
   h += '<h4>② 키 없이 자동으로 오는 데이터</h4>' + tbl([
