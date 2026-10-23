@@ -561,7 +561,7 @@
   .opsStep.wait { background: #fbfbfc; }
   .opsStepBody { flex: 1; margin: 12px 0 10px; font-size: 13px; line-height: 1.5; color: var(--oInk); }
   .opsStep footer { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .opsBtn { border: 1px solid var(--oInk); background: #fff; color: var(--oInk); border-radius: 9px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .opsBtn { white-space: normal; text-align: left; max-width: 100%; line-height: 1.35; border: 1px solid var(--oInk); background: #fff; color: var(--oInk); border-radius: 9px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
   .opsBtn.pri { background: var(--oInk); color: #f1d590; } .opsBtn:disabled { opacity: .5; cursor: default; }
   .opsLink { border: 0; background: none; color: var(--oSub); font-size: 12.5px; padding: 6px 4px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; } .opsLink:disabled { opacity: .4; }
   .opsBtn:focus-visible, .opsLink:focus-visible, .opsPicks button:focus-visible, .opsMade button:focus-visible { outline: 2px solid var(--oGold); outline-offset: 2px; }
@@ -2714,7 +2714,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.51"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.52"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";

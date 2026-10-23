@@ -441,28 +441,43 @@ smDailyApply = function (j, input) {
   var D = j.data || {}, iss = SM_DAILY_ISS, day = smKstDay();
   if (smDailyEmpty(D)) { var e = new Error("Claude 답에 내용이 없어요 (해설·이슈·편성 모두 0) — 멈춘 이유: " + (j.stop || "?") + (j.repaired ? " · 형식 복구 뒤에도 비어 있음" : "") + (j.blocks ? " · 블록: " + Object.keys(j.blocks).map(function (k) { return k + "×" + j.blocks[k]; }).join(", ") : "") + (j.usage ? " · 출력 토큰 " + j.usage.output_tokens : "") + "\n원문 앞부분: " + String(j.text || "").slice(0, 200)); e.raw = j; throw e; }
   var src = input + "\n" + (D.tomorrow || []).map(function (t) { return t.when || ""; }).join(" ");
-  var chk = { story: (D.story || []).map(function (l) { return smNumCheck(l, src); }), issues: (D.issues || []).map(function (x) { return smNumCheck([x.why, x.so, x.next].join(" "), src); }), movers: (D.movers || []).map(function (x) { return smNumCheck(x.why, src); }) };
-  (D.issues || []).forEach(function (x, k) { var it = iss[(+x.i || 0) - 1]; if (it) ISS_WHY[it.title] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf, bad: chk.issues[k] }; });
-  ISS_WHY._note = D.note || ""; ISS_WHY._src = j.sources || [];
-  var rec = { at: Date.now(), model: j.model, data: { story: D.story || [], issues: D.issues || [], movers: D.movers || [], tomorrow: D.tomorrow || [], note: D.note || "" }, sources: j.sources || [], searches: (j.searches || []).length, iss: iss.map(function (it) { return it.title; }), chk: chk, repaired: !!j.repaired, truncated: !!j.truncated, stop: j.stop, usage: j.usage || null, raw: String(j.text || "").slice(0, 6000), shared: true };
-  var P = D.plan || {}, plan = { day: day, at: rec.at, data: { summary: P.summary || D.note || "", picks: P.picks || [], extra: P.extra || [], week: P.week || [], reports: (D.reports || []).filter(function (r) { return r.id; }) }, rpick: { picks: D.reports || [], summary: P.summary || "" }, sources: j.sources || [], searches: j.searches || [], used: j.used, max: j.max, shared: true };
-  var mode = briefState.mode || "day";
-  SM_MK_LIST.forEach(function (m) { BR_AI[day + "|" + m + "|" + mode] = rec; MK_AI_MAP[m] = Object.assign({ mk: m }, plan); });
+  var chk = { story: (D.story || []).map(function (l) { return smNumCheck(l, src); }), bymk: {}, issues: (D.issues || []).map(function (x) { return smNumCheck([x.why, x.so, x.next].join(" "), src); }), movers: (D.movers || []).map(function (x) { return smNumCheck(x.why, src); }) };
+  Object.keys(D.bymk || {}).forEach(function (m) { chk.bymk[m] = (D.bymk[m] || []).map(function (l) { return smNumCheck(l, src); }); });
+  var why = {};
+  (D.issues || []).forEach(function (x, k) { var it = iss[(+x.i || 0) - 1]; if (it) why[it.title] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf, bad: chk.issues[k] }; });
+  var P = D.plan || {};
+  var full = { day: day, at: Date.now(), model: j.model, sources: j.sources || [], searches: j.searches || [], used: j.used, max: j.max, repaired: !!j.repaired, truncated: !!j.truncated, stop: j.stop, usage: j.usage || null, raw: String(j.text || "").slice(0, 6000),
+    data: { story: D.story || [], bymk: D.bymk || {}, issues: D.issues || [], movers: D.movers || [], tomorrow: D.tomorrow || [], note: D.note || "" }, iss: iss.map(function (it) { return it.title; }), chk: chk, why: why,
+    plan: { summary: P.summary || D.note || "", picks: P.picks || [], extra: P.extra || [], week: P.week || [], reports: D.reports || [] } };
+  smDailyDistribute(full); SM_DAILY.full = full;
+};
+/* 한 번의 결과를 시장별로 나눠 넣는다 — 해설은 그 시장 2줄(bymk), 편성·일정·리포트는 그 시장 것만. '전체'는 다 */
+function smDailyDistribute(full) {
+  var day = full.day || smKstDay(), mode = briefState.mode || "day", D = full.data || {}, P = full.plan || {}, inMk = function (x, mk) { var m = x && x.mk; return mk === "all" || !m || m === "all" || m === mk; };
+  var repMk = function (r) { if (r.ticker) return /^\d{6}$/.test(String(r.ticker)) ? "kr" : "us"; var id = String(r.id || ""); var q = id.indexOf(":") > 0 ? id.slice(id.indexOf(":") + 1) : ""; if (/^market:\^KS|^market:\^KQ/.test(id)) return "kr"; if (/^market:/.test(id)) return "us"; if (/^stock:/.test(id)) return smSymMk(q); return "all"; };
+  Object.keys(full.why || {}).forEach(function (t) { ISS_WHY[t] = full.why[t]; }); ISS_WHY._note = D.note || ""; ISS_WHY._src = full.sources || [];
+  SM_MK_LIST.forEach(function (mk) {
+    var story = mk !== "all" && D.bymk && (D.bymk[mk] || []).filter(Boolean).length ? D.bymk[mk] : (D.story || []);
+    var chk = Object.assign({}, full.chk || {}, { story: mk !== "all" && full.chk && full.chk.bymk && full.chk.bymk[mk] ? full.chk.bymk[mk] : (full.chk || {}).story || [] });
+    BR_AI[day + "|" + mk + "|" + mode] = { at: full.at, model: full.model, data: { story: story, issues: D.issues || [], movers: D.movers || [], tomorrow: (D.tomorrow || []).filter(function (t) { return inMk(t, mk); }), note: D.note || "" }, sources: full.sources || [], searches: (full.searches || []).length, iss: full.iss || [], chk: chk, repaired: !!full.repaired, truncated: !!full.truncated, stop: full.stop, usage: full.usage || null, raw: mk === "all" ? full.raw : "", shared: true };
+    var reps = (P.reports || []).filter(function (r) { return mk === "all" || repMk(r) === mk || repMk(r) === "all"; });
+    MK_AI_MAP[mk] = { day: day, at: full.at, mk: mk, data: { summary: P.summary || "", picks: (P.picks || []).filter(function (p) { return inMk(p, mk); }), extra: (P.extra || []).filter(function (x) { return inMk(x, mk); }), week: P.week || [], reports: reps.filter(function (r) { return r.id; }) }, rpick: { picks: reps, summary: P.summary || "" }, sources: full.sources || [], searches: full.searches || [], used: full.used, max: full.max, shared: true };
+  });
   brAiSave(); issWhySave();
-  try { localStorage.setItem("sm.aiPlanMk", JSON.stringify({ d: day, m: MK_AI_MAP })); } catch (e) {}
+  try { localStorage.setItem("sm.aiPlanMk", JSON.stringify({ d: day, m: MK_AI_MAP })); localStorage.setItem("sm.dailyFull", JSON.stringify(Object.assign({}, full, { raw: "" }))); } catch (e) {}
   MK_AI = MK_AI_MAP[smMk()]; if (typeof MK !== "undefined") { MK.filt = "ai"; MK._T = null; }
   smRpickApply();
-};
+}
 /* 빈 결과·실패 원문을 남겨 두고 작업실에서 볼 수 있게 */
 smDailyRun = function (btn) {
   if (SM_DAILY.busy) return Promise.resolve(false);
   if (!briefState.result) { alert("시장 데이터를 아직 준비하는 중이에요 — 잠시 뒤 다시 눌러 주세요"); return Promise.resolve(false); }
-  SM_DAILY.busy = true; var old = btn ? btn.innerHTML : ""; if (btn) { btn.disabled = true; btn.textContent = "Claude가 국내·미국·코인 기사·이슈를 읽고 브리핑·편성·리포트를 한 번에 만드는 중… (1~3분)"; }
+  SM_DAILY.busy = true; var old = btn ? btn.innerHTML : ""; if (btn) { btn.disabled = true; btn.textContent = "만드는 중… (1~3분)"; }
   var prep = typeof cardsNewsFetch === "function" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : Promise.resolve();
   var mac = typeof macroEnsure === "function" ? macroEnsure().catch(function () { return null; }) : Promise.resolve();
   var input = "";
-  var resume = !!smJobPending("daily"), onWait = function (sec) { if (btn && document.body.contains(btn)) btn.textContent = "Claude가 국내·미국·코인 기사·이슈를 읽고 만드는 중… " + sec + "초 (보통 1~3분 · 화면을 닫아도 이어져요)"; };
-  if (resume && btn) btn.textContent = "아까 시작한 브리핑 작업을 이어서 기다리는 중…";
+  var resume = !!smJobPending("daily"), onWait = function (sec) { if (btn && document.body.contains(btn)) btn.textContent = "만드는 중… " + sec + "초 (1~3분 · 닫아도 이어져요)"; };
+  if (resume && btn) btn.textContent = "아까 시작한 작업을 이어서 기다리는 중…";
   return Promise.all([prep, mac]).then(function () { input = smDailyInput(); return smClaude("daily", input, { json: true, resume: resume, onWait: onWait }); })
     .then(function (j) { smDailyApply(j, input); SM_DAILY.last = null; return true; })
     .catch(function (e) { SM_DAILY.last = { at: Date.now(), msg: e.message, raw: e.raw ? String(e.raw.text || "").slice(0, 6000) : (e.res && e.res.text) || "", stop: e.raw ? e.raw.stop : e.res && e.res.reason }; try { localStorage.setItem("sm.dailyErr", JSON.stringify(SM_DAILY.last)); } catch (x) {} alert("오늘 브리핑 실패: " + e.message); return false; })
@@ -475,22 +490,20 @@ brAiRun = function (btn) { return smDailyRun(btn); }; issWhyRun = function (l, b
 
 /* ============================================================ v12.50 오늘 브리핑을 서버에도 하루치 저장 — 휴대폰에서 만든 것을 PC에서 그대로(다시 돌리지 않음) ============================================================ */
 function smDailyPost(payload) { var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {} return fetch("/api/channel?op=claude", { method: "POST", headers: { "content-type": "application/json", "x-owner": tok }, body: JSON.stringify(payload) }).then(function (r) { return r.json(); }); }
+function smDailyFull() { if (SM_DAILY.full) return SM_DAILY.full; try { var f = JSON.parse(localStorage.getItem("sm.dailyFull") || "null"); return f && f.day === smKstDay() ? f : null; } catch (e) { return null; } }
 function smDailyShare() {
-  var day = smKstDay(), rec = null, k = Object.keys(BR_AI).filter(function (x) { return x.indexOf(day + "|") === 0 && BR_AI[x] && BR_AI[x].shared; })[0]; if (k) rec = BR_AI[k];
-  var plan = MK_AI_MAP.all && MK_AI_MAP.all.shared ? MK_AI_MAP.all : null; if (!rec || !plan) return Promise.resolve(false);
-  var slim = Object.assign({}, rec, { raw: undefined });
-  var m = {}; Object.keys(ISS_WHY).forEach(function (t) { if (t.charAt(0) !== "_") m[t] = ISS_WHY[t]; });
-  return smDailyPost({ today: 1, put: { day: day, rec: slim, plan: plan, why: m } }).then(function (j) { return !!(j && j.ok); }).catch(function () { return false; });
+  var full = smDailyFull(); if (!full) return Promise.resolve(false);
+  return smDailyPost({ today: 1, put: { day: full.day, full: Object.assign({}, full, { raw: "" }) } }).then(function (j) { return !!(j && j.ok); }).catch(function () { return false; });
 }
 function smDailyFetch() {
   var day = smKstDay(); if (Object.keys(BR_AI).some(function (x) { return x.indexOf(day + "|") === 0 && BR_AI[x] && BR_AI[x].shared; })) return Promise.resolve(false);
   if (!(typeof isOwner === "function" && isOwner())) return Promise.resolve(false);
   return smDailyPost({ today: 1 }).then(function (j) {
-    if (!j || !j.ok || !j.rec || j.day !== day) return false;
-    var mode = briefState.mode || "day"; SM_MK_LIST.forEach(function (mk) { BR_AI[day + "|" + mk + "|" + mode] = j.rec; MK_AI_MAP[mk] = Object.assign({}, j.plan, { mk: mk }); });
-    Object.keys(j.why || {}).forEach(function (t) { ISS_WHY[t] = j.why[t]; });
-    brAiSave(); issWhySave(); try { localStorage.setItem("sm.aiPlanMk", JSON.stringify({ d: day, m: MK_AI_MAP })); } catch (e) {}
-    MK_AI = MK_AI_MAP[smMk()]; smRpickApply(); smDailyRepaint(); return true;
+    if (!j || !j.ok || j.day !== day) return false;
+    var full = j.full;
+    if (!full && j.rec) full = { day: day, at: j.rec.at, model: j.rec.model, sources: j.rec.sources, searches: [], data: j.rec.data, iss: j.rec.iss, chk: j.rec.chk, why: j.why || {}, plan: (j.plan && j.plan.data) || {}, repaired: j.rec.repaired, truncated: j.rec.truncated, stop: j.rec.stop };   // v12.50 모양 호환
+    if (!full) return false;
+    smDailyDistribute(full); SM_DAILY.full = full; smDailyRepaint(); return true;
   }).catch(function () { return false; });
 }
 (function () { var a0 = smDailyApply; smDailyApply = function () { var r = a0.apply(this, arguments); try { smDailyShare(); } catch (e) {} return r; }; })();
