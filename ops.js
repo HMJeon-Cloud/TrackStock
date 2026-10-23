@@ -59,7 +59,7 @@ function opsSteps() {
     : R ? '<div class="opsMuted">Claude 호출 한 번으로 국내·미국·코인을 함께 읽고 여섯 가지를 채워요: 시장 해설 3줄 · 핵심 이슈 왜/그래서/볼 것 · 급등락 이유 · 내일 볼 것 · 오늘 카드 편성 · 볼 리포트</div>' : '<div class="opsMuted">브리핑 계산 중…</div>';
   if (typeof SM_DAILY !== "undefined" && SM_DAILY.last && !A) b2 += '<div class="opsErr">마지막 시도 실패 ' + opsHM(SM_DAILY.last.at) + ' — ' + opsEsc(String(SM_DAILY.last.msg || "").split("\n")[0]) + (SM_DAILY.last.raw ? ' <button class="opsLink" data-ops="rawerr">원문 보기</button>' : '') + '</div>';
   h.push(opsStep(2, "brief", st("brief"), "오늘 브리핑", "Claude 한 번 · 세 시장 공통 — 해설 · 이유 · 편성 · 리포트", b2,
-    '<button class="opsBtn' + (st("brief") === "now" ? " pri" : "") + '" data-ops="daily"' + (R && !busy ? '' : ' disabled') + '>' + (busy ? "Claude가 만드는 중… (1~3분)" : A ? "다시 만들기" : "Claude 브리핑 만들기") + '</button><button class="opsLink" data-ops="go:brief">브리핑 화면</button>'));
+    '<button class="opsBtn' + (st("brief") === "now" ? " pri" : "") + '" data-ops="daily"' + (R && !busy ? '' : ' disabled') + '>' + (busy ? "Claude가 만드는 중… (1~3분)" : typeof smJobPending === "function" && smJobPending("daily") ? "진행 중인 작업 이어서 받기" : A ? "다시 만들기" : "Claude 브리핑 만들기") + '</button><button class="opsLink" data-ops="go:brief">브리핑 화면</button>'));
   // ③ 만들기
   var doneCtx = {}; made.forEach(function (d) { doneCtx[d.ctx] = 1; });
   var picks = plan ? (typeof mkAiList === "function" && typeof mkTopicsScored === "function" ? (function () { try { return mkAiList(mkTopicsScored()); } catch (e) { return []; } })() : []) : [];

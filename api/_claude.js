@@ -4,7 +4,7 @@
 //   공통 규칙: 앱 숫자가 근거, 지어내지 않기, 웹에서 보완한 사실은 출처와 함께. 권유·목표가·과장 금지.
 //   비용 보호: 하루 상한 CLAUDE_DAILY_MAX(기본 60, 작업 1회 = 1) · 작업별 출력 토큰·웹 검색 횟수 상한
 //   모델: ANTHROPIC_MODEL(기본 claude-sonnet-5-5) = 깊은 작업 / ANTHROPIC_FAST_MODEL(기본 claude-haiku-5-5) = 검수·요약
-import { redisConf, redisCmd } from "./_redis.js";
+import { redisConf, redisCmd, setJsonGz, getJsonGzText } from "./_redis.js";
 
 const BASE = `너는 한국 투자 데이터 계정 '우상향연구소(@uphill.lab)'와 분석 앱 StockMind의 수석 리서처다. 독자는 한국 개인투자자 초보.
 공통 규칙: (1) 앱(StockMind)이 준 숫자가 1순위 근거 — 그대로 인용하고 지어내지 않는다. (2) 웹에서 찾은 사실은 날짜·출처를 붙이고, 확실하지 않으면 쓰지 않는다. (3) 매수·매도 권유, 목표가 제시, 수익 보장, 과장 금지. 판단은 '근거와 조건'으로 말한다. (4) 오늘 날짜 기준으로 최신 상황을 우선한다.
@@ -136,19 +136,11 @@ async function callClaude(key, payload, ms) {
   finally { clearTimeout(tm); }
 }
 
-export async function claudeHandler(req, res) {
-  res.setHeader("Cache-Control", "no-store");
-  if (req.method !== "POST") return res.status(405).json({ ok: false, reason: "POST만" });
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
-  let body = req.body; if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = null; } }
-  const T = body && TASKS[body.task];
-  if (!T || !body.input) return res.status(400).json({ ok: false, reason: "task·input 필요" });
+/* 실제 작업 — 결과 객체를 돌려준다(응답은 claudeHandler 가). used 는 미리 세어 둔 오늘 횟수 */
+async function runClaude(body, key, used) {
+  const T = TASKS[body.task];
   const model = T.tier === "fast" ? (process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5") : (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
   const max = +(process.env.CLAUDE_DAILY_MAX || 60), web = T.web && process.env.COPY_WEB !== "0" && body.web !== false;
-  const rc = redisConf(), dayKey = "sm:claude:" + kstDay(); let used = 0;
-  if (rc) { try { used = +(await redisCmd(rc, ["INCR", dayKey])) || 0; if (used === 1) await redisCmd(rc, ["EXPIRE", dayKey, String(3 * 86400)]); } catch (e) {} }
-  if (used > max) return res.status(200).json({ ok: false, reason: "DAILY_MAX", msg: "오늘 Claude 작업 횟수(" + max + "회)를 다 썼어요 — CLAUDE_DAILY_MAX로 늘릴 수 있어요" });
   const payload = { model, max_tokens: T.max, system: T.system, messages: [{ role: "user", content: "오늘: " + kstDay() + " (한국 시간)\n\n" + clip(body.input, 60000) }] };
   if (web) payload.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: T.web, user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" } }];
   /* v12.45 안정화: ① 웹 검색이 길어져 API가 'pause_turn'으로 잠깐 멈추면 이어서 다시 요청(최대 3번) ② JSON이 깨지면 빠른 모델로 형식만 고치는 한 번 더(내용은 그대로) ③ 실패하면 이유(stop)를 같이 알려 준다
@@ -158,7 +150,7 @@ export async function claudeHandler(req, res) {
     let blocks = [], j = null, r = null, turns = 0, usage = { input_tokens: 0, output_tokens: 0 };
     for (;;) {
       ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000))));
-      if (!r.ok || !j) return res.status(200).json({ ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) || ("Claude API 오류 " + r.status) });
+      if (!r.ok || !j) return { ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) || ("Claude API 오류 " + r.status) };
       blocks = blocks.concat(j.content || []); if (j.usage) { usage.input_tokens += j.usage.input_tokens || 0; usage.output_tokens += j.usage.output_tokens || 0; }
       if (j.stop_reason === "pause_turn" && turns < 3 && left() > 60000) { turns++; payload.messages = payload.messages.concat([{ role: "assistant", content: j.content }]); continue; }
       break;
@@ -188,8 +180,52 @@ export async function claudeHandler(req, res) {
       }
       if (!out.data) { out.ok = false; out.reason = "PARSE"; out.msg = "AI 응답을 읽지 못했어요" + (j.stop_reason === "max_tokens" ? " — 답이 너무 길어 중간에 끊겼어요(다시 시도하면 대개 됩니다)" : j.stop_reason === "pause_turn" ? " — 웹 검색이 길어져 답을 끝내지 못했어요" : !text.trim() ? " — 답 본문이 비어 있어요(웹 검색만 하고 끝남 · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + ")" : " — 형식이 깨졌어요") + " [stop: " + j.stop_reason + (finish ? " → 마무리 " + finish : "") + " · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + " · 출력 토큰 " + usage.output_tokens + "]"; out.text = clip(text, 600); }
     }
-    return res.status(200).json(out);
+    return out;
   } catch (e) {
-    return res.status(200).json({ ok: false, reason: e.name === "AbortError" ? "TIMEOUT" : "ERROR", msg: e.name === "AbortError" ? "시간이 너무 걸려 멈췄어요 — 잠시 뒤 다시 시도해 주세요" : clip(e.message, 160) });
+    return ({ ok: false, reason: e.name === "AbortError" ? "TIMEOUT" : "ERROR", msg: e.name === "AbortError" ? "시간이 너무 걸려 멈췄어요 — 잠시 뒤 다시 시도해 주세요" : clip(e.message, 160) });
   }
+}
+
+/* ============================================================ v12.49 긴 작업은 '시작 → 백그라운드 실행 → 결과 조회' 로
+   휴대폰·모바일망에서 2~3분짜리 HTTP 한 통을 열어 두면 중간에 끊긴다(Failed to fetch). 그래서
+   ① POST {task,input} → 즉시 {ok:true, job:ID} 로 답하고 Vercel waitUntil 로 뒤에서 계속 돌린다(함수 한도 300초 안).
+   ② 클라이언트가 POST {job:ID} 로 몇 초마다 물어보면 Redis 에 적힌 상태/결과를 돌려준다(연결은 매번 짧다).
+   waitUntil 이나 Redis 가 없으면 예전처럼 한 통으로 처리한다.
+   ============================================================ */
+async function jobGet(rc, id) { try { const t = await getJsonGzText(rc, "sm:job:" + id); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
+async function jobSet(rc, id, obj) { try { await setJsonGz(rc, "sm:job:" + id, obj, 1800); } catch (e) {} }
+export async function claudeHandler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") return res.status(405).json({ ok: false, reason: "POST만" });
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
+  let body = req.body; if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = null; } }
+  if (!body) return res.status(400).json({ ok: false, reason: "본문 필요" });
+  const rc = redisConf();
+  // 결과 조회
+  if (body.job) {
+    if (!rc) return res.status(200).json({ ok: false, reason: "NO_REDIS" });
+    const J = await jobGet(rc, String(body.job).slice(0, 40));
+    if (!J) return res.status(200).json({ ok: false, reason: "NO_JOB", msg: "작업을 찾지 못했어요(만료)" });
+    return res.status(200).json(J.st === "done" ? Object.assign({ job: body.job }, J.out) : { ok: true, pending: true, job: body.job, st: J.st, at: J.at, task: J.task, sec: Math.round((Date.now() - J.at) / 1000) });
+  }
+  const T = TASKS[body.task];
+  if (!T || !body.input) return res.status(400).json({ ok: false, reason: "task·input 필요" });
+  // 하루 상한
+  const max = +(process.env.CLAUDE_DAILY_MAX || 60), dayKey = "sm:claude:" + kstDay(); let used = 0;
+  if (rc) { try { used = +(await redisCmd(rc, ["INCR", dayKey])) || 0; if (used === 1) await redisCmd(rc, ["EXPIRE", dayKey, String(3 * 86400)]); } catch (e) {} }
+  if (used > max) return res.status(200).json({ ok: false, reason: "DAILY_MAX", msg: "오늘 Claude 작업 횟수(" + max + "회)를 다 썼어요 — CLAUDE_DAILY_MAX로 늘릴 수 있어요" });
+  // 백그라운드 실행이 가능하면 작업 번호만 바로 돌려준다
+  let waitUntil = null; try { const m = await import("@vercel/functions"); waitUntil = m && m.waitUntil; } catch (e) { waitUntil = null; }
+  if (rc && typeof waitUntil === "function" && body.sync !== true) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    await jobSet(rc, id, { st: "run", at: Date.now(), task: body.task });
+    waitUntil((async () => {
+      let out; try { out = await runClaude(body, key, used); } catch (e) { out = { ok: false, reason: "ERROR", msg: clip(e.message, 200) }; }
+      await jobSet(rc, id, { st: "done", at: Date.now(), task: body.task, out });
+    })());
+    return res.status(200).json({ ok: true, job: id, pending: true, task: body.task });
+  }
+  const out = await runClaude(body, key, used);
+  return res.status(200).json(out);
 }

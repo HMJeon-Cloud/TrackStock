@@ -7,10 +7,33 @@
 function smClaude(task, input, opt) {
   opt = opt || {};
   var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
-  return fetch("/api/channel?op=claude", { method: "POST", headers: { "content-type": "application/json", "x-owner": tok }, body: JSON.stringify({ task: task, input: input, json: !!opt.json, web: opt.web }) })
-    .then(function (r) { return r.json().catch(function () { return { ok: false, reason: "HTTP_" + r.status, msg: r.status === 504 ? "서버 시간 초과(5분) — 범위를 줄여 다시 시도해 주세요" : "응답을 읽지 못했어요" }; }); })
-    .then(function (j) { if (!j || !j.ok) { var e = new Error((j && (j.msg || j.reason)) || "응답 없음"); e.res = j; throw e; } return j; });
+  var post = function (payload) { return fetch("/api/channel?op=claude", { method: "POST", headers: { "content-type": "application/json", "x-owner": tok }, body: JSON.stringify(payload) }).then(function (r) { return r.json().catch(function () { return { ok: false, reason: "HTTP_" + r.status, msg: r.status === 504 ? "서버 시간 초과(5분) — 범위를 줄여 다시 시도해 주세요" : "응답을 읽지 못했어요" }; }); }); };
+  var fail = function (j) { var e = new Error((j && (j.msg || j.reason)) || "응답 없음"); e.res = j; throw e; };
+  /* v12.49 서버가 작업 번호(job)를 주면 몇 초마다 결과를 물어본다 — 휴대폰에서 긴 연결 한 통이 끊기던 문제(Failed to fetch) 해결.
+     작업 번호는 브라우저에 남겨 두어, 화면을 닫았다 열어도 같은 작업을 이어서 기다린다 */
+  var jobKey = "sm.job:" + task, t0 = Date.now(), poll = function (id) {
+    try { localStorage.setItem(jobKey, JSON.stringify({ id: id, at: t0 })); } catch (e) {}
+    return new Promise(function (resolve, reject) {
+      var tick = function () {
+        post({ job: id }).then(function (j) {
+          if (j && j.pending) { if (Date.now() - t0 > 420000) { try { localStorage.removeItem(jobKey); } catch (e) {} return reject(Object.assign(new Error("7분이 지나도 결과가 없어요 — 서버 작업이 중간에 끊겼을 수 있어요. 다시 시도해 주세요"), { res: j })); } if (opt.onWait) try { opt.onWait(Math.round((Date.now() - t0) / 1000)); } catch (e) {} return setTimeout(tick, 4000); }
+          try { localStorage.removeItem(jobKey); } catch (e) {}
+          if (!j || !j.ok) return reject((function () { try { fail(j); } catch (e) { return e; } })());
+          resolve(j);
+        }).catch(function (e) { if (e.res) return reject(e); setTimeout(tick, 6000); });   // 네트워크 잠깐 끊김은 다시 물어본다
+      };
+      tick();
+    });
+  };
+  var pending = null; try { pending = JSON.parse(localStorage.getItem(jobKey) || "null"); } catch (e) {}
+  if (opt.resume && pending && pending.id && Date.now() - pending.at < 600000) { t0 = pending.at; return poll(pending.id); }
+  return post({ task: task, input: input, json: !!opt.json, web: opt.web }).then(function (j) {
+    if (j && j.ok && j.job && j.pending) return poll(j.job);
+    if (!j || !j.ok) fail(j);
+    return j;
+  });
 }
+function smJobPending(task) { try { var p = JSON.parse(localStorage.getItem("sm.job:" + task) || "null"); return p && p.id && Date.now() - p.at < 600000 ? p : null; } catch (e) { return null; } }
 function smSrcHtml(S) { return S && S.length ? '<div class="smSrc">출처: ' + S.map(function (s) { return '<a href="' + escapeHtml(s.u) + '" target="_blank" rel="noopener">' + escapeHtml(s.t || s.u) + '</a>'; }).join(" · ") + '</div>' : ""; }
 function smKstDay() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); }
 
@@ -437,7 +460,9 @@ smDailyRun = function (btn) {
   var prep = typeof cardsNewsFetch === "function" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : Promise.resolve();
   var mac = typeof macroEnsure === "function" ? macroEnsure().catch(function () { return null; }) : Promise.resolve();
   var input = "";
-  return Promise.all([prep, mac]).then(function () { input = smDailyInput(); return smClaude("daily", input, { json: true }); })
+  var resume = !!smJobPending("daily"), onWait = function (sec) { if (btn && document.body.contains(btn)) btn.textContent = "Claude가 국내·미국·코인 기사·이슈를 읽고 만드는 중… " + sec + "초 (보통 1~3분 · 화면을 닫아도 이어져요)"; };
+  if (resume && btn) btn.textContent = "아까 시작한 브리핑 작업을 이어서 기다리는 중…";
+  return Promise.all([prep, mac]).then(function () { input = smDailyInput(); return smClaude("daily", input, { json: true, resume: resume, onWait: onWait }); })
     .then(function (j) { smDailyApply(j, input); SM_DAILY.last = null; return true; })
     .catch(function (e) { SM_DAILY.last = { at: Date.now(), msg: e.message, raw: e.raw ? String(e.raw.text || "").slice(0, 6000) : (e.res && e.res.text) || "", stop: e.raw ? e.raw.stop : e.res && e.res.reason }; try { localStorage.setItem("sm.dailyErr", JSON.stringify(SM_DAILY.last)); } catch (x) {} alert("오늘 브리핑 실패: " + e.message); return false; })
     .then(function (ok) { SM_DAILY.busy = false; if (btn && document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; } smDailyRepaint(); return ok; });
