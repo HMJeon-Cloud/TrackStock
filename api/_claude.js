@@ -7,7 +7,7 @@ import { redisConf, redisCmd } from "./_redis.js";
 
 const BASE = `너는 한국 투자 데이터 계정 '우상향연구소(@uphill.lab)'와 분석 앱 StockMind의 수석 리서처다. 독자는 한국 개인투자자 초보.
 공통 규칙: (1) 앱(StockMind)이 준 숫자가 1순위 근거 — 그대로 인용하고 지어내지 않는다. (2) 웹에서 찾은 사실은 날짜·출처를 붙이고, 확실하지 않으면 쓰지 않는다. (3) 매수·매도 권유, 목표가 제시, 수익 보장, 과장 금지. 판단은 '근거와 조건'으로 말한다. (4) 오늘 날짜 기준으로 최신 상황을 우선한다.
-글 품질 기준(v12.43): (5) 문장마다 '무엇이(사건·발표·수치) → 얼마나(앱 숫자) → 그래서(의미)' 중 최소 둘이 들어가야 한다. (6) 근거 없는 상투어 금지 — '투자심리 개선/위축', '불확실성 확대', '관망세', '차익실현 매물', '기대감 유입', '수급 개선'은 그 말을 뒷받침하는 구체 사건·숫자를 같은 문장에 쓸 때만 허용. (7) 숫자는 앱이 준 표기 그대로(소수점·부호·단위·% 와 %p 구분). 웹에서 가져온 숫자는 같은 문장에 출처 이름을 붙인다. (8) 확신 표시 conf: 상 = 공식 발표·공시 또는 서로 다른 출처 2곳 이상 / 중 = 믿을 만한 언론 1곳 / 하 = 정황상 추정. '하'는 되도록 빈칸으로 둔다. (9) 출력 전에 스스로 점검: 숫자가 입력과 같은가, 날짜가 오늘 기준 맞는가(어제·지난주 일을 오늘 일로 쓰지 않았는가), 권유로 읽히는 문장이 없는가 — 틀린 게 있으면 고친 뒤 출력한다.`;
+글 품질 기준(v12.43): (5) 문장마다 '무엇이(사건·발표·수치) → 얼마나(앱 숫자) → 그래서(의미)' 중 최소 둘이 들어가야 한다. (6) 근거 없는 상투어 금지 — '투자심리 개선/위축', '불확실성 확대', '관망세', '차익실현 매물', '기대감 유입', '수급 개선'은 그 말을 뒷받침하는 구체 사건·숫자를 같은 문장에 쓸 때만 허용. (7) 숫자는 앱이 준 표기 그대로(소수점·부호·단위·% 와 %p 구분). 웹에서 가져온 숫자는 같은 문장에 출처 이름을 붙인다. (8) 확신 표시 conf: 상 = 공식 발표·공시 또는 서로 다른 출처 2곳 이상 / 중 = 믿을 만한 언론 1곳 / 하 = 정황상 추정. '하'는 되도록 빈칸으로 둔다. (10) JSON으로 답하라는 작업이면: 검색이 끝난 뒤 마지막에 JSON 하나만 쓰고 앞뒤에 설명·코드 블록을 붙이지 않는다. 문자열 안에서는 큰따옴표 대신 ‘ ’를 쓰고 줄바꿈을 넣지 않는다. 각 문장은 짧게 — 길이 제한을 지켜 답이 끊기지 않게 한다. (9) 출력 전에 스스로 점검: 숫자가 입력과 같은가, 날짜가 오늘 기준 맞는가(어제·지난주 일을 오늘 일로 쓰지 않았는가), 권유로 읽히는 문장이 없는가 — 틀린 게 있으면 고친 뒤 출력한다.`;
 
 const TASKS = {
   analyst: {
@@ -40,13 +40,13 @@ const TASKS = {
 출력: JSON 하나만 {"ok":true|false,"summary":"한 줄","issues":[{"where":"카드|인스타|스레드|답글1|답글2","level":"고침|권장","problem":"무엇이 문제","fix":"이렇게 고치기"}]}`
   },
   why: {
-    tier: "main", web: 5, max: 5000, timeout: 200000,
+    tier: "main", web: 5, max: 8000, timeout: 200000,
     system: BASE + `
 이번 작업: 오늘 시장의 '핵심 이슈' 목록을 초보도 이해하게 강화한다. 이슈마다 세 가지: 왜(원인 — 주어진 [후보 기사]를 먼저, 부족하면 웹 검색. '누가·무엇을·언제'가 드러나는 구체 사건), 그래서(초보에게 무슨 의미인지 — 내 계좌·시장 전체에 주는 뜻), 볼 것(다음에 확인할 숫자·일정 하나). 확실한 원인이 없으면 why는 빈칸(추측 금지), so·next는 숫자로 말할 수 있는 것만.
 출력: JSON 하나만 {"items":[{"i":번호,"why":"원인 한 줄(60자 이하)","so":"그래서 한 줄(60자 이하)","next":"볼 것 한 줄(40자 이하)","src":"출처 이름","url":"출처 주소 또는 빈칸","conf":"상|중|하"}],"note":"오늘 이슈 전체를 관통하는 흐름 한 줄"}`
   },
   brief: {
-    tier: "main", web: 6, max: 6000, timeout: 240000,
+    tier: "main", web: 5, max: 10000, timeout: 230000,
     system: BASE + `
 이번 작업: '오늘의 브리핑' 화면을 사람이 읽는 해설로 완성한다. 앱 숫자(지수·오른 종목 비율·업종·급등락·이슈)와 [후보 기사], 필요하면 웹 검색으로:
 1) story: 오늘 시장 해설 3줄(각 70자 이하) — 지수 → 업종 → 급등락을 하나의 이야기로 묶고 '왜'를 출처와 함께. 첫 줄은 결론, 줄마다 앱 숫자를 최소 하나 넣는다. 세 줄이 같은 말을 반복하면 실패.
@@ -106,7 +106,21 @@ const TASKS = {
 
 function kstDay() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); }
 function clip(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n) : s; }
-function pickJson(text) { const a = text.indexOf("{"), b = text.lastIndexOf("}"); if (a < 0 || b <= a) return null; try { return JSON.parse(text.slice(a, b + 1)); } catch (e) { return null; } }
+/* v12.45 JSON 꺼내기 — 코드 블록(```json)·앞뒤 설명·여러 '{' 후보를 견딘다. 마지막(가장 완성된) 객체부터 시도 */
+function pickJson(text) {
+  text = String(text || "").replace(/```(?:json)?/gi, "");
+  const tryParse = (t) => { try { return JSON.parse(t); } catch (e) { try { return JSON.parse(t.replace(/,\s*([}\]])/g, "$1").replace(/[\u201c\u201d]/g, '"')); } catch (e2) { return null; } } };
+  const b = text.lastIndexOf("}"); if (b < 0) return null;
+  const starts = []; for (let i = text.indexOf("{"); i >= 0 && i < b; i = text.indexOf("{", i + 1)) starts.push(i);
+  for (const a of starts.slice(0, 40)) { const o = tryParse(text.slice(a, b + 1)); if (o && typeof o === "object") return o; }
+  return null;
+}
+const API = "https://api.anthropic.com/v1/messages";
+async function callClaude(key, payload, ms) {
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), Math.max(5000, ms));
+  try { const r = await fetch(API, { method: "POST", signal: ac.signal, headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(payload) }); const j = await r.json().catch(() => null); return { r, j }; }
+  finally { clearTimeout(tm); }
+}
 
 export async function claudeHandler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -123,19 +137,35 @@ export async function claudeHandler(req, res) {
   if (used > max) return res.status(200).json({ ok: false, reason: "DAILY_MAX", msg: "오늘 Claude 작업 횟수(" + max + "회)를 다 썼어요 — CLAUDE_DAILY_MAX로 늘릴 수 있어요" });
   const payload = { model, max_tokens: T.max, system: T.system, messages: [{ role: "user", content: "오늘: " + kstDay() + " (한국 시간)\n\n" + clip(body.input, 60000) }] };
   if (web) payload.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: T.web, user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" } }];
-  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), T.timeout);
+  /* v12.45 안정화: ① 웹 검색이 길어져 API가 'pause_turn'으로 잠깐 멈추면 이어서 다시 요청(최대 3번) ② JSON이 깨지면 빠른 모델로 형식만 고치는 한 번 더(내용은 그대로) ③ 실패하면 이유(stop)를 같이 알려 준다
+     Vercel 함수 한도 300초 안에서 남은 시간을 나눠 쓴다 */
+  const t0 = Date.now(), left = () => 290000 - (Date.now() - t0);
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", signal: ac.signal, headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(payload) });
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j) return res.status(200).json({ ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) });
-    const blocks = j.content || [], text = blocks.filter((b) => b.type === "text").map((b) => b.text).join("");
+    let blocks = [], j = null, r = null, turns = 0, usage = { input_tokens: 0, output_tokens: 0 };
+    for (;;) {
+      ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000))));
+      if (!r.ok || !j) return res.status(200).json({ ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) || ("Claude API 오류 " + r.status) });
+      blocks = blocks.concat(j.content || []); if (j.usage) { usage.input_tokens += j.usage.input_tokens || 0; usage.output_tokens += j.usage.output_tokens || 0; }
+      if (j.stop_reason === "pause_turn" && turns < 3 && left() > 60000) { turns++; payload.messages = payload.messages.concat([{ role: "assistant", content: j.content }]); continue; }
+      break;
+    }
+    const texts = blocks.filter((b) => b.type === "text").map((b) => b.text), text = texts.join("");
     const src = [], seen = {};
     blocks.forEach((b) => { (b.citations || []).forEach((c) => { if (c.url && !seen[c.url]) { seen[c.url] = 1; src.push({ t: clip(c.title, 90), u: c.url }); } }); });
     const searches = blocks.filter((b) => b.type === "server_tool_use").map((b) => b.input && b.input.query).filter(Boolean);
-    const out = { ok: true, task: body.task, model, text, sources: src.slice(0, 12), searches, used, max, stop: j.stop_reason, usage: j.usage || null };
-    if (body.json) { out.data = pickJson(text); if (!out.data) { out.ok = false; out.reason = "PARSE"; out.msg = "AI 응답을 읽지 못했어요"; out.text = clip(text, 600); } }
+    const out = { ok: true, task: body.task, model, text, sources: src.slice(0, 12), searches, used, max, stop: j.stop_reason, turns, usage };
+    if (body.json) {
+      out.data = pickJson(text);
+      if (!out.data && left() > 25000) {   // 형식만 고치기 — 빠른 모델 · 웹 없음 · 횟수에 안 셈
+        const schema = String(T.system).split("출력:").pop().trim();
+        const fix = await callClaude(key, { model: process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5", max_tokens: Math.max(4000, T.max), system: "너는 JSON 정리기다. 아래 [원문]에 담긴 내용을 [형식]에 맞는 올바른 JSON 하나로만 출력한다. 내용·숫자·출처는 한 글자도 바꾸거나 더하지 않는다. 문자열 안의 큰따옴표는 ‘ ’로 바꾼다. 원문이 중간에 끊겼으면 있는 내용만 담고, 없는 칸은 빈 문자열·빈 배열로 둔다. JSON 외의 말 금지.", messages: [{ role: "user", content: "[형식]\n" + schema + "\n\n[원문]\n" + clip(text, 40000) }] }, left() - 3000).catch(() => null);
+        const ft = fix && fix.j && (fix.j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+        out.data = ft ? pickJson(ft) : null; if (out.data) out.repaired = true;
+      }
+      if (!out.data) { out.ok = false; out.reason = "PARSE"; out.msg = "AI 응답을 읽지 못했어요" + (j.stop_reason === "max_tokens" ? " — 답이 너무 길어 중간에 끊겼어요(다시 시도하면 대개 됩니다)" : j.stop_reason === "pause_turn" ? " — 웹 검색이 길어져 답을 끝내지 못했어요" : !text.trim() ? " — 답 본문이 비어 있어요(웹 검색만 하고 끝남)" : " — 형식이 깨졌어요") + " [stop: " + j.stop_reason + "]"; out.text = clip(text, 600); }
+    }
     return res.status(200).json(out);
   } catch (e) {
-    return res.status(200).json({ ok: false, reason: e.name === "AbortError" ? "TIMEOUT" : "ERROR", msg: e.name === "AbortError" ? "시간이 너무 걸려 멈췄어요 — 범위를 줄이거나(이 틀만) 다시 시도해 주세요" : clip(e.message, 160) });
-  } finally { clearTimeout(tm); }
+    return res.status(200).json({ ok: false, reason: e.name === "AbortError" ? "TIMEOUT" : "ERROR", msg: e.name === "AbortError" ? "시간이 너무 걸려 멈췄어요 — 잠시 뒤 다시 시도해 주세요" : clip(e.message, 160) });
+  }
 }
