@@ -415,7 +415,7 @@ smDailyInput = function () {
 function smDailyEmpty(D) { return !(D.story || []).filter(Boolean).length && !(D.issues || []).some(function (x) { return x.why; }) && !((D.plan || {}).picks || []).length && !(D.reports || []).length; }
 smDailyApply = function (j, input) {
   var D = j.data || {}, iss = SM_DAILY_ISS, day = smKstDay();
-  if (smDailyEmpty(D)) { var e = new Error("Claude 답에 내용이 없어요 (해설·이슈·편성 모두 0) — 멈춘 이유: " + (j.stop || "?") + (j.repaired ? " · 형식 복구 뒤에도 비어 있음" : "") + "\n원문 앞부분: " + String(j.text || "").slice(0, 200)); e.raw = j; throw e; }
+  if (smDailyEmpty(D)) { var e = new Error("Claude 답에 내용이 없어요 (해설·이슈·편성 모두 0) — 멈춘 이유: " + (j.stop || "?") + (j.repaired ? " · 형식 복구 뒤에도 비어 있음" : "") + (j.blocks ? " · 블록: " + Object.keys(j.blocks).map(function (k) { return k + "×" + j.blocks[k]; }).join(", ") : "") + (j.usage ? " · 출력 토큰 " + j.usage.output_tokens : "") + "\n원문 앞부분: " + String(j.text || "").slice(0, 200)); e.raw = j; throw e; }
   var src = input + "\n" + (D.tomorrow || []).map(function (t) { return t.when || ""; }).join(" ");
   var chk = { story: (D.story || []).map(function (l) { return smNumCheck(l, src); }), issues: (D.issues || []).map(function (x) { return smNumCheck([x.why, x.so, x.next].join(" "), src); }), movers: (D.movers || []).map(function (x) { return smNumCheck(x.why, src); }) };
   (D.issues || []).forEach(function (x, k) { var it = iss[(+x.i || 0) - 1]; if (it) ISS_WHY[it.title] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf, bad: chk.issues[k] }; });
