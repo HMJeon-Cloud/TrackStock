@@ -163,11 +163,21 @@ export async function claudeHandler(req, res) {
       if (j.stop_reason === "pause_turn" && turns < 3 && left() > 60000) { turns++; payload.messages = payload.messages.concat([{ role: "assistant", content: j.content }]); continue; }
       break;
     }
+    /* v12.48 글 없이 끝난 경우(검색만 하다 max_tokens 등) — 지금까지 모은 검색 결과를 그대로 이어 붙이고 "이제 결과만 써라"고 한 번 더(도구 없이). 그래도 안 되면 웹 없이 앱 숫자만으로 새로 */
+    let finish = null, textNow = blocks.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    if (!textNow && left() > 45000) {
+      const ask = { role: "user", content: "검색은 여기까지. 지금까지 읽은 자료와 앱 숫자로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") };
+      let f1 = null;
+      if (blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: payload.messages.concat([{ role: "assistant", content: blocks }, ask]) }, Math.min(T.timeout, left() - 30000)); } catch (e) { f1 = null; } }
+      if (!(f1 && f1.r.ok && f1.j && (f1.j.content || []).some((b) => b.type === "text" && b.text.trim())) && left() > 45000) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "user", content: "(웹 검색 없이) 위 앱 숫자와 후보 기사만으로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") }] }, Math.min(T.timeout, left() - 5000)); } catch (e) { f1 = null; } }
+      if (f1 && f1.r.ok && f1.j) { finish = f1.j.stop_reason || "finish"; blocks = blocks.concat(f1.j.content || []); if (f1.j.usage) { usage.input_tokens += f1.j.usage.input_tokens || 0; usage.output_tokens += f1.j.usage.output_tokens || 0; } }
+    }
     const texts = blocks.filter((b) => b.type === "text").map((b) => b.text), text = texts.join("");
+    const kinds = {}; blocks.forEach((b) => { kinds[b.type] = (kinds[b.type] || 0) + 1; });
     const src = [], seen = {};
     blocks.forEach((b) => { (b.citations || []).forEach((c) => { if (c.url && !seen[c.url]) { seen[c.url] = 1; src.push({ t: clip(c.title, 90), u: c.url }); } }); });
     const searches = blocks.filter((b) => b.type === "server_tool_use").map((b) => b.input && b.input.query).filter(Boolean);
-    const out = { ok: true, task: body.task, model, text, sources: src.slice(0, 12), searches, used, max, stop: j.stop_reason, turns, usage };
+    const out = { ok: true, task: body.task, model, text, sources: src.slice(0, 12), searches, used, max, stop: j.stop_reason, finish, turns, usage, blocks: kinds };
     if (body.json) {
       out.data = pickJson(text);
       if (!out.data && left() > 25000) {   // 형식만 고치기 — 빠른 모델 · 웹 없음 · 횟수에 안 셈
@@ -176,7 +186,7 @@ export async function claudeHandler(req, res) {
         const ft = fix && fix.j && (fix.j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
         out.data = ft ? pickJson(ft) : null; if (out.data) out.repaired = true;
       }
-      if (!out.data) { out.ok = false; out.reason = "PARSE"; out.msg = "AI 응답을 읽지 못했어요" + (j.stop_reason === "max_tokens" ? " — 답이 너무 길어 중간에 끊겼어요(다시 시도하면 대개 됩니다)" : j.stop_reason === "pause_turn" ? " — 웹 검색이 길어져 답을 끝내지 못했어요" : !text.trim() ? " — 답 본문이 비어 있어요(웹 검색만 하고 끝남)" : " — 형식이 깨졌어요") + " [stop: " + j.stop_reason + "]"; out.text = clip(text, 600); }
+      if (!out.data) { out.ok = false; out.reason = "PARSE"; out.msg = "AI 응답을 읽지 못했어요" + (j.stop_reason === "max_tokens" ? " — 답이 너무 길어 중간에 끊겼어요(다시 시도하면 대개 됩니다)" : j.stop_reason === "pause_turn" ? " — 웹 검색이 길어져 답을 끝내지 못했어요" : !text.trim() ? " — 답 본문이 비어 있어요(웹 검색만 하고 끝남 · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + ")" : " — 형식이 깨졌어요") + " [stop: " + j.stop_reason + (finish ? " → 마무리 " + finish : "") + " · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + " · 출력 토큰 " + usage.output_tokens + "]"; out.text = clip(text, 600); }
     }
     return res.status(200).json(out);
   } catch (e) {
