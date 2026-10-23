@@ -471,3 +471,26 @@ try { SM_DAILY.last = JSON.parse(localStorage.getItem("sm.dailyErr") || "null");
 brAiRun = function (btn) { return smDailyRun(btn); }; issWhyRun = function (l, b, btn) { return smDailyRun(btn); }; mkAiRun = function (btn) { return smDailyRun(btn); }; if (typeof rpAiPickRun === "function") rpAiPickRun = function (btn) { return smDailyRun(btn); };
 /* 진행 표시: 브리핑은 시장 공통 */
 (function () { var d0 = smFlowDone; smFlowDone = function (mk) { var d = d0.apply(this, arguments); var day = smKstDay(); d.brief = d.brief || Object.keys(BR_AI).some(function (k) { return k.indexOf(day + "|") === 0 && BR_AI[k] && BR_AI[k].shared; }); return d; }; })();
+
+/* ============================================================ v12.50 오늘 브리핑을 서버에도 하루치 저장 — 휴대폰에서 만든 것을 PC에서 그대로(다시 돌리지 않음) ============================================================ */
+function smDailyPost(payload) { var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {} return fetch("/api/channel?op=claude", { method: "POST", headers: { "content-type": "application/json", "x-owner": tok }, body: JSON.stringify(payload) }).then(function (r) { return r.json(); }); }
+function smDailyShare() {
+  var day = smKstDay(), rec = null, k = Object.keys(BR_AI).filter(function (x) { return x.indexOf(day + "|") === 0 && BR_AI[x] && BR_AI[x].shared; })[0]; if (k) rec = BR_AI[k];
+  var plan = MK_AI_MAP.all && MK_AI_MAP.all.shared ? MK_AI_MAP.all : null; if (!rec || !plan) return Promise.resolve(false);
+  var slim = Object.assign({}, rec, { raw: undefined });
+  var m = {}; Object.keys(ISS_WHY).forEach(function (t) { if (t.charAt(0) !== "_") m[t] = ISS_WHY[t]; });
+  return smDailyPost({ today: 1, put: { day: day, rec: slim, plan: plan, why: m } }).then(function (j) { return !!(j && j.ok); }).catch(function () { return false; });
+}
+function smDailyFetch() {
+  var day = smKstDay(); if (Object.keys(BR_AI).some(function (x) { return x.indexOf(day + "|") === 0 && BR_AI[x] && BR_AI[x].shared; })) return Promise.resolve(false);
+  if (!(typeof isOwner === "function" && isOwner())) return Promise.resolve(false);
+  return smDailyPost({ today: 1 }).then(function (j) {
+    if (!j || !j.ok || !j.rec || j.day !== day) return false;
+    var mode = briefState.mode || "day"; SM_MK_LIST.forEach(function (mk) { BR_AI[day + "|" + mk + "|" + mode] = j.rec; MK_AI_MAP[mk] = Object.assign({}, j.plan, { mk: mk }); });
+    Object.keys(j.why || {}).forEach(function (t) { ISS_WHY[t] = j.why[t]; });
+    brAiSave(); issWhySave(); try { localStorage.setItem("sm.aiPlanMk", JSON.stringify({ d: day, m: MK_AI_MAP })); } catch (e) {}
+    MK_AI = MK_AI_MAP[smMk()]; smRpickApply(); smDailyRepaint(); return true;
+  }).catch(function () { return false; });
+}
+(function () { var a0 = smDailyApply; smDailyApply = function () { var r = a0.apply(this, arguments); try { smDailyShare(); } catch (e) {} return r; }; })();
+(function () { var tries = 0, go = function () { if (typeof isOwner === "function" && isOwner()) { smDailyFetch(); return; } if (++tries < 10) setTimeout(go, 1500); }; setTimeout(go, 2500); })();

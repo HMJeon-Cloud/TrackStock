@@ -202,6 +202,13 @@ export async function claudeHandler(req, res) {
   let body = req.body; if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = null; } }
   if (!body) return res.status(400).json({ ok: false, reason: "본문 필요" });
   const rc = redisConf();
+  // v12.50 오늘 브리핑 하루치 — 어느 기기에서 열어도 같은 결과 (3일 보관). 결과를 받은 쪽이 저장(PUT)하고, 다른 기기는 불러온다(GET)
+  if (body.today) {
+    if (!rc) return res.status(200).json({ ok: false, reason: "NO_REDIS" });
+    const k = "sm:daily:" + kstDay();
+    if (body.put && typeof body.put === "object") { try { await setJsonGz(rc, k, Object.assign({ at: Date.now() }, body.put), 3 * 86400); } catch (e) { return res.status(200).json({ ok: false, reason: "SAVE" }); } return res.status(200).json({ ok: true, saved: true }); }
+    try { const t = await getJsonGzText(rc, k); return res.status(200).json(t ? Object.assign({ ok: true }, JSON.parse(t)) : { ok: false, reason: "NONE" }); } catch (e) { return res.status(200).json({ ok: false, reason: "READ" }); }
+  }
   // 결과 조회
   if (body.job) {
     if (!rc) return res.status(200).json({ ok: false, reason: "NO_REDIS" });
