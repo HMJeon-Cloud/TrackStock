@@ -454,7 +454,12 @@ smDailyApply = function (j, input) {
 /* 한 번의 결과를 시장별로 나눠 넣는다 — 해설은 그 시장 2줄(bymk), 편성·일정·리포트는 그 시장 것만. '전체'는 다 */
 function smDailyDistribute(full) {
   var day = full.day || smKstDay(), mode = briefState.mode || "day", D = full.data || {}, P = full.plan || {}, inMk = function (x, mk) { var m = x && x.mk; return mk === "all" || !m || m === "all" || m === mk; };
-  var repMk = function (r) { if (r.ticker) return /^\d{6}$/.test(String(r.ticker)) ? "kr" : "us"; var id = String(r.id || ""); var q = id.indexOf(":") > 0 ? id.slice(id.indexOf(":") + 1) : ""; if (/^market:\^KS|^market:\^KQ/.test(id)) return "kr"; if (/^market:/.test(id)) return "us"; if (/^stock:/.test(id)) return smSymMk(q); return "all"; };
+  /* 리포트가 어느 시장 것인지 — id 가 있으면 id 로(후보 리포트), 없으면 Claude 가 적은 티커로. 코스피·코스닥 지수는 국내 */
+  var repMk = function (r) { var id = String(r.id || ""), q = id.indexOf(":") > 0 ? id.slice(id.indexOf(":") + 1) : "";
+    if (/^market:|^stock:/.test(id)) return smSymMk(q);
+    if (/^macro:|^timing:/.test(id)) return "all";
+    var t = String(r.ticker || "").trim().toUpperCase(); if (t) return /^\d{6}(\.K[SQ])?$|^\^K[SQ]/.test(t) ? "kr" : /-USD$|^(BTC|ETH|XRP|SOL|BNB|DOGE|ADA|TRX|LINK)$/.test(t) ? "coin" : "us";
+    return "all"; };
   Object.keys(full.why || {}).forEach(function (t) { ISS_WHY[t] = full.why[t]; }); ISS_WHY._note = D.note || ""; ISS_WHY._src = full.sources || [];
   SM_MK_LIST.forEach(function (mk) {
     var story = mk !== "all" && D.bymk && (D.bymk[mk] || []).filter(Boolean).length ? D.bymk[mk] : (D.story || []);
