@@ -110,7 +110,7 @@ function issuesRender(boxId, list) {
   var box = $(boxId); if (!box) return;
   if (!list || !list.length) { box.innerHTML = ""; return; }
   box.innerHTML = '<div class="issHead"><b>📌 ' + (ISS_LBL[list.mode] || "오늘") + '의 핵심 이슈 5</b><small>' + (list.market && list.market !== "all" ? list.mktName + " · " : "") + '자료 전체에서 평소보다 이례적인 순</small>' +
-    '<span class="issBtns"><button class="chip" data-act="copy">복사</button>' + (typeof smClaude === "function" && typeof isOwner === "function" && isOwner() ? '<button class="chip" data-act="why" title="Claude가 기사·웹을 보고 이슈마다 왜·그래서·볼 것(출처 포함)">✨ 왜·그래서·볼 것</button>' : '') + '</span></div>' +
+    '<span class="issBtns"><button class="chip" data-act="copy">복사</button>' + (typeof smClaude === "function" && typeof isOwner === "function" && isOwner() ? '<button class="chip" data-act="why" title="오늘 브리핑(Claude 한 번)으로 이슈마다 왜·그래서·볼 것이 채워져요 — 해설·편성·리포트 선정도 같이">✨ 이유 채우기</button>' : '') + '</span></div>' +
     '<ol class="issList">' + list.map(function (it, i) {
       return '<li><span class="issNo">' + (i + 1) + '</span><span class="issEmo">' + it.emoji + '</span><div><b>' + escapeHtml(it.title) + '</b><small>' + escapeHtml(it.sub) + '</small></div>' +
         (it.sym ? '<button class="linkBtn issGo" data-sym="' + it.sym + '" title="종목 탭에서 보기">›</button>' : '') + '</li>';

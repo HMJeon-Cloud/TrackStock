@@ -48,7 +48,7 @@ function mkAiList(T) {
   return (MK_AI.data.picks || []).map(function (p) { var x = by[p.ctx]; return x ? Object.assign({}, x, { why: (p.slot ? "[" + p.slot + "] " : "") + (p.hook ? "“" + p.hook + "” · " : "") + (p.why || "") }) : null; }).filter(Boolean);
 }
 function mkAiHtml() {
-  if (!MK_AI || !MK_AI.data) return '<div class="aiPlan briefDim">아직 오늘 편성이 없어요 — <b>✨ Claude 편성</b>을 누르면 기사·이슈를 모아 오늘 올릴 카드와 볼 리포트를 골라 줘요.</div>';
+  if (!MK_AI || !MK_AI.data) return '<div class="aiPlan briefDim">아직 ' + SM_MK_NM[smMk()] + ' 오늘 편성이 없어요 — <b>✨ 오늘 브리핑으로 편성</b>을 누르면 기사·이슈를 모아 오늘 올릴 카드와 볼 리포트를 골라 줘요(브리핑 해설도 같이).</div>';
   var D = MK_AI.data, Q = typeof rpQuestions === "function" ? (function () { try { return rpQuestions(); } catch (e) { return []; } })() : [], qb = {}; Q.forEach(function (q) { qb[q.id] = q; });
   var h = '<div class="aiPlan"><div class="aiPlanTop"><b>✨ 오늘 편성</b> <small class="briefDim">' + new Date(MK_AI.at + 9 * 3600e3).toISOString().slice(11, 16) + ' · 웹 검색 ' + (MK_AI.searches || []).length + '회 · 오늘 ' + MK_AI.used + '/' + MK_AI.max + '회</small></div>' + (D.summary ? '<div class="aiPlanSum">' + escapeHtml(D.summary) + '</div>' : '');
   var R = (D.reports || []).filter(function (r) { return qb[r.id]; });
@@ -132,7 +132,7 @@ function brAiPaint() {
   if (!own) { sec.style.display = "none"; return; }
   sec.style.display = "";
   if (A && A.data) { (A.data.issues || []).forEach(function (x, k) { var t = A.iss && A.iss[(+x.i || 0) - 1]; if (t && !ISS_WHY[t]) ISS_WHY[t] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf, bad: A.chk && A.chk.issues[k] }; }); }
-  var h = '<div class="brAiHead"><b>✨ 오늘 해설</b><small class="briefDim">' + (A ? new Date(A.at + 9 * 3600e3).toISOString().slice(11, 16) + ' · ' + escapeHtml(A.model || "") + ' · 웹 검색 ' + A.searches + '회' : '시장 해설 3줄 · 핵심 이슈 왜/그래서/볼 것 · 급등락 이유 · 내일 볼 것을 한 번에') + '</small><button class="' + (A ? 'chip' : 'primary') + '" data-brai>' + (A ? '다시 만들기' : '✨ Claude 해설 만들기') + '</button></div>';
+  var h = '<div class="brAiHead"><b>✨ 오늘 브리핑</b><small class="briefDim">' + (A ? new Date(A.at + 9 * 3600e3).toISOString().slice(11, 16) + ' · ' + escapeHtml(A.model || "") + ' · 웹 검색 ' + A.searches + '회' : 'Claude 한 번 — 해설 3줄 · 이슈 왜/그래서/볼 것 · 급등락 이유 · 내일 볼 것 · 카드 편성 · 리포트 선정') + '</small><button class="' + (A ? 'chip' : 'primary') + '" data-brai>' + (A ? '다시 만들기' : '✨ 오늘 브리핑 만들기') + '</button></div>';
   if (A && A.data) {
     var D = A.data;
     if ((D.story || []).length) h += '<ol class="brAiStory">' + D.story.map(function (x, k) { return x ? '<li>' + escapeHtml(x) + (A.chk && typeof smNumWarn === "function" ? ' ' + smNumWarn(A.chk.story[k]) : '') + '</li>' : ''; }).join("") + '</ol>';
@@ -270,3 +270,102 @@ function smNumWarn(bad) { return bad && bad.length ? '<span class="smNumBad" tit
     return wr0(list, box, btn);
   };
 })();
+
+/* ============================================================ v12.46 오늘 브리핑 한 번 — 해설·이슈 이유·급등락 이유·내일 볼 것·카드 편성·리포트 선정을 Claude 호출 1회로
+   이전: brief(해설) · why(이슈) · plan(편성) · rpick(리포트) 네 번이 같은 기사·이슈를 각각 읽었다 → 입력 토큰 4배, 웹 검색 4배, 서로 다른 설명.
+   지금: smDailyRun 한 번 → BR_AI(해설) · ISS_WHY(이슈) · MK_AI(편성) · RP.ai2(리포트) 를 모두 채운다. 시장(국내·미국·코인·전체)마다 따로, 하루 보관.
+   브리핑 화면 · 카드 작업대 · 리포트 · 작업실의 버튼은 전부 이 함수를 부른다(결과 공유).
+   ============================================================ */
+function smDailyInput() {
+  var R = briefState.result, L = [], pc = function (x) { return typeof briefPct === "function" ? briefPct(x) : (x * 100).toFixed(2) + "%"; }, st = function (s) { return typeof nbStat === "function" ? nbStat(s) : null; };
+  L.push("[시장 — " + (R.mktName || "전체") + " · " + (R.label || "오늘") + " · 기준일 " + (typeof cDate === "function" ? cDate(R.asOf) : "") + "]");
+  (R.indexRow || []).forEach(function (x) { var S = st(x.sym); L.push("- " + x.name + " " + pc(x.ret) + (S ? " · 5일 " + pc(S.ret5 || 0) + " · 1개월 " + pc(S.m1) + " · 52주 고점 대비 " + pc(S.vsHi || 0) + " · 평소 하루 변동의 " + (S.sd > 0 ? (Math.abs(S.ret1) / S.sd).toFixed(1) : "-") + "배" : "")); });
+  var t = R.temp; if (t && isFinite(t.upPct)) L.push("[폭] 오른 종목 " + Math.round(t.upPct * 100) + "% (" + t.up + "/" + t.total + ") · 20일선 위 " + Math.round(t.abovePct * 100) + "%" + (t.above200Pct != null ? " · 200일선 위 " + Math.round(t.above200Pct * 100) + "%" : "") + " · 52주 신고가 " + (t.newHigh || []).length + " · 신저가 " + (t.newLow || []).length + (R.basis && R.basis.name ? " · 기준 " + R.basis.name : ""));
+  var th = R.themes || []; if (th.length) L.push("[업종] " + th.slice(0, 4).map(function (x) { return x.name + " " + pc(x.ret) + "(" + x.up + "/" + x.n + ")"; }).join(", ") + " / 약세 " + th.slice(-3).map(function (x) { return x.name + " " + pc(x.ret); }).join(", "));
+  if (t && (t.newHigh || []).length) L.push("[52주 신고가] " + t.newHigh.slice(0, 8).map(function (s) { return s && s.sym ? briefName(s) : String(s); }).join(", "));
+  if ((R.hotVol || []).length) L.push("[거래대금 급증 — 평소 대비] " + R.hotVol.slice(0, 6).map(function (s) { return s.sym + " " + briefName(s) + " " + s.amtX.toFixed(1) + "배 (" + pc(s.ret) + ")"; }).join(" · "));
+  var mv = R.movers || { up: [], down: [] };
+  L.push("[급등] " + mv.up.slice(0, 5).map(function (s) { return s.sym + " " + briefName(s) + " " + pc(s.ret); }).join(" · "));
+  L.push("[급락] " + mv.down.slice(0, 5).map(function (s) { return s.sym + " " + briefName(s) + " " + pc(s.ret); }).join(" · "));
+  try { var now = nbNow(); if (now && now.why && now.why.length) L.push("[국면 신호 — 앱 규칙] " + now.why.join(" / ")); } catch (e) {}
+  try { if (typeof macSer === "function") { var mm = ["krw", "bok", "fed", "us10y"].map(function (k) { var S = macSer(k); if (!S || !S.v.length) return null; var nm = { krw: "원/달러", bok: "한국 기준금리", fed: "미 기준금리", us10y: "미 10년물" }[k]; return nm + " " + S.v[S.v.length - 1] + (k === "krw" ? "원" : "%"); }).filter(Boolean); if (mm.length) L.push("[매크로] " + mm.join(" · ")); } } catch (e) {}
+  var iss = briefState.issues || []; if (iss.length) { L.push("", "[핵심 이슈]"); iss.forEach(function (it, i) { L.push((i + 1) + ". " + it.title + " · " + (it.sub || "") + (it.sym ? " (" + it.sym + ")" : "")); }); }
+  var news = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).slice(0, 40); if (news.length) { L.push("", "[후보 기사 — 네이버]"); news.forEach(function (n) { L.push("- " + (n.title || "") + (n.press ? " (" + n.press + (n.time ? " · " + n.time : "") + ")" : "") + (n.desc ? " — " + String(n.desc).slice(0, 110) : "") + (n.url ? " " + n.url : "")); }); }
+  var ev = []; try { ev = typeof pubUpcoming === "function" ? pubUpcoming(7) : []; } catch (e) {} if (ev.length) { L.push("", "[다가오는 일정 7일]"); ev.slice(0, 12).forEach(function (e) { L.push("- " + e.d + " " + e.t + (e.n ? " — " + e.n : "")); }); }
+  var T = []; try { T = typeof mkTopicsScored === "function" ? mkTopicsScored() : []; } catch (e) {}
+  if (T.length) { L.push("", "[주제 후보] — ctx | 묶음 | 제목 | 앱 점수(0~10) | 앱이 본 선정 이유"); T.slice().sort(function (a, b) { return b.s - a.s; }).slice(0, 60).forEach(function (x) { L.push("- " + x.ctx + " | " + x.g + " | " + cPlain(x.t) + " | " + Math.round(x.s) + " | " + (x.why || x.d || "").slice(0, 80)); }); }
+  var Q = []; try { Q = typeof rpQuestions === "function" ? rpQuestions() : []; } catch (e) {}
+  if (Q.length) { L.push("", "[리포트 후보] — id | 종류 | 질문 | 왜"); Q.slice(0, 24).forEach(function (q) { L.push("- " + q.id + " | " + q.kind + " | " + q.t + " | " + (q.why || q.d || "")); }); }
+  L.push("", "요일: " + "일월화수목금토"[new Date(Date.now() + 9 * 3600e3).getUTCDay()] + " · 선택한 시장: " + smMk());
+  return L.join("\n");
+}
+var SM_DAILY = { busy: false };
+function smDailyApply(j, input) {
+  var D = j.data || {}, mk = smMk(), key = brAiKey(), iss = briefState.issues || [];
+  // ① 해설·이슈·급등락·내일 → BR_AI + ISS_WHY (숫자 대조 포함)
+  var src = input + "\n" + (D.tomorrow || []).map(function (t) { return t.when || ""; }).join(" ");
+  var chk = { story: (D.story || []).map(function (l) { return smNumCheck(l, src); }), issues: (D.issues || []).map(function (x) { return smNumCheck([x.why, x.so, x.next].join(" "), src); }), movers: (D.movers || []).map(function (x) { return smNumCheck(x.why, src); }) };
+  (D.issues || []).forEach(function (x, k) { var it = iss[(+x.i || 0) - 1]; if (it) ISS_WHY[it.title] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf, bad: chk.issues[k] }; });
+  ISS_WHY._note = D.note || ""; ISS_WHY._src = j.sources || [];
+  BR_AI[key] = { at: Date.now(), model: j.model, data: { story: D.story || [], issues: D.issues || [], movers: D.movers || [], tomorrow: D.tomorrow || [], note: D.note || "" }, sources: j.sources || [], searches: (j.searches || []).length, iss: iss.map(function (it) { return it.title; }), chk: chk, repaired: !!j.repaired };
+  brAiSave(); issWhySave();
+  // ② 편성 → MK_AI (시장별)
+  var P = D.plan || {}; MK_AI = { day: smKstDay(), at: Date.now(), mk: mk, data: { summary: P.summary || D.note || "", picks: P.picks || [], extra: P.extra || [], week: P.week || [], reports: (D.reports || []).filter(function (r) { return r.id; }) }, rpick: { picks: D.reports || [], summary: P.summary || "" }, sources: j.sources || [], searches: j.searches || [], used: j.used, max: j.max };
+  mkAiSave(); if (typeof MK !== "undefined") { MK.filt = "ai"; MK._T = null; }
+  // ③ 리포트 선정 → RP.ai2
+  smRpickApply();
+}
+function smRpickApply() { if (typeof RP === "undefined") return; var P = smPlanFor(smMk()); RP.ai2 = P && P.rpick && P.rpick.picks && P.rpick.picks.length ? { day: smKstDay(), picks: P.rpick.picks, summary: P.rpick.summary || "", sources: P.sources || [], model: "daily" } : null; RP.today = null; try { if (RP.ai2) localStorage.setItem("sm.rpAi", JSON.stringify(RP.ai2)); else localStorage.removeItem("sm.rpAi"); } catch (e) {} }
+function smDailyRepaint() {
+  try { if (typeof brAiPaint === "function") brAiPaint(); } catch (e) {}
+  try { if (currentTab === "onecard" && typeof makerRender === "function") makerRender(); } catch (e) {}
+  try { if (currentTab === "report" && typeof renderReport === "function") renderReport(); } catch (e) {}
+  try { if (currentTab === "ops" && typeof renderOps === "function") renderOps(); } catch (e) {}
+  try { if (currentTab === "channel" && typeof chState !== "undefined" && chState.issues && typeof issWhyPaint === "function") issWhyPaint(chState.issues, document.getElementById("chIssues")); } catch (e) {}
+  try { smFlowPaint(); } catch (e) {}
+}
+/* 실행 — btn 은 눌린 버튼(있으면 잠그고 진행 문구). 돌아오는 Promise 는 성공 여부(true/false) */
+function smDailyRun(btn) {
+  if (SM_DAILY.busy) return Promise.resolve(false);
+  if (!briefState.result) { alert("시장 데이터를 아직 준비하는 중이에요 — 잠시 뒤 다시 눌러 주세요"); return Promise.resolve(false); }
+  if (!briefState.issues && typeof issuesCompute === "function" && briefState.recent) { try { briefState.issues = issuesCompute(briefState.recent, { market: smMk(), popular: briefState.popular }); } catch (e) {} }
+  SM_DAILY.busy = true; var old = btn ? btn.innerHTML : ""; if (btn) { btn.disabled = true; btn.textContent = "Claude가 기사·이슈를 읽고 브리핑·편성·리포트를 한 번에 만드는 중… (1~3분)"; }
+  var prep = typeof cardsNewsFetch === "function" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : Promise.resolve();
+  var mac = typeof macroEnsure === "function" ? macroEnsure().catch(function () { return null; }) : Promise.resolve();
+  var input = "";
+  return Promise.all([prep, mac]).then(function () { input = smDailyInput(); return smClaude("daily", input, { json: true }); })
+    .then(function (j) { smDailyApply(j, input); return true; })
+    .catch(function (e) { alert("오늘 브리핑 실패: " + e.message); return false; })
+    .then(function (ok) { SM_DAILY.busy = false; if (btn && document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; } smDailyRepaint(); return ok; });
+}
+/* 옛 진입점을 모두 한 번 호출로 — 브리핑 화면 · 이슈 '이유' · 카드 작업대 편성 · 리포트 선정 */
+brAiRun = function (btn) { return smDailyRun(btn); };
+issWhyRun = function (list, box, btn) { return smDailyRun(btn); };
+mkAiRun = function (btn) { return smDailyRun(btn); };
+if (typeof rpAiPickRun === "function") rpAiPickRun = function (btn) { return smDailyRun(btn); };
+/* 리포트 선정은 시장별 편성 안에 들어 있으므로 시장을 바꾸면 따라간다 */
+(function () { var s0 = smSetMk; smSetMk = function () { var r = s0.apply(this, arguments); try { smRpickApply(); } catch (e) {} return r; }; var b0 = switchBriefMarket; switchBriefMarket = function () { var r = b0.apply(this, arguments); try { smRpickApply(); } catch (e) {} return r; }; try { smRpickApply(); } catch (e) {} })();
+/* 편성 목록 — Claude 가 ctx 를 조금 바꿔 써도 제목으로 찾는다(하나도 안 나오던 원인). 못 찾은 것은 '아이디어'로 */
+mkAiList = function (T) {
+  if (!MK_AI || !MK_AI.data) return [];
+  var by = {}, byT = {}; T.forEach(function (x) { by[x.ctx] = x; byT[cPlain(x.t).replace(/\s+/g, "")] = x; });
+  var norm = function (s) { return String(s || "").replace(/\s+/g, "").toLowerCase(); };
+  return (MK_AI.data.picks || []).map(function (p) {
+    var x = by[p.ctx] || byT[norm(p.title)] || null;
+    if (!x && p.ctx) { var c = norm(p.ctx); x = T.filter(function (y) { return norm(y.ctx) === c || norm(y.ctx).indexOf(c) >= 0 || c.indexOf(norm(y.ctx)) >= 0; })[0] || null; }
+    if (!x && (p.title || p.hook)) { var tt = norm(p.title || p.hook); x = T.filter(function (y) { var yt = norm(cPlain(y.t)); return yt && (yt.indexOf(tt) >= 0 || tt.indexOf(yt) >= 0); })[0] || null; }
+    return x ? Object.assign({}, x, { why: (p.slot ? "[" + p.slot + "] " : "") + (p.hook ? "“" + p.hook + "” · " : "") + (p.why || "") }) : null;
+  }).filter(Boolean);
+};
+/* 운영 순서 — 편성 단계가 브리핑에 합쳐져 4단계 */
+SM_FLOW = [
+  { k: "data", n: "데이터 확인", tab: ["data"], hint: "데이터 센터에서 시세가 최신인지 확인하세요 (늦은 시장은 ✨ 원인 확인)" },
+  { k: "brief", n: "오늘 브리핑", tab: ["brief"], hint: "✨ 오늘 브리핑 한 번 — 해설 3줄 · 이슈 왜/그래서/볼 것 · 급등락 이유 · 내일 볼 것 · 카드 편성 · 리포트 선정이 한 번에 나와요" },
+  { k: "make", n: "만들기", tab: ["onecard", "report", "analyst"], hint: "편성 순서대로 카드 · 리포트 · 분석(🤖 끝까지 분석)을 만드세요" },
+  { k: "pub", n: "업로드 · 검수", tab: [], hint: "카드마다 ✨ AI 문구(인스타·스레드 글) → 발행 전 검수 → 올리기" }
+];
+smFlowGo = function (k) {
+  if (k === "data") return navTo("data");
+  if (k === "brief") return navTo("ops");
+  if (k === "make" || k === "pub") { if (typeof MK !== "undefined") { MK.tab = "work"; MK.mk = smMk(); if (smPlanFor(smMk())) MK.filt = "ai"; } return navTo("onecard"); }
+};
