@@ -369,3 +369,80 @@ smFlowGo = function (k) {
   if (k === "brief") return navTo("ops");
   if (k === "make" || k === "pub") { if (typeof MK !== "undefined") { MK.tab = "work"; MK.mk = smMk(); if (smPlanFor(smMk())) MK.filt = "ai"; } return navTo("onecard"); }
 };
+
+/* ============================================================ v12.47 오늘 브리핑은 시장 구분 없이 하루 한 번 — 국내·미국·코인을 한 입력에 담아 한 번 호출하고, 결과를 네 시장 키에 모두 저장
+   (시장마다 따로 부르면 같은 기사·일정을 세 번 읽고 토큰도 세 배. 계정은 세 시장을 함께 다루므로 한 번이 맞다)
+   + 결과가 비어 있으면(해설·이슈·편성 전부 0) 성공으로 치지 않고 원문·멈춘 이유를 보여 준다 ============================================================ */
+var SM_MK_LIST = ["all", "kr", "us", "coin"];
+function smMkFrame(mk) {
+  if (!briefState.recent || typeof briefCompute !== "function") return null;
+  try { return { R: briefCompute(briefState.recent, { mode: "day", market: mk, popular: briefState.popular }), iss: typeof issuesCompute === "function" ? issuesCompute(briefState.recent, { market: mk, popular: briefState.popular }) : [] }; } catch (e) { return null; }
+}
+/* 네 시장의 이슈를 제목으로 합친 목록(순서: 전체 → 국내 → 미국 → 코인) — Claude 에 번호로 넘기고, 돌아온 번호를 제목으로 되돌린다 */
+var SM_DAILY_ISS = [];
+smDailyInput = function () {
+  var pc = function (x) { return typeof briefPct === "function" ? briefPct(x) : (x * 100).toFixed(2) + "%"; }, st = function (s) { return typeof nbStat === "function" ? nbStat(s) : null; }, L = [], F = {};
+  SM_MK_LIST.forEach(function (m) { F[m] = smMkFrame(m); });
+  var R0 = F.all && F.all.R || briefState.result;
+  L.push("[기준일 " + (typeof cDate === "function" ? cDate(R0.asOf) : "") + " 종가 · 국내(오후 3:30 마감) · 미국(한국 새벽 마감) · 코인(오전 9시 마감)을 한 번에]");
+  [["kr", "국내"], ["us", "미국"], ["coin", "코인"]].forEach(function (p) {
+    var Fm = F[p[0]], R = Fm && Fm.R; if (!R) return;
+    L.push("", "[" + p[1] + " 시장]");
+    (R.indexRow || []).forEach(function (x) { var S = st(x.sym); L.push("- " + x.name + " " + pc(x.ret) + (S ? " · 5일 " + pc(S.ret5 || 0) + " · 1개월 " + pc(S.m1) + " · 52주 고점 대비 " + pc(S.vsHi || 0) + " · 평소 하루 변동의 " + (S.sd > 0 ? (Math.abs(S.ret1) / S.sd).toFixed(1) : "-") + "배" : "")); });
+    var t = R.temp; if (t && isFinite(t.upPct)) L.push("폭: 오른 종목 " + Math.round(t.upPct * 100) + "% (" + t.up + "/" + t.total + ") · 20일선 위 " + Math.round(t.abovePct * 100) + "%" + (t.above200Pct != null ? " · 200일선 위 " + Math.round(t.above200Pct * 100) + "%" : "") + " · 52주 신고가 " + (t.newHigh || []).length + " · 신저가 " + (t.newLow || []).length);
+    var th = R.themes || []; if (th.length) L.push("업종: 강세 " + th.slice(0, 3).map(function (x) { return x.name + " " + pc(x.ret) + "(" + x.up + "/" + x.n + ")"; }).join(", ") + " / 약세 " + th.slice(-2).map(function (x) { return x.name + " " + pc(x.ret); }).join(", "));
+    if (t && (t.newHigh || []).length) L.push("52주 신고가: " + t.newHigh.slice(0, 6).map(function (s) { return s && s.sym ? briefName(s) : String(s); }).join(", "));
+    if ((R.hotVol || []).length) L.push("거래대금 급증: " + R.hotVol.slice(0, 4).map(function (s) { return s.sym + " " + briefName(s) + " " + s.amtX.toFixed(1) + "배 (" + pc(s.ret) + ")"; }).join(" · "));
+    var mv = R.movers || { up: [], down: [] };
+    if (mv.up.length) L.push("급등: " + mv.up.slice(0, 4).map(function (s) { return s.sym + " " + briefName(s) + " " + pc(s.ret); }).join(" · "));
+    if (mv.down.length) L.push("급락: " + mv.down.slice(0, 4).map(function (s) { return s.sym + " " + briefName(s) + " " + pc(s.ret); }).join(" · "));
+  });
+  try { var now = nbNow(); if (now && now.why && now.why.length) L.push("", "[국면 신호 — 앱 규칙] " + now.why.join(" / ")); } catch (e) {}
+  try { if (typeof macSer === "function") { var mm = ["krw", "bok", "fed", "us10y"].map(function (k) { var S = macSer(k); if (!S || !S.v.length) return null; return { krw: "원/달러", bok: "한국 기준금리", fed: "미 기준금리", us10y: "미 10년물" }[k] + " " + S.v[S.v.length - 1] + (k === "krw" ? "원" : "%"); }).filter(Boolean); if (mm.length) L.push("[매크로] " + mm.join(" · ")); } } catch (e) {}
+  // 이슈: 네 시장 합치기(제목 중복 제거)
+  SM_DAILY_ISS = []; var seen = {};
+  SM_MK_LIST.forEach(function (m) { ((F[m] && F[m].iss) || []).forEach(function (it) { if (seen[it.title]) return; seen[it.title] = 1; SM_DAILY_ISS.push(Object.assign({ mk: m }, it)); }); });
+  if (SM_DAILY_ISS.length) { L.push("", "[핵심 이슈 — 시장별 상위]"); SM_DAILY_ISS.forEach(function (it, i) { L.push((i + 1) + ". [" + ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[it.mk] + "] " + it.title + " · " + (it.sub || "") + (it.sym ? " (" + it.sym + ")" : "")); }); }
+  var news = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).slice(0, 40); if (news.length) { L.push("", "[후보 기사 — 네이버]"); news.forEach(function (n) { L.push("- " + (n.title || "") + (n.press ? " (" + n.press + (n.time ? " · " + n.time : "") + ")" : "") + (n.desc ? " — " + String(n.desc).slice(0, 110) : "") + (n.url ? " " + n.url : "")); }); }
+  var ev = []; try { ev = typeof pubUpcoming === "function" ? pubUpcoming(7) : []; } catch (e) {} if (ev.length) { L.push("", "[다가오는 일정 7일]"); ev.slice(0, 12).forEach(function (e) { L.push("- " + e.d + " " + e.t + (e.n ? " — " + e.n : "")); }); }
+  var T = []; try { T = typeof mkTopicsScored === "function" ? mkTopicsScored() : []; } catch (e) {}
+  if (T.length) { L.push("", "[주제 후보] — ctx | 묶음 | 제목 | 앱 점수(0~10) | 앱이 본 선정 이유"); T.slice().sort(function (a, b) { return b.s - a.s; }).slice(0, 60).forEach(function (x) { L.push("- " + x.ctx + " | " + x.g + " | " + cPlain(x.t) + " | " + Math.round(x.s) + " | " + (x.why || x.d || "").slice(0, 80)); }); }
+  var Q = []; try { Q = typeof rpQuestions === "function" ? rpQuestions() : []; } catch (e) {}
+  if (Q.length) { L.push("", "[리포트 후보] — id | 종류 | 질문 | 왜"); Q.slice(0, 24).forEach(function (q) { L.push("- " + q.id + " | " + q.kind + " | " + q.t + " | " + (q.why || q.d || "")); }); }
+  L.push("", "요일: " + "일월화수목금토"[new Date(Date.now() + 9 * 3600e3).getUTCDay()] + " · 계정은 국내·미국·코인을 모두 다룬다 — 편성은 세 시장을 섞어서");
+  return L.join("\n");
+};
+function smDailyEmpty(D) { return !(D.story || []).filter(Boolean).length && !(D.issues || []).some(function (x) { return x.why; }) && !((D.plan || {}).picks || []).length && !(D.reports || []).length; }
+smDailyApply = function (j, input) {
+  var D = j.data || {}, iss = SM_DAILY_ISS, day = smKstDay();
+  if (smDailyEmpty(D)) { var e = new Error("Claude 답에 내용이 없어요 (해설·이슈·편성 모두 0) — 멈춘 이유: " + (j.stop || "?") + (j.repaired ? " · 형식 복구 뒤에도 비어 있음" : "") + "\n원문 앞부분: " + String(j.text || "").slice(0, 200)); e.raw = j; throw e; }
+  var src = input + "\n" + (D.tomorrow || []).map(function (t) { return t.when || ""; }).join(" ");
+  var chk = { story: (D.story || []).map(function (l) { return smNumCheck(l, src); }), issues: (D.issues || []).map(function (x) { return smNumCheck([x.why, x.so, x.next].join(" "), src); }), movers: (D.movers || []).map(function (x) { return smNumCheck(x.why, src); }) };
+  (D.issues || []).forEach(function (x, k) { var it = iss[(+x.i || 0) - 1]; if (it) ISS_WHY[it.title] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf, bad: chk.issues[k] }; });
+  ISS_WHY._note = D.note || ""; ISS_WHY._src = j.sources || [];
+  var rec = { at: Date.now(), model: j.model, data: { story: D.story || [], issues: D.issues || [], movers: D.movers || [], tomorrow: D.tomorrow || [], note: D.note || "" }, sources: j.sources || [], searches: (j.searches || []).length, iss: iss.map(function (it) { return it.title; }), chk: chk, repaired: !!j.repaired, stop: j.stop, usage: j.usage || null, raw: String(j.text || "").slice(0, 6000), shared: true };
+  var P = D.plan || {}, plan = { day: day, at: rec.at, data: { summary: P.summary || D.note || "", picks: P.picks || [], extra: P.extra || [], week: P.week || [], reports: (D.reports || []).filter(function (r) { return r.id; }) }, rpick: { picks: D.reports || [], summary: P.summary || "" }, sources: j.sources || [], searches: j.searches || [], used: j.used, max: j.max, shared: true };
+  var mode = briefState.mode || "day";
+  SM_MK_LIST.forEach(function (m) { BR_AI[day + "|" + m + "|" + mode] = rec; MK_AI_MAP[m] = Object.assign({ mk: m }, plan); });
+  brAiSave(); issWhySave();
+  try { localStorage.setItem("sm.aiPlanMk", JSON.stringify({ d: day, m: MK_AI_MAP })); } catch (e) {}
+  MK_AI = MK_AI_MAP[smMk()]; if (typeof MK !== "undefined") { MK.filt = "ai"; MK._T = null; }
+  smRpickApply();
+};
+/* 빈 결과·실패 원문을 남겨 두고 작업실에서 볼 수 있게 */
+smDailyRun = function (btn) {
+  if (SM_DAILY.busy) return Promise.resolve(false);
+  if (!briefState.result) { alert("시장 데이터를 아직 준비하는 중이에요 — 잠시 뒤 다시 눌러 주세요"); return Promise.resolve(false); }
+  SM_DAILY.busy = true; var old = btn ? btn.innerHTML : ""; if (btn) { btn.disabled = true; btn.textContent = "Claude가 국내·미국·코인 기사·이슈를 읽고 브리핑·편성·리포트를 한 번에 만드는 중… (1~3분)"; }
+  var prep = typeof cardsNewsFetch === "function" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : Promise.resolve();
+  var mac = typeof macroEnsure === "function" ? macroEnsure().catch(function () { return null; }) : Promise.resolve();
+  var input = "";
+  return Promise.all([prep, mac]).then(function () { input = smDailyInput(); return smClaude("daily", input, { json: true }); })
+    .then(function (j) { smDailyApply(j, input); SM_DAILY.last = null; return true; })
+    .catch(function (e) { SM_DAILY.last = { at: Date.now(), msg: e.message, raw: e.raw ? String(e.raw.text || "").slice(0, 6000) : (e.res && e.res.text) || "", stop: e.raw ? e.raw.stop : e.res && e.res.reason }; try { localStorage.setItem("sm.dailyErr", JSON.stringify(SM_DAILY.last)); } catch (x) {} alert("오늘 브리핑 실패: " + e.message); return false; })
+    .then(function (ok) { SM_DAILY.busy = false; if (btn && document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; } smDailyRepaint(); return ok; });
+};
+try { SM_DAILY.last = JSON.parse(localStorage.getItem("sm.dailyErr") || "null"); if (SM_DAILY.last && Date.now() - SM_DAILY.last.at > 12 * 3600e3) SM_DAILY.last = null; } catch (e) {}
+brAiRun = function (btn) { return smDailyRun(btn); }; issWhyRun = function (l, b, btn) { return smDailyRun(btn); }; mkAiRun = function (btn) { return smDailyRun(btn); }; if (typeof rpAiPickRun === "function") rpAiPickRun = function (btn) { return smDailyRun(btn); };
+/* 진행 표시: 브리핑은 시장 공통 */
+(function () { var d0 = smFlowDone; smFlowDone = function (mk) { var d = d0.apply(this, arguments); var day = smKstDay(); d.brief = d.brief || Object.keys(BR_AI).some(function (k) { return k.indexOf(day + "|") === 0 && BR_AI[k] && BR_AI[k].shared; }); return d; }; })();
