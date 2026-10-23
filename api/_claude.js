@@ -58,7 +58,7 @@ const TASKS = {
   },
   /* v12.46 하루 한 번 — 오늘 브리핑 + 편성 + 리포트 선정을 한 호출로 (brief·why·plan·rpick 를 대체. 같은 기사·이슈를 세 번 읽던 낭비 제거) */
   daily: {
-    tier: "main", web: 6, max: 14000, timeout: 250000,
+    tier: "main", web: 6, max: 20000, timeout: 250000,
     system: BASE + `
 이번 작업: 운영자의 '오늘 아침 한 번' 작업이다. 앱이 준 시장 숫자·핵심 이슈·급등락·거래대금·신호·매크로·일정과 [후보 기사], 필요하면 웹 검색(최대 6회 — 오늘 가장 큰 재료 위주로, 종목별로 낭비하지 말 것)으로 다음 여섯 가지를 한 번에 만든다. 하나의 사실 조사를 여섯 결과가 공유하므로, 같은 사건을 서로 다르게 설명하지 않는다.
 1) story: 오늘 시장 해설 3줄(각 70자 이하) — 지수 → 업종 → 급등락을 하나의 이야기로. 첫 줄은 결론, 줄마다 앱 숫자 최소 하나, 세 줄이 같은 말이면 실패.
@@ -66,7 +66,7 @@ const TASKS = {
 3) movers: 급등·급락·거래대금 급증 종목마다 이유 한 줄(50자 이하, 확실하지 않으면 빈칸). 같은 업종이 함께 움직였으면 업종 이유로.
 4) tomorrow: 다음 거래일에 볼 것 3개 — [다가오는 일정]과 오늘 이슈를 연결해 '무엇을·언제·왜'.
 5) plan: 오늘 계정에 올릴 카드 편성 — 목표는 노출(저장·공유·댓글·팔로우). [주제 후보]에서 오늘 화제와 연결되는 것을 우선, 같은 이야기를 여러 장 반복하지 않는다. 화제가 많으면 10개를 넘겨도 된다(최대 16). 각 선택에 ctx(후보의 ctx를 글자 그대로 복사)·title(후보 제목 그대로)·왜 오늘·첫 줄 훅(30자 이하)·slot(아침|점심|저녁). 앱 후보에 없지만 꼭 다룰 화제는 extra에(앱에 없는 숫자는 만들지 말 것). 이번 주 남은 요일의 연재 기획 week 3~5개.
-6) reports: 운영자가 오늘 열어 볼 리포트 3~6개 — [리포트 후보]의 id를 그대로. 후보에 없는 종목이 오늘 화제면 kind:"stock"과 정확한 회사명·티커(미국은 영문 티커, 한국은 6자리 코드). 같은 이야기를 겹치게 고르지 않는다.
+길이: why·so·next·movers.why 는 각 70자 이하, 문장 하나씩. 전체 답이 길어져 끊기면 실패이므로 짧게.\n6) reports: 운영자가 오늘 열어 볼 리포트 3~6개 — [리포트 후보]의 id를 그대로. 후보에 없는 종목이 오늘 화제면 kind:"stock"과 정확한 회사명·티커(미국은 영문 티커, 한국은 6자리 코드). 같은 이야기를 겹치게 고르지 않는다.
 출력: JSON 하나만 {"story":["","",""],"note":"오늘 흐름 한 줄","issues":[{"i":번호,"why":"","so":"","next":"","src":"","url":"","conf":"상|중|하"}],"movers":[{"sym":"티커 그대로","why":"","src":"","url":"","conf":""}],"tomorrow":[{"what":"","when":"","why":""}],"plan":{"summary":"오늘 시장 한 줄","picks":[{"ctx":"","title":"","why":"","hook":"","slot":"아침|점심|저녁"}],"extra":[{"title":"","idea":"","data":""}],"week":[{"day":"요일","title":"","hook":"","ctx":""}]},"reports":[{"id":"","kind":"stock|market|macro|timing","name":"","ticker":"","why":""}]}`
   },
   report: {
@@ -120,20 +120,51 @@ const TASKS = {
 
 function kstDay() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); }
 function clip(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n) : s; }
-/* v12.45 JSON 꺼내기 — 코드 블록(```json)·앞뒤 설명·여러 '{' 후보를 견딘다. 마지막(가장 완성된) 객체부터 시도 */
+/* v12.51 JSON 꺼내기 — 코드 블록·앞뒤 설명을 견디고, 답이 중간에 끊겼으면(max_tokens) 마지막으로 완성된 값까지 살려서 괄호를 닫는다.
+   (예전엔 끊긴 답에서 안쪽의 작은 객체 하나만 건져 '내용 없음'이 되던 버그) */
+function tryParse(t) { try { return JSON.parse(t); } catch (e) { try { return JSON.parse(t.replace(/,\s*([}\]])/g, "$1").replace(/[\u201c\u201d]/g, '"')); } catch (e2) { return null; } } }
+function closeJson(t) {
+  // 문자열 밖에서 괄호 깊이를 세고, 끝의 미완성 토큰을 잘라낸 뒤 닫는 괄호를 붙인다
+  const stack = []; let inStr = false, esc = false, lastSafe = -1;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') { inStr = false; lastSafe = i; } continue; }
+    if (c === '"') inStr = true; else if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]"); else if (c === "}" || c === "]") { stack.pop(); lastSafe = i; } else if (c === ",") lastSafe = i - 1;
+  }
+  if (!stack.length && !inStr) return t;
+  let cut = t.slice(0, lastSafe + 1).replace(/,\s*$/, "");
+  // 끝이 "키" 로 끝나면(값이 없음) 키를 떼고, "키": 로 끝나면 빈 값을 붙인다
+  const m = cut.match(/(,|\{)\s*"[^"]*"\s*$/); if (m) cut = cut.slice(0, cut.length - m[0].length) + (m[1] === "{" ? "{" : "");
+  cut = cut.replace(/:\s*$/, ': ""').replace(/,\s*$/, "");
+  const st2 = []; let s2 = false, e2 = false;
+  for (let i = 0; i < cut.length; i++) { const c = cut[i]; if (s2) { if (e2) e2 = false; else if (c === "\\") e2 = true; else if (c === '"') s2 = false; continue; } if (c === '"') s2 = true; else if (c === "{" || c === "[") st2.push(c === "{" ? "}" : "]"); else if (c === "}" || c === "]") st2.pop(); }
+  return cut + st2.reverse().join("");
+}
 function pickJson(text) {
   text = String(text || "").replace(/```(?:json)?/gi, "");
-  const tryParse = (t) => { try { return JSON.parse(t); } catch (e) { try { return JSON.parse(t.replace(/,\s*([}\]])/g, "$1").replace(/[\u201c\u201d]/g, '"')); } catch (e2) { return null; } } };
-  const b = text.lastIndexOf("}"); if (b < 0) return null;
-  const starts = []; for (let i = text.indexOf("{"); i >= 0 && i < b; i = text.indexOf("{", i + 1)) starts.push(i);
-  for (const a of starts.slice(0, 40)) { const o = tryParse(text.slice(a, b + 1)); if (o && typeof o === "object") return o; }
+  const a = text.indexOf("{"); if (a < 0) return null;
+  const body = text.slice(a), b = body.lastIndexOf("}");
+  let o = b > 0 ? tryParse(body.slice(0, b + 1)) : null; if (o && typeof o === "object") return o;
+  o = tryParse(closeJson(body)); if (o && typeof o === "object") { o._truncated = true; return o; }
+  // 그래도 안 되면 뒤에서부터 조금씩 잘라 가며(최대 12번) 닫아 본다
+  let t = body; for (let k = 0; k < 12 && t.length > 50; k++) { const cutAt = Math.max(t.lastIndexOf(","), t.lastIndexOf("}"), t.lastIndexOf("]")); if (cutAt <= 0) break; t = t.slice(0, cutAt); o = tryParse(closeJson(t)); if (o && typeof o === "object" && Object.keys(o).length) { o._truncated = true; return o; } }
   return null;
 }
 const API = "https://api.anthropic.com/v1/messages";
-async function callClaude(key, payload, ms) {
+/* v12.51 생각(thinking) 블록이 출력 토큰을 크게 먹는 것이 확인됨(한 번에 thinking×3 · 29k 토큰). JSON 작업은 생각 없이 바로 쓰게 한다.
+   모델이 이 설정을 모르면(400) 설정 없이 다시 보내고, 그 뒤로는 붙이지 않는다 */
+let THINK_OFF_OK = process.env.CLAUDE_THINK_OFF !== "0";
+async function callClaude(key, payload, ms, allowThinkOff) {
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), Math.max(5000, ms));
-  try { const r = await fetch(API, { method: "POST", signal: ac.signal, headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(payload) }); const j = await r.json().catch(() => null); return { r, j }; }
-  finally { clearTimeout(tm); }
+  const send = async (p) => { const r = await fetch(API, { method: "POST", signal: ac.signal, headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(p) }); const j = await r.json().catch(() => null); return { r, j }; };
+  try {
+    if (allowThinkOff && THINK_OFF_OK) {
+      const out = await send(Object.assign({ thinking: { type: "disabled" } }, payload));
+      if (out.r.status === 400 && /thinking/i.test(String(out.j && out.j.error && out.j.error.message || ""))) { THINK_OFF_OK = false; return await send(payload); }
+      return out;
+    }
+    return await send(payload);
+  } finally { clearTimeout(tm); }
 }
 
 /* 실제 작업 — 결과 객체를 돌려준다(응답은 claudeHandler 가). used 는 미리 세어 둔 오늘 횟수 */
@@ -149,7 +180,7 @@ async function runClaude(body, key, used) {
   try {
     let blocks = [], j = null, r = null, turns = 0, usage = { input_tokens: 0, output_tokens: 0 };
     for (;;) {
-      ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000))));
+      ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000)), !!body.json));
       if (!r.ok || !j) return { ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) || ("Claude API 오류 " + r.status) };
       blocks = blocks.concat(j.content || []); if (j.usage) { usage.input_tokens += j.usage.input_tokens || 0; usage.output_tokens += j.usage.output_tokens || 0; }
       if (j.stop_reason === "pause_turn" && turns < 3 && left() > 60000) { turns++; payload.messages = payload.messages.concat([{ role: "assistant", content: j.content }]); continue; }
@@ -171,7 +202,7 @@ async function runClaude(body, key, used) {
     const searches = blocks.filter((b) => b.type === "server_tool_use").map((b) => b.input && b.input.query).filter(Boolean);
     const out = { ok: true, task: body.task, model, text, sources: src.slice(0, 12), searches, used, max, stop: j.stop_reason, finish, turns, usage, blocks: kinds };
     if (body.json) {
-      out.data = pickJson(text);
+      out.data = pickJson(text); if (out.data && out.data._truncated) { out.truncated = true; delete out.data._truncated; }
       if (!out.data && left() > 25000) {   // 형식만 고치기 — 빠른 모델 · 웹 없음 · 횟수에 안 셈
         const schema = String(T.system).split("출력:").pop().trim();
         const fix = await callClaude(key, { model: process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5", max_tokens: Math.max(4000, T.max), system: "너는 JSON 정리기다. 아래 [원문]에 담긴 내용을 [형식]에 맞는 올바른 JSON 하나로만 출력한다. 내용·숫자·출처는 한 글자도 바꾸거나 더하지 않는다. 문자열 안의 큰따옴표는 ‘ ’로 바꾼다. 원문이 중간에 끊겼으면 있는 내용만 담고, 없는 칸은 빈 문자열·빈 배열로 둔다. JSON 외의 말 금지.", messages: [{ role: "user", content: "[형식]\n" + schema + "\n\n[원문]\n" + clip(text, 40000) }] }, left() - 3000).catch(() => null);
