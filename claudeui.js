@@ -80,7 +80,7 @@ function issWhyRun(list, box, btn) {
 }
 function issWhyPaint(list, box) {
   if (!box) return; var lis = box.querySelectorAll(".issList > li");
-  Array.prototype.forEach.call(lis, function (li, i) { var it = list[i], w = it && ISS_WHY[it.title], old = li.querySelector(".issWhyAi"); if (old) old.remove(); if (!w) return; var d = document.createElement("div"); d.className = "issWhyAi"; d.innerHTML = '<div><b>왜</b> ' + escapeHtml(w.why) + '</div>' + (w.so ? '<div><b>그래서</b> ' + escapeHtml(w.so) + '</div>' : "") + (w.next ? '<div><b>볼 것</b> ' + escapeHtml(w.next) + '</div>' : "") + (w.src ? ' <small>' + (w.url ? '<a href="' + escapeHtml(w.url) + '" target="_blank" rel="noopener">' + escapeHtml(w.src) + '</a>' : escapeHtml(w.src)) + (w.conf ? " · 확신 " + escapeHtml(w.conf) : "") + '</small>' : ""); var host = li.querySelector("div") || li; host.appendChild(d); });
+  Array.prototype.forEach.call(lis, function (li, i) { var it = list[i], w = it && ISS_WHY[it.title], old = li.querySelector(".issWhyAi"); if (old) old.remove(); if (!w) return; var d = document.createElement("div"); d.className = "issWhyAi"; d.innerHTML = '<div><b>왜</b> ' + escapeHtml(w.why) + '</div>' + (w.so ? '<div><b>그래서</b> ' + escapeHtml(w.so) + '</div>' : "") + (w.next ? '<div><b>볼 것</b> ' + escapeHtml(w.next) + '</div>' : "") + (w.src ? ' <small>' + (w.url ? '<a href="' + escapeHtml(w.url) + '" target="_blank" rel="noopener">' + escapeHtml(w.src) + '</a>' : escapeHtml(w.src)) + (w.conf ? " · 확신 " + escapeHtml(w.conf) : "") + '</small>' : "") + (w.bad && w.bad.length && typeof smNumWarn === "function" ? smNumWarn(w.bad) : ""); var host = li.querySelector("div") || li; host.appendChild(d); });
   var n = box.querySelector(".issWhyNote"); if (!n) { n = document.createElement("div"); n.className = "issWhyNote briefDim"; box.appendChild(n); }
   n.innerHTML = (ISS_WHY._note ? "흐름: " + escapeHtml(ISS_WHY._note) : "") + smSrcHtml(ISS_WHY._src);
 }
@@ -105,6 +105,8 @@ function brAiInput() {
   L.push("[시장 — " + (R.mktName || "전체") + " · " + (R.label || "오늘") + "] " + (R.indexRow || []).slice(0, 5).map(function (x) { return x.name + " " + pc(x.ret); }).join(" · "));
   var t = R.temp; if (t && isFinite(t.upPct)) L.push("오른 종목 " + Math.round(t.upPct * 100) + "% (" + t.up + "/" + t.total + ") · 20일선 위 " + Math.round(t.abovePct * 100) + "% · 52주 신고가 " + (t.newHigh || []).length + " · 신저가 " + (t.newLow || []).length + (R.basis && R.basis.name ? " · 기준 " + R.basis.name : ""));
   var th = R.themes || []; if (th.length) L.push("[업종] 강세 " + th.slice(0, 3).map(function (x) { return x.name + " " + pc(x.ret); }).join(", ") + " / 약세 " + th.slice(-2).map(function (x) { return x.name + " " + pc(x.ret); }).join(", "));
+  if (t && (t.newHigh || []).length) L.push("[52주 신고가] " + t.newHigh.slice(0, 8).map(function (s) { return s && s.sym ? briefName(s) : String(s); }).join(", "));
+  if ((R.hotVol || []).length) L.push("[거래대금 급증 — 평소 대비] " + R.hotVol.slice(0, 6).map(function (s) { return briefName(s) + " " + s.amtX.toFixed(1) + "배 (" + pc(s.ret) + ")"; }).join(" · "));
   var mv = R.movers || { up: [], down: [] };
   L.push("[급등] " + mv.up.slice(0, 5).map(function (s) { return s.sym + " " + briefName(s) + " " + pc(s.ret); }).join(" · "));
   L.push("[급락] " + mv.down.slice(0, 5).map(function (s) { return s.sym + " " + briefName(s) + " " + pc(s.ret); }).join(" · "));
@@ -129,11 +131,11 @@ function brAiPaint() {
   var A = BR_AI[brAiKey()], own = typeof isOwner === "function" && isOwner() && typeof smClaude === "function";
   if (!own) { sec.style.display = "none"; return; }
   sec.style.display = "";
-  if (A && A.data) { (A.data.issues || []).forEach(function (x) { var t = A.iss && A.iss[(+x.i || 0) - 1]; if (t && !ISS_WHY[t]) ISS_WHY[t] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf }; }); }
+  if (A && A.data) { (A.data.issues || []).forEach(function (x, k) { var t = A.iss && A.iss[(+x.i || 0) - 1]; if (t && !ISS_WHY[t]) ISS_WHY[t] = { why: x.why || "", so: x.so || "", next: x.next || "", src: x.src, url: x.url, conf: x.conf, bad: A.chk && A.chk.issues[k] }; }); }
   var h = '<div class="brAiHead"><b>✨ 오늘 해설</b><small class="briefDim">' + (A ? new Date(A.at + 9 * 3600e3).toISOString().slice(11, 16) + ' · ' + escapeHtml(A.model || "") + ' · 웹 검색 ' + A.searches + '회' : '시장 해설 3줄 · 핵심 이슈 왜/그래서/볼 것 · 급등락 이유 · 내일 볼 것을 한 번에') + '</small><button class="' + (A ? 'chip' : 'primary') + '" data-brai>' + (A ? '다시 만들기' : '✨ Claude 해설 만들기') + '</button></div>';
   if (A && A.data) {
     var D = A.data;
-    if ((D.story || []).length) h += '<ol class="brAiStory">' + D.story.filter(Boolean).map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join("") + '</ol>';
+    if ((D.story || []).length) h += '<ol class="brAiStory">' + D.story.map(function (x, k) { return x ? '<li>' + escapeHtml(x) + (A.chk && typeof smNumWarn === "function" ? ' ' + smNumWarn(A.chk.story[k]) : '') + '</li>' : ''; }).join("") + '</ol>';
     if ((D.tomorrow || []).length) h += '<div class="brAiSub">내일 볼 것</div><ul class="brAiTm">' + D.tomorrow.map(function (x) { return '<li><b>' + escapeHtml(x.what || "") + '</b>' + (x.when ? ' <small>' + escapeHtml(x.when) + '</small>' : '') + (x.why ? '<div class="briefDim">' + escapeHtml(x.why) + '</div>' : '') + '</li>'; }).join("") + '</ul>';
     if (D.note) h += '<div class="briefDim" style="margin-top:6px">흐름: ' + escapeHtml(D.note) + '</div>';
     h += smSrcHtml(A.sources);
@@ -141,7 +143,7 @@ function brAiPaint() {
   sec.innerHTML = h;
   var b = sec.querySelector("[data-brai]"); if (b) b.onclick = function () { brAiRun(b); };
   // 급등락 이유
-  if (A && A.data) (A.data.movers || []).forEach(function (m) { if (!m.why) return; Array.prototype.forEach.call(document.querySelectorAll('#briefBody .briefMover[data-sym="' + String(m.sym).replace(/"/g, "") + '"]'), function (el) { var o = el.querySelector(".brMovWhy"); if (o) o.remove(); var d = document.createElement("div"); d.className = "brMovWhy"; d.innerHTML = "왜: " + escapeHtml(m.why) + (m.src ? ' <small>' + (m.url ? '<a href="' + escapeHtml(m.url) + '" target="_blank" rel="noopener">' + escapeHtml(m.src) + '</a>' : escapeHtml(m.src)) + (m.conf ? ' · 확신 ' + escapeHtml(m.conf) : '') + '</small>' : ''); el.appendChild(d); }); });
+  if (A && A.data) (A.data.movers || []).forEach(function (m, mi) { if (!m.why) return; var mb = A.chk && A.chk.movers[mi]; Array.prototype.forEach.call(document.querySelectorAll('#briefBody .briefMover[data-sym="' + String(m.sym).replace(/"/g, "") + '"]'), function (el) { var o = el.querySelector(".brMovWhy"); if (o) o.remove(); var d = document.createElement("div"); d.className = "brMovWhy"; d.innerHTML = "왜: " + escapeHtml(m.why) + (m.src ? ' <small>' + (m.url ? '<a href="' + escapeHtml(m.url) + '" target="_blank" rel="noopener">' + escapeHtml(m.src) + '</a>' : escapeHtml(m.src)) + (m.conf ? ' · 확신 ' + escapeHtml(m.conf) : '') + '</small>' : '') + (mb && mb.length && typeof smNumWarn === "function" ? ' ' + smNumWarn(mb) : ''); el.appendChild(d); }); });
   if (typeof issWhyPaint === "function" && briefState.issues) issWhyPaint(briefState.issues, document.getElementById("briefTop5"));
 }
 (function () { if (typeof renderBrief !== "function") return; var rb0 = renderBrief; renderBrief = function () { var r = rb0.apply(this, arguments); try { brAiPaint(); } catch (e) { console.warn(e); } return r; }; })();
@@ -186,8 +188,9 @@ function smFlowPaint() {
   var D = smFlowDone(), next = SM_FLOW.filter(function (s) { return !D[s.k]; })[0];
   var cur = SM_FLOW.filter(function (s) { return s.tab.indexOf(tab) >= 0; })[0];
   el.innerHTML = '<div class="smFlowBar">' + SM_FLOW.map(function (s, i) { return '<button data-flow="' + s.k + '" class="' + (D[s.k] ? "done " : "") + (cur && cur.k === s.k ? "on " : "") + (next && next.k === s.k ? "next" : "") + '"><i>' + (D[s.k] ? "✓" : i + 1) + '</i><span>' + s.n + '</span></button>'; }).join('<em>›</em>') + '</div>' +
-    '<div class="smFlowHint">' + (next ? '<b>다음 할 일 · ' + (SM_FLOW.indexOf(next) + 1) + '</b> ' + escapeHtml(next.hint) : '<b>오늘 순서 끝 ✓</b> 수고했어요 — 내일 아침 데이터 확인부터') + '</div>';
+    '<div class="smFlowHint"><button class="smFlowOps" data-flowops>작업실에서 한눈에</button>' + (next ? '<b>다음 할 일 · ' + (SM_FLOW.indexOf(next) + 1) + '</b> ' + escapeHtml(next.hint) : '<b>오늘 순서 끝 ✓</b> 수고했어요 — 내일 아침 데이터 확인부터') + '</div>';
   Array.prototype.forEach.call(el.querySelectorAll("[data-flow]"), function (b) { b.onclick = function () { smFlowGo(b.getAttribute("data-flow")); }; });
+  var ob = el.querySelector("[data-flowops]"); if (ob) ob.onclick = function () { navTo("ops"); };
 }
 (function () {
   if (typeof switchTab !== "function") return;
@@ -197,4 +200,50 @@ function smFlowPaint() {
   document.addEventListener("click", function (e) { var t = e.target && e.target.closest && e.target.closest(".thrAi, .thrChkBtn, .thrCopy, [data-thrcopy]"); if (t) smFlowMark("pub"); }, true);
   document.addEventListener("DOMContentLoaded", function () { setTimeout(smFlowPaint, 800); });
   setTimeout(smFlowPaint, 1500);
+})();
+
+/* ============================================================ v12.43 숫자 대조 — Claude 글의 숫자가 앱이 준 입력에 있는지 확인 (틀린 정보 차단)
+   %·%p·배·원·달러·pt·bp·조·억 이 붙은 숫자만 본다. 입력 숫자를 글의 소수 자리로 반올림해도 같으면 통과.
+   ============================================================ */
+function smNumTok(t) {
+  var out = [], re = /([+\-−–]?\d[\d,]*(?:\.\d+)?)\s*(%p|%포인트|%|배|원|달러|pt|bp|조|억|만)/g, m;
+  t = String(t || "");
+  while ((m = re.exec(t))) { var raw = m[1].replace(/[−–]/g, "-").replace(/,/g, ""), v = Math.abs(parseFloat(raw)); if (!isFinite(v)) continue; var dec = (raw.split(".")[1] || "").length; out.push({ s: m[0].trim(), v: v, dec: dec, u: m[2] === "%포인트" ? "%p" : m[2], at: m.index }); }
+  return out;
+}
+var SM_NUM_STOP = /^(상승|하락|급등|급락|오른|내린|종목|비율|평소|하루|대비|기준|최근|오늘|어제|전일|거래|대금|변동|수익률|시장|전체|이상|이하|약|만에|가장|지수|업종|평균)$/;
+/* 숫자 바로 앞의 이름(코스피·삼성전자 등)이 입력에도 있으면, 입력에서 그 이름 근처(같은 칸 안)의 숫자와만 맞춰 본다 — '코스피 1%'가 다른 지수의 1.46%로 통과하지 않게 */
+function smNumCheck(text, src) {
+  src = String(src || ""); text = String(text || "");
+  var S = smNumTok(src), bad = [], seen = {};
+  var same = function (x, y) { if (y.u !== x.u && !((x.u === "%" || x.u === "%p") && (y.u === "%" || y.u === "%p"))) return false; var f = Math.pow(10, x.dec); return Math.abs(Math.round(y.v * f) / f - x.v) < 1e-9 || Math.abs(y.v - x.v) < 1e-9; };
+  smNumTok(text).forEach(function (x) {
+    if (x.v === 0 || (x.u === "만" && x.v < 10)) return;
+    var st = Math.max(0, x.at - 16), pre = text.slice(st, x.at); if (st > 0 && /[가-힣A-Za-z]/.test(text.charAt(st - 1))) pre = pre.replace(/^[가-힣A-Za-z0-9&.]+/, ""); pre = pre.split(/[\d%,·|]/).pop(); var words = (pre.match(/[가-힣A-Za-z&][가-힣A-Za-z0-9&.]{1,}/g) || []).filter(function (w) { return !SM_NUM_STOP.test(w) && src.indexOf(w) >= 0; }), ok;
+    if (words.length) { var w = words[words.length - 1], near = [], p = -1; while ((p = src.indexOf(w, p + 1)) >= 0) near = near.concat(smNumTok(src.slice(p, p + w.length + 70).split(/[·|\n]/)[0])); ok = near.some(function (y) { return same(x, y); }); }
+    else ok = S.some(function (y) { return same(x, y); });
+    if (!ok && !seen[x.s]) { seen[x.s] = 1; bad.push((words.length ? words[words.length - 1] + " " : "") + x.s); }
+  });
+  return bad;
+}
+function smNumWarn(bad) { return bad && bad.length ? '<span class="smNumBad" title="앱이 준 숫자에 없는 값이에요 — 웹 출처를 확인하기 전까지 카드·업로드 글에는 넣지 않아요">⚠ 숫자 확인: ' + bad.slice(0, 4).map(escapeHtml).join(", ") + '</span>' : ""; }
+
+/* 브리핑 해설 · 이슈 이유에 숫자 대조 붙이기 */
+(function () {
+  if (typeof brAiRun !== "function") return;
+  var inpLast = "";
+  var bi0 = brAiInput; brAiInput = function () { inpLast = bi0.apply(this, arguments); return inpLast; };
+  var save0 = brAiSave; brAiSave = function () {
+    try { var A = BR_AI[brAiKey()]; if (A && A.data && !A.chk && inpLast) { var D = A.data, src = inpLast + "\n" + (D.tomorrow || []).map(function (t) { return t.when || ""; }).join(" ");
+      A.chk = { story: (D.story || []).map(function (l) { return smNumCheck(l, src); }), issues: (D.issues || []).map(function (x) { return smNumCheck([x.why, x.so, x.next].join(" "), src); }), movers: (D.movers || []).map(function (x) { return smNumCheck(x.why, src); }) };
+      (D.issues || []).forEach(function (x, k) { var t = A.iss && A.iss[(+x.i || 0) - 1]; if (t && ISS_WHY[t]) ISS_WHY[t].bad = A.chk.issues[k]; });
+    } } catch (e) { console.warn(e); }
+    return save0.apply(this, arguments);
+  };
+  var wr0 = issWhyRun; issWhyRun = function (list, box, btn) {
+    var news = []; try { news = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).map(function (n) { return (n.title || "") + " " + (n.desc || ""); }); } catch (e) {}
+    var src = list.map(function (it) { return it.title + " " + (it.sub || ""); }).join("\n") + "\n" + news.join("\n");
+    var p0 = issWhyPaint; issWhyPaint = function (l, b) { list.forEach(function (it) { var w = ISS_WHY[it.title]; if (w && !w.bad) w.bad = smNumCheck([w.why, w.so, w.next].join(" "), src); }); issWhyPaint = p0; return p0(l, b); };
+    return wr0(list, box, btn);
+  };
 })();

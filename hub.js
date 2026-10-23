@@ -405,7 +405,7 @@ function hubIssueWhy(it) {
   if (/index/.test(it.cat)) why.push("지수는 종목의 합 — 아래 '오른 종목 비율'과 같이 봐야 한 방향인지 알 수 있다");
   var news = (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items || []).filter(function (n) { var key = it.sym ? nm({ sym: it.sym }) : it.title.split(" ")[0]; return key && key.length >= 2 && (n.title || "").indexOf(key) >= 0; }).slice(0, 3);
   var cw = typeof ISS_WHY !== "undefined" && ISS_WHY[it.title];   /* v12.42 Claude가 기사로 찾은 이유를 맨 앞에 (확신 하는 제외) */
-  if (cw && cw.why && cw.conf !== "하") { if (cw.so) why.unshift("그래서 " + cw.so); why.unshift("왜? " + cw.why + (cw.src ? " (" + cw.src + ")" : "")); }
+  if (cw && cw.why && cw.conf !== "하" && !(cw.bad && cw.bad.length)) { if (cw.so) why.unshift("그래서 " + cw.so); why.unshift("왜? " + cw.why + (cw.src ? " (" + cw.src + ")" : "")); }
   return { rows: rows.slice(0, 6), why: why, news: news };
 }
 function hubIssuesDeck() {

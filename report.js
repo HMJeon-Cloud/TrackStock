@@ -411,8 +411,10 @@ function rpAiLines(rp) {
 function rpAiWrite(rp) {   // v12.42 OpenAI → Claude (웹 검색 없이 앱 근거만으로 빠르게 다시 쓰기) · 결과 모양은 그대로
   var draft = ""; try { var N = rpNarrative(rp); draft = [N.one, N.numbers, N.story, N.both, N.so].join("\n\n"); } catch (e) {}
   var inp = "질문: " + rp.title + "\n리포트 종류: " + rp.kind + (rp.sym ? " · " + rp.name + "(" + rp.sym + ")" : "") + " · 기준 " + rp.asOf + "\n규칙 기반 의견: " + rp.view.stance + " — " + rp.view.txt + "\n\n[근거 줄 — 앱 계산값]\n" + rpAiLines(rp).map(function (l) { return l.id + " | " + l.text; }).join("\n") + (draft ? "\n\n[규칙으로 쓴 초안]\n" + draft : "") + "\n\n(이번엔 웹 검색 없이 위 근거만으로 써 줘)";
-  return smClaude("report", inp, { json: true, web: false }).then(function (j) { return { ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, j.data || {}), model: j.model, claude: true, sources: [], searches: [] }; });
+  return smClaude("report", inp, { json: true, web: false }).then(function (j) { return rpNumChk({ ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, j.data || {}), model: j.model, claude: true, sources: [], searches: [] }, inp); });
 }
+/* v12.43 Claude 글의 숫자 대조 — 근거 줄·웹 보완 문장에 없는 숫자는 경고(카드 덱·업로드에 쓰기 전에 확인) */
+function rpNumChk(ai, inp) { try { var V = ai.out || {}, F = V.forecast || {}, txt = [V.headline, V.situation, V.narrative, V.opinion].concat(V.interpretation || [], V.plan || [], V.watch || [], Object.keys(F).map(function (k) { return F[k]; })).join("\n"); ai.numBad = typeof smNumCheck === "function" ? smNumCheck(txt, inp + "\n" + (V.added || []).join("\n")) : []; } catch (e) { ai.numBad = []; } return ai; }
 
 /* ============================================================ 카드 덱 (Exhibit 카드) ============================================================ */
 function rpDeck(rp) {
@@ -468,7 +470,8 @@ function rpShow(pane, rp) {
   var h = '<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="chip" data-rpa="back">‹ 다른 질문</button><button class="chip" data-rpa="save">💾 저장(검증용)</button>' + (typeof smClaude === "function" ? '<button class="chip" data-rpa="claude" title="Claude가 증거·기사(+최근 웹)를 읽고 리서치 노트처럼 다시 쓰고, 이 결론이 나온 생각의 흐름을 밝혀요">✨ Claude 서술(웹 검색)</button>' : '') + '<button class="chip" data-rpa="deck">🃏 Exhibit 카드 덱</button><button class="chip" data-rpa="thread">🧵 스레드 연재 글</button><button class="chip aiBtn" data-rpa="ai" title="웹 검색 없이 앱 근거만으로 Claude가 빠르게 다시 써요">' + (V ? "✨ 빠르게 다시" : "✨ 빠르게 다시 쓰기") + '</button></div>';
   h += '<div class="rpHead"><div class="rpKicker">' + rpEsc(rp.asOf) + ' 기준 · ' + ({ stock: "종목", market: "시장", macro: "매크로", timing: "시점" })[rp.kind] + ' 리포트</div><h3>' + rpEsc(V && V.headline || rp.title) + '</h3><div class="rpSit">' + (V && V.situation ? rpEsc(V.situation) : rp.situation.map(function (s) { return '<div>· ' + rpEsc(s) + '</div>'; }).join("")) + '</div></div>';
   var NR = null; try { NR = rpNarrative(rp); } catch (e) { console.warn(e); }
-  if (V && V.narrative) h += '<div class="rpNar"><div class="rpNarT">종합 해석 <small>AI 서술 · 숫자는 근거 줄 그대로</small></div>' + V.narrative.split(/\n{2,}/).map(function (p) { return '<div class="rpNarS"><p>' + rpEsc(p) + '</p></div>'; }).join("") + '</div>';
+  if (V && ai.numBad && ai.numBad.length) h += '<div class="rbWarn" style="margin:8px 0">⚠ 근거 줄에 없는 숫자 ' + ai.numBad.length + '개: ' + ai.numBad.slice(0, 6).map(rpEsc).join(", ") + ' — 웹 출처를 확인하기 전에는 카드·업로드 글에 쓰지 마세요</div>';
+  if (V && V.narrative) h += '<div class="rpNar"><div class="rpNarT">종합 해석 <small>AI 서술 · 숫자 대조 ' + (ai.numBad && ai.numBad.length ? '경고 ' + ai.numBad.length : '통과 ✓') + '</small></div>' + V.narrative.split(/\n{2,}/).map(function (p) { return '<div class="rpNarS"><p>' + rpEsc(p) + '</p></div>'; }).join("") + '</div>';
   else if (NR) h += rpNarrativeHtml(NR, rp);
   if (V && V.thinking) h += '<div class="rpAiBox rpThink"><b>이 결론이 나온 생각의 흐름</b> <small class="briefDim">' + rpEsc(ai.model || "") + (ai.searches && ai.searches.length ? ' · 웹 검색 ' + ai.searches.length + '회' : '') + '</small><p>' + rpEsc(V.thinking) + '</p>' + (V.added && V.added.length ? '<div class="briefDim" style="font-size:12px">웹에서 보완: ' + V.added.map(rpEsc).join(" / ") + '</div>' : '') + (ai.sources && typeof smSrcHtml === "function" ? smSrcHtml(ai.sources) : '') + '</div>';
   h += '<div class="rpStance ' + (rp.view.score >= 3 ? "good" : rp.view.score >= 1 ? "mid" : "low") + '"><div class="rpStL">내 생각</div><div><b>' + rpEsc(rp.view.stance) + '</b><div class="rpStT">' + rpEsc(V && V.opinion || rp.view.txt) + '</div><div class="rpWhy">근거: ' + rpEsc(rp.view.why.join(" · ")) + '</div></div></div>';
@@ -494,7 +497,7 @@ function rpAction(a, btn) {
     var o3 = btn.textContent; btn.textContent = "Claude 쓰는 중… (30초~2분)"; btn.disabled = true;
     var draft = ""; try { var N0 = rpNarrative(rp); draft = [N0.one, N0.numbers, N0.story, N0.both, N0.so].join("\n\n"); } catch (e) {}
     var inp = "질문: " + rp.title + "\n리포트 종류: " + rp.kind + (rp.sym ? " · " + rp.name + "(" + rp.sym + ")" : "") + " · 기준 " + rp.asOf + "\n규칙 기반 의견: " + rp.view.stance + " — " + rp.view.txt + "\n\n[근거 줄 — 앱 계산값]\n" + rpAiLines(rp).map(function (l) { return l.id + " | " + l.text; }).join("\n") + (draft ? "\n\n[규칙으로 쓴 초안]\n" + draft : "");
-    smClaude("report", inp, { json: true }).then(function (j) { RP.ai = { ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, j.data || {}), model: j.model, claude: true, sources: j.sources || [], searches: j.searches || [] }; renderReport(); })
+    smClaude("report", inp, { json: true }).then(function (j) { RP.ai = { ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, j.data || {}), model: j.model, claude: true, sources: j.sources || [], searches: j.searches || [] }; rpNumChk(RP.ai, inp); renderReport(); })
       .catch(function (e) { RP.ai = { ok: false, reason: e.message }; renderReport(); }).then(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = o3; } });
     return;
   }

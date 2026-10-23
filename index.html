@@ -542,6 +542,68 @@
   .thrPanel { background: #141317; color: #f4f1ea; border-radius: 16px; padding: 12px 12px 10px; margin-bottom: 12px; }
   /* v12.40 */ .anRetroSum { font-weight: 700; margin: 6px 0; } .anRetroL { margin: 4px 0 8px 18px; padding: 0; font-size: 13px; } .anRetroL li { margin: 4px 0; } .anRetroL small { display: block; color: var(--sub); } .anRetroL i { display: block; color: #8a6a1f; font-style: normal; } .anRetroR { margin: 4px 0 8px 18px; font-size: 13px; } .anRevAi { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; } .anRevOut { border: 1px solid #e6d3a3; background: #fffaf0; border-radius: 12px; padding: 10px 12px; margin-top: 10px; } .anRevOut .anSubH { display: flex; align-items: center; gap: 6px; } .anRevTxt { font-size: 13px; line-height: 1.65; max-height: 520px; overflow: auto; margin-top: 6px; } .rpThink p { margin: 6px 0; line-height: 1.65; } .dhAnomBox { margin-top: 8px; font-size: 12.5px; border-top: 1px dashed var(--line, #eee); padding-top: 6px; } .dhAnomRow { padding: 4px 0; }
   /* v12.39 Claude */ .thrAiBtns { display: inline-flex; gap: 6px; flex-wrap: wrap; } .thrHead .thrChkBtn { background: #2a2d35; color: #f1dca2; border: 1px solid #5a4a25; } .thrChk { margin: 4px 0 0 16px; padding: 0; } .thrChk li { margin: 2px 0; }
+  /* v12.43 오늘의 작업실 — 검정·금색. 단계는 왼쪽→오른쪽(모바일은 위→아래), 금색 선이 진행을 이어 준다 */
+  #tab-ops { --oInk: #1c1e23; --oGold: #b4862a; --oGoldL: #f5ecd6; --oLine: #e2e5ea; --oOk: #1d7f55; --oWarn: #b9600f; --oSub: #6b7380; }
+  .opsHead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin: 4px 0 18px; }
+  .opsHead h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--oInk); margin: 0; }
+  .opsHead p { margin: 4px 0 0; color: var(--oSub); font-size: 14px; } .opsHead p b { color: var(--oInk); }
+  .opsHeadR { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--oSub); font-variant-numeric: tabular-nums; }
+  .opsProg { width: 120px; height: 6px; border-radius: 3px; background: var(--oLine); overflow: hidden; } .opsProg i { display: block; height: 100%; width: calc(var(--p) * 100%); background: var(--oGold); }
+  .opsRail { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .opsRail::before { content: ""; position: absolute; left: 24px; right: 24px; top: 31px; height: 2px; background: var(--oLine); }
+  .opsStep { position: relative; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--oLine); border-radius: 14px; padding: 14px 14px 12px; min-height: 250px; }
+  .opsStep header { display: flex; gap: 10px; align-items: flex-start; }
+  .opsStep h3 { font-size: 16px; font-weight: 800; margin: 2px 0 2px; color: var(--oInk); } .opsStep header p { margin: 0; font-size: 12px; color: var(--oSub); line-height: 1.45; }
+  .opsNode { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 15px; background: #fff; border: 2px solid var(--oLine); color: var(--oSub); position: relative; z-index: 1; font-variant-numeric: tabular-nums; }
+  .opsStep.done .opsNode { background: var(--oGold); border-color: var(--oGold); color: #fff; }
+  .opsStep.now { border: 2px solid var(--oInk); padding: 13px 13px 11px; box-shadow: 0 6px 20px rgba(28, 30, 35, 0.08); }
+  .opsStep.now .opsNode { background: var(--oInk); border-color: var(--oInk); color: #e9c97a; }
+  .opsStep.wait { background: #fbfbfc; }
+  .opsStepBody { flex: 1; margin: 12px 0 10px; font-size: 13px; line-height: 1.5; color: var(--oInk); }
+  .opsStep footer { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .opsBtn { border: 1px solid var(--oInk); background: #fff; color: var(--oInk); border-radius: 9px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .opsBtn.pri { background: var(--oInk); color: #f1d590; } .opsBtn:disabled { opacity: .5; cursor: default; }
+  .opsLink { border: 0; background: none; color: var(--oSub); font-size: 12.5px; padding: 6px 4px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; } .opsLink:disabled { opacity: .4; }
+  .opsBtn:focus-visible, .opsLink:focus-visible, .opsPicks button:focus-visible, .opsMade button:focus-visible { outline: 2px solid var(--oGold); outline-offset: 2px; }
+  .opsMuted { color: var(--oSub); font-size: 12px; margin-top: 4px; } .opsLead { margin: 0 0 4px; font-weight: 600; }
+  .opsMk em { grid-column: 2; }
+  .opsMk { display: grid; grid-template-columns: 34px 1fr; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--oLine); font-variant-numeric: tabular-nums; } .opsMk:last-child { border-bottom: 0; }
+  .opsMk em { font-style: normal; font-size: 11.5px; font-weight: 700; } .opsMk.ok em { color: var(--oOk); } .opsMk.warn em { color: var(--oWarn); }
+  .opsPicks, .opsMade { list-style: none; margin: 0; padding: 0; counter-reset: pk; }
+  .opsPicks li { counter-increment: pk; } .opsPicks button, .opsMade button { width: 100%; text-align: left; display: flex; gap: 6px; align-items: baseline; border: 0; background: none; padding: 5px 0; border-bottom: 1px solid var(--oLine); cursor: pointer; font-size: 12.5px; color: var(--oInk); }
+  .opsPicks button::before { content: counter(pk); color: var(--oGold); font-weight: 800; min-width: 14px; }
+  .opsPicks button span, .opsMade button { flex: 1; } .opsPicks small, .opsMade small { color: var(--oSub); font-size: 11px; margin-left: auto; white-space: nowrap; }
+  .opsPicks li.done span { text-decoration: line-through; color: var(--oSub); } .opsPicks li.done small { color: var(--oOk); font-weight: 700; }
+  .opsBoardH { font-size: 18px; font-weight: 800; margin: 28px 0 10px; color: var(--oInk); }
+  .opsBoard { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; align-items: start; }
+  .opsPanel { background: #fff; border: 1px solid var(--oLine); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+  .opsPanel h4 { margin: 0 0 10px; font-size: 14px; font-weight: 800; color: var(--oInk); padding-left: 9px; border-left: 3px solid var(--oGold); }
+  .opsEmpty { color: var(--oSub); font-size: 13px; margin: 6px 0; }
+  .opsStory { margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.7; } .opsStory li::marker { color: var(--oGold); font-weight: 800; }
+  .opsTm { list-style: none; margin: 0; padding: 0; } .opsTm li { padding: 7px 0; border-bottom: 1px solid var(--oLine); font-size: 13px; } .opsTm li:last-child { border-bottom: 0; }
+  .opsTm time { display: inline-block; margin-left: 6px; font-size: 11.5px; color: var(--oGold); font-weight: 700; } .opsTm p { margin: 2px 0 0; color: var(--oSub); font-size: 12px; }
+  .opsIss { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.45; }
+  #tab-ops .opsIss { table-layout: fixed; font-size: 12.5px; } #tab-ops .opsIss th, #tab-ops .opsIss td { text-align: left; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; } #tab-ops .opsIss tbody tr:hover td { background: transparent; } #tab-ops .opsIss th:nth-child(1) { width: 22px; } #tab-ops .opsIss th:nth-child(2) { width: 30%; } #tab-ops .opsIss th:nth-child(5) { width: 18%; } .opsIss th { text-align: left; font-size: 11.5px; color: var(--oSub); font-weight: 700; padding: 0 8px 6px; border-bottom: 1px solid var(--oInk); }
+  .opsIss td { padding: 8px; border-bottom: 1px solid var(--oLine); vertical-align: top; } .opsIss td small { display: block; color: var(--oSub); font-size: 11px; margin-top: 2px; } .opsIss td small a { color: inherit; }
+  .opsIss td:nth-child(2) { width: 30%; } .opsNo { color: var(--oGold); font-weight: 800; width: 18px; }
+  .opsMv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .opsMv ul { list-style: none; margin: 0; padding: 0; } .opsMv li { padding: 5px 0; border-bottom: 1px solid var(--oLine); font-size: 12.5px; }
+  .opsMv li b { float: right; font-variant-numeric: tabular-nums; } .opsMv b.up { color: var(--up, #f04452); } .opsMv b.down { color: var(--down, #3182f6); } .opsMv p { clear: both; margin: 2px 0 0; color: var(--oSub); font-size: 11.5px; }
+  .opsPlan { margin: 0; padding: 0; list-style: none; } .opsPlan li { display: grid; grid-template-columns: 34px 1fr; gap: 2px 8px; padding: 6px 0; border-bottom: 1px solid var(--oLine); font-size: 12.5px; }
+  .opsPlan li span { grid-row: span 2; font-size: 11px; color: var(--oGold); font-weight: 700; } .opsPlan li small { color: var(--oSub); font-size: 11px; } .opsPlan li.done b { text-decoration: line-through; color: var(--oSub); }
+  .opsCount { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; margin-bottom: 8px; } .opsCount b { display: block; font-size: 24px; font-weight: 800; color: var(--oInk); font-variant-numeric: tabular-nums; } .opsCount span { font-size: 11.5px; color: var(--oSub); }
+  .opsList { margin: 0; padding: 0; list-style: none; font-size: 12.5px; } .opsList li { padding: 4px 0; border-top: 1px solid var(--oLine); } .opsList small { color: var(--oSub); }
+  .smNumBad { display: inline-block; font-size: 11px; font-weight: 700; color: #b9600f; background: #fff3e6; border-radius: 4px; padding: 0 5px; margin-left: 2px; cursor: help; }
+  .smFlowOps { float: right; border: 0; background: none; color: #8a6d2b; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0; }
+  @media (max-width: 960px) {
+    .opsRail { grid-template-columns: 1fr; gap: 10px; padding-left: 0; }
+    .opsRail::before { left: 31px; right: auto; top: 24px; bottom: 24px; width: 2px; height: auto; }
+    .opsStep { min-height: 0; }
+    .opsBoard { grid-template-columns: 1fr; }
+    #tab-ops .opsIss thead { display: none; } #tab-ops .opsIss tr { display: grid; grid-template-columns: 22px 1fr; padding: 8px 0; border-bottom: 1px solid var(--oLine); } #tab-ops .opsIss td { border: 0; padding: 2px 4px; } #tab-ops .opsIss td:nth-child(2) { width: auto; } .opsIss td:nth-child(n+3) { grid-column: 2; }
+    .opsIss td:nth-child(3)::before { content: "왜 "; } .opsIss td:nth-child(4)::before { content: "그래서 "; } .opsIss td:nth-child(5)::before { content: "볼 것 "; } .opsIss td:nth-child(n+3)::before { font-weight: 800; color: #8a6d2b; }
+    .opsIss td[colspan]::before { content: ""; }
+    .opsHead h2 { font-size: 22px; }
+  }
   /* v12.42 브리핑 Claude 해설 · 이슈 왜/그래서/볼 것 · 운영 순서 바 */
   .brAiSec { border: 1px solid #e6d3a3; background: linear-gradient(180deg, #fffaf0, #fff); }
   .brAiHead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .brAiHead small { flex: 1; min-width: 160px; }
@@ -1443,6 +1505,7 @@
   </div>
   <nav class="tabs">
     <button class="active" data-tab="home"><i>🏠</i><span>홈</span></button>
+    <button data-tab="ops" class="ownerOnly"><i>🧭</i><span>작업실</span></button>
     <button data-tab="data" class="ownerOnly"><i>🔌</i><span>데이터</span></button>
     <button data-tab="brief" class="ownerOnly"><i>📰</i><span>오늘</span></button>
     <button data-tab="onecard" class="ownerOnly"><i>🃏</i><span>카드</span></button>
@@ -2372,6 +2435,7 @@
 </div>
 </div><!-- /tab-channel -->
 
+<div id="tab-ops" class="hidden"><div id="opsBody"></div></div>
 <div id="tab-data" class="hidden">
 <div class="card" id="dataHubCard">
   <div class="pgHead"><h2>🔌 데이터 센터 <small>지금 무엇을 보여주고 있나 · 무엇을 언제 어떻게 최신화하나 · 운영자용</small></h2></div>
@@ -2399,6 +2463,11 @@
     <button class="startCard" id="startBrowse">
       <span class="startIcon" style="background:#fff4e6">🔍</span>
       <span class="startText"><b>종목 둘러보기</b><small>삼성전자·S&amp;P500의 지난 기록 보기</small></span>
+      <span class="startArrow">›</span>
+    </button>
+    <button class="startCard ownerOnly" id="startOps">
+      <span class="startIcon" style="background:#f6efdc">🧭</span>
+      <span class="startText"><b>오늘의 작업실</b><small>데이터 확인부터 업로드까지 한 화면에서 · 결과물 한눈에</small></span>
       <span class="startArrow">›</span>
     </button>
     <button class="startCard ownerOnly" id="startData">
@@ -2618,7 +2687,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.42"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.43"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -4199,7 +4268,7 @@ function renderRecent() {
 renderRecent();
 
 /* ---------- 탭 전환 ---------- */
-var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "report", "analyst", "data"];   // v11.6 배당(div)은 관심 탭 안으로
+var TABS = ["home", "brief", "single", "compare", "sim", "guide", "watch", "channel", "mind", "onecard", "report", "analyst", "data", "ops"];   // v11.6 배당(div)은 관심 탭 안으로
 var currentTab = "home";
 
 var SUBS = ["chart", "history", "insight", "tech", "company"];
@@ -4238,7 +4307,7 @@ function refreshSubPanes() {
 function switchTab(target, sub, noScroll) {
   if (target === "div") { target = "watch"; setTimeout(function () { if (typeof switchWatchPane === "function") switchWatchPane("div"); }, 0); }   // v11.6 배당은 관심 탭 안
   if (TABS.indexOf(target) < 0) target = "home";
-  if ((target === "brief" || target === "channel" || target === "onecard" || target === "report" || target === "analyst" || target === "data") && !isOwner()) { if (typeof OWNER !== "undefined" && OWNER.token && !OWNER.checked) OWNER.want = target; target = "home"; }   // 운영자 전용 화면
+  if ((target === "brief" || target === "channel" || target === "onecard" || target === "report" || target === "analyst" || target === "data" || target === "ops") && !isOwner()) { if (typeof OWNER !== "undefined" && OWNER.token && !OWNER.checked) OWNER.want = target; target = "home"; }   // 운영자 전용 화면
   currentTab = target;
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
     b.classList.toggle("active", b.getAttribute("data-tab") === target);
@@ -4253,7 +4322,8 @@ function switchTab(target, sub, noScroll) {
   if (target === "watch" && typeof renderWatchTab === "function") renderWatchTab(false);
   if (target === "brief" && typeof loadBrief === "function") loadBrief(false);
   if (target === "channel" && typeof renderChannel === "function") renderChannel();
-  if (target === "data" && typeof renderDataHub === "function") renderDataHub();   // v12.33 데이터 센터
+  if (target === "data" && typeof renderDataHub === "function") renderDataHub();
+  if (target === "ops" && typeof renderOps === "function") renderOps();   // v12.43 오늘의 작업실   // v12.33 데이터 센터
   if (target === "mind" && typeof renderMind === "function") renderMind();
   if (target === "onecard" && typeof makerRender === "function") makerRender();   // v10.5 카드 만들기 화면
   if (target === "report" && typeof renderReport === "function") renderReport();   // v11.7 리포트(인사이트)
@@ -4290,7 +4360,7 @@ function pushPaneState(patch) {
 /* ---------- 운영자 전용 화면 ('오늘의 브리핑'·'채널 브리핑 자료') ----------
    운영자 키를 한 번 넣으면 이 기기에 토큰이 저장되어 계속 보인다. 다른 사람에겐 진입 버튼이 아예 보이지 않고,
    주소로 직접 들어와도 홈으로 돌아간다. 잠금 해제: 주소 끝에 ?owner 를 붙여 접속 → 운영자 키 입력. */
-var OWNER_TABS = ["brief", "channel", "onecard", "report", "analyst", "data"];
+var OWNER_TABS = ["brief", "channel", "onecard", "report", "analyst", "data", "ops"];
 var OWNER = { token: (function () { try { return localStorage.getItem("sm.owner") || ""; } catch (e) { return ""; } })(), ok: false, want: null };
 OWNER.ok = !!OWNER.token;   // v12.7 저장된 토큰은 일단 믿고 운영자 화면을 바로 그린다(서버 확인이 끝나면 틀린 토큰은 즉시 해제). 홈이 먼저 보였다가 바뀌는 깜빡임 방지 — 데이터 자체는 서버가 토큰으로 다시 검사한다
 /* v10.8 운영자 = 기기에 토큰이 있고 + 이번 접속에서 서버가 그 토큰을 확인한 경우만 (기기 저장소를 고쳐도 열리지 않음) */
@@ -4431,6 +4501,7 @@ $("footChannel").onclick = function () { navTo("channel"); };
 $("ownerLock").onclick = function () { ownerSet(""); };
 $("startChannel").onclick = function () { navTo("channel"); };
 $("startData").onclick = function () { navTo("data"); };
+$("startOps").onclick = function () { navTo("ops"); };
 $("startMind").onclick = function () { navTo("mind"); };
 $("briefToChannel").onclick = function () { navTo("channel"); };
 
@@ -5016,7 +5087,7 @@ setTimeout(smBootDone, 3000);
 <!-- v12.13 앱 스크립트 한 곳에서 로드 — 버전은 SM_VER 하나만 올리면 전 파일 캐시가 같이 갱신된다(파일마다 ?v= 손으로 올리던 실수 방지). 순서는 의존 관계 그대로 -->
 <script>
 (function () {
-  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js"];
+  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js"];
   document.write(files.map(function (f) { return '<script src="' + f + '?v=' + SM_VER + '"><\/script>'; }).join(""));
 })();
 </script>
