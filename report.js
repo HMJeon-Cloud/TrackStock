@@ -420,14 +420,39 @@ function rpNumChk(ai, inp) { try { var V = ai.out || {}, F = V.forecast || {}, t
 function rpDeck(rp) {
   var NR = null; try { NR = rpNarrative(rp); } catch (e) {}
   var plain = function (t) { return String(t || "").replace(/\s?\[E\d+\]/g, "").replace(/\s?\([^()]{2,14} \d{4}\.\d{1,2}\.\d{1,2}\)/g, ""); };
+  /* v12.55 Claude 서술(✨)이 있으면 종합·결론 장은 그 글로, '생각의 흐름' 장을 하나 더 — 규칙 문장과 Claude 문장이 섞이지 않게 */
+  var V = RP.ai && RP.ai.ok && RP.ai.claude && RP.ai.out && RP.ai.out.narrative ? RP.ai.out : null;
+  if (V) { var ps = String(V.narrative).split(/\n{2,}/).map(plain).filter(Boolean); NR = { one: ps[0] || plain(V.headline || ""), numbers: ps[1] || "", story: ps[2] || "", both: ps[3] || "", so: ps[4] || ps[ps.length - 1] || "" }; }
   var pages = (NR ? [{ name: "종합", top: ["한 줄로:", "[[" + rp.view.stance + "]]", "", plain(NR.one).split(/(?<=\.)\s/)[1] || ""], title: "종합 해석", sub: "숫자 · 기사 · 의견을 한 편으로 (근거는 다음 장부터)", kind: "text", data: { paras: [plain(NR.numbers), plain(NR.story), plain(NR.both)], after: ["그래서", (function (t) { var o = ""; t.split(/(?<=\.)\s/).some(function (x) { if ((o + x).length > 110) return true; o += (o ? " " : "") + x; }); return o || t.slice(0, 110); })(plain(NR.so))] } }] : []).concat(rp.exhibits.map(function (e) { return { name: "Exhibit" + e.no, top: [e.title.indexOf(",") > 0 ? e.title.split(",")[0] + "," : e.title, "[[" + e.big + "]]", "", e.read.split(/(?<=\.)\s/)[0]], title: "Exhibit " + String(e.no).padStart(2, "0") + " · " + e.title, sub: e.sub, kind: e.kind, data: e.kind === "tiles" ? { tiles: e.data } : e.data, note: e.read, foot: rp.src + " · 투자 권유 아님" }; }));
   if (rp.scen.length) pages.push({ name: "시나리오", top: ["앞으로 1년, 과거 빈도로 보면", "[[" + rp.scen[0].name + " " + Math.round(rp.scen[0].p * 100) + "%]]"], title: "시나리오 — 과거 비슷한 상황의 결과 분포", sub: "확률 = 과거 사례 빈도 · 예측이 아니라 참고", kind: "rows", data: rp.scen.map(function (s) { return [Math.round(s.p * 100) + "%", s.name + " · " + s.range, s.txt.split(".")[0], s.name.indexOf("하락") >= 0 ? NB_C.down : NB_C.up]; }), leftW: 110 });
   if (rp.hz) pages.push({ name: "단기장기", top: ["짧게 보면 [[" + rp.hz.s.stance + "]]", "길게 보면 [[" + rp.hz.l.stance + "]]"], title: "단기 · 장기 해석", sub: "단기 = 1~3개월 · 장기 = 1~3년 · 같은 숫자를 다른 시간으로", kind: "rows", data: rp.hz.s.pts.slice(0, 3).map(function (x) { return ["단기", x, "", NB_C.navy]; }).concat(rp.hz.l.pts.slice(0, 3).map(function (x) { return ["장기", x, "", NB_C.up]; })), leftW: 90 });
   if (rp.exp && rp.exp.bull.length + rp.exp.bear.length >= 2) pages.push({ name: "전문가", top: ["전문가 의견은", "[[상승 " + rp.exp.bull.length + " vs 하락 " + rp.exp.bear.length + "]]"], title: "전문가·증권사 의견 — 대립 구조", sub: "최근 기사 제목에서 상승·하락 근거를 나눠 모음 · " + rp.exp.src, kind: "rows", data: rp.exp.bull.slice(0, 4).map(function (x) { return ["▲ 상승", x.t, x.press || "", NB_C.up]; }).concat(rp.exp.bear.slice(0, 4).map(function (x) { return ["▼ 하락", x.t, x.press || "", NB_C.down]; })), leftW: 100 });
-  pages.push({ name: "내생각", top: ["내 생각:", "[[" + rp.view.stance + "]]", "", rp.view.txt.split(/(?<=\.)\s/)[0]], title: "결론과 행동안", sub: "근거: " + rp.view.why.join(" · "), kind: "text", data: { paras: [rp.view.txt].concat(rp.view.plan.map(function (p) { return "· " + p; })), after: ["생각을 바꿀 조건", rp.watch.slice(0, 2).join(" · ")] } });
-  return hubDraw({ small: rp.asOf + " 기준 · 리포트", hook: rp.title.split(", ").length > 1 ? [rp.title.split(", ")[0] + ",", "[[" + rp.title.split(", ").slice(1).join(", ") + "]]"] : [rp.title], lead: rp.situation.join(" "), meta: rp.src + " · 개인 의견이며 투자 권유 아님", pages: pages, close: ["여러분은 어떻게 보시나요?", ["저장해 두고 3개월 뒤", "이 리포트의 결론을 다시 채점해 보세요."]], foot: rp.src + " · 투자 권유 아님" });
+  if (V && V.thinking) pages.push({ name: "흐름", top: ["이 결론이 나온", "[[생각의 흐름]]"], title: "생각의 흐름", sub: "출발 가설 → 무게를 둔 증거 → 반대 근거 → 굳어진 지점" + (RP.ai.searches && RP.ai.searches.length ? " · 웹 검색 " + RP.ai.searches.length + "회" : ""), kind: "text", data: { paras: String(V.thinking).split(/(?<=\.)\s+/).reduce(function (acc, x) { var l = acc[acc.length - 1]; if (l && (l + " " + x).length < 180) acc[acc.length - 1] = l + " " + x; else acc.push(x); return acc; }, []).slice(0, 4) } });
+  var opin = V && V.opinion ? plain(V.opinion) : rp.view.txt, planL = V && V.plan && V.plan.length ? V.plan : rp.view.plan, watchL = V && V.watch && V.watch.length ? V.watch : rp.watch;
+  pages.push({ name: "내생각", top: ["내 생각:", "[[" + rp.view.stance + "]]", "", opin.split(/(?<=\.)\s/)[0]], title: "결론과 행동안", sub: "근거: " + rp.view.why.join(" · "), kind: "text", data: { paras: [opin].concat(planL.map(function (p) { return "· " + plain(p); })), after: ["생각을 바꿀 조건", watchL.slice(0, 2).map(plain).join(" · ")] } });
+  return hubDraw({ small: rp.asOf + " 기준 · 리포트", hook: rp.title.split(", ").length > 1 ? [rp.title.split(", ")[0] + ",", "[[" + rp.title.split(", ").slice(1).join(", ") + "]]"] : [rp.title], lead: rpCoverFacts(rp), meta: rp.src + " · 개인 의견이며 투자 권유 아님", pages: pages, close: ["여러분은 어떻게 보시나요?", ["저장해 두고 3개월 뒤", "이 리포트의 결론을 다시 채점해 보세요."]], foot: rp.src + " · 투자 권유 아님" });
 }
 
+/* v12.55 Claude 서술은 리포트마다 하루 보관 — 같은 리포트를 다시 열면 API 없이 그대로 (카드 덱에도 들어간다) */
+function rpAiKey(rp) { return "sm.rpAi:" + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) + ":" + rp.id; }
+function rpAiSave(rp, ai) { try { if (ai && ai.ok) localStorage.setItem(rpAiKey(rp), JSON.stringify(ai)); } catch (e) {} }
+function rpAiLoad(rp) { try { var j = JSON.parse(localStorage.getItem(rpAiKey(rp)) || "null"); return j && j.ok ? j : null; } catch (e) { return null; } }
+/* v12.55 표지 설명 — 상황 문장을 '한 줄 = 사실 하나'로 쪼개고 숫자를 [[ ]]로 강조 (한 문단으로 뭉쳐 읽기 어렵던 것) */
+function rpCoverFacts(rp) {
+  var out = [], hi = function (frag) {
+    // 강조: %·배·$·천 단위 콤마·부호가 있는 숫자, RSI·VIX 뒤의 숫자. 날짜(2026.10)·기간(20일·1년)·이름 속 숫자(나스닥100)는 그대로
+    return frag.replace(/(^|[\s(])([+\-−]?\$?[\d,]+(?:\.\d+)?(?:%p|%|배|원|달러|pt)?)(?=$|[\s).,·의])/g, function (m, pre, num) {
+      var keep = /%|배|원|달러|pt|^\$|^[+\-−]|,\d{3}/.test(num) && !/^\d{4}\.\d{1,2}$/.test(num);
+      return pre + (keep ? "[[" + num + "]]" : num);
+    }).replace(/\b(RSI|VIX)\s+(\d+(?:\.\d+)?)/g, "$1 [[$2]]");
+  };
+  (rp.situation || []).forEach(function (sent) {
+    var frags = String(sent).replace(/\.\s*$/, "").split(/\s+[—·]\s+/).map(function (x) { return x.trim(); }).filter(Boolean), acc = [];
+    frags.forEach(function (fr) { if (acc.length && (fr.length < 7 || !/\d/.test(fr))) acc[acc.length - 1] += " — " + fr; else acc.push(fr); });
+    acc.forEach(function (fr) { out.push(hi(fr)); });
+  });
+  return out.length ? out.slice(0, 7) : (rp.situation || []).join(" ");
+}
 /* ============================================================ 화면 ============================================================ */
 function renderReport() {
   var box = document.getElementById("rpBody"); if (!box) return;
@@ -455,7 +480,7 @@ function rpPick(pane) {
 function rpGo(q, btn) {
   var old = btn ? btn.innerHTML : ""; if (btn) { btn.textContent = "계산 중…"; btn.disabled = true; }
   RP.ai = null;
-  rpBuild(q).then(function (rp) { RP.cur = rp; RP.tab = "new"; renderReport(); window.scrollTo({ top: 0, behavior: "smooth" }); rpExpertFetch(rp).then(function (E) { if (E && RP.cur === rp) { rp.exp = E; renderReport(); } }).catch(function () {}); }).catch(function (e) { alert("리포트를 만들지 못했어요: " + e.message); if (btn) { btn.innerHTML = old; btn.disabled = false; } });
+  rpBuild(q).then(function (rp) { RP.cur = rp; RP.tab = "new"; RP.ai = rpAiLoad(rp); renderReport(); window.scrollTo({ top: 0, behavior: "smooth" }); rpExpertFetch(rp).then(function (E) { if (E && RP.cur === rp) { rp.exp = E; renderReport(); } }).catch(function () {}); }).catch(function (e) { alert("리포트를 만들지 못했어요: " + e.message); if (btn) { btn.innerHTML = old; btn.disabled = false; } });
 }
 function rpBar(v, max) { var w = Math.min(100, Math.abs(v) / (max || 1) * 100); return '<span class="rpBarW"><i class="' + (v >= 0 ? "up" : "dn") + '" style="width:' + w.toFixed(1) + '%"></i></span>'; }
 function rpExhibitHtml(e) {
@@ -497,11 +522,11 @@ function rpAction(a, btn) {
     var o3 = btn.textContent; btn.textContent = "Claude 쓰는 중… (30초~2분)"; btn.disabled = true;
     var draft = ""; try { var N0 = rpNarrative(rp); draft = [N0.one, N0.numbers, N0.story, N0.both, N0.so].join("\n\n"); } catch (e) {}
     var inp = "질문: " + rp.title + "\n리포트 종류: " + rp.kind + (rp.sym ? " · " + rp.name + "(" + rp.sym + ")" : "") + " · 기준 " + rp.asOf + "\n규칙 기반 의견: " + rp.view.stance + " — " + rp.view.txt + "\n\n[근거 줄 — 앱 계산값]\n" + rpAiLines(rp).map(function (l) { return l.id + " | " + l.text; }).join("\n") + (draft ? "\n\n[규칙으로 쓴 초안]\n" + draft : "");
-    smClaude("report", inp, { json: true }).then(function (j) { RP.ai = { ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, j.data || {}), model: j.model, claude: true, sources: j.sources || [], searches: j.searches || [] }; rpNumChk(RP.ai, inp); renderReport(); })
+    smClaude("report", inp, { json: true }).then(function (j) { RP.ai = { ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, j.data || {}), model: j.model, claude: true, sources: j.sources || [], searches: j.searches || [] }; rpNumChk(RP.ai, inp); rpAiSave(rp, RP.ai); renderReport(); })
       .catch(function (e) { RP.ai = { ok: false, reason: e.message }; renderReport(); }).then(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = o3; } });
     return;
   }
-  if (a === "ai") { var o2 = btn.textContent; btn.textContent = "AI 쓰는 중…"; btn.disabled = true; rpAiWrite(rp).then(function (j) { RP.ai = j; renderReport(); }).catch(function (e) { RP.ai = { ok: false, reason: e.message }; renderReport(); }); return; }
+  if (a === "ai") { var o2 = btn.textContent; btn.textContent = "AI 쓰는 중…"; btn.disabled = true; rpAiWrite(rp).then(function (j) { RP.ai = j; rpAiSave(rp, j); renderReport(); }).catch(function (e) { RP.ai = { ok: false, reason: e.message }; renderReport(); }); return; }
 }
 /* 오늘의 리포트 — 시장 상황으로 질문을 자동 고르고(점수), 하루 한 번 계산 · 상황이 바뀌면 다음 날 자동으로 다른 리포트 */
 /* v12.41 Claude가 고른 오늘의 리포트 — 오늘 이슈·기사(+웹)로 3~6개. 하루 동안 유지, '규칙으로 되돌리기' 가능 */

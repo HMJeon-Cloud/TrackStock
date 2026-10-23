@@ -108,9 +108,17 @@ function nbCover(small, lines, sub, meta, items) {
   // 아래 검정 블록 — 제목 바로 아래부터 끝까지, 설명 글씨는 블록 높이에 맞춰 키운다(빈 곳 없이)
   var by = ry + 70, bh = NB.H - by; g.fillStyle = NB_INK; g.fillRect(0, by, NB.W, bh);
   items = (items || []).filter(Boolean).slice(0, 7); var listH = items.length ? items.length * 44 + 60 : 0;
-  var room = bh - 250 - listH, fs = 28; while (fs < 36 && cWrapCount(g, sub, W, fs + 2, 600) * (fs + 2) * 1.5 <= room) fs += 2; while (fs > 22 && cWrapCount(g, sub, W, fs, 600) * fs * 1.5 > room) fs -= 2;
-  var nl = cWrapCount(g, sub, W, fs, 600), ty = by + 60 + (items.length ? 0 : Math.max(0, (room - nl * fs * 1.5) / 2)) + fs;
-  var ly = cWrap(g, sub, P, ty, W, fs, 600, "#f3efe6", fs * 1.5, 8);
+  var room = bh - 250 - listH, fs = 28, nl, ly;
+  if (Array.isArray(sub)) {   // v12.55 설명을 한 덩어리 문단 대신 '한 줄 = 사실 하나'로 — 숫자는 금색([[ ]])
+    var rows = sub.filter(Boolean).slice(0, 7), rh = Math.max(44, Math.min(62, Math.floor((room + 40) / Math.max(1, rows.length)))), rfs = Math.min(32, Math.round(rh * 0.56));
+    var ry0 = by + 54 + (items.length ? 0 : Math.max(0, (room - rows.length * rh) / 2));
+    rows.forEach(function (r, i) { var yy = ry0 + i * rh + rh / 2 + rfs * 0.36, f = rfs; while (f > 20 && cW(g, cPlain(r), f, 700) > W - 34) f -= 1; g.fillStyle = NB_C.gold; g.fillRect(P, yy - rfs * 0.62, 6, rfs * 0.78); cRich(g, r, P + 24, yy, f, 700, "#f3efe6", NB_C.gold); });
+    nl = rows.length; fs = rh / 1.5; ly = ry0 + rows.length * rh;
+  } else {
+    while (fs < 36 && cWrapCount(g, sub, W, fs + 2, 600) * (fs + 2) * 1.5 <= room) fs += 2; while (fs > 22 && cWrapCount(g, sub, W, fs, 600) * fs * 1.5 > room) fs -= 2;
+    nl = cWrapCount(g, sub, W, fs, 600); var ty = by + 60 + (items.length ? 0 : Math.max(0, (room - nl * fs * 1.5) / 2)) + fs;
+    ly = cWrap(g, sub, P, ty, W, fs, 600, "#f3efe6", fs * 1.5, 8);
+  }
   if (items.length) {   // v12.24 '안에 든 숫자' 미리보기 — 가장 눈에 띄는 숫자 하나를 크게 먼저, 나머지는 몇 장에 숫자가 있는지만(넘기게)
     var top = Math.max(ly + 30, by + 60 + nl * fs * 1.5 + 30);
     g.fillStyle = "rgba(255,255,255,0.18)"; g.fillRect(P, top, W, 1); top += 24;

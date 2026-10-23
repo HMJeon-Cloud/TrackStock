@@ -289,15 +289,14 @@ function thrBind(box, variants) {
   /* v12.38 ✨ AI 문구: 누를 때만 Claude API로 다시 쓴다(자동 생성 아님). 결과는 탭으로 앞에 붙이고, 우리 데이터에 없는 숫자는 표시만 */
   var ab = p.querySelector(".thrAi"), ao = p.querySelector(".thrAiOut"), cbk = p.querySelector(".thrChkBtn");
   if (cbk) cbk.onclick = function () { if (typeof thrCheckRun === "function") thrCheckRun(p, cbk, ao); };   // v12.39 발행 전 검수
-  if (ab) ab.onclick = function () {
-    var base = variants.filter(function (v) { return !/^✨/.test(v.label); })[0] || variants[0];
-    var data = ["[인스타 규칙 글]", base.ig, "[스레드 본문]", base.th, "[답글1]", base.r1 || "", "[답글2]", base.r2 || ""].join("\n");
-    var ttl = (p.closest(".modalBox") && (p.closest(".modalBox").querySelector("h3, .modalTitle, .mTitle") || {}).textContent) || String(base.th || "").split("\n")[0];
-    var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
-    var old = ab.innerHTML; ab.disabled = true; ab.textContent = "쓰는 중… (10~40초)"; ao.textContent = "";
-    fetch("/api/channel?op=copy", { method: "POST", headers: { "content-type": "application/json", "x-owner": tok }, body: JSON.stringify({ title: ttl, topic: p.getAttribute("data-topic") || "", data: data, lines: typeof CARD_TXT === "string" ? CARD_TXT.slice(0, 2500) : "" }) })
-      .then(function (r) { return r.json(); }).then(function (j) {
+  /* v12.55 AI 문구는 카드(제목)마다 하루 보관 — 같은 카드를 다시 열면 API 없이 바로 보여 준다 */
+  var baseV = function () { return variants.filter(function (v) { return !/^✨/.test(v.label); })[0] || variants[0]; };
+  var ttl0 = (p.closest(".modalBox") && (p.closest(".modalBox").querySelector("h3, .modalTitle, .mTitle") || {}).textContent) || String((baseV() || {}).th || "").split("\n")[0];
+  var ckey = "sm.copy:" + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) + ":" + String(ttl0).slice(0, 80), old = ab ? ab.innerHTML : "";
+  function applyCopy(j, data, fromCache) {
+
         ab.disabled = false; ab.innerHTML = old;
+        if (j && j.ok && !fromCache) try { localStorage.setItem(ckey, JSON.stringify(j)); } catch (e) {}
         if (!j || !j.ok) { ao.innerHTML = '<span style="color:#b45309">AI 문구 실패: ' + escapeHtml((j && (j.msg || j.reason)) || "응답 없음") + '</span>'; return; }
         variants = j.variants.concat(variants.filter(function (v) { return !/^✨/.test(v.label); }));
         tabs.innerHTML = variants.map(function (v) { return '<button>' + escapeHtml(v.label) + '</button>'; }).join("");
@@ -311,7 +310,17 @@ function thrBind(box, variants) {
           (j.sources && j.sources.length ? '<div>출처: ' + j.sources.map(function (s) { return '<a href="' + escapeHtml(s.u) + '" target="_blank" rel="noopener">' + escapeHtml(s.t || s.u) + '</a>'; }).join(" · ") + '</div>' : '') +
           (odd.length ? '<div style="color:#b45309">⚠️ 우리 데이터에서 못 찾은 숫자: ' + escapeHtml(odd.join(", ")) + ' — 올리기 전에 확인하세요</div>' : '<div style="color:var(--good)">✓ 글 속 % 숫자가 모두 우리 데이터·보완 사실과 일치</div>') +
           (j.note ? '<div>편집 메모: ' + escapeHtml(j.note) + '</div>' : '');
-      }).catch(function (e) { ab.disabled = false; ab.innerHTML = old; ao.textContent = "AI 문구 실패: " + e.message; });
+        if (fromCache) ao.innerHTML = '<span class="briefDim">오늘 만든 문구를 다시 불러왔어요(API 없음) · 새로 쓰려면 ✨ 버튼</span><br>' + ao.innerHTML;
+  }
+  if (ab) { try { var cj = JSON.parse(localStorage.getItem(ckey) || "null"); if (cj && cj.ok) { var b0 = baseV(); applyCopy(cj, ["[인스타 규칙 글]", b0.ig, "[스레드 본문]", b0.th, "[답글1]", b0.r1 || "", "[답글2]", b0.r2 || ""].join("\n"), true); } } catch (e) {} }
+  if (ab) ab.onclick = function () {
+    var base = baseV();
+    var data = ["[인스타 규칙 글]", base.ig, "[스레드 본문]", base.th, "[답글1]", base.r1 || "", "[답글2]", base.r2 || ""].join("\n");
+    var ttl = ttl0;
+    var tok = ""; try { tok = (typeof OWNER !== "undefined" && OWNER.token) || localStorage.getItem("sm.owner") || ""; } catch (e) {}
+    ab.disabled = true; ab.textContent = "쓰는 중… (10~40초)"; ao.textContent = "";
+    fetch("/api/channel?op=copy", { method: "POST", headers: { "content-type": "application/json", "x-owner": tok }, body: JSON.stringify({ title: ttl, topic: p.getAttribute("data-topic") || "", data: data, lines: typeof CARD_TXT === "string" ? CARD_TXT.slice(0, 2500) : "" }) })
+      .then(function (r) { return r.json(); }).then(function (j) { applyCopy(j, data, false); }).catch(function (e) { ab.disabled = false; ab.innerHTML = old; ao.textContent = "AI 문구 실패: " + e.message; });
   };
 }
 /* 변형이 하나도 안 나오면 기존 캡션을 이모지만 지워 기본형으로 쓴다 (스레드는 줄 단위로 500자 안에) */
