@@ -25,12 +25,17 @@ function smClaude(task, input, opt) {
       tick();
     });
   };
+  /* v12.56 발행 전 검수는 같은 글이면 다시 묻지 않는다(하루 보관) — 글을 고친 뒤에만 새로 */
+  var hash = function (t) { var h = 5381; t = String(t); for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+  var cacheKey = task === "check" ? "sm.chk:" + smKstDay() + ":" + hash(input) : null;
+  if (cacheKey) { try { var cj = JSON.parse(localStorage.getItem(cacheKey) || "null"); if (cj && cj.ok) return Promise.resolve(Object.assign({ cached: true }, cj)); } catch (e) {} }
+  var done = function (j) { if (cacheKey && j && j.ok) try { localStorage.setItem(cacheKey, JSON.stringify(j)); } catch (e) {} return j; };
   var pending = null; try { pending = JSON.parse(localStorage.getItem(jobKey) || "null"); } catch (e) {}
   if (opt.resume && pending && pending.id && Date.now() - pending.at < 600000) { t0 = pending.at; return poll(pending.id); }
   return post({ task: task, input: input, json: !!opt.json, web: opt.web }).then(function (j) {
-    if (j && j.ok && j.job && j.pending) return poll(j.job);
+    if (j && j.ok && j.job && j.pending) return poll(j.job).then(done);
     if (!j || !j.ok) fail(j);
-    return j;
+    return done(j);
   });
 }
 function smJobPending(task) { try { var p = JSON.parse(localStorage.getItem("sm.job:" + task) || "null"); return p && p.id && Date.now() - p.at < 600000 ? p : null; } catch (e) { return null; } }
@@ -214,7 +219,7 @@ function smFlowDone(mk) {
   d.data = has("data");
   d.brief = has("brief") || Object.keys(typeof BR_AI !== "undefined" ? BR_AI : {}).some(function (k) { return k.indexOf(smKstDay() + "|" + mk + "|") === 0; });
   d.plan = !!smPlanFor(mk);
-  d.make = smDoneFor(mk).filter(function (x) { return mk === "all" || x.mk === mk; }).length > 0 || has("make");
+  d.make = smDoneFor(mk).length > 0 || has("make");   // v12.56 ④와 같은 기준(시장 표시가 없는 옛 카드도 센다)
   d.pub = has("pub");
   return d;
 }
