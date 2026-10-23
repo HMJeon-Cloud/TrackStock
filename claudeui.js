@@ -154,8 +154,31 @@ function brAiPaint() {
 (function () { try { var j = JSON.parse(localStorage.getItem("sm.issWhy") || "null"); if (j && j.d === smKstDay() && j.m) Object.keys(j.m).forEach(function (k) { if (!ISS_WHY[k]) ISS_WHY[k] = j.m[k]; }); } catch (e) {} })();
 function issWhySave() { try { var m = {}; Object.keys(ISS_WHY).forEach(function (k) { if (k.charAt(0) !== "_") m[k] = ISS_WHY[k]; }); localStorage.setItem("sm.issWhy", JSON.stringify({ d: smKstDay(), m: m })); } catch (e) {} }
 (function () { var p0 = issWhyPaint; issWhyPaint = function (list, box) { issWhySave(); return p0(list, box); }; })();
+/* v12.44 시장별 작업 — 작업실·브리핑·카드 작업대가 같은 시장(briefState.market)을 쓴다. 진행 표시·편성·만든 카드도 시장마다 따로 */
+var SM_MK_NM = { all: "전체", kr: "🇰🇷 국내", us: "🇺🇸 미국", coin: "₿ 코인" };
+function smMk() { return typeof briefState !== "undefined" && SM_MK_NM[briefState.market] ? briefState.market : "all"; }
+function smSymMk(sym) { if (!sym) return "all"; return /\.K[SQ]$|^\^K[SQ]/.test(sym) ? "kr" : /-USD$/.test(sym) ? "coin" : "us"; }
 function smFlowFlags() { try { var j = JSON.parse(localStorage.getItem("sm.flow") || "null"); return j && j.d === smKstDay() ? j.f : {}; } catch (e) { return {}; } }
-function smFlowMark(k) { try { var f = smFlowFlags(); if (f[k]) return; f[k] = Date.now(); localStorage.setItem("sm.flow", JSON.stringify({ d: smKstDay(), f: f })); smFlowPaint(); } catch (e) {} }
+function smFlowMark(k, mk) { try { var f = smFlowFlags(), key = k + "@" + (mk || smMk()); if (f[key]) return; f[key] = Date.now(); localStorage.setItem("sm.flow", JSON.stringify({ d: smKstDay(), f: f })); smFlowPaint(); } catch (e) {} }
+/* 편성: 시장마다 하나씩 (하루 유지) */
+var MK_AI_MAP = (function () { try { var j = JSON.parse(localStorage.getItem("sm.aiPlanMk") || "null"); return j && j.d === smKstDay() ? j.m : {}; } catch (e) { return {}; } })();
+if (MK_AI && !MK_AI_MAP[MK_AI.mk || "all"]) MK_AI_MAP[MK_AI.mk || "all"] = MK_AI;
+MK_AI = MK_AI_MAP[smMk()] || null;
+(function () { var s0 = mkAiSave; mkAiSave = function () { try { if (MK_AI) { MK_AI.mk = MK_AI.mk || smMk(); MK_AI_MAP[MK_AI.mk] = MK_AI; localStorage.setItem("sm.aiPlanMk", JSON.stringify({ d: smKstDay(), m: MK_AI_MAP })); } } catch (e) {} return s0.apply(this, arguments); }; })();
+function smPlanFor(mk) { return MK_AI_MAP[mk] && MK_AI_MAP[mk].data ? MK_AI_MAP[mk] : null; }
+/* 만든 카드에 시장 표시 */
+function smDoneFor(mk) { return (typeof hubDoneLoad === "function" ? hubDoneLoad() : []).filter(function (d) { return !d.mk || mk === "all" || d.mk === mk; }); }
+(function () { if (typeof hubDoneAdd !== "function") return; var a0 = hubDoneAdd; hubDoneAdd = function (ctx, title) { var r = a0.apply(this, arguments); try { var j = JSON.parse(localStorage.getItem("sm.mkdone") || "null"); if (j && j.items && j.items.length) { var it = j.items[j.items.length - 1]; if (!it.mk) it.mk = (typeof MK !== "undefined" && MK.mk) || smMk(); localStorage.setItem("sm.mkdone", JSON.stringify(j)); } } catch (e) {} smFlowPaint(); return r; }; })();
+/* 시장 바꾸기 — 브리핑 · 카드 작업대 · 편성을 함께 */
+function smSetMk(m, quiet) {
+  if (!SM_MK_NM[m]) m = "all";
+  if (typeof switchBriefMarket === "function" && briefState.market !== m) switchBriefMarket(m, true);
+  else { briefState.market = m; try { localStorage.setItem("sm.briefMkt", m); } catch (e) {} }
+  if (typeof MK !== "undefined") { MK.mk = m; MK._T = null; }
+  MK_AI = MK_AI_MAP[m] || null;
+  if (!quiet) smFlowPaint();
+}
+(function () { if (typeof switchBriefMarket !== "function") return; var b0 = switchBriefMarket; switchBriefMarket = function (m) { var r = b0.apply(this, arguments); try { if (typeof MK !== "undefined") { MK.mk = briefState.market; MK._T = null; } MK_AI = MK_AI_MAP[briefState.market] || null; if (briefState.result && typeof issuesCompute === "function" && briefState.recent) briefState.issues = issuesCompute(briefState.recent, { market: briefState.market, popular: briefState.popular }); smFlowPaint(); } catch (e) {} return r; }; })();
 var SM_FLOW = [
   { k: "data", n: "데이터 확인", tab: ["data"], hint: "데이터 센터에서 국내·미국 최신화 상태를 확인하세요 (늦은 시장은 ✨ 이상치 점검)" },
   { k: "brief", n: "오늘 시장", tab: ["brief"], hint: "오늘의 브리핑에서 ✨ Claude 해설 만들기 — 해설 3줄 · 핵심 이슈 왜/그래서/볼 것 · 급등락 이유" },
@@ -163,13 +186,13 @@ var SM_FLOW = [
   { k: "make", n: "만들기", tab: ["onecard", "report", "analyst"], hint: "편성 순서대로 카드 · 리포트 · 분석(🤖 끝까지 분석)을 만드세요" },
   { k: "pub", n: "업로드 글 · 검수", tab: [], hint: "카드 아래 업로드 글에서 ✨ AI 문구 → 발행 전 검수 후 올리세요" }
 ];
-function smFlowDone() {
-  var f = smFlowFlags(), d = {};
-  d.data = !!f.data;
-  d.brief = !!f.brief || Object.keys(typeof BR_AI !== "undefined" ? BR_AI : {}).some(function (k) { return k.indexOf(smKstDay()) === 0; });
-  d.plan = !!(typeof MK_AI !== "undefined" && MK_AI && MK_AI.data);
-  d.make = (typeof hubDoneLoad === "function" ? hubDoneLoad().length : 0) > 0 || !!f.make;
-  d.pub = !!f.pub;
+function smFlowDone(mk) {
+  mk = mk || smMk(); var f = smFlowFlags(), d = {}, has = function (k) { return !!(f[k + "@" + mk] || (mk !== "all" && f[k + "@all"] && k === "data")); };
+  d.data = has("data");
+  d.brief = has("brief") || Object.keys(typeof BR_AI !== "undefined" ? BR_AI : {}).some(function (k) { return k.indexOf(smKstDay() + "|" + mk + "|") === 0; });
+  d.plan = !!smPlanFor(mk);
+  d.make = smDoneFor(mk).filter(function (x) { return mk === "all" || x.mk === mk; }).length > 0 || has("make");
+  d.pub = has("pub");
   return d;
 }
 function smFlowGo(k) {
@@ -187,14 +210,14 @@ function smFlowPaint() {
   el.style.display = "";
   var D = smFlowDone(), next = SM_FLOW.filter(function (s) { return !D[s.k]; })[0];
   var cur = SM_FLOW.filter(function (s) { return s.tab.indexOf(tab) >= 0; })[0];
-  el.innerHTML = '<div class="smFlowBar">' + SM_FLOW.map(function (s, i) { return '<button data-flow="' + s.k + '" class="' + (D[s.k] ? "done " : "") + (cur && cur.k === s.k ? "on " : "") + (next && next.k === s.k ? "next" : "") + '"><i>' + (D[s.k] ? "✓" : i + 1) + '</i><span>' + s.n + '</span></button>'; }).join('<em>›</em>') + '</div>' +
+  el.innerHTML = '<div class="smFlowBar"><span class="smFlowMk" title="작업실 · 브리핑 · 카드 작업대가 같은 시장을 써요">' + SM_MK_NM[smMk()] + ' 기준</span>' + SM_FLOW.map(function (s, i) { return '<button data-flow="' + s.k + '" class="' + (D[s.k] ? "done " : "") + (cur && cur.k === s.k ? "on " : "") + (next && next.k === s.k ? "next" : "") + '"><i>' + (D[s.k] ? "✓" : i + 1) + '</i><span>' + s.n + '</span></button>'; }).join('<em>›</em>') + '</div>' +
     '<div class="smFlowHint"><button class="smFlowOps" data-flowops>작업실에서 한눈에</button>' + (next ? '<b>다음 할 일 · ' + (SM_FLOW.indexOf(next) + 1) + '</b> ' + escapeHtml(next.hint) : '<b>오늘 순서 끝 ✓</b> 수고했어요 — 내일 아침 데이터 확인부터') + '</div>';
   Array.prototype.forEach.call(el.querySelectorAll("[data-flow]"), function (b) { b.onclick = function () { smFlowGo(b.getAttribute("data-flow")); }; });
   var ob = el.querySelector("[data-flowops]"); if (ob) ob.onclick = function () { navTo("ops"); };
 }
 (function () {
   if (typeof switchTab !== "function") return;
-  var sw0 = switchTab; switchTab = function (t) { var r = sw0.apply(this, arguments); try { if (currentTab === "data") smFlowMark("data"); smFlowPaint(); } catch (e) {} return r; };
+  var sw0 = switchTab; switchTab = function (t) { var r = sw0.apply(this, arguments); try { if (currentTab === "data") ["all", "kr", "us", "coin"].forEach(function (m) { smFlowMark("data", m); }); smFlowPaint(); } catch (e) {} return r; };
   if (typeof brAiPaint === "function") { var bp0 = brAiPaint; brAiPaint = function () { var r = bp0.apply(this, arguments); try { smFlowPaint(); } catch (e) {} return r; }; }
   if (typeof mkAiRun === "function") { var mr0 = mkAiRun; mkAiRun = function () { var r = mr0.apply(this, arguments); Promise.resolve(r).then(function () { smFlowPaint(); }); return r; }; }
   document.addEventListener("click", function (e) { var t = e.target && e.target.closest && e.target.closest(".thrAi, .thrChkBtn, .thrCopy, [data-thrcopy]"); if (t) smFlowMark("pub"); }, true);
