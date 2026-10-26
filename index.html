@@ -635,6 +635,12 @@
   .smGuide { margin: 0 0 12px; padding: 10px 14px; border: 1px dashed #c9a24f; border-radius: 12px; background: #fffdf7; font-size: 13px; } .smGuide b { display: block; margin-bottom: 4px; } .smGuide ol { margin: 0 0 4px; padding-left: 20px; line-height: 1.55; } .smGuide ol li::marker { color: #c9a24f; font-weight: 800; }
   .dhTodo { margin: 10px 0 4px; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; } .dhTodo.ok { background: #effaf3; border: 1px solid #bfe3cc; } .dhTodo.warn { background: #fff6e8; border: 1px solid #f0d3a6; } .dhTodo b { margin-right: 8px; } .dhTodo ul { margin: 6px 0 0; padding-left: 18px; } .dhTodo li { margin: 4px 0; } .dhTodo .chip { margin-left: 6px; }
   .rpBar { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; } .rpBarMain { display: flex; gap: 8px; flex-wrap: wrap; } .rpBarMain button { display: inline-flex; align-items: center; gap: 6px; } .rpBarMain button i { font-style: normal; width: 18px; height: 18px; border-radius: 50%; background: #c9a24f; color: #fff; font-size: 11px; font-weight: 800; display: inline-grid; place-items: center; } .rpBarMain .primary i { background: #e8c877; color: #111; } .rpBarMain small { font-weight: 500; opacity: .8; } .rpBarSub { display: flex; gap: 6px; flex-wrap: wrap; } .rpBarSub .chip { font-size: 12px; opacity: .85; }
+  /* v12.62 토스트 · 2차 대조 · 성과 입력 · 공통 시장 바 */
+  #smToasts { position: fixed; left: 50%; bottom: calc(76px + var(--sab, 0px)); transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; width: min(560px, calc(100% - 24px)); pointer-events: none; }
+  .smToast { pointer-events: auto; background: #1c1e23; color: #f3efe6; border-radius: 12px; padding: 12px 40px 12px 14px; font-size: 13.5px; line-height: 1.5; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,.25); border-left: 4px solid #c9a24f; } .smToast.bad { border-left-color: #f04452; } .smToast .opsLink { color: #e8c877; padding: 2px 0; } .smToastX { position: absolute; right: 8px; top: 6px; border: 0; background: none; color: #bbb; font-size: 20px; cursor: pointer; }
+  .proVerify { margin: 14px 0 6px; padding: 10px 14px; border-radius: 12px; font-size: 13px; } .proVerify.ok { background: #effaf3; border: 1px solid #bfe3cc; } .proVerify.bad { background: #fff0f0; border: 1px solid #f3b8bd; } .proVerify ul { margin: 6px 0 4px; padding-left: 18px; } .proVerify li { margin: 2px 0; } .proVerify li small { color: var(--sub); } .proOk { color: #1d7f55; } .proBad { color: #c0303e; }
+  .proPerf { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 6px; } .proPerfRow { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; font-size: 12px; padding: 3px 0; } .proPerfRow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .proPerfRow label { color: var(--sub); font-size: 11px; } .proPerfRow input { width: 56px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12px; margin-left: 3px; }
+  .smFlowMk.seg { padding: 2px; background: #f3e6c4; display: inline-flex; gap: 2px; } .smFlowMk.seg button { border: 0; background: transparent; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700; color: #6b5a2e; cursor: pointer; } .smFlowMk.seg button.on { background: #1c1e23; color: #f1d590; }
   /* v12.46 모닝 노트 */
   .opsTag.pop { background: #f3e6c4; color: #7a5c17; } .opsErr { margin-top: 6px; font-size: 12px; color: #b9600f; background: #fff3e6; border-radius: 6px; padding: 5px 8px; }
   .opsBoard .opsWide { grid-column: 1 / -1; } #tab-ops .opsT th:first-child, #tab-ops .opsT td:first-child { white-space: nowrap; } .opsBoard .opsPanel { overflow-x: auto; }
@@ -2737,7 +2743,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.61"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.62"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -5137,7 +5143,7 @@ setTimeout(smBootDone, 3000);
 <!-- v12.13 앱 스크립트 한 곳에서 로드 — 버전은 SM_VER 하나만 올리면 전 파일 캐시가 같이 갱신된다(파일마다 ?v= 손으로 올리던 실수 방지). 순서는 의존 관계 그대로 -->
 <script>
 (function () {
-  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js"];
+  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js","pro.js"];
   document.write(files.map(function (f) { return '<script src="' + f + '?v=' + SM_VER + '"><\/script>'; }).join(""));
 })();
 </script>
