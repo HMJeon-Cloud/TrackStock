@@ -6,7 +6,9 @@ import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
 import { collectAll, saveGurusFromUpload } from "./_disc.js";
 import { copyHandler } from "./_copy.js";
-import { claudeHandler } from "./_claude.js";   // v12.39 Claude 작업(분석·검수·이유·편성)   // v12.38 업로드 글 Claude 다시 쓰기
+import { claudeHandler } from "./_claude.js";
+import { kvHandler } from "./_kv.js";   // v12.62 작은 공용 저장소
+import { verifyHandler } from "./_verify.js";   // v12.62 지수 종가 2차 출처 대조   // v12.39 Claude 작업(분석·검수·이유·편성)   // v12.38 업로드 글 Claude 다시 쓰기
 
 export async function loadNames(origin) {
   const { pairs } = await loadTickerPairs(origin);
@@ -36,7 +38,9 @@ export default async function handler(req, res) {
   if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
   if (req.query.op === "ai") return aiHandler(req, res);
   if (req.query.op === "copy") return copyHandler(req, res);
-  if (req.query.op === "claude") return claudeHandler(req, res);   // v12.38 업로드 글(인스타·스레드) — Claude API
+  if (req.query.op === "claude") return claudeHandler(req, res);
+  if (req.query.op === "kv") return kvHandler(req, res);
+  if (req.query.op === "verify") return verifyHandler(req, res);   // v12.38 업로드 글(인스타·스레드) — Claude API
   if (req.query.op === "disc") return discHandler(req, res);   // v11.2 공시·구루 수동 수집 (운영자) — 크론과 같은 수집기를 시간 넉넉히
   if (req.query.op === "lib") return libHandler(req, res);
   if (req.query.op === "archive") return archiveHandler(req, res);   // v12.5 분석 자산(아카이브) — AI 답변·앱 데이터 스냅샷을 서버(Redis)에 쌓아 다음 분석에 재사용   // v10.7 AI 보관함 (배경·스타일·구성·아이콘) — 서버(Redis) 저장   // v9.5 대표 카드 문구 (OpenAI) — 새 함수 파일을 만들 수 없어(무료 12개 한도) 여기에 붙임
