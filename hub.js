@@ -100,16 +100,32 @@ function hubTableFill(c, d) {
 }
 /* 글 문단 (기사 본문 등) — 남은 높이에 맞게 글씨 크기 조절 */
 function hubTextFill(c, d) {
-  var g = c.g, P = NB.PAD, W = NB.W - P * 2, avail = NB.H - 100 - c.y - (d.tiles ? 200 : 0) - (d.after ? 130 : 0), paras = (d.paras || []).filter(Boolean);
-  var fs = 34; function need() { var n = 0; paras.forEach(function (p) { n += cWrapCount(g, p, W - 56, fs, 600); }); return n * fs * 1.55 + paras.length * 18 + 40; }
-  while (need() > avail && fs > 20) fs -= 1;
-  while (need() < avail * 0.72 && fs < 46) fs += 1;   // v11.9 글이 짧으면 키워서 빈 곳 없이
-  if (need() > avail) fs -= 1;
-  var h = Math.max(140, Math.min(avail, need())); cRound(g, P, c.y, W, h, 16, "#ffffff"); g.strokeStyle = NB_C.line; g.lineWidth = 2; g.stroke();
-  var y = c.y + Math.max(28, (h - need() + 40) / 2) + fs * 0.9; paras.forEach(function (p) { var k = cWrapCount(g, p, W - 56, fs, 600); cWrap(g, p, P + 28, y, W - 56, fs, 600, NB_C.txt, fs * 1.55, 30); y += k * fs * 1.55 + 18; });
-  c.y += h + 16;
-  if (d.tiles && d.tiles.length) { var keep = c.y; c.y -= 40; nbTiles(c, d.tiles); c.y = Math.max(c.y - 30, keep + 170); }
-  if (d.after) { var g2 = c.g, ah = Math.min(120, NB.H - 96 - c.y); if (ah > 60) { cRound(g2, P, c.y, W, ah, 14, NB_INK); cText(g2, d.after[0], P + 24, c.y + 40, 20, 800, NB_C.gold); cWrap(g2, d.after[1], P + 24, c.y + 76, W - 48, 22, 600, "#f3efe6", 30, 2); c.y += ah; } }
+  /* v12.60 흰 상자에 문단을 넣던 양식 → 다른 장과 같은 문법으로: 첫 문단은 금색 세로선이 붙은 큰 결론, 나머지는 가는 줄로 나눈 항목(■ 로 시작하면 금색 점 항목) */
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, paras = (d.paras || []).filter(Boolean).map(function (p) { return String(p); });
+  var avail = NB.H - 100 - c.y - (d.tiles ? 200 : 0) - (d.after ? 150 : 0);
+  if (!paras.length) { c.y += 20; return; }
+  var lead = paras[0], rest = paras.slice(1), L = Math.min(44, 40), B = 32;
+  function need(ls, bs) { var n = cWrapCount(g, lead, W - 40, ls, 800) * ls * 1.4 + 36; rest.forEach(function (p) { n += cWrapCount(g, p.replace(/^■\s*/, ""), W - 56, bs, 600) * bs * 1.5 + 30; }); return n; }
+  while (need(L, B) > avail && (L > 26 || B > 20)) { if (B > 20) B -= 1; if (L > 26 && B <= 24) L -= 1; }
+  while (need(L + 1, B + 1) < avail * 0.8 && L < 48 && B < 36) { L += 1; B += 1; }
+  // 결론
+  var lh = cWrapCount(g, lead, W - 40, L, 800) * L * 1.4;
+  g.fillStyle = NB_C.gold; g.fillRect(P, c.y + 6, 8, lh);
+  cWrap(g, lead, P + 32, c.y + L * 1.05, W - 40, L, 800, NB_INK, L * 1.4, 8);
+  c.y += lh + 36;
+  // 항목
+  rest.forEach(function (p, k) {
+    var bullet = /^■/.test(p), txt = p.replace(/^■\s*/, "");
+    if (k > 0 || true) { g.strokeStyle = NB_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(P, c.y); g.lineTo(P + W, c.y); g.stroke(); }
+    var n = cWrapCount(g, txt, W - 56, B, 600), th = n * B * 1.5;
+    if (bullet) { g.fillStyle = NB_C.gold; g.fillRect(P + 4, c.y + 16 + B * 0.25, 12, 12); }
+    else { cText(g, String(k + 1).padStart(2, "0"), P + 2, c.y + 16 + B * 0.95, 18, 900, NB_C.gold2 || NB_C.gold); }
+    cWrap(g, txt, P + 40, c.y + 16 + B * 0.95, W - 56, B, 600, NB_C.txt, B * 1.5, 12);
+    c.y += th + 30;
+  });
+  if (rest.length) { g.strokeStyle = NB_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(P, c.y); g.lineTo(P + W, c.y); g.stroke(); c.y += 16; }
+  if (d.tiles && d.tiles.length) { var keep = c.y; c.y -= 30; nbTiles(c, d.tiles); c.y = Math.max(c.y - 30, keep + 170); }
+  if (d.after) { var g2 = c.g, ah = Math.min(130, NB.H - 96 - c.y); if (ah > 60) { c.y += 10; cRound(g2, P, c.y, W, ah - 10, 14, NB_INK); cText(g2, d.after[0], P + 24, c.y + 40, 20, 800, NB_C.gold); cWrap(g2, d.after[1], P + 24, c.y + 76, W - 48, 22, 600, "#f3efe6", 30, 2); c.y += ah; } }
 }
 
 /* ============================================================ v12.18 새 양식 4종 — 선(추이) · 분포 · 짝 막대(둘 비교) · 게이지(지금 위치) ============================================================ */
@@ -761,6 +777,7 @@ function hubOneMake(ctx) {
     r.ev.slice(-6).reverse().forEach(function (e) { var v = e.f.ks[2]; F.push({ label: macD(e.t, true) + " 사례 → 코스피 1년", value: typeof v === "number" ? cPct(v, 0) : v === "wait" ? "진행 중" : "-" }); });
     return function () { return hubOneCard({ title: r.c.tag + " → 1년 뒤", head2: (r.from ? new Date(r.from).getUTCFullYear() + "년 이후 " : "") + r.ev.length + "번 · 다음 거래일에 샀다면 · " + r.c.mean.split(" — ")[0], facts: F, src: "한국은행 ECOS · 미국 FRED · 야후 종가 · " + cDate(Date.now()), n: 8 }); };
   });
+  if (kind === "per" && typeof perOneFacts === "function") { var PF = null; try { PF = perOneFacts(arg); } catch (e) { PF = null; } if (PF) return Promise.resolve(function () { return hubOneCard(PF); }); }   // v12.60 한 주·한 달 예상 한 장
   var S = hubSrc(ctx);
   if (kind === "div") return Promise.resolve(S.prep()).then(function () { return function () { var x = dvSpec("table", "divTop", "all"); return x ? tplCard("table", x.meta, x.spec) : null; }; });
   if (kind === "disc") return Promise.resolve(S.prep()).then(function () { return function () { var x = dsSpec("table", "discInsider"); return x ? tplCard("table", x.meta, x.spec) : null; }; });

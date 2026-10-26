@@ -199,8 +199,8 @@ function pubCalCard() {
     if (e.k === "hol") cRound(g, P, c.y, W, h - 10, 14, "#f6f3ec");
     cText(g, dstr, P + 22, c.y + h * 0.5 + 8, 24, 800, e.d === last ? CARD_C.sub : CARD_C.navy);
     var tx = P + 170;
-    cText(g, cFit(g, e.t + (e.sure === false ? " (예정)" : ""), W - 190, 27, 700), tx, c.y + (e.n ? h * 0.42 : h * 0.5 + 8), 27, 700, CARD_C.txt);
-    if (e.n) cText(g, cFit(g, e.n, W - 190, 21, 500), tx, c.y + h * 0.42 + 30, 21, 500, CARD_C.sub);
+    cText(g, cFit(g, e.t + (e.sure === false ? " (예정)" : ""), W - 190, 27, 700), tx, c.y + (pubEvNote(e) ? h * 0.42 : h * 0.5 + 8), 27, 700, CARD_C.txt);
+    var en = pubEvNote(e); if (en) cText(g, cFit(g, en, W - 190, 21, 500), tx, c.y + h * 0.42 + 30, 21, 500, CARD_C.sub);
     last = e.d; c.y += h;
   });
   cNote(c, "일정은 발표 기관 사정으로 바뀔 수 있어요. 발표 당일 아침 다시 확인하세요.");
@@ -421,3 +421,33 @@ function pubBriefLine() {
   var up = pubUpcoming(7).filter(function (e) { return e.k !== "hol"; }).slice(0, 4);
   el.innerHTML = up.length ? '<span class="briefDim">🗓️ 이번 주</span> ' + up.map(function (e) { return '<span class="briefHist"><b>' + e.d.slice(5).replace("-", "/") + '(' + pubDow(e.d) + ')</b> ' + escapeHtml(e.t.replace(/^[^\s]+\s/, "")) + '</span>'; }).join("") : "";
 }
+
+/* ============================================================ v12.60 일정 지식 — 이 발표로 '무엇을 알 수 있고 · 왜 중요하고 · 무엇을 보면 되는지' (단어+날짜만 있던 카드 보강)
+   + 과거 FOMC 당일 S&P500 반응은 앱 시세로 직접 계산(알려진 결정일 기준) — 계산 표본이 4번 미만이면 숫자를 쓰지 않는다 ============================================================ */
+var PUB_KB = [
+  { k: "fomc", short: "기준금리", re: /FOMC/, what: "미국 기준금리 결정(연준)", why: "금리는 모든 자산의 '할인율' — 결정 자체보다 점도표·기자회견 톤이 주가·환율·금을 움직여요", watch: "동결/인하 폭 · 앞으로의 경로(점도표) · 발표 뒤 달러와 10년물 반응", who: "나스닥·성장주 · 환율 · 금" },
+  { k: "cpi", short: "물가", re: /CPI|소비자물가/, what: "미국 소비자물가 — 금리 인하 속도를 정하는 숫자", why: "예상보다 높으면 '금리 오래 높게' → 성장주 약세·달러 강세, 낮으면 반대", watch: "전월 대비 · 근원(음식·에너지 제외) · 예상치와의 차이", who: "나스닥 · 장기채 · 환율" },
+  { k: "jobs", short: "고용", re: /고용보고서|비농업|실업률/, what: "미국 고용(비농업 일자리·실업률) — 경기 체력", why: "너무 좋으면 금리 걱정, 너무 나쁘면 경기 걱정 — 어느 쪽이든 크게 흔들 수 있어요", watch: "일자리 증가 수 · 실업률 · 시간당 임금(물가 압력)", who: "지수 전체 · 달러" },
+  { k: "pce", short: "물가(PCE)", re: /PCE/, what: "연준이 기준으로 보는 물가(PCE)", why: "CPI보다 늦게 나오지만 연준의 '공식' 물가 — 인하 명분을 확인하는 자리", watch: "근원 PCE 전년 대비가 2%대 어디쯤인지", who: "장기채 · 성장주" },
+  { k: "gdp", short: "성장률", re: /GDP/, what: "미국 성장률(분기)", why: "경기가 식는지 버티는지 — 실적 기대와 금리 전망을 동시에 바꿔요", watch: "속보치 vs 예상 · 소비 항목", who: "경기민감주 · 소형주" },
+  { k: "retail", short: "소비", re: /소매판매/, what: "미국 소비(소매판매)", why: "미국 경제의 7할이 소비 — 소비가 꺾이면 실적 전망이 먼저 흔들려요", watch: "전월 대비 · 자동차 제외", who: "소비주 · 지수" },
+  { k: "bok", short: "기준금리", re: /금통위|한국은행/, what: "한국 기준금리 결정(한국은행)", why: "환율·주담대 금리·은행주에 직접 — 인하면 성장주·건설, 동결이면 환율 방어에 무게", watch: "결정 + 소수의견 수 · 총재 기자회견 톤 · 환율 반응", who: "코스피 · 은행·건설 · 환율" },
+  { k: "exp", short: "만기", re: /만기/, what: "선물·옵션 만기일", why: "방향 신호가 아니라 '변동성·거래량이 커지는 날' — 장 막판 출렁임은 재료가 아니에요", watch: "마감 동시호가 거래량 · 외국인 선물 포지션", who: "코스피200 대형주" },
+  { k: "earn", short: "실적", re: /실적/, what: "실적 발표", why: "숫자보다 '다음 분기 가이던스'가 주가를 정해요 — 좋은 실적에 떨어지는 건 기대치 때문", watch: "매출·영업이익 vs 예상 · 가이던스 · 장외 반응", who: "해당 종목 · 같은 업종" },
+  { k: "hol", short: "휴장", re: /휴장|조기 폐장/, what: "휴장", why: "그 시장 데이터가 갱신되지 않고, 다음 거래일에 밀린 뉴스가 한꺼번에 반영돼 갭이 생길 수 있어요", watch: "휴장 중 다른 시장(선물·환율) 움직임", who: "" },
+  { k: "pmi", short: "체감경기", re: /PMI|ISM|심리/, what: "경기 체감 지표(설문)", why: "실제 생산·소비보다 먼저 움직이는 '선행' 지표 — 50(기준선) 위아래가 기준", watch: "50 돌파/이탈 · 신규주문 항목", who: "경기민감주" }
+];
+function pubKb(t) { t = String(t || ""); for (var i = 0; i < PUB_KB.length; i++) if (PUB_KB[i].re.test(t)) return PUB_KB[i]; return null; }
+/* 알려진 FOMC 결정일(미국 날짜) — 앱 1년치 시세에서 당일 S&P500 등락을 계산 */
+var PUB_FOMC = ["2025-01-29", "2025-03-19", "2025-05-07", "2025-06-18", "2025-07-30", "2025-09-17", "2025-10-29", "2025-12-10", "2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17", "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09"];
+function pubEvStats(k) {
+  if (k !== "fomc") return null;
+  var rec = (typeof briefState !== "undefined" && briefState.recent) || (typeof chState !== "undefined" && chState.recent); var d = rec && rec.symbols && rec.symbols["^GSPC"]; if (!d || !d.t) return null;
+  var byD = {}; d.t.forEach(function (t, i) { byD[new Date(t * 1000 - 5 * 3600e3).toISOString().slice(0, 10)] = i; });
+  var rs = []; PUB_FOMC.forEach(function (ds) { var i = byD[ds]; if (i == null || i < 1 || d.c[i] == null || d.c[i - 1] == null) return; rs.push({ d: ds, r: d.c[i] / d.c[i - 1] - 1, next: i + 1 < d.c.length && d.c[i + 1] != null ? d.c[i + 1] / d.c[i] - 1 : null }); });
+  if (rs.length < 4) return null;
+  var abs = rs.reduce(function (a, x) { return a + Math.abs(x.r); }, 0) / rs.length, up = rs.filter(function (x) { return x.r > 0; }).length, big = rs.slice().sort(function (a, b) { return Math.abs(b.r) - Math.abs(a.r); })[0];
+  return { n: rs.length, abs: abs, up: up, big: big, line: "최근 " + rs.length + "번 FOMC 당일 S&P500 평균 ±" + (abs * 100).toFixed(1) + "% · 상승 " + up + "/" + rs.length + " · 가장 컸던 날 " + big.d.slice(2).replace(/-/g, ".") + " " + (big.r > 0 ? "+" : "") + (big.r * 100).toFixed(1) + "%" };
+}
+/* 일정 한 줄 설명: 손으로 적은 메모(n)가 있으면 그것, 없으면 지식에서 */
+function pubEvNote(e) { if (e.n) return e.n; var kb = pubKb(e.t); return kb ? kb.what + " — " + kb.why : ""; }

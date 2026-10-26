@@ -261,7 +261,9 @@ function perCardsInner(kind, S, recent, mode, pop, win, prevWin) {
     // 2. 볼 것 3가지 = 가장 큰 일정 + 지금 신호 + 임계 자산
     c = cNew(); var watch = [];
     var keyEv = up7.filter(function (e) { return /FOMC|CPI|고용|금통위/.test(e.t); })[0] || up7[0];
-    if (keyEv) watch.push({ e: "🗓️", t: keyEv.d.slice(5).replace("-", "/") + "(" + pubDow(keyEv.d) + ") " + keyEv.t.replace(/^[^\s]+\s/, ""), s: keyEv.n || "발표 전후로 변동이 커질 수 있어요" });
+    if (keyEv) { var kbE = typeof pubKb === "function" ? pubKb(keyEv.t) : null, stE = kbE && typeof pubEvStats === "function" ? pubEvStats(kbE.k) : null; watch.push({ e: "🗓️", t: keyEv.d.slice(5).replace("-", "/") + "(" + pubDow(keyEv.d) + ") " + keyEv.t.replace(/^[^\s]+\s/, ""), s: stE ? stE.line : kbE ? "볼 것: " + kbE.watch : (keyEv.n || "발표 전후로 변동이 커질 수 있어요") }); }
+    // v12.60 두 번째 큰 일정도 '왜 중요한지'와 함께
+    var keyEv2 = up7.filter(function (e) { return e !== keyEv && /FOMC|CPI|고용|금통위|PCE|GDP|실적/.test(e.t); })[0]; if (keyEv2) { var kb2 = typeof pubKb === "function" ? pubKb(keyEv2.t) : null; watch.push({ e: "🗓️", t: keyEv2.d.slice(5).replace("-", "/") + "(" + pubDow(keyEv2.d) + ") " + keyEv2.t.replace(/^[^\s]+\s/, ""), s: kb2 ? kb2.why : (keyEv2.n || "") }); }
     if (now.why.length) watch.push({ e: "🧭", t: now.why[0].split("→").pop().trim(), s: now.why[0].split("→")[0].trim() });
     var spy = recent.symbols["^GSPC"] ? briefStats("^GSPC", recent.symbols["^GSPC"], "week") : null, ks = recent.symbols["^KS11"] ? briefStats("^KS11", recent.symbols["^KS11"], "week") : null;
     if (spy && spy.vsHi != null && spy.vsHi >= -0.02) watch.push({ e: "🏔️", t: "S&P500 사상 최고가 근처 (" + cPct(spy.vsHi, 1) + ")", s: "고점에선 '너무 올랐다'는 말이 늘지만, 신고가 뒤에 신고가가 오는 경우가 더 많았어요" });
@@ -446,3 +448,23 @@ var PER_TOPICS = [
   { when: "월말 · 한 달 정리", items: ["📌 월간 핵심 이슈 5", "🏆 월간 자산 성적표", "🔥 월간 테마 순위", "🚀 월간 급등·급락", "📊 이달 가장 큰 하루 · VIX 범위", "🔢 월말 숫자", "💰 월간 돈이 몰린 곳 + 과거 같은 달 대비", "(수동) 내 계좌 월간 정산 — 넣은 돈 vs 평가금 (숫자만, 자랑 아님)"] },
   { when: "수시 · 상황 발생 시", items: ["😱 VIX 25↑ — 과거 공포 사례 카드 (채널 ④)", "🕳️ 지수 -10% — MDD 체크 카드 (채널 ②)", "⚖️ 금리·유가·달러 급변 — 자산배분 비교 (채널 ③)", "🗓️ 1년 전 100만원 / 매달 10만원 (적금처럼 시리즈)", "💛 투자 유형 테스트 — 댓글 참여형", "📰 큰 뉴스 날 — '왜 올랐나/내렸나' 기사 제목 카드", "📋 정책·제도 변경 — 구간별 금리·한도 표 + 조건 (정책 카드 탭)", "🏦 금리 결정 뒤 — 예금·대출·국채 숫자가 어떻게 바뀌었나 표", "📓 연구노트 — 국면 5종 · 낙폭 · 적립 · 기사 vs 숫자 (연구노트 탭)"] }
 ];
+
+/* ============================================================ v12.60 한 주 예상 · 한 달 예상 '한 장' — 단어+날짜만 있던 것을 '무엇을 알 수 있나 · 왜 중요한가 · 무엇을 보면 되나'로 ============================================================ */
+function perOneFacts(kind) {
+  if (kind !== "weekPreview" && kind !== "monthPreview") return null;
+  var rec = perRecent(); if (!rec || !rec.symbols) return null;
+  var F = [], kb = function (t) { return typeof pubKb === "function" ? pubKb(t) : null; }, dd = function (d) { return d.slice(5).replace("-", "/") + "(" + pubDow(d) + ")"; }, strip = function (t) { return String(t).replace(/^[^\s]+\s/, ""); };
+  var isW = kind === "weekPreview", evs = isW ? pubUpcoming(8) : PUB_CAL.filter(function (e) { return e.d.slice(0, 7) === pubToday().slice(0, 7) && e.d >= pubToday(); }).sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+  var main = evs.filter(function (e) { return e.k !== "hol"; }), hol = evs.filter(function (e) { return e.k === "hol"; });
+  var key = main.filter(function (e) { return /FOMC|CPI|고용|금통위/.test(e.t); })[0] || main[0], keyKb = key ? kb(key.t) : null, st = keyKb && typeof pubEvStats === "function" ? pubEvStats(keyKb.k) : null;
+  main.slice(0, isW ? 4 : 5).forEach(function (e) { var k = kb(e.t), s = k && typeof pubEvStats === "function" ? pubEvStats(k.k) : null; F.push({ label: dd(e.d) + " " + strip(e.t), value: k ? k.short : "일정", note: s ? s.line : k ? k.why : (e.n || "") }); });
+  if (hol.length) F.push({ label: hol.map(function (e) { return dd(e.d) + " " + strip(e.t); }).join(" · "), value: "휴장", note: "그 시장 데이터 갱신 없음 · 다음 거래일 갭 가능" });
+  var now = perNow(); if (now.why.length) { var w = now.why[0].split("→"); F.push({ label: "지금 신호 · " + w[0].trim(), value: (w[1] || "").trim(), note: "앱 규칙 신호 — 국면이 바뀌는 중인지 확인하는 기준" }); }
+  var pos = function (sym, nm) { var d = rec.symbols[sym]; var s = d ? briefStats(sym, d, isW ? "week" : "month") : null; if (!s || s.vsHi == null) return; F.push({ label: nm + " 지금 위치 (52주 고점 대비)", value: cPct(s.vsHi, 1), note: (s.above20 ? "20일선 위" : "20일선 아래") + " · " + (isW ? "지난주 " : "지난달 ") + cPct(s.ret, 1) + (s.vsHi <= -0.2 ? " · 약세장 구간" : s.vsHi <= -0.1 ? " · 조정 구간" : s.vsHi >= -0.02 ? " · 고점 근처" : "") }); };
+  pos("^GSPC", "S&P500"); pos("^KS11", "코스피");
+  var vx = rec.symbols["^VIX"] ? briefStats("^VIX", rec.symbols["^VIX"], "week") : null; if (vx) F.push({ label: "공포지수(VIX)", value: vx.last.toFixed(0), note: vx.last >= 30 ? "공포 — 뉴스가 커 보이는 때, 규칙대로만" : vx.last >= 20 ? "경계 — 평소보다 출렁임 큼" : "안정 — 재료보다 실적·금리가 좌우" });
+  if (!isW) { try { var mo = new Date(Date.now() + 9 * 3600e3).getUTCMonth() + 1, ss = typeof perSeason === "function" ? perSeason("SPY", mo) : null; if (ss) F.push({ label: mo + "월은 과거에 어땠나 (S&P500 " + ss.n + "년)", value: cPct(ss.avg, 1), note: "오른 해 " + ss.up + "/" + ss.n + " · 최고 " + ss.best.y + "년 " + cPct(ss.best.r, 0) + " · 최저 " + ss.worst.y + "년 " + cPct(ss.worst.r, 0) }); } catch (e) {} }
+  if (!F.length) return null;
+  var head2 = key ? (isW ? "이번 주 핵심: " : "이달 핵심: ") + strip(key.t) + "(" + dd(key.d) + ")" + (keyKb ? " — 볼 것: " + keyKb.watch : "") : (isW ? "이번 주는 큰 일정 없음 — 지금 위치와 신호만 챙기세요" : "이달 일정과 지금 위치");
+  return { title: isW ? "한 주 예상 — 일정 · 왜 중요한가 · 지금 위치" : "한 달 예상 — 일정 · 계절성 · 지금 위치", head2: head2, facts: F.slice(0, 10), src: "공개 일정(연준·BLS·한국은행) · 야후 파이낸스 종가 · StockMind 계산 · 예측 아님", n: F.length };
+}
