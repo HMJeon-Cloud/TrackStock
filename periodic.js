@@ -457,8 +457,10 @@ function perOneFacts(kind) {
   var isW = kind === "weekPreview", evs = isW ? pubUpcoming(8) : PUB_CAL.filter(function (e) { return e.d.slice(0, 7) === pubToday().slice(0, 7) && e.d >= pubToday(); }).sort(function (a, b) { return a.d < b.d ? -1 : 1; });
   var main = evs.filter(function (e) { return e.k !== "hol"; }), hol = evs.filter(function (e) { return e.k === "hol"; });
   var key = main.filter(function (e) { return /FOMC|CPI|고용|금통위/.test(e.t); })[0] || main[0], keyKb = key ? kb(key.t) : null, st = keyKb && typeof pubEvStats === "function" ? pubEvStats(keyKb.k) : null;
+  if (main.length || hol.length) F.push({ sec: isW ? "이번 주 일정 · 왜 중요한가" : "이달 일정 · 왜 중요한가" });
   main.slice(0, isW ? 4 : 5).forEach(function (e) { var k = kb(e.t), s = k && typeof pubEvStats === "function" ? pubEvStats(k.k) : null; F.push({ label: dd(e.d) + " " + strip(e.t), value: k ? k.short : "일정", note: s ? s.line : k ? k.why : (e.n || "") }); });
   if (hol.length) F.push({ label: hol.map(function (e) { return dd(e.d) + " " + strip(e.t); }).join(" · "), value: "휴장", note: "그 시장 데이터 갱신 없음 · 다음 거래일 갭 가능" });
+  F.push({ sec: "지금 위치 · 신호" });
   var now = perNow(); if (now.why.length) { var w = now.why[0].split("→"); F.push({ label: "지금 신호 · " + w[0].trim(), value: (w[1] || "").trim(), note: "앱 규칙 신호 — 국면이 바뀌는 중인지 확인하는 기준" }); }
   var pos = function (sym, nm) { var d = rec.symbols[sym]; var s = d ? briefStats(sym, d, isW ? "week" : "month") : null; if (!s || s.vsHi == null) return; F.push({ label: nm + " 지금 위치 (52주 고점 대비)", value: cPct(s.vsHi, 1), note: (s.above20 ? "20일선 위" : "20일선 아래") + " · " + (isW ? "지난주 " : "지난달 ") + cPct(s.ret, 1) + (s.vsHi <= -0.2 ? " · 약세장 구간" : s.vsHi <= -0.1 ? " · 조정 구간" : s.vsHi >= -0.02 ? " · 고점 근처" : "") }); };
   pos("^GSPC", "S&P500"); pos("^KS11", "코스피");
@@ -466,5 +468,5 @@ function perOneFacts(kind) {
   if (!isW) { try { var mo = new Date(Date.now() + 9 * 3600e3).getUTCMonth() + 1, ss = typeof perSeason === "function" ? perSeason("SPY", mo) : null; if (ss) F.push({ label: mo + "월은 과거에 어땠나 (S&P500 " + ss.n + "년)", value: cPct(ss.avg, 1), note: "오른 해 " + ss.up + "/" + ss.n + " · 최고 " + ss.best.y + "년 " + cPct(ss.best.r, 0) + " · 최저 " + ss.worst.y + "년 " + cPct(ss.worst.r, 0) }); } catch (e) {} }
   if (!F.length) return null;
   var head2 = key ? (isW ? "이번 주 핵심: " : "이달 핵심: ") + strip(key.t) + "(" + dd(key.d) + ")" + (keyKb ? " — 볼 것: " + keyKb.watch : "") : (isW ? "이번 주는 큰 일정 없음 — 지금 위치와 신호만 챙기세요" : "이달 일정과 지금 위치");
-  return { title: isW ? "한 주 예상 — 일정 · 왜 중요한가 · 지금 위치" : "한 달 예상 — 일정 · 계절성 · 지금 위치", head2: head2, facts: F.slice(0, 10), src: "공개 일정(연준·BLS·한국은행) · 야후 파이낸스 종가 · StockMind 계산 · 예측 아님", n: F.length };
+  return { title: isW ? "한 주 예상" : "한 달 예상", sub: isW ? "이번 주 일정 · 왜 중요한가 · 지금 위치" : "이달 일정 · 계절성 · 지금 위치", head2: head2, facts: F.slice(0, 12), src: "공개 일정(연준·BLS·한국은행) · 야후 파이낸스 종가 · StockMind 계산 · 예측 아님", n: F.length };
 }

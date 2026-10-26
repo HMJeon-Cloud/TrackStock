@@ -523,3 +523,24 @@ function smDailyFetch() {
 (function () { try { var f = smDailyFull(); if (f && f.day === smKstDay()) { smDailyDistribute(f); SM_DAILY.full = f; } } catch (e) { console.warn(e); } })();
 /* 리포트 탭 '오늘의 리포트' 규칙 선정도 보는 시장에 맞춘다 (Claude 선정이 없을 때) */
 (function () { if (typeof rpTodayPicks !== "function") return; var t0 = rpTodayPicks; rpTodayPicks = function () { var L = t0.apply(this, arguments), mk = smMk(); if (mk === "all" || !L) return L; var F = L.filter(function (q) { return q.kind === "macro" || q.kind === "timing" || !q.sym || smSymMk(q.sym) === mk; }); return F.length ? F : L; }; })();
+
+/* ============================================================ v12.61 화면마다 '이 화면에서 하는 일' 세 줄 — 처음 보는 사람용. '다시 보지 않기'로 접힌다(화면별) ============================================================ */
+var SM_GUIDE = {
+  data: { t: "데이터 확인", s: ["세 시장(국내·미국·코인)의 날짜가 마지막 마감일인지 봅니다. 평소엔 '정상'이면 끝.", "늦거나 '숨김'이면 위 '지금 할 일'의 버튼을 누르면 돼요(1~4분).", "급변·늦은 종목은 ✨ 원인 확인(Claude)으로 휴장·분할·오류인지 확인해요."] },
+  brief: { t: "오늘의 브리핑", s: ["위에서 시장을 고르고, ✨ 오늘 브리핑 만들기를 하루 한 번 누르세요(세 시장 공통).", "핵심 이슈·급등락 아래에 '왜 / 그래서 / 볼 것'이 붙어요. ⚠ 숫자 확인 표시는 카드에 안 들어가요.", "카드로 만들려면 카드 탭(작업대)에서 — 여기서는 읽고 확인만."] },
+  onecard: { t: "카드 만들기", s: ["① 오늘 편성이나 주제 칩을 고르면 → ② 모양에 '추천'이 자동으로 골라져요.", "③ 미리보기가 실제 카드예요. 마음에 들면 '이 모양으로 만들기'.", "④에서 저장 · ✨ AI 문구(인스타·스레드 글) · 발행 전 검수 · 복사까지 끝."] },
+  report: { t: "리포트", s: ["'오늘의 리포트'에서 하나 열면 앱이 증거(Exhibit)와 규칙 의견을 계산해요.", "① ✨ Claude 서술 → ② 🃏 카드 덱 → ③ 💾 저장 순서로 누르면 돼요.", "저장한 리포트는 '회상·검증'에서 3개월 뒤 결론을 채점해요."] },
+  analyst: { t: "분석", s: ["① 분석 틀과 종목을 고르면 ② 앱 데이터가 바로 계산돼요.", "③ 🤖 Claude가 끝까지 분석 한 번이면 분석 → 검사관 재검토 → 저장 → 카드까지 자동.", "결과는 ④ 저장된 답변에 쌓이고, 과거 분석과 비교·보정에 쓰여요."] },
+  channel: { t: "채널 브리핑 자료", s: ["데일리·MDD·자산배분·과거 사례를 글로 정리한 화면이에요.", "각 칸의 '복사'로 글을 가져가 쓰면 돼요.", "카드는 카드 탭에서, 오늘 해설은 작업실에서."] }
+};
+function smGuideOff(tab) { try { return (JSON.parse(localStorage.getItem("sm.guideOff") || "{}") || {})[tab]; } catch (e) { return false; } }
+function smGuidePaint() {
+  var tab = typeof currentTab !== "undefined" ? currentTab : "", G = SM_GUIDE[tab], old = document.getElementById("smGuide");
+  if (!G || !(typeof isOwner === "function" && isOwner()) || smGuideOff(tab)) { if (old) old.remove(); return; }
+  var host = document.getElementById("tab-" + tab); if (!host) return;
+  if (!old) { old = document.createElement("div"); old.id = "smGuide"; old.className = "smGuide"; }
+  var flow = document.getElementById("smFlow"); if (flow && flow.parentNode === host) host.insertBefore(old, flow.nextSibling); else host.insertBefore(old, host.firstChild);
+  old.innerHTML = '<b>' + escapeHtml(G.t) + ' — 이 화면에서 하는 일</b><ol>' + G.s.map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join("") + '</ol><button class="opsLink" data-goff>알겠어요, 다시 보지 않기</button>';
+  old.querySelector("[data-goff]").onclick = function () { try { var j = JSON.parse(localStorage.getItem("sm.guideOff") || "{}") || {}; j[tab] = 1; localStorage.setItem("sm.guideOff", JSON.stringify(j)); } catch (e) {} old.remove(); };
+}
+(function () { var p0 = smFlowPaint; smFlowPaint = function () { var r = p0.apply(this, arguments); try { smGuidePaint(); } catch (e) {} return r; }; })();

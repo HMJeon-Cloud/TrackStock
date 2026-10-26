@@ -631,6 +631,10 @@
   .wbGo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; } .wbGo .primary { padding: 12px 20px; font-size: 15px; }
   .wbResHead { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 4px 0 10px; } .wbResHead .chip { margin-left: auto; }
   @media (max-width: 900px) { .wbCheck { grid-template-columns: 1fr; } .wbRow { grid-template-columns: 1fr; } .wbRowL { border-right: 0; border-bottom: 1px dashed var(--line); padding: 6px 10px; } .wbSec .wbStep .wbQ { width: 100%; margin-left: 0; } }
+  /* v12.61 처음 보는 사람용 안내 · 데이터 센터 할 일 · 리포트 권장 순서 */
+  .smGuide { margin: 0 0 12px; padding: 10px 14px; border: 1px dashed #c9a24f; border-radius: 12px; background: #fffdf7; font-size: 13px; } .smGuide b { display: block; margin-bottom: 4px; } .smGuide ol { margin: 0 0 4px; padding-left: 20px; line-height: 1.55; } .smGuide ol li::marker { color: #c9a24f; font-weight: 800; }
+  .dhTodo { margin: 10px 0 4px; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; } .dhTodo.ok { background: #effaf3; border: 1px solid #bfe3cc; } .dhTodo.warn { background: #fff6e8; border: 1px solid #f0d3a6; } .dhTodo b { margin-right: 8px; } .dhTodo ul { margin: 6px 0 0; padding-left: 18px; } .dhTodo li { margin: 4px 0; } .dhTodo .chip { margin-left: 6px; }
+  .rpBar { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; } .rpBarMain { display: flex; gap: 8px; flex-wrap: wrap; } .rpBarMain button { display: inline-flex; align-items: center; gap: 6px; } .rpBarMain button i { font-style: normal; width: 18px; height: 18px; border-radius: 50%; background: #c9a24f; color: #fff; font-size: 11px; font-weight: 800; display: inline-grid; place-items: center; } .rpBarMain .primary i { background: #e8c877; color: #111; } .rpBarMain small { font-weight: 500; opacity: .8; } .rpBarSub { display: flex; gap: 6px; flex-wrap: wrap; } .rpBarSub .chip { font-size: 12px; opacity: .85; }
   /* v12.46 모닝 노트 */
   .opsTag.pop { background: #f3e6c4; color: #7a5c17; } .opsErr { margin-top: 6px; font-size: 12px; color: #b9600f; background: #fff3e6; border-radius: 6px; padding: 5px 8px; }
   .opsBoard .opsWide { grid-column: 1 / -1; } #tab-ops .opsT th:first-child, #tab-ops .opsT td:first-child { white-space: nowrap; } .opsBoard .opsPanel { overflow-x: auto; }
@@ -2733,7 +2737,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.60"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.61"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";

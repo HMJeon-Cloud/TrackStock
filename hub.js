@@ -718,15 +718,19 @@ function hubOneCard(sp) {
   var meta = { title: sp.title, sub: sp.sub || "", source: sp.src || (cDate(Date.now()) + " 기준 · StockMind 자동 집계"), catName: "한 장 요약", cat: "table" };
   var reel = TPL.H > 1500, c = tplNew(meta), g = c.g, P = TPL.P, W = TPL.W - P * 2, F = (sp.facts || []).slice(0, reel ? 22 : 14), y = c.y;   // v12.23 릴스형: 숫자를 더 담는다
   if (sp.head2) { var hs = 30, nl = Math.min(2, cWrapCount(g, sp.head2, W - 40, hs, 800)), hh = nl * 40 + 34; cRound(g, P, y, W, hh, 12, TPL_C.black); cWrap(g, sp.head2, P + 20, y + 48, W - 40, hs, 800, TPL_C.gold, 40, 2); y += hh + 14; }
-  var longV = F.some(function (f) { return String(f.value).length > 12; }), two = F.length > 6 && !longV, cols = two ? 2 : 1, rowsN = Math.ceil(F.length / cols) || 1;
+  var secN = F.filter(function (f) { return f.sec; }).length, FN = F.length - secN;   // v12.61 구역 제목 줄({sec:"일정"}) — 한 열로, 가는 금색 제목
+  var longV = F.some(function (f) { return !f.sec && String(f.value).length > 12; }), two = !secN && FN > 6 && !longV, cols = two ? 2 : 1, rowsN = Math.ceil(FN / cols) || 1;
   var B = sp.brief && (sp.brief.issue.length || sp.brief.exp) ? sp.brief : null, bh = B ? (reel ? 260 : 150) : 0;   // v12.1 아래 '요즘 이슈 · 전문가' 띠 (릴스형은 기사·의견을 더)
   // v12.23 먼저 게시형 칸 높이로 담고, 숫자가 모자라 자리가 남을 때만 칸을 키운다
-  var avail = TPL.H - TPL.FOOT - 22 - y - bh, capPost = two ? 230 : 200, rh = Math.max(56, Math.min(capPost, Math.floor(avail / rowsN)));
+  var avail = TPL.H - TPL.FOOT - 22 - y - bh - secN * 40, capPost = two ? 230 : 200, rh = Math.max(56, Math.min(capPost, Math.floor(avail / rowsN)));
   if (rh * rowsN < avail - 20) rh = Math.max(56, Math.min(Math.round(capPost * TPL.H / 1350), Math.floor(avail / rowsN)));
   var cw = (W - (cols - 1) * 14) / cols;
-  if (rh * rowsN > avail) { F = F.slice(0, Math.floor(avail / rh) * cols); rowsN = Math.ceil(F.length / cols); }
-  F.forEach(function (f, i) {
-    var col = i % cols, row = Math.floor(i / cols), x = P + col * (cw + 14), yy = y + row * rh, h = rh - 10, v = String(f.value);
+  if (rh * rowsN > avail) { var keepN = Math.floor(avail / rh) * cols, cnt = 0; F = F.filter(function (f) { if (f.sec) return true; return cnt++ < keepN; }); rowsN = Math.ceil(F.filter(function (f) { return !f.sec; }).length / cols); }
+  var ycur = y, idx = 0;
+  F.forEach(function (f) {
+    if (f.sec) { cText(g, f.sec, P + 4, ycur + 24, 20, 800, TPL_C.gold2); g.fillStyle = TPL_C.soft; g.fillRect(P + 4 + cW(g, f.sec, 20, 800) + 12, ycur + 17, W - 8 - cW(g, f.sec, 20, 800) - 12, 2); ycur += 40; return; }
+    var i = idx++, col = i % cols, row = Math.floor(i / cols), x = P + col * (cw + 14), yy = secN ? ycur : y + row * rh, h = rh - 10, v = String(f.value);
+    if (secN) ycur += rh;
     cRound(g, x, yy, cw, h, 12, row % 2 ? "#ffffff" : TPL_C.box); g.strokeStyle = TPL_C.soft; g.lineWidth = 2; g.stroke();
     var ls = Math.max(18, Math.min(two ? 24 : 28, h * 0.24));
     if (v.length > 12 && h < 104) {   // v11.9 줄이 낮으면 한 줄로: 이름(왼쪽) + 값(오른쪽, 줄여서) — 겹치지 않게
