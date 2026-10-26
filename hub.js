@@ -648,9 +648,10 @@ function hubShow(title, list, opts) {
   var host = document.getElementById("mkResult");
   if (host && typeof currentTab !== "undefined" && currentTab === "onecard" && !opts.modal) {   // v12.1 작업대 안에 바로 보여 준다
     // v12.14 결과가 생기면 ①②③은 접고 결과를 맨 위에 — '다른 주제 만들기'로 다시 펼친다
-    var pane = host.parentElement; if (pane) pane.classList.add("wbCollapsed");
-    host.innerHTML = '<div class="wbStep"><b>4</b> 결과 · 업로드 <small>' + hubEsc(title) + ' · ' + list.length + '장</small><button class="chip wbClose" title="①②③ 펼치기">← 다른 주제 만들기</button></div>';
-    host.appendChild(box); host.hidden = false; host.querySelector(".wbClose").onclick = function () { host.hidden = true; host.innerHTML = ""; if (pane) pane.classList.remove("wbCollapsed"); try { pane.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} };
+    /* v12.58 세로 흐름: ①②③은 그대로 두고 ④ 자리에 결과를 넣는다 */
+    var empty = host.parentElement && host.parentElement.querySelector(".wbResultEmpty"); if (empty) empty.hidden = true;
+    host.innerHTML = '<div class="wbResHead"><b>' + hubEsc(title) + '</b> · ' + list.length + '장<button class="chip wbClose">닫기</button></div>';
+    host.appendChild(box); host.hidden = false; host.querySelector(".wbClose").onclick = function () { host.hidden = true; host.innerHTML = ""; if (empty) empty.hidden = false; };
     if (opts.brief) { var bb = document.createElement("div"); bb.className = "wbBrief"; bb.innerHTML = hubBriefHtml(opts.brief); box.insertBefore(bb, box.firstChild); }
     try { host.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
     return;
@@ -1088,3 +1089,52 @@ function hubCounter(stance, exp, oursText) {
   var fix = gap.length >= 2 ? "보완: 결론을 한 단계 보수적으로 보고(" + (stance === "up" ? "검토 → 나눠서·작게" : stance === "down" ? "관망 → 조건부 관심" : "양쪽 모두 열어 두기") + "), " + gap.slice(0, 3).map(function (g) { return g.w; }).join("·") + "에 대한 숫자를 먼저 확인한 뒤 판단을 확정하세요." : gap.length === 1 ? "보완: '" + gap[0].w + "' 한 가지만 확인하면 결론을 유지해도 돼요." : "보완: 반대편 주장을 숫자로 반박할 수 있는지(우리 Exhibit과 대조) 한 번만 더 보세요.";
   return { n: opp.length, items: opp.slice(0, 5), gap: gap, txt: txt, fix: fix, covered: covered };
 }
+
+/* ============================================================ v12.59 '오늘 자료 취합' — 카드를 만들 때 오늘 브리핑(Claude: 해설·이슈 왜/그래서·급등락 이유)을 앱 데이터와 합친다
+   · 덱 끝(마무리 앞)에 '오늘 시장 맥락' 한 장을 넣고, 업로드 글(캡션·답글)에도 맥락 문장을 넣는다. 작업대 ② 모양 정하기 '자료' 에서 켠다(기본: 오늘 브리핑이 있으면 켬)
+   ============================================================ */
+HUB.useToday = false;
+function hubTodayData() {
+  var A = typeof BR_AI !== "undefined" && typeof brAiKey === "function" ? BR_AI[brAiKey()] : null; if (!A || !A.data) return null;
+  var ok = function (w) { return w && w.why && w.conf !== "하" && !(w.bad && w.bad.length); };
+  var iss = ((typeof briefState !== "undefined" && briefState.issues) || []).map(function (it) { var w = typeof ISS_WHY !== "undefined" && ISS_WHY[it.title]; return ok(w) ? { t: it.title, why: w.why, so: w.so, next: w.next, src: w.src } : null; }).filter(Boolean).slice(0, 3);
+  var R = typeof briefState !== "undefined" && briefState.result, mv = [], chk = A.chk || {};
+  (A.data.movers || []).forEach(function (m, k) { if (!m.why || m.conf === "하" || (chk.movers && chk.movers[k] && chk.movers[k].length)) return; var s = R && (R.movers.up.concat(R.movers.down)).filter(function (x) { return x.sym === m.sym; })[0]; if (s) mv.push({ n: briefName(s), ret: s.ret, why: m.why, src: m.src }); });
+  var story = (A.data.story || []).filter(Boolean).filter(function (l, k) { return !(chk.story && chk.story[k] && chk.story[k].length); });
+  if (!story.length && !iss.length && !mv.length) return null;
+  return { story: story, iss: iss, mv: mv.slice(0, 3), tomorrow: (A.data.tomorrow || []).slice(0, 2), note: A.data.note || "", srcs: (A.sources || []).slice(0, 4).map(function (s) { return s.t || ""; }).filter(Boolean), at: A.at };
+}
+function hubTodayLines(D) {
+  D = D || hubTodayData(); if (!D) return [];
+  var L = D.story.map(function (s) { return "오늘 시장: " + s; });
+  D.iss.forEach(function (x) { L.push("왜 " + hubStrip(x.t).split(" — ")[0] + ": " + x.why + (x.so ? " → " + x.so : "")); });
+  D.mv.forEach(function (x) { L.push(x.n + " " + cPct(x.ret, 2) + " 이유: " + x.why); });
+  return L;
+}
+function hubTodayPage(total) {
+  var D = hubTodayData(); if (!D) return null;
+  var c = nbNew(), paras = D.story.slice(0, 3).slice();
+  D.iss.slice(0, 2).forEach(function (x) { paras.push("■ " + hubStrip(x.t).split(" — ")[0] + " — " + x.why + (x.so ? " 그래서 " + x.so : "")); });
+  D.mv.slice(0, 2).forEach(function (x) { paras.push("■ " + x.n + " " + cPct(x.ret, 2) + " — " + x.why); });
+  nbTop(c, Math.max(1, (total || 2) - 2), ["오늘 시장 맥락", "[[왜 이런 숫자인가]]"], Math.max(2, (total || 2) - 1), total || 2);
+  nbBody(c, "오늘 시장 맥락 · 숫자 뒤의 이유", (typeof cDate === "function" ? cDate(Date.now()) : "") + " 아침 브리핑 · 기사·웹 출처 확인한 것만" + (D.srcs.length ? " · " + D.srcs.slice(0, 2).join(" · ") : ""));
+  hubBody(c, { kind: "text", data: { paras: paras.slice(0, 6), after: D.tomorrow.length ? ["다음에 볼 것", D.tomorrow.map(function (t) { return t.what + (t.when ? "(" + t.when + ")" : ""); }).join(" · ")] : (D.note ? ["오늘의 흐름", D.note] : null) } });
+  nbFoot(c, "앱 데이터 + 오늘 브리핑(Claude · 출처 확인) · 투자 권유 아님");
+  return { name: "오늘맥락", cv: c.cv };
+}
+/* 덱에 끼우기: '마무리' 앞, 없으면 맨 뒤. 한 장짜리는 2장이 된다 */
+function hubTodayInsert(list) {
+  if (!HUB.useToday || !list || !list.length || list.some(function (x) { return x.name === "오늘맥락"; })) return list;
+  var pg = hubTodayPage(list.length + 1); if (!pg) return list;
+  var i = list.length && list[list.length - 1].name === "마무리" ? list.length - 1 : list.length;
+  list.splice(i, 0, pg); return list;
+}
+(function () {
+  var s0 = hubShow; hubShow = function (title, list, opts) { try { if (typeof currentTab !== "undefined" && currentTab === "onecard") list = hubTodayInsert(list); } catch (e) { console.warn(e); } return s0.call(this, title, list, opts); };
+  var t0 = hubThreadsAuto; hubThreadsAuto = function (title, list, opts) {
+    var out = t0.apply(this, arguments);
+    try { if (HUB.useToday && out && out.length) { var L = hubTodayLines(); if (L.length) { var add = "\n\n오늘 시장 맥락\n" + L.slice(0, 3).map(function (x) { return "· " + x; }).join("\n"); out.forEach(function (v) { if (v.r1 != null && !/오늘 시장 맥락/.test(v.r1)) v.r1 = (v.r1 ? v.r1 + add : add.trim()); if (v.ig && !/오늘 시장 맥락/.test(v.ig)) { var k = v.ig.indexOf("\n#"); v.ig = k > 0 ? v.ig.slice(0, k) + add + "\n" + v.ig.slice(k) : v.ig + add; } }); } } } catch (e) { console.warn(e); }
+    return out;
+  };
+  var b0 = hubBriefLines; hubBriefLines = function (B) { var L = b0.apply(this, arguments); try { if (HUB.useToday) L = L.concat(hubTodayLines()); } catch (e) {} return L; };
+})();
