@@ -612,6 +612,10 @@
     .opsIss td[colspan]::before { content: ""; }
     .opsHead h2 { font-size: 22px; }
   }
+  /* v12.57 작업대 카드 미리보기 */
+  .wbPrev { margin: 10px 0; } .wbPrevHead { display: flex; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 6px; } .wbPrevHead small { color: var(--sub); font-size: 11.5px; }
+  .wbPrevRow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .wbPrevRow figure { margin: 0; flex: 0 0 118px; cursor: zoom-in; } .wbPrevRow img { width: 118px; display: block; border-radius: 8px; border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.08); } .wbPrevRow figcaption { font-size: 11px; color: var(--sub); text-align: center; margin-top: 3px; }
+  .wbPrevMore { flex: 0 0 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 8px; font-weight: 800; color: var(--sub); cursor: pointer; font-size: 14px; } .wbPrevMore small { font-size: 10.5px; font-weight: 600; margin-top: 2px; }
   /* v12.46 모닝 노트 */
   .opsTag.pop { background: #f3e6c4; color: #7a5c17; } .opsErr { margin-top: 6px; font-size: 12px; color: #b9600f; background: #fff3e6; border-radius: 6px; padding: 5px 8px; }
   .opsBoard .opsWide { grid-column: 1 / -1; } #tab-ops .opsT th:first-child, #tab-ops .opsT td:first-child { white-space: nowrap; } .opsBoard .opsPanel { overflow-x: auto; }
@@ -1444,7 +1448,7 @@
   .wbCols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   .wbFilt { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; } .wbFilt button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; color: var(--sub); cursor: pointer; } .wbFilt button.on { background: #14161c; color: #e6c57a; border-color: #14161c; } .wbQ { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; width: 90px; }
   .wbList { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; } .wbItem { display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; } .wbItem:last-child { border-bottom: 0; } .wbItem:hover { background: #fbf8f1; } .wbItem.on { background: #fff8e6; box-shadow: inset 3px 0 0 #c9a24f; }
-  .wbRank { width: 24px; flex: 0 0 24px; text-align: center; font-weight: 900; font-size: 13px; color: var(--sub); } .wbSc { display: inline-block; font-style: normal; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 5px; background: #eef0f3; color: var(--sub); } .wbSc.mid { background: #fbf5e6; color: #8a6a24; } .wbSc.hi { background: #14161c; color: #e6c57a; }
+  .wbRank { width: 28px; flex: 0 0 28px; text-align: center; font-weight: 900; font-size: 13px; color: var(--sub); } .wbSc { display: inline-block; font-style: normal; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 4px; min-width: 22px; text-align: center; white-space: nowrap; line-height: 1.4; background: #eef0f3; color: var(--sub); } .wbSc.mid { background: #fbf5e6; color: #8a6a24; } .wbSc.hi { background: #14161c; color: #e6c57a; }
   .wbMain { min-width: 0; flex: 1; } .wbMain b { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbMain small { display: block; color: var(--sub); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .wbDone { font-style: normal; font-size: 11px; color: #2e7d4f; font-weight: 700; } .wbG { flex: 0 0 84px; width: 84px; text-align: center; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; font-size: 10.5px; color: var(--sub); background: #eef0f3; border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
   .wbRight { position: sticky; top: 8px; } .wbSel { border: 1px solid #e6d3a3; background: #fffdf7; border-radius: 12px; padding: 12px 14px; } .wbSelT { font-weight: 900; font-size: 15px; } .wbSelD { color: var(--sub); font-size: 12.5px; margin-top: 2px; } .wbSel .hubWhy { margin-top: 8px; }
   .wbBriefBox { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; } .wbBrH { font-weight: 900; font-size: 13.5px; margin-bottom: 6px; } .wbBrH small { display: block; font-weight: 500; color: var(--sub); font-size: 11px; }
@@ -2714,7 +2718,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.56"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.57"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";

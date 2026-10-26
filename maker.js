@@ -176,6 +176,7 @@ function mkWorkHtml() {
 }
 function mkMakeHtml(S) {
   var h = '<div class="wbSel"><div class="wbSelT">' + escapeHtml(S.t) + '</div><div class="wbSelD">' + escapeHtml(S.d) + '</div>' + (S.why ? '<div class="hubWhy"><span>왜 지금</span>' + escapeHtml(S.why) + '</div>' : '') + '</div>';
+  h += '<div class="wbPrev" data-prev="' + escapeHtml(S.ctx) + '"><div class="briefDim">카드 미리보기를 그리는 중…</div></div>';   // v12.57 고르면 바로 카드 미리보기
   h += '<div class="wbBriefBox" data-brief="' + escapeHtml(S.ctx) + '"><div class="briefDim">읽는 요약(숫자 + 요즘 이슈 + 전문가)을 준비하는 중…</div></div>';
   h += '<div class="wbActs">' +
     '<button class="wbAct" data-hub="one" data-ctx="' + escapeHtml(S.ctx) + '"><b>한 장</b><small>핵심 숫자 + 이슈 띠 · 1장</small></button>' +
@@ -190,6 +191,7 @@ function mkWorkBind(pane) {
   var q = pane.querySelector(".wbQ"); if (q) { q.oninput = function () { MK.q = q.value; clearTimeout(MK.qt); MK.qt = setTimeout(function () { var pos = q.selectionStart; makerRender(); var q2 = document.querySelector("#mkBody .wbQ"); if (q2) { q2.focus(); try { q2.setSelectionRange(pos, pos); } catch (e) {} } }, 350); }; }
   Array.prototype.forEach.call(pane.querySelectorAll("[data-wsel]"), function (b) { b.onclick = function () { MK.sel = b.getAttribute("data-wsel"); makerRender(); var r = document.querySelector("#mkBody .wbRight"); if (r && window.innerWidth < 900) try { r.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }; });
   if (typeof mkAiBind === "function") mkAiBind(pane);   // v12.39 Claude 편성
+  var pv = pane.querySelector("[data-prev]"); if (pv) mkPreviewLoad(pv.getAttribute("data-prev"));   // v12.57
   if (typeof hubBind === "function") hubBind(pane);
   var bb = pane.querySelector("[data-brief]");
   if (bb && typeof hubBrief === "function") { var ctx = bb.getAttribute("data-brief"); hubBrief(ctx).then(function (B) { var cur = document.querySelector('#mkBody [data-brief="' + ctx.replace(/"/g, '\\"') + '"]'); if (cur) cur.innerHTML = hubBriefHtml(B); }).catch(function (e) { var cur = document.querySelector("#mkBody [data-brief]"); if (cur) cur.innerHTML = '<div class="briefDim">읽는 요약을 만들지 못했어요: ' + escapeHtml(e.message) + '</div>'; }); }
@@ -230,4 +232,29 @@ function mkDeckBind(box) {
       else if (k === "macro") macroDeckOpen(arg);
     };
   });
+}
+
+/* ============================================================ v12.57 주제를 고르면 오른쪽에 카드 미리보기 — '여러 장'과 같은 그림을 작게(저장·완료 표시 없음). 주제마다 10분 보관 ============================================================ */
+MK._prev = MK._prev || {};
+function mkPreviewHtml(P, ctx) {
+  if (!P) return '<div class="briefDim">이 주제는 미리보기 없이 바로 만들어요 — 아래 <b>여러 장</b>을 누르면 완성본이 떠요.</div>';
+  if (P.err) return '<div class="briefDim">미리보기를 그리지 못했어요: ' + escapeHtml(P.err) + '</div>';
+  return '<div class="wbPrevHead"><b>미리보기</b><small>' + P.n + '장 · 앱 데이터 그대로 · 누르면 크게</small></div><div class="wbPrevRow">' + P.imgs.map(function (u, i) { return '<figure data-pvi="' + i + '"><img src="' + u + '" alt=""><figcaption>' + (i === 0 ? "표지" : (i + 1) + "장") + '</figcaption></figure>'; }).join("") + (P.n > P.imgs.length ? '<div class="wbPrevMore">+' + (P.n - P.imgs.length) + '장<small>여러 장으로 전부</small></div>' : '') + '</div>';
+}
+function mkPreviewPaint(ctx) {
+  var box = document.querySelector('#mkBody .wbPrev[data-prev="' + ctx.replace(/"/g, '\\"') + '"]'); if (!box) return;
+  var P = MK._prev[ctx]; box.innerHTML = mkPreviewHtml(P === undefined ? null : P, ctx);
+  Array.prototype.forEach.call(box.querySelectorAll("[data-pvi]"), function (f) { f.onclick = function () { var i = +f.getAttribute("data-pvi"), big = document.createElement("div"); big.innerHTML = '<img alt="" style="width:100%;max-width:540px;display:block;margin:0 auto;border-radius:12px">'; big.querySelector("img").src = P.imgs[i]; if (typeof infoModal !== "undefined") infoModal.open((i === 0 ? "표지" : (i + 1) + "장") + " 미리보기", big); }; });
+  var more = box.querySelector(".wbPrevMore"); if (more) more.onclick = function () { var b = document.querySelector('#mkBody [data-hub="multi"]'); if (b) b.click(); };
+}
+function mkPreviewLoad(ctx) {
+  var P = MK._prev[ctx]; if (P && Date.now() - P.at < 10 * 60e3) { mkPreviewPaint(ctx); return; }
+  var S = typeof hubSrc === "function" ? hubSrc(ctx) : null;
+  if (!S) { MK._prev[ctx] = null; mkPreviewPaint(ctx); return; }
+  var mk = (typeof MK !== "undefined" && MK.mk) || null; if (mk && typeof briefState !== "undefined" && briefState.market !== mk && typeof switchBriefMarket === "function") switchBriefMarket(mk, true);
+  Promise.resolve(S.prep()).then(function () { return hubFonts(S.build); }).then(function (list) {
+    if (!list || !list.length) throw new Error("데이터가 아직 없어요");
+    var small = function (cv) { var c = document.createElement("canvas"), r = 300 / cv.width; c.width = 300; c.height = Math.round(cv.height * r); c.getContext("2d").drawImage(cv, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.85); };
+    MK._prev[ctx] = { at: Date.now(), n: list.length, imgs: list.slice(0, 3).map(function (it) { return small(it.cv); }) };
+  }).catch(function (e) { MK._prev[ctx] = { at: Date.now(), err: e.message, n: 0, imgs: [] }; }).then(function () { if (MK.sel === ctx) mkPreviewPaint(ctx); });
 }
