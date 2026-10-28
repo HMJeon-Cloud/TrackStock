@@ -505,30 +505,48 @@ function nbTodayDeck() {
   var R = typeof briefState !== "undefined" && briefState.result ? briefState.result : briefCompute(recent, {});
   var seed = nbSeed(), now = nbNow(), mods = [], st = nbStat, date = cDate(R.asOf || Date.now());
   function z(s) { return s && s.sd > 0 ? Math.abs(s.ret1) / s.sd : 0; }
+  /* v12.65 핵심 이슈 5와 역할 나누기 — 이슈 = '오늘 무엇이 일어났나', 관찰 = '그 숫자가 어디쯤인가(위치·폭·흐름)'.
+     이슈에 나온 종목·자산·카테고리는 여기서 같은 숫자로 반복하지 않는다: 다른 대상으로 바꾸거나, 다른 각도로 그리거나, 뺀다 */
+  var ISS = [], iCat = {}, iSym = {};
+  try { ISS = typeof hubIssuesList === "function" ? hubIssuesList() : (typeof briefState !== "undefined" && briefState.issues) || []; } catch (e) { ISS = []; }
+  (ISS || []).forEach(function (it) { iCat[String(it.cat || "").replace(/-.*/, "")] = 1; if (it.cat) iCat[it.cat] = 1; if (it.sym) iSym[it.sym] = 1; });
+  var IDX_ALIAS = { "^GSPC": ["SPY", "^GSPC"], "SPY": ["SPY", "^GSPC"], "^KS11": ["^KS11"], "^IXIC": ["^IXIC", "QQQ"] };
+  function inIss(sym) { if (!sym) return false; if (iSym[sym]) return true; var al = IDX_ALIAS[sym]; return !!(al && al.some(function (a) { return iSym[a]; })); }
   var spy = st("SPY"), ks = st("^KS11"), vix = st("^VIX"), tlt = st("TLT"), krw = st("KRW=X"), uso = st("USO"), gld = st("GLD"), btc = st("BTC-USD");
   /* 1. 오늘 가장 크게 움직인 자산 셋 (타일) */
-  var macro = [["^GSPC", "S&P500"], ["^KS11", "코스피"], ["^VIX", "공포지수"], ["TLT", "미국 장기채"], ["KRW=X", "달러/원"], ["USO", "원유"], ["GLD", "금"], ["BTC-USD", "비트코인"]].map(function (a) { var x = st(a[0]); return x ? { sym: a[0], name: a[1], s: x, z: z(x) } : null; }).filter(Boolean).sort(function (a, b) { return b.z - a.z; });
-  if (macro.length >= 3) mods.push({ score: macro[0].z, key: "macro", draw: function (c, n, pg, total) {
+  var macroAll = [["^GSPC", "S&P500"], ["^KS11", "코스피"], ["^VIX", "공포지수"], ["TLT", "미국 장기채"], ["KRW=X", "달러/원"], ["USO", "원유"], ["GLD", "금"], ["BTC-USD", "비트코인"]].map(function (a) { var x = st(a[0]); return x ? { sym: a[0], name: a[1], s: x, z: z(x) } : null; }).filter(Boolean).sort(function (a, b) { return b.z - a.z; });
+  var macro = macroAll.filter(function (x) { return !inIss(x.sym); }), macroSkip = macroAll.length - macro.length;
+  if (macro.length >= 3 && !(macroSkip && macro[0].z < 1.3)) mods.push({ score: macro[0].z * (macroSkip ? 0.8 : 1), key: "macro", draw: function (c, n, pg, total) {
     var m = macro.slice(0, 3), lead = m[0];
-    nbTop(c, n, nbPick([["오늘 가장 크게 움직인 건", "[[" + lead.name + " " + cPct(lead.s.ret1) + "]] — 평소 하루의 " + lead.z.toFixed(1) + "배.", "", "나머지 둘도 평소보다 컸다."], ["[[" + lead.name + "]]이 " + cPct(lead.s.ret1) + ".", "이 정도 움직임은 최근 90일 중 상위 " + Math.round((1 - (lead.s.pctRank || 0.5)) * 100) + "% 안이다.", "", "오늘은 이 숫자부터 본다."], ["뉴스보다 먼저 보는 숫자 셋.", "", "[[" + m.map(function (x) { return x.name + " " + cPct(x.s.ret1); }).join(" · ") + "]]"]], seed), pg, total);
-    nbBody(c, "오늘 평소와 가장 달랐던 숫자", date + " 종가 · 전일 대비 · 아래 작은 글씨는 평소 하루 변동 대비 배수");
+    if (macroSkip) { nbTop(c, n, ["이슈엔 안 올랐지만", "[[" + lead.name + " " + (lead.sym === "^VIX" ? lead.s.last.toFixed(1) : cPct(lead.s.ret1)) + "]] — 평소의 " + lead.z.toFixed(1) + "배.", "", "헤드라인 밖에서 움직인 숫자들."], pg, total); }
+    else nbTop(c, n, nbPick([["오늘 가장 크게 움직인 건", "[[" + lead.name + " " + cPct(lead.s.ret1) + "]] — 평소 하루의 " + lead.z.toFixed(1) + "배.", "", "나머지 둘도 평소보다 컸다."], ["[[" + lead.name + "]]이 " + cPct(lead.s.ret1) + ".", "이 정도 움직임은 최근 90일 중 상위 " + Math.round((1 - (lead.s.pctRank || 0.5)) * 100) + "% 안이다.", "", "오늘은 이 숫자부터 본다."], ["뉴스보다 먼저 보는 숫자 셋.", "", "[[" + m.map(function (x) { return x.name + " " + cPct(x.s.ret1); }).join(" · ") + "]]"]], seed), pg, total);
+    nbBody(c, macroSkip ? "핵심 이슈 밖에서 움직인 숫자" : "오늘 평소와 가장 달랐던 숫자", date + " 종가 · 전일 대비 · 아래 작은 글씨는 평소 하루 변동 대비 배수" + (macroSkip ? " · 이슈에 나온 자산은 뺐어요" : ""));
     nbTiles(c, m.map(function (x) { return { v: x.sym === "^VIX" ? x.s.last.toFixed(1) : cPct(x.s.ret1), l: x.name + " · 평소의 " + x.z.toFixed(1) + "배", color: x.sym === "^VIX" ? (x.s.last >= 25 ? NB_C.up : NB_C.navy) : cCol(x.s.ret1) }; }));
-    nbGoldLine(c, now.why.length ? now.why[0] : "두드러진 국면 신호 없음 — 평소 구간", "장기채↑=금리 하락 · VIX 25↑=공포 · 고점 대비 -10%=조정");
+    nbGoldLine(c, iCat.signal ? "평소 하루 변동의 " + lead.z.toFixed(1) + "배 — 최근 90일 중 상위 " + Math.max(1, Math.round((1 - (lead.s.pctRank || 0.5)) * 100)) + "%" : now.why.length ? now.why[0] : "두드러진 국면 신호 없음 — 평소 구간", iCat.signal ? "지금 시장 신호는 핵심 이슈에서" : "장기채↑=금리 하락 · VIX 25↑=공포 · 고점 대비 -10%=조정");
     nbFoot(c);
   } });
   /* 2. 급등 1위 종목 해부 (막대: 1일·1주·1달·3달) */
-  var up = R.movers && R.movers.up[0], dn = R.movers && R.movers.down[0];
-  var lead2 = up && dn ? (Math.abs(up.ret1) >= Math.abs(dn.ret1) ? up : dn) : up || dn;
-  if (lead2) mods.push({ score: z(lead2) * 0.9, key: "mover", draw: function (c, n, pg, total) {
+  var mvPool = (R.movers ? (R.movers.up || []).concat(R.movers.down || []) : []).filter(function (s) { return !inIss(s.sym) && !/^\^|=X$|=F$/.test(s.sym); }).sort(function (a, b) { return Math.abs(b.ret1) - Math.abs(a.ret1); });
+  var lead2 = mvPool[0] || null, moverQuiet = !!(iCat.mover && lead2);
+  if (lead2) mods.push({ score: z(lead2) * (moverQuiet ? 0.6 : 0.9), key: "mover", draw: function (c, n, pg, total) {
     var nm = briefName(lead2), isUp = lead2.ret1 >= 0;
     nbTop(c, n, nbPick([["오늘 " + (isUp ? "가장 많이 오른" : "가장 많이 내린") + " 종목은", "[[" + nm + " " + cPct(lead2.ret1) + "]].", "", "하루 숫자보다 [[어디서 왔는지]]를 본다 — 1주·1달·3달."], ["[[" + nm + "]] " + cPct(lead2.ret1) + ".", "", "고점 대비 " + cPct(lead2.vsHi, 0) + ", 20일선 " + (lead2.above20 ? "위" : "아래") + ".", (isUp ? "오른 날엔 '얼마나 올라와 있나'" : "내린 날엔 '얼마나 내려와 있나'") + "부터."]], seed + 1), pg, total);
-    nbBody(c, nm + " — 하루가 아니라 흐름으로", "오늘 · 1주 · 1달 · 3달 등락 · 지금 " + cPrice(lead2.sym, lead2.last));
+    nbBody(c, nm + " — 하루가 아니라 흐름으로", (moverQuiet ? "핵심 이슈의 급등락 다음으로 컸던 종목 · " : "") + "오늘 · 1주 · 1달 · 3달 등락 · 지금 " + cPrice(lead2.sym, lead2.last));
     nbBars(c, [{ l: "오늘", v: lead2.ret1, color: cCol(lead2.ret1) }, { l: "1주", v: lead2.ret5 || 0, color: NB_C.navy }, { l: "1달", v: lead2.m1, color: NB_C.navy }, { l: "3달", v: lead2.m3, color: NB_C.teal }, { l: "52주 고점比", v: lead2.vsHi || 0, color: NB_C.grey }]);
     nbFoot(c, "종가 기준 · 특정 종목 언급은 사실 전달이며 추천 아님");
   } });
   /* 3. 시장 온도 — 오른 종목 비율 vs 지수 (타일 2 + 골드라인) */
   var t = R.temp, idx = R.indexRow && R.indexRow[0];
-  if (t) mods.push({ score: Math.abs(t.upPct - 0.5) * 6, key: "temp", draw: function (c, n, pg, total) {
+  if (t && iCat.breadth && t.above200Pct != null) mods.push({ score: Math.abs(t.abovePct - 0.5) * 5 + 0.6, key: "temp", draw: function (c, n, pg, total) {
+    // 이슈가 '오늘 오른 비율'을 다뤘으니, 여기선 '추세 위치'(20일·200일선·고점 근처) — 하루가 아니라 몇 주·몇 달의 폭
+    var a20 = Math.round(t.abovePct * 100), a200 = Math.round(t.above200Pct * 100), nh = (t.nearHigh || []).length;
+    nbTop(c, n, [a200 >= 60 ? "긴 추세로 보면 [[" + a200 + "%]]가 200일선 위." : a200 <= 40 ? "200일선 위 종목은 [[" + a200 + "%]]뿐." : "200일선 위 [[" + a200 + "%]] — 반반.", "", a20 > a200 + 10 ? "짧은 추세(20일선 " + a20 + "%)가 긴 추세보다 강하다 — 반등이 넓어지는 중." : a20 < a200 - 10 ? "짧은 추세(20일선 " + a20 + "%)가 긴 추세보다 약하다 — 최근 몇 주가 식었다." : "짧은 추세와 긴 추세가 같은 방향이다."], pg, total);
+    nbBody(c, "시장의 폭 — 하루가 아니라 추세로", t.total + "개 · 20일선 위 · 200일선 위 · 52주 고점 근처(5% 안)");
+    nbTiles(c, [{ v: a20 + "%", l: "20일선 위 (몇 주 추세)", color: a20 >= 50 ? NB_C.up : NB_C.down }, { v: a200 + "%", l: "200일선 위 (1년 추세)", color: a200 >= 50 ? NB_C.up : NB_C.down }, { v: nh + "개", l: "52주 고점 5% 안" }]);
+    nbGoldLine(c, "20일선 > 200일선 비율이면 반등이 넓어지는 중, 반대면 식는 중", "오늘 오른 종목 비율은 핵심 이슈에서");
+    nbFoot(c);
+  } });
+  else if (t) mods.push({ score: Math.abs(t.upPct - 0.5) * 6, key: "temp", draw: function (c, n, pg, total) {
     var diverge = idx && ((idx.ret > 0 && t.upPct < 0.45) || (idx.ret < 0 && t.upPct > 0.55));
     nbTop(c, n, diverge ? ["지수는 " + cPct(idx.ret) + "인데", "오른 종목은 [[" + Math.round(t.upPct * 100) + "%]]뿐.", "", "몇 개 큰 종목이 지수를 끌었다. 내 종목이 안 오른 게 이상한 날이 아니다."] : nbPick([["오늘 오른 종목 [[" + Math.round(t.upPct * 100) + "%]].", "", t.upPct >= 0.6 ? "넓게 오른 날 — 지수와 체감이 같은 날." : t.upPct <= 0.4 ? "넓게 내린 날 — 개별 악재보다 시장 전체." : "반반 — 종목마다 다른 날."], ["열 종목 중 [[" + Math.round(t.upPct * 10) + "개]]가 올랐다.", "", "20일선 위 종목은 " + Math.round(t.abovePct * 100) + "% — 추세는 " + (t.abovePct >= 0.5 ? "아직 위쪽" : "아직 아래쪽") + "."]], seed + 2), pg, total);
     nbBody(c, "시장 온도 — 지수 뒤의 종목들", t.total + "개 집계 · 오른 종목 비율 · 20일선 위 비율");
@@ -538,7 +556,17 @@ function nbTodayDeck() {
   } });
   /* 4. 테마 — 1등 vs 꼴찌 (막대 5) */
   var th = R.themes || [];
-  if (th.length >= 4) mods.push({ score: Math.abs(th[0].ret - th[th.length - 1].ret) * 40, key: "theme", draw: function (c, n, pg, total) {
+  var byB = th.filter(function (x) { return x.n >= 3; }).map(function (x) { return Object.assign({ b: x.up / x.n }, x); }).sort(function (a, b) { return b.b - a.b; });
+  if (th.length >= 4 && iCat.theme && byB.length >= 4) mods.push({ score: Math.abs(th[0].ret - th[th.length - 1].ret) * 28, key: "theme", draw: function (c, n, pg, total) {
+    // 이슈가 '평균 등락 1등·꼴찌'를 다뤘으니, 여기선 '몇 개가 같이 움직였나'(업종 안의 폭) — 평균은 한두 종목이 끌 수 있다
+    var hi = byB[0], lo = byB[byB.length - 1], lead = th[0], lb = lead.up / lead.n;
+    nbTop(c, n, lb < 0.6 && lead.ret > 0 ? ["업종 1등 " + lead.name + "도", "같이 오른 건 [[" + lead.up + "/" + lead.n + "]]뿐.", "", "평균은 " + briefName(lead.best) + " 같은 몇 종목이 끌었다."] : ["가장 '다 같이' 오른 업종은 [[" + hi.name + "]].", "", hi.n + "개 중 " + hi.up + "개 상승 — 한두 종목이 아니라 업종 전체의 날."], pg, total);
+    nbBody(c, "업종 안의 폭 — 몇 개가 같이 움직였나", "업종별 오른 종목 비율 · 평균 등락은 핵심 이슈에서");
+    var pick = byB.slice(0, 3).concat(byB.slice(-2));
+    nbBars(c, pick.map(function (x) { return { l: x.name, v: x.b, color: x.b >= 0.6 ? NB_C.up : x.b <= 0.4 ? NB_C.down : NB_C.navy, txt: x.up + "/" + x.n }; }));
+    nbFoot(c);
+  } });
+  else if (th.length >= 4 && !iCat.theme) mods.push({ score: Math.abs(th[0].ret - th[th.length - 1].ret) * 40, key: "theme", draw: function (c, n, pg, total) {
     var a = th[0], b = th[th.length - 1];
     nbTop(c, n, nbPick([["오늘 돈은 [[" + a.name + "]]로 갔고", b.name + "에서 나왔다.", "", "차이 " + cPct(a.ret - b.ret) + "p — 같은 시장, 다른 하루."], ["[[" + a.name + " " + cPct(a.ret) + "]] vs " + b.name + " " + cPct(b.ret) + ".", "", "업종 1등엔 " + briefName(a.best) + " " + cPct(a.best.ret) + "이 있었다."]], seed + 3), pg, total);
     nbBody(c, "업종 흐름 — 위 둘, 아래 둘, 그리고 가운데", "업종 평균 등락 · 오른 종목 수");
@@ -548,8 +576,9 @@ function nbTodayDeck() {
   } });
   /* 5. 낙폭 — 대표 자산 중 -10% 아래 (목록) */
   var dds = NB_DD_SYMS.map(nbDd).filter(Boolean).sort(function (a, b) { return a.cur - b.cur; });
-  if (dds.length >= 3 && dds[0].cur <= -0.08) mods.push({ score: Math.abs(dds[0].cur) * 8, key: "dd", draw: function (c, n, pg, total) {
-    var d = dds[0];
+  var ddLead = dds.filter(function (x) { return !inIss(x.sym); })[0] || null;
+  if (dds.length >= 3 && ddLead && ddLead.cur <= -0.08) mods.push({ score: Math.abs(ddLead.cur) * (iCat.mdd ? 5 : 8), key: "dd", draw: function (c, n, pg, total) {
+    var d = ddLead;
     nbTop(c, n, nbPick([["[[" + d.name + "]]은 전고점을", "못 넘은 지 [[" + nbMonths(d.sincePeak) + "]]째.", "", d.medSim != null ? "비슷한 깊이의 과거 " + d.simN + "번은 고점까지 보통 " + nbMonths(d.medSim) + " 걸렸다." : "이만큼 빠졌다 회복한 전례가 아직 없다."], ["고점 대비 [[" + cPct(d.cur, 0) + "]] — " + d.name + ".", "", "지난 " + Math.round(d.years) + "년 중 이보다 깊었던 적 " + d.deeper + "번. " + (d.deeper ? "모두 끝이 있었다." : "처음이다.")]], seed + 4), pg, total);
     nbBody(c, "대표 자산의 고점 대비 위치", "역대 최고가 대비 · 최고가 이후 기간 · 비슷한 깊이의 과거 회복(중앙값)");
     nbRows(c, dds.map(function (x) { return ["최고가 후 " + nbMonths(x.sincePeak) + (x.medSim != null ? " · 과거 회복 " + nbMonths(x.medSim) : ""), x.name, cPct(x.cur, 0), x.cur <= -0.1 ? NB_C.up : NB_C.navy]; }), 340);
@@ -563,7 +592,8 @@ function nbTodayDeck() {
     nbBody(c, "숫자 넷으로 보는 시장 위치", "세일 중 · 신고가 근처 · 20일선 위 · 공포지수");
     var lbl = ["세일 중 (고점 -20%↓)", "신고가 근처", "20일선 위 비율", "공포지수 VIX"], four = nums.slice(0, 4);
     while (four.length < 4) four.push({ v: vix ? vix.last.toFixed(1) : "-", l: "VIX" });
-    nbChecks(c, four.map(function (x, i) { return { t: lbl[i], s: x.v + (i === 0 ? " — 싸졌다는 사실" : i === 1 ? " — 강한 종목들" : i === 2 ? " — 추세 위" : (vix && vix.last < 20 ? " — 평온" : vix && vix.last < 25 ? " — 불안" : " — 공포")), ok: i === 1 ? athN >= 5 : i === 2 ? !!(t && t.abovePct >= 0.5) : i === 3 ? !!(vix && vix.last < 20) : saleN / Math.max(1, R.count) < 0.4 }; }));
+    if (inIss("^VIX") && t && t.above200Pct != null) { lbl[3] = "200일선 위 비율"; four[3] = { v: Math.round(t.above200Pct * 100) + "%", l: "200일선" }; }   // v12.65 VIX는 핵심 이슈에 있으니 1년 추세로
+    nbChecks(c, four.map(function (x, i) { return { t: lbl[i], s: x.v + (i === 0 ? " — 싸졌다는 사실" : i === 1 ? " — 강한 종목들" : i === 2 ? " — 추세 위" : lbl[3] !== "공포지수 VIX" ? " — 1년 추세 위" : (vix && vix.last < 20 ? " — 평온" : vix && vix.last < 25 ? " — 불안" : " — 공포")), ok: i === 1 ? athN >= 5 : i === 2 ? !!(t && t.abovePct >= 0.5) : i === 3 ? (lbl[3] !== "공포지수 VIX" ? !!(t && t.above200Pct >= 0.5) : !!(vix && vix.last < 20)) : saleN / Math.max(1, R.count) < 0.4 }; }));
     nbFoot(c);
   } });
   /* 7. 역사 속 이번 주 (타임라인 목록) */
@@ -589,7 +619,7 @@ function nbTodayDeck() {
   /* 9. 뉴스 vs 숫자 (목록) */
   if (typeof CARD_NEWS !== "undefined" && CARD_NEWS.items.length) {
     var items = CARD_NEWS.items.map(function (it) { var m = NB_NEWS_MAP.filter(function (p) { return p[0].test(it.title); })[0]; var x = m ? st(m[1]) : null; return x ? { title: cNewsClean(it.title), sym: m[1], s: x, press: it.press } : null; }).filter(Boolean);
-    var seen = {}; items = items.filter(function (x) { if (seen[x.sym]) return false; seen[x.sym] = 1; return true; }).slice(0, 4);
+    var seen = {}; items = items.filter(function (x) { if (seen[x.sym] || inIss(x.sym)) return false; seen[x.sym] = 1; return true; }).slice(0, 4);
     if (items.length >= 2) mods.push({ score: 1.2 + Math.max.apply(null, items.map(function (x) { return z(x.s); })) * 0.5, key: "news", draw: function (c, n, pg, total) {
       var big = items.slice().sort(function (a, b) { return Math.abs(b.s.ret1) - Math.abs(a.s.ret1); })[0];
       nbTop(c, n, nbPick([["오늘 아침 기사 " + items.length + "개의 자산 중", "숫자가 가장 컸던 건 [[" + nbName(big.sym) + " " + cPct(big.s.ret1) + "]].", "", "기사는 이유를 말하고, 숫자는 크기를 말한다."], ["\"" + (items[0].title.length > 24 ? items[0].title.slice(0, 23) + "…" : items[0].title) + "\"", "", "실제 숫자: [[" + nbName(items[0].sym) + " " + cPct(items[0].s.ret1) + "]]. 제목의 크기와 숫자의 크기는 다를 때가 많다."]], seed + 6), pg, total);
@@ -608,8 +638,8 @@ function nbTodayDeck() {
     nbFoot(c);
   } });
   /* 11. 돈이 몰린 곳 (목록) */
-  var hot = (R.hotVol || []).slice(0, 5);
-  if (hot.length >= 3) mods.push({ score: (hot[0].amtX || 1) * 0.6, key: "money", draw: function (c, n, pg, total) {
+  var hot = (R.hotVol || []).filter(function (x) { return !inIss(x.sym); }).slice(0, 5);
+  if (hot.length >= 3) mods.push({ score: (hot[0].amtX || 1) * (iCat.hot ? 0.4 : 0.6), key: "money", draw: function (c, n, pg, total) {
     nbTop(c, n, nbPick([["오늘 돈이 몰린 곳은 [[" + briefName(hot[0]) + "]].", "거래대금이 평소의 " + (hot[0].amtX || 0).toFixed(1) + "배.", "", "관심이 쏠린 곳은 방향이 아니라 변동이 커진다."], ["거래대금 평소의 [[" + (hot[0].amtX || 0).toFixed(1) + "배]] — " + briefName(hot[0]) + ".", "", "몰린 돈은 며칠 뒤 되돌림도 큰 편이었다. 관찰 목록에만."]], seed + 7), pg, total);
     nbBody(c, "거래대금이 평소보다 급증한 종목", "20일 평균 대비 배수 · 오늘 등락");
     nbRows(c, hot.map(function (x) { return ["평소의 " + (x.amtX || 0).toFixed(1) + "배 · " + cPrice(x.sym, x.last), briefName(x), cPct(x.ret1), cCol(x.ret1)]; }), 300);
@@ -629,7 +659,7 @@ function nbTodayDeck() {
   var chosen = mods.slice(0, 6);
   if (!chosen.length) return [];
   var total = chosen.length + 2, pg = 0, n = 0, out = [];
-  var leadMod = chosen[0], covers = [["오늘 가장 이례적인 것부터", ["오늘 시장에서", "[[평소와 달랐던]] " + chosen.length + "가지"], "순서는 '얼마나 이례적인가'로 매일 새로 정해져요. 1번이 오늘의 주인공."], ["숫자가 먼저, 해석은 나중", ["[[" + date + "]]", "데이터가 고른 오늘의 관찰 " + chosen.length + "개"], "큰 뉴스와 큰 숫자는 다를 때가 많아요. 오늘은 숫자부터."], ["매일 다른 질문", ["오늘은 [[" + { macro: "지수와 금리", mover: "한 종목", temp: "시장 온도", theme: "업종", dd: "낙폭", numbers: "위치", history: "역사", season: "계절", news: "뉴스", fx: "환율", money: "거래대금", dca: "적립" }[leadMod.key] + "]]부터", "본다."], "오늘 데이터에서 가장 눈에 띈 것을 1번으로 올렸어요."]];
+  var leadMod = chosen[0], covers = ISS.length ? [["핵심 이슈 다음 장", ["이슈는 '무엇이',", "관찰은 [[그 숫자가 어디쯤인지]]"], "핵심 이슈에 나온 숫자는 반복하지 않아요 — 오늘은 위치·폭·흐름으로 " + chosen.length + "가지."], ["헤드라인 밖의 숫자", ["오늘 이슈에 안 오른", "[[" + chosen.length + "가지 관찰]]"], "큰 뉴스와 겹치지 않게 골랐어요. 1번이 오늘 가장 이례적인 것."]] : [["오늘 가장 이례적인 것부터", ["오늘 시장에서", "[[평소와 달랐던]] " + chosen.length + "가지"], "순서는 '얼마나 이례적인가'로 매일 새로 정해져요. 1번이 오늘의 주인공."], ["숫자가 먼저, 해석은 나중", ["[[" + date + "]]", "데이터가 고른 오늘의 관찰 " + chosen.length + "개"], "큰 뉴스와 큰 숫자는 다를 때가 많아요. 오늘은 숫자부터."], ["매일 다른 질문", ["오늘은 [[" + { macro: "지수와 금리", mover: "한 종목", temp: "시장 온도", theme: "업종", dd: "낙폭", numbers: "위치", history: "역사", season: "계절", news: "뉴스", fx: "환율", money: "거래대금", dca: "적립" }[leadMod.key] + "]]부터", "본다."], "오늘 데이터에서 가장 눈에 띈 것을 1번으로 올렸어요."]];
   var cv = nbPick(covers, seed);
   pg++; out.push({ name: "표지", cv: nbCover(cv[0], cv[1], cv[2]) });
   chosen.forEach(function (m) { var c = nbNew(); pg++; n++; try { m.draw(c, n, pg, total); } catch (e) { console.warn(m.key, e); return; } out.push({ name: m.key, cv: c.cv }); });
