@@ -12,7 +12,7 @@ const BASE = `너는 한국 투자 데이터 계정 '우상향연구소(@uphill.
 
 const TASKS = {
   analyst: {
-    tier: "main", web: 6, max: 16000, timeout: 280000,
+    tier: "main", web: 4, max: 20000, timeout: 270000,
     system: BASE + `
 이번 작업: 증권사 리서치 팀장처럼 '끝까지' 분석한다. 허술한 요약은 실패다. 반드시:
 - 분석을 시작하기 전에 세운 '출발 가설'과 그걸 검증하려고 무엇을 봤는지, 어떤 근거에 무게를 뒀고 어디서 생각이 바뀌었는지를 투명하게 쓴다(=어떤 방향·생각으로 이 결론이 나왔는지).
@@ -22,7 +22,8 @@ const TASKS = {
 - 실패 시나리오(6개월 뒤 -30%라면 원인 3개·조기 경고 신호)와 '생각을 바꿀 조건' 3개를 숫자·사건으로 딱 잘라 쓴다.
 - 결론은 행동 수준(검토·관망·분할·비중 조절 등)과 그 조건으로 말한다. 단정적 권유는 하지 않는다.
 - 서술형 첫 문단은 【사고 과정】, 마지막 바로 앞 문단은 【실패 시나리오】로 쓴다.
-사용자 메시지의 '답변 형식'(## 서술형 / ## 카드형)을 정확히 지킨다. 형식 외 머리말·인사 금지.`
+사용자 메시지의 '답변 형식'(## 서술형 / ## 카드형)을 정확히 지킨다. 형식 외 머리말·인사 금지.
+길이(v12.66): 서울 서버 시간 한도(5분) 안에 끝나야 한다. 틀이 하나면 서술형 3,000자, 여러 틀(풀세트·6틀)이면 틀마다 핵심 3~4문단 + 종합으로 전체 서술형 7,000자 이내. 웹 검색은 빈칸을 메울 때만(최대 4회). 반드시 '## 서술형'으로 시작하고 '## 카드형' 블록으로 끝낸다 — 길어질 것 같으면 서술을 줄이고 카드형은 꼭 쓴다.`
   },
   inspect: {
     tier: "main", web: 2, max: 10000, timeout: 240000,
@@ -180,7 +181,7 @@ async function runClaude(body, key, used) {
   try {
     let blocks = [], j = null, r = null, turns = 0, usage = { input_tokens: 0, output_tokens: 0 };
     for (;;) {
-      ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000)), !!body.json));
+      ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000)), true));   // v12.66 생각(thinking) 블록이 출력 한도를 먹지 않게 모든 작업에서 끔(모델이 거부하면 자동으로 설정 없이)
       if (!r.ok || !j) return { ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) || ("Claude API 오류 " + r.status) };
       blocks = blocks.concat(j.content || []); if (j.usage) { usage.input_tokens += j.usage.input_tokens || 0; usage.output_tokens += j.usage.output_tokens || 0; }
       if (j.stop_reason === "pause_turn" && turns < 3 && left() > 60000) { turns++; payload.messages = payload.messages.concat([{ role: "assistant", content: j.content }]); continue; }
@@ -189,10 +190,10 @@ async function runClaude(body, key, used) {
     /* v12.48 글 없이 끝난 경우(검색만 하다 max_tokens 등) — 지금까지 모은 검색 결과를 그대로 이어 붙이고 "이제 결과만 써라"고 한 번 더(도구 없이). 그래도 안 되면 웹 없이 앱 숫자만으로 새로 */
     let finish = null, textNow = blocks.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
     if (!textNow && left() > 45000) {
-      const ask = { role: "user", content: "검색은 여기까지. 지금까지 읽은 자료와 앱 숫자로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") };
+      const ask = { role: "user", content: "검색은 여기까지. 지금까지 읽은 자료와 앱 숫자로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : body.task === "analyst" ? "'## 서술형'으로 시작해 '## 카드형' 블록까지, 처음 요청한 답변 형식 그대로." : "결과만.") };
       let f1 = null;
-      if (blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: payload.messages.concat([{ role: "assistant", content: blocks }, ask]) }, Math.min(T.timeout, left() - 30000)); } catch (e) { f1 = null; } }
-      if (!(f1 && f1.r.ok && f1.j && (f1.j.content || []).some((b) => b.type === "text" && b.text.trim())) && left() > 45000) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "user", content: "(웹 검색 없이) 위 앱 숫자와 후보 기사만으로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") }] }, Math.min(T.timeout, left() - 5000)); } catch (e) { f1 = null; } }
+      if (blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: payload.messages.concat([{ role: "assistant", content: blocks.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking") }, ask]) }, Math.min(T.timeout, left() - 30000), true); } catch (e) { f1 = null; } }
+      if (!(f1 && f1.r.ok && f1.j && (f1.j.content || []).some((b) => b.type === "text" && b.text.trim())) && left() > 45000) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "user", content: "(웹 검색 없이) 위 앱 숫자와 후보 기사만으로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") }] }, Math.min(T.timeout, left() - 5000), true); } catch (e) { f1 = null; } }
       if (f1 && f1.r.ok && f1.j) { finish = f1.j.stop_reason || "finish"; blocks = blocks.concat(f1.j.content || []); if (f1.j.usage) { usage.input_tokens += f1.j.usage.input_tokens || 0; usage.output_tokens += f1.j.usage.output_tokens || 0; } }
     }
     const texts = blocks.filter((b) => b.type === "text").map((b) => b.text), text = texts.join("");

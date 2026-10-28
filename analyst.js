@@ -466,11 +466,16 @@ function anAutoMerge(t1, t2, src) {
 }
 function anAutoRun(prompt, O) {
   var m = anMod(), label = m.no + " " + m.t + (AN.sym && m.need === "stock" ? " · " + anName(AN.sym) : "") + " · " + ({ module: "이 틀만", full: "종목 풀세트", all: "전체 6틀" })[AN.pScope || "module"], src = [];
-  AN.auto = null; anAutoSet({ busy: true, step: 1, label: label, msg: "Claude가 앱 데이터를 읽고, 빈칸은 최신 공시·기사로 보완하며 분석 중이에요 (1~4분)…", err: null, src: [] });
+  AN.auto = null; AN.autoNote = null; anAutoSet({ busy: true, step: 1, label: label, msg: "Claude가 앱 데이터를 읽고, 빈칸은 최신 공시·기사로 보완하며 분석 중이에요 (1~4분)…", err: null, src: [] });
   var t0 = Date.now(), t1 = "";
   smClaude("analyst", prompt).then(function (j) {
     t1 = j.text || ""; src = j.sources || [];
-    if (!/##\s*카드형/.test(t1) && !/##\s*서술형/.test(t1)) throw new Error("분석 형식이 맞지 않아요 — 다시 시도해 주세요");
+    /* v12.66 형식 머리(## 서술형/카드형)가 빠졌어도 내용이 있으면 살린다 — 빈 답일 때만 실패(이유를 같이 보여 줌) */
+    if (!/##\s*카드형/.test(t1) && !/##\s*서술형/.test(t1)) {
+      if (String(t1).replace(/\s+/g, "").length > 400) t1 = "## 서술형\n" + t1;
+      else throw new Error("Claude 답이 비어 있어요(멈춘 이유: " + (j.stop || "?") + (j.blocks ? " · 블록 " + Object.keys(j.blocks).map(function (k) { return k + "×" + j.blocks[k]; }).join(", ") : "") + (j.usage ? " · 출력 토큰 " + j.usage.output_tokens : "") + ") — 범위를 '이 틀만'으로 줄이거나 다시 시도해 주세요");
+    }
+    if (j.stop === "max_tokens" && !/##\s*카드형/.test(t1)) AN.autoNote = "답이 길어 끝부분(카드형)이 잘렸어요 — 서술형만 저장했어요";
     anAutoSet({ step: 2, src: src, msg: "검사관이 숫자·출처·논리를 다시 확인하는 중… (분석에서 웹 검색 " + (j.searches || []).length + "회 사용)" });
     return smClaude("inspect", anPromptInspector(O && AN.pScope === "module" ? O : null, t1)).then(function (k) { (k.sources || []).forEach(function (s) { if (!src.some(function (x) { return x.u === s.u; })) src.push(s); }); return k.text || ""; }).catch(function (e) { AN.auto.msg = "검사관 단계 실패(" + e.message + ") — 분석 원문으로 저장해요"; return ""; });
   }).then(function (t2) {
@@ -483,7 +488,7 @@ function anAutoRun(prompt, O) {
     anAutoSet({ step: 4, msg: "카드를 만드는 중…" });
     var P = anParse(it.text || ""), kind = P.items.length ? "card" : "narr";
     anMakeCards(it, kind, null);
-    anAutoSet({ busy: false, step: 5, msg: "완료 · " + Math.round((Date.now() - t0) / 1000) + "초 · ④에 저장됨 · " + (kind === "card" ? "카드형" : "서술형") + " 카드를 열었어요(다른 형태는 ⑤에서)" });
+    anAutoSet({ busy: false, step: 5, msg: (AN.autoNote ? AN.autoNote + " · " : "") + "완료 · " + Math.round((Date.now() - t0) / 1000) + "초 · ④에 저장됨 · " + (kind === "card" ? "카드형" : "서술형") + " 카드를 열었어요(다른 형태는 ⑤에서)" });
   }).catch(function (e) { anAutoSet({ busy: false, err: "자동 분석 실패: " + e.message + (t1 ? " — 분석 원문은 ④ 입력칸에 넣어 두었어요" : "") }); if (t1) { var ta = document.getElementById("anAnsMain"); if (ta) ta.value = t1; } });
 }
 
