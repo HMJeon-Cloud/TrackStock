@@ -2746,7 +2746,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.67"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.68"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -5146,7 +5146,7 @@ setTimeout(smBootDone, 3000);
 <!-- v12.13 앱 스크립트 한 곳에서 로드 — 버전은 SM_VER 하나만 올리면 전 파일 캐시가 같이 갱신된다(파일마다 ?v= 손으로 올리던 실수 방지). 순서는 의존 관계 그대로 -->
 <script>
 (function () {
-  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js","pro.js","tg.js"];
+  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js","pro.js","tg.js","anx.js"];
   document.write(files.map(function (f) { return '<script src="' + f + '?v=' + SM_VER + '"><\/script>'; }).join(""));
 })();
 </script>
