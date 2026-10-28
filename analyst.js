@@ -473,9 +473,11 @@ function anAutoRun(prompt, O) {
     /* v12.66 형식 머리(## 서술형/카드형)가 빠졌어도 내용이 있으면 살린다 — 빈 답일 때만 실패(이유를 같이 보여 줌) */
     if (!/##\s*카드형/.test(t1) && !/##\s*서술형/.test(t1)) {
       if (String(t1).replace(/\s+/g, "").length > 400) t1 = "## 서술형\n" + t1;
+      else if (j.stop === "refusal") throw new Error("Claude가 이 요청을 거절했어요" + (j.retry ? " (" + j.retry + ")" : "") + " — 프롬프트 안의 표현(예: 매수·매도 판단)이 안전 기준에 걸린 것 같아요. ③ 아래 '수동 → 프롬프트 보기'로 문구를 확인하거나, 잠시 뒤 다시 시도해 주세요");
       else throw new Error("Claude 답이 비어 있어요(멈춘 이유: " + (j.stop || "?") + (j.blocks ? " · 블록 " + Object.keys(j.blocks).map(function (k) { return k + "×" + j.blocks[k]; }).join(", ") : "") + (j.usage ? " · 출력 토큰 " + j.usage.output_tokens : "") + ") — 범위를 '이 틀만'으로 줄이거나 다시 시도해 주세요");
     }
     if (j.stop === "max_tokens" && !/##\s*카드형/.test(t1)) AN.autoNote = "답이 길어 끝부분(카드형)이 잘렸어요 — 서술형만 저장했어요";
+    if (j.retry) AN.autoNote = (AN.autoNote ? AN.autoNote + " · " : "") + "처음엔 거절돼서 다시 받았어요(" + j.retry + ")";
     anAutoSet({ step: 2, src: src, msg: "검사관이 숫자·출처·논리를 다시 확인하는 중… (분석에서 웹 검색 " + (j.searches || []).length + "회 사용)" });
     return smClaude("inspect", anPromptInspector(O && AN.pScope === "module" ? O : null, t1)).then(function (k) { (k.sources || []).forEach(function (s) { if (!src.some(function (x) { return x.u === s.u; })) src.push(s); }); return k.text || ""; }).catch(function (e) { AN.auto.msg = "검사관 단계 실패(" + e.message + ") — 분석 원문으로 저장해요"; return ""; });
   }).then(function (t2) {
