@@ -381,7 +381,7 @@ function pubRender(target, onlyTab) {
   Array.prototype.forEach.call(box.querySelectorAll("[data-per]"), function (b) { b.onclick = function () { perOpen(b.getAttribute("data-per")); }; });
   Array.prototype.forEach.call(box.querySelectorAll("[data-term]"), function (b) { b.onclick = function () { pubState.termOffset += +b.getAttribute("data-term"); pubRender(); }; });
   if (pubState.tab === "caption") { var cap2 = pubCaption();
-    try { var Rb = (typeof briefState !== "undefined" && briefState.result) || chState.brief, ib = (typeof briefState !== "undefined" && briefState.recent) ? issuesCompute(briefState.recent, { market: briefState.market }) : (chState.issues || []); thrBind(box, thrOr(thrDaily(Rb, ib, null), cap2)); } catch (e) { console.warn(e); thrBind(box, thrOr([], cap2)); } }
+    try { var Rb = chState.brief || (typeof briefState !== "undefined" && briefState.result), ib = (chState.issues && chState.issues.length) ? chState.issues : ((typeof briefState !== "undefined" && briefState.recent) ? issuesCompute(briefState.recent, { market: briefState.market }) : []);   /* v12.69 히어로와 같은 범위(주식 · 코인 제외) */ thrBind(box, thrOr(thrDaily(Rb, ib, null), cap2)); } catch (e) { console.warn(e); thrBind(box, thrOr([], cap2)); } }
   Array.prototype.forEach.call(box.querySelectorAll("[data-copy]"), function (b) {
     b.onclick = function () { var k = b.getAttribute("data-copy"), cap3 = pubCaption(); chCopy(k === "ig" ? cap3.ig : pubTermCaption(pubTerm(pubState.termOffset)), b); };
   });

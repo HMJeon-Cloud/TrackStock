@@ -43,10 +43,17 @@ function opsStep(i, k, st, title, what, body, acts) {
   return '<article class="opsStep ' + st + '" data-step="' + k + '"><header><span class="opsNode">' + (st === "done" ? "✓" : i) + '</span><div><h3>' + title + '</h3><p>' + what + '</p></div></header><div class="opsStepBody">' + body + '</div><footer>' + acts + '</footer></article>';
 }
 /* 볼 리포트 — 리포트 탭의 '오늘의 리포트'와 같은 목록(rpAiPicks: 후보 밖 종목도 이름으로) */
+/* v12.69 이름만 있는 리포트 후보 → 종목 질문 id (못 찾으면 버튼을 만들지 않음) */
+function opsRepFromName(r) {
+  var t = String(r.ticker || "").trim().toUpperCase(), sym = null;
+  if (/^\d{6}$/.test(t)) sym = t + ".KS"; else if (/^[A-Z.\-]{1,6}$/.test(t)) sym = t.replace(".", "-");
+  try { if (typeof searchDict === "function" && typeof TICKER_DICT !== "undefined") { var hit = searchDict(TICKER_DICT, r.name || t)[0]; if (hit && (!sym || /\.K[SQ]$/.test(hit.symbol) === /\.K[SQ]$/.test(sym))) sym = hit.symbol; } } catch (e) {}
+  return sym ? { id: "stock:" + sym, t: r.name + ", 기회인가 위기인가", why: r.why } : null;
+}
 function opsReps(plan, qb) {
   var ai = null; try { ai = typeof rpAiPicks === "function" ? rpAiPicks() : null; } catch (e) {}
   if (ai && ai.length) return ai.map(function (q) { return { id: q.id, t: q.t, why: String(q.pickWhy || "").replace(/^✨ /, "") }; });
-  return plan ? (plan.reports || []).map(function (r) { return qb[r.id] ? { id: r.id, t: qb[r.id].t, why: r.why } : r.name ? { id: "", t: r.name + ", 기회인가 위기인가", why: r.why } : null; }).filter(Boolean) : [];
+  return plan ? (plan.reports || []).map(function (r) { return qb[r.id] ? { id: r.id, t: qb[r.id].t, why: r.why } : r.name ? opsRepFromName(r) : null; }).filter(Boolean) : [];
 }
 function opsSteps() {
   var mk = smMk(), D = smFlowDone(mk), next = SM_FLOW.filter(function (s) { return !D[s.k]; })[0], st = function (k) { return D[k] ? "done" : next && next.k === k ? "now" : "wait"; };
@@ -61,7 +68,7 @@ function opsSteps() {
     '<button class="opsBtn" data-ops="recheck">다시 확인</button><button class="opsLink" data-ops="go:data">데이터 센터</button>' + (D.data ? '' : '<button class="opsLink" data-ops="mark:data">확인했어요</button>')));
   // ② 오늘 브리핑 (Claude 한 번)
   var nIss = A ? (A.data.issues || []).filter(function (x) { return x.why; }).length : 0;
-  var b2 = A ? '<p class="opsLead">' + opsEsc((A.data.story || [])[0] || A.data.note || "") + '</p><ul class="opsGot"><li>해설 ' + (A.data.story || []).filter(Boolean).length + '줄</li><li>이슈 이유 ' + nIss + '/' + (A.iss || []).length + '</li><li>급등락 이유 ' + (A.data.movers || []).filter(function (m) { return m.why; }).length + '</li><li>내일 볼 것 ' + (A.data.tomorrow || []).length + '</li><li>카드 편성 ' + (plan ? (plan.picks || []).length : 0) + '</li><li>리포트 ' + opsReps(plan, {}).length + '</li></ul><div class="opsMuted">' + opsHM(A.at) + ' · 웹 검색 ' + (A.searches || 0) + '회' + (A.repaired ? ' · 형식 자동 복구' : '') + (A.truncated ? ' · <span class="opsHot">답이 길어 뒷부분이 잘림 — 다시 만들면 대개 전부 나와요</span>' : '') + (A.stop && A.stop !== "end_turn" ? ' · 멈춤 ' + opsEsc(A.stop) : '') + (A.shared ? ' · 국내·미국·코인 공통' : '') + '</div>' + (A.raw ? '<button class="opsLink" data-ops="raw">Claude 원문 보기</button>' : '') + ''
+  var b2 = A ? '<p class="opsLead">' + opsEsc((A.data.story || [])[0] || A.data.note || "") + '</p><ul class="opsGot"><li>해설 ' + (A.data.story || []).filter(Boolean).length + '줄</li><li>이슈 이유 ' + nIss + '/' + (A.iss || []).length + (A.shared ? ' <small>(세 시장 합산)</small>' : '') + '</li><li>급등락 이유 ' + (A.data.movers || []).filter(function (m) { return m.why; }).length + '</li><li>내일 볼 것 ' + (A.data.tomorrow || []).length + '</li><li>카드 편성 ' + (plan ? (plan.picks || []).length : 0) + '</li><li>리포트 ' + opsReps(plan, {}).length + '</li></ul><div class="opsMuted">' + opsHM(A.at) + ' · 웹 검색 ' + (A.searches || 0) + '회' + (A.repaired ? ' · 형식 자동 복구' : '') + (A.truncated ? ' · <span class="opsHot">답이 길어 뒷부분이 잘림 — 다시 만들면 대개 전부 나와요</span>' : '') + (A.stop && A.stop !== "end_turn" ? ' · 멈춤 ' + opsEsc(A.stop) : '') + (A.shared ? ' · 국내·미국·코인 공통' : '') + '</div>' + (A.raw ? '<button class="opsLink" data-ops="raw">Claude 원문 보기</button>' : '') + ''
     : R ? '<div class="opsMuted">Claude 호출 한 번으로 국내·미국·코인을 함께 읽고 여섯 가지를 채워요: 시장 해설 3줄 · 핵심 이슈 왜/그래서/볼 것 · 급등락 이유 · 내일 볼 것 · 오늘 카드 편성 · 볼 리포트</div>' : '<div class="opsMuted">브리핑 계산 중…</div>';
   if (typeof SM_DAILY !== "undefined" && SM_DAILY.last && !A) b2 += '<div class="opsErr">마지막 시도 실패 ' + opsHM(SM_DAILY.last.at) + ' — ' + opsEsc(String(SM_DAILY.last.msg || "").split("\n")[0]) + (SM_DAILY.last.raw ? ' <button class="opsLink" data-ops="rawerr">원문 보기</button>' : '') + '</div>';
   h.push(opsStep(2, "brief", st("brief"), "오늘 브리핑", "Claude 한 번으로 세 시장 — 보는 시장에 맞춰 해설 · 편성 · 일정이 나뉘어요", b2,

@@ -55,7 +55,7 @@ function arcVerifyOne(it) {
   var key = it.id + ":" + Math.floor(Date.now() / 36e5); if (ARC_ST.verify[key]) return Promise.resolve(ARC_ST.verify[key]);
   return (typeof rpLoad === "function" ? rpLoad([it.sym]) : Promise.resolve()).then(function () {
     var rows = typeof rpRows === "function" ? rpRows(it.sym) : []; if (!rows.length) return null;
-    var last = rows[rows.length - 1], since = last.c / it.snap.price - 1, days = Math.round((last.t - it.at) / 86400e3), ex = arcExpect(it.p && it.p.verdictSt);
+    var last = rows[rows.length - 1], since = last.c / it.snap.price - 1, days = Math.max(0, Math.round((last.t - it.at) / 86400e3)), ex = arcExpect(it.p && it.p.verdictSt);
     var hit = days < 20 ? null : ex > 0 ? since > 0.03 : ex < 0 ? since < -0.03 : Math.abs(since) <= 0.1;
     var lo = Infinity, hi = -Infinity; rows.forEach(function (r) { if (r.t >= it.at) { lo = Math.min(lo, r.c); hi = Math.max(hi, r.c); } }); if (lo === Infinity) { lo = hi = last.c; }
     var v = { since: since, days: days, last: last.c, hit: hit, ex: ex, lo: lo / it.snap.price - 1, hi: hi / it.snap.price - 1 }; ARC_ST.verify[key] = v; return v;

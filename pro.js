@@ -24,7 +24,7 @@ if (!window.__SM_TEST) { window.__alert0 = window.alert; window.alert = function
 /* ---------- ② 공용 저장소 ---------- */
 function smKvGet(k) { return proOwner() ? proPost("kv", { get: k }).then(function (j) { return j && j.ok ? j.val : null; }).catch(function () { return null; }) : Promise.resolve(null); }
 function smKvPut(k, v, ex) { return proOwner() ? proPost("kv", { put: k, val: v, ex: ex }).then(function (j) { return !!(j && j.ok); }).catch(function () { return false; }) : Promise.resolve(false); }
-function smKvList(prefix) { return proOwner() ? proPost("kv", { list: prefix }).then(function (j) { return j && j.ok ? j.items : []; }).catch(function () { return []; }) : Promise.resolve([]); }
+function smKvList(prefix) { return proOwner() ? proPost("kv", { list: prefix }).then(function (j) { return j && j.ok ? (j.items || []) : []; }).catch(function () { return []; }) : Promise.resolve([]); }
 /* 리포트 Claude 서술 — 저장할 때 서버에도, 열 때 브라우저에 없으면 서버에서 */
 (function () {
   if (typeof rpAiSave !== "function") return;

@@ -136,8 +136,8 @@ function nbCover(small, lines, sub, meta, items) {
     rest.forEach(function (x, k) {
       var yy = top + k * gap + gap / 2 + 6;
       cRound(g, P, yy - 22, 44, 28, 14, NB_C.gold); cText(g, String(x.i + 2).padStart(2, "0"), P + 22, yy - 2, 16, 900, NB_INK, "center");
-      var vw = x.v ? 64 : 0; cText(g, cFit(g, cPlain(x.t), W - 80 - vw, 22, 700), P + 60, yy, 22, 700, "#f3efe6");
-      if (x.v) { cRound(g, P + W - vw, yy - 26, vw, 36, 8, "rgba(255,255,255,0.10)"); cText(g, "??", P + W - vw / 2, yy + 2, 22, 900, NB_C.gold, "center"); }
+      var vw = x.v && !/\d/.test(cPlain(x.t)) ? 64 : 0; cText(g, cFit(g, cPlain(x.t), W - 80 - vw, 22, 700), P + 60, yy, 22, 700, "#f3efe6");
+      if (vw) { cRound(g, P + W - vw, yy - 26, vw, 36, 8, "rgba(255,255,255,0.10)"); cText(g, "??", P + W - vw / 2, yy + 2, 22, 900, NB_C.gold, "center"); }
     });
   }
 
