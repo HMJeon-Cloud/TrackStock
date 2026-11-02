@@ -245,10 +245,12 @@ async function jobSet(rc, id, obj) { try { await setJsonGz(rc, "sm:job:" + id, o
 export async function claudeHandler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ ok: false, reason: "POST만" });
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
   let body = req.body; if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = null; } }
   if (!body) return res.status(400).json({ ok: false, reason: "본문 필요" });
+  // v12.70 수동 모드: 운영자가 claude.ai에 직접 붙여넣을 수 있게 작업 지시문만 돌려준다 (API 키 불필요 · 운영자 토큰은 channel.js에서 확인)
+  if (body.prompt) { const T = TASKS[body.task]; if (!T) return res.status(200).json({ ok: false, reason: "NO_TASK" }); return res.status(200).json({ ok: true, task: body.task, system: T.system, web: T.web || 0, max: T.max || 0 }); }
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
   const rc = redisConf();
   // v12.50 오늘 브리핑 하루치 — 어느 기기에서 열어도 같은 결과 (3일 보관). 결과를 받은 쪽이 저장(PUT)하고, 다른 기기는 불러온다(GET)
   if (body.today) {

@@ -209,3 +209,96 @@ function rpxOpen(rp) {
 "@media(max-width:560px){.anxTwo,.anxThree{grid-template-columns:1fr}.anxVerdict{font-size:19px}}",
 "[data-theme=dark] .anxSteps>div,[data-theme=dark] .anxFrame,[data-theme=dark] .anxQA>div,[data-theme=dark] .anxAct,[data-theme=dark] .anxThree>div{background:#1e2533;color:#dde}[data-theme=dark] .anxFL{color:#bbc}"
 ].join(""); document.head.appendChild(st); })();
+
+/* ============================================================ v12.70 오늘 브리핑 — 프롬프트 복사(claude.ai · Fable 5.1 / Opus 5.5) → 답변 붙여넣기 → 기존과 같이 배분
+   숫자·이슈·후보(앱 데이터)는 그대로, 해설·이유·편성을 쓰는 모델만 바뀐다. 입력과 이슈 목록을 하루치 보관해 두어 나중에 붙여넣어도 이슈 번호가 맞는다.
+   ============================================================ */
+var DLX = { sys: null };
+function dlxKey() { return "sm.dailyManual:" + smKstDay(); }
+function dlxLoad() { try { var j = JSON.parse(localStorage.getItem(dlxKey()) || "null"); return j && j.input ? j : null; } catch (e) { return null; } }
+function dlxSys() {
+  if (DLX.sys) return Promise.resolve(DLX.sys);
+  try { var c = JSON.parse(localStorage.getItem("sm.dailySys") || "null"); if (c && c.day === smKstDay() && c.system) { DLX.sys = c.system; return Promise.resolve(c.system); } } catch (e) {}
+  return smDailyPost({ prompt: 1, task: "daily" }).then(function (j) { if (!j || !j.ok || !j.system) throw new Error(j && j.reason === "NO_TASK" ? "서버에 daily 작업이 없어요" : "서버가 아직 옛 버전이에요 — api/_claude.js 를 먼저 올려 주세요"); DLX.sys = j.system; try { localStorage.setItem("sm.dailySys", JSON.stringify({ day: smKstDay(), system: j.system })); } catch (e) {} return j.system; });
+}
+var DLX_MANUAL = [
+  "", "=== 직접 질문 모드 안내 (claude.ai에서 답할 때) ===",
+  "- 웹 검색은 횟수 제한 없이 충분히 써도 된다. 이슈마다 1차 출처(공시·회사 발표·주요 언론)를 하나 이상 확인하고 src·url에 적는다. 확인 못 한 것은 빈칸(지어내지 말 것).",
+  "- 글자 수 제한(70자·50자·30자)은 카드에 그대로 들어가므로 꼭 지킨다.",
+  "- 출력은 설명 없이 ```json 코드 블록 하나. 위 JSON 모양의 키 이름을 바꾸지 않는다. ctx와 리포트 id는 후보 목록에서 글자 그대로 복사."
+];
+function dlxBuild() {
+  if (!briefState.result) return Promise.reject(new Error("시장 데이터를 아직 준비하는 중이에요 — 잠시 뒤 다시"));
+  var prep = typeof cardsNewsFetch === "function" ? cardsNewsFetch(briefState.result).catch(function () { return []; }) : Promise.resolve();
+  var mac = typeof macroEnsure === "function" ? macroEnsure().catch(function () { return null; }) : Promise.resolve();
+  return Promise.all([prep, mac, dlxSys()]).then(function (r) {
+    var input = smDailyInput(), sys = r[2];
+    var rec = { day: smKstDay(), at: Date.now(), input: input, iss: SM_DAILY_ISS.map(function (it) { return { title: it.title, mk: it.mk }; }) };
+    try { localStorage.setItem(dlxKey(), JSON.stringify(rec)); } catch (e) {}
+    return sys + "\n\n오늘: " + smKstDay() + " (한국 시간)\n\n[앱 데이터]\n" + input + "\n" + DLX_MANUAL.join("\n");
+  });
+}
+function dlxParse(text) {
+  var t = String(text || ""), m = t.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/i), raw = m ? m[1] : (function () { var s = t.indexOf("{"), e = t.lastIndexOf("}"); return s >= 0 && e > s ? t.slice(s, e + 1) : null; })();
+  if (!raw) return null; var tries = [raw, raw.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/,\s*([}\]])/g, "$1").replace(/\/\/[^\n"]*$/gm, "")];
+  for (var i = 0; i < tries.length; i++) { try { var J = JSON.parse(tries[i]); if (J && typeof J === "object") return J; } catch (e) {} }
+  return null;
+}
+/* 붙여넣은 답의 점검표 — 무엇이 몇 개 채워졌고 후보와 맞는지 */
+function dlxCheck(D) {
+  var rec = dlxLoad(), nIss = rec ? rec.iss.length : SM_DAILY_ISS.length, ctxOk = {}, idOk = {};
+  try { (typeof mkTopicsScored === "function" ? mkTopicsScored() : []).forEach(function (x) { ctxOk[x.ctx] = 1; }); } catch (e) {}
+  try { (typeof rpQuestions === "function" ? rpQuestions() : []).forEach(function (q) { idOk[q.id] = 1; }); } catch (e) {}
+  var picks = (D.plan && D.plan.picks) || [], badCtx = picks.filter(function (p) { return !ctxOk[p.ctx]; }), reps = D.reports || [], badId = reps.filter(function (r) { return r.id && !idOk[r.id]; });
+  var story = (D.story || []).filter(Boolean).length, bymk = D.bymk ? ["kr", "us", "coin"].filter(function (m) { return (D.bymk[m] || []).filter(Boolean).length; }).length : 0;
+  var issWhy = (D.issues || []).filter(function (x) { return x.why; }).length, long = [];
+  (D.issues || []).forEach(function (x) { ["why", "so", "next"].forEach(function (k) { if (x[k] && x[k].length > 90) long.push("이슈 " + x.i + " " + k); }); }); picks.forEach(function (p) { if (p.hook && p.hook.length > 40) long.push("훅 '" + p.hook.slice(0, 12) + "…'"); });
+  var rows = [["해설", story + "/3줄" + (bymk ? " · 시장별 " + bymk + "/3" : " · 시장별 없음"), story >= 3 ? 1 : 0], ["이슈 이유", issWhy + "/" + nIss, issWhy ? 1 : 0], ["급등락 이유", (D.movers || []).filter(function (x) { return x.why; }).length + "개", 1], ["내일 볼 것", (D.tomorrow || []).length + "개", (D.tomorrow || []).length ? 1 : 0], ["카드 편성", picks.length + "개" + (badCtx.length ? " · 후보에 없는 ctx " + badCtx.length + "개(무시됨)" : " · ctx 모두 일치"), picks.length && !badCtx.length ? 1 : picks.length ? 2 : 0], ["리포트", reps.length + "개" + (badId.length ? " · 후보에 없는 id " + badId.length + "(이름으로 찾음)" : ""), reps.length ? 1 : 0]];
+  if (long.length) rows.push(["글자 수 초과", long.slice(0, 4).join(", ") + (long.length > 4 ? " 외 " + (long.length - 4) : "") + " — 카드에서 잘릴 수 있어요", 2]);
+  return { rows: rows, ok: story > 0 || issWhy > 0 || picks.length > 0, badCtx: badCtx, empty: typeof smDailyEmpty === "function" ? smDailyEmpty(D) : false };
+}
+function dlxCheckHtml(C) { return '<table class="dlxChk">' + C.rows.map(function (r) { return '<tr><td>' + (r[2] === 1 ? '<b class="good">✓</b>' : r[2] === 2 ? '<b class="warn">△</b>' : '<b class="bad">✗</b>') + '</td><td>' + anxEsc(r[0]) + '</td><td>' + anxEsc(r[1]) + '</td></tr>'; }).join("") + '</table>'; }
+function dlxApply(text) {
+  var D = dlxParse(text); if (!D) throw new Error("JSON을 읽지 못했어요 — ```json 블록 전체를 붙여넣어 주세요");
+  var rec = dlxLoad(); if (!rec) throw new Error("오늘 만든 프롬프트 기록이 없어요 — 먼저 '프롬프트 복사'를 눌러 주세요(이슈 번호를 맞추는 데 필요)");
+  if (rec.iss && rec.iss.length) SM_DAILY_ISS = rec.iss.map(function (x) { return Object.assign({}, x); });
+  var C = dlxCheck(D); if (C.badCtx.length && D.plan) D.plan.picks = D.plan.picks.filter(function (p) { return C.badCtx.indexOf(p) < 0; });
+  var j = { ok: true, data: D, model: "claude.ai(직접)", manual: true, sources: [], searches: [], text: String(text).slice(0, 6000), stop: "end_turn" };
+  smDailyApply(j, rec.input); SM_DAILY.last = null; try { localStorage.removeItem("sm.dailyErr"); } catch (e) {}
+  return C;
+}
+function dlxOpen() {
+  var w = document.createElement("div"), rec = dlxLoad();
+  w.innerHTML = '<div class="anxSteps"><div><i>1</i> 프롬프트 복사</div><div><i>2</i> claude.ai 새 대화 · <b>Fable 5.1</b>(없으면 Opus 5.5) · 웹 검색 켜기</div><div><i>3</i> 답변의 ```json 블록을 아래에 붙여넣고 적용</div></div>' +
+    '<div class="anActs"><button class="primary" data-dlxc>📋 오늘 브리핑 프롬프트 복사</button><button class="chip" data-dlxv>프롬프트 보기</button><span class="briefDim" data-dlxm>' + (rec ? '오늘 ' + new Date(rec.at).toTimeString().slice(0, 5) + '에 만든 프롬프트가 있어요 — 다시 누르면 지금 데이터로 새로 만들어요' : '') + '</span></div>' +
+    '<div class="anxPv" hidden><textarea class="thrText" rows="12" readonly spellcheck="false"></textarea><small class="briefDim anxLen"></small></div>' +
+    '<textarea class="anAnsIn" rows="8" data-dlxin placeholder="Claude 답변을 붙여넣으세요 (```json … ``` 포함)"></textarea><div data-dlxchk></div><div class="anActs"><button class="primary" data-dlxok>적용하기 — 브리핑 · 이슈 이유 · 편성 · 리포트에 반영</button><span class="briefDim" data-dlxmsg></span></div>';
+  var msg = w.querySelector("[data-dlxm]"), pv = w.querySelector(".anxPv"), cur = "";
+  var build = function (cb) { msg.textContent = "여섯 가지 앱 데이터를 모으는 중…"; dlxBuild().then(function (t) { cur = t; msg.textContent = t.length.toLocaleString() + "자 · 이슈 " + SM_DAILY_ISS.length + "개 · 후보 포함"; cb(t); }).catch(function (e) { msg.textContent = ""; smToast(e.message, "bad"); }); };
+  var cb = w.querySelector("[data-dlxc]"); cb.onclick = function () { build(function (t) { chCopy(t, cb); pv.querySelector("textarea").value = t; pv.querySelector(".anxLen").textContent = t.length.toLocaleString() + "자"; }); };
+  w.querySelector("[data-dlxv]").onclick = function () { if (!pv.hidden) { pv.hidden = true; return; } var show = function (t) { pv.hidden = false; pv.querySelector("textarea").value = t; pv.querySelector(".anxLen").textContent = t.length.toLocaleString() + "자"; }; if (cur) show(cur); else build(show); };
+  var inp = w.querySelector("[data-dlxin]"), chk = w.querySelector("[data-dlxchk]"), m2 = w.querySelector("[data-dlxmsg]");
+  inp.oninput = function () { var D = dlxParse(inp.value); if (!inp.value.trim()) { chk.innerHTML = ""; return; } if (!D) { chk.innerHTML = '<span style="color:#b9600f">JSON을 아직 못 읽었어요 — ```json 블록 전체를 붙여넣어 주세요</span>'; return; } chk.innerHTML = dlxCheckHtml(dlxCheck(D)); };
+  w.querySelector("[data-dlxok]").onclick = function () {
+    try { var C = dlxApply(inp.value); if (infoModal.close) infoModal.close(); smToast("오늘 브리핑을 적용했어요 — 작업실 · 브리핑 · 카드 편성 · 리포트 선정에 반영"); if (typeof renderOps === "function" && currentTab === "ops") renderOps(); if (typeof smFlowPaint === "function") smFlowPaint(); }
+    catch (e) { m2.innerHTML = '<span style="color:#b9600f">' + anxEsc(e.message) + '</span>'; }
+  };
+  infoModal.open("오늘 브리핑 — 직접 질문 (claude.ai)", w);
+}
+(function () {
+  if (typeof renderOps !== "function") return;
+  var r0 = renderOps; renderOps = function () {
+    var r = r0.apply(this, arguments);
+    try {
+      var step = document.querySelector('#opsBody .opsStep[data-step="brief"]'), api = step && step.querySelector('[data-ops="daily"]');
+      if (step && api && !step.querySelector("[data-dlx]")) {
+        var now = step.classList.contains("now"), b = document.createElement("button"); b.className = "opsBtn" + (now ? " pri" : ""); b.setAttribute("data-dlx", "1"); b.textContent = "📋 직접 질문 (claude.ai · Fable 5.1)"; b.title = "프롬프트를 복사해 claude.ai에 붙여넣고 답을 가져와요 — 더 센 모델 · 웹 검색 제한 없음 · 비용 없음"; b.onclick = dlxOpen;
+        api.parentNode.insertBefore(b, api); api.classList.remove("pri"); if (!/중|이어서/.test(api.textContent)) api.textContent = "자동 (API · Sonnet)"; api.title = "서버 API로 자동 생성 — 급할 때 (웹 검색 6회 · 약간 얕음)";
+        var rec = dlxLoad(); if (rec) { var s = document.createElement("small"); s.className = "opsMuted"; s.style.cssText = "display:block;flex-basis:100%;margin-top:4px"; s.textContent = "오늘 " + new Date(rec.at).toTimeString().slice(0, 5) + " 프롬프트 복사함 — 답을 받았으면 '직접 질문'에서 붙여넣기"; api.parentNode.appendChild(s); }
+      }
+    } catch (e) { console.warn("dlx", e); }
+    return r;
+  };
+  var st = document.createElement("style"); st.textContent = ".dlxChk{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0}.dlxChk td{padding:4px 6px;border-bottom:1px solid #eceff5;text-align:left}.dlxChk td:first-child{width:22px}.dlxChk .good{color:#1d7f55}.dlxChk .bad{color:#c03b3b}.dlxChk .warn{color:#b9600f}"; document.head.appendChild(st);
+  if (typeof SM_FLOW !== "undefined") SM_FLOW.forEach(function (s) { if (s.k === "brief") s.hint = "작업실 ② 직접 질문 — 프롬프트 복사 → claude.ai(Fable 5.1) → 답 붙여넣기. 급하면 자동(API)"; });
+})();
