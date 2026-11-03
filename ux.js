@@ -194,3 +194,27 @@ function uxAnRail(root) {
 "#rpBody,#anBody,#ocBody,#opsBody{overflow-x:hidden}.rpEx,.anSec,.anxHero,.uxDiff{max-width:100%;box-sizing:border-box}textarea{max-width:100%}}",
 "[data-theme=dark] .rpBar{background:#1b2130}[data-theme=dark] .uxRail{background:#1b2130;border-color:#2b3447}[data-theme=dark] .uxB{background:#1e2533;color:#dde}[data-theme=dark] .uxA{background:#232a38;color:#bbc}[data-theme=dark] .uxDiff{background:#1b2130}"
 ].join(""); document.head.appendChild(st); })();
+
+/* ============================================================ v12.72 카드 작업대 · 작업실: '오늘 이슈'(매일 새로 생기는 것) vs '오늘 카드'(매일 올릴 수 있는 것) 두 묶음으로 ============================================================ */
+var UX_ISSUE_RE = /^(issues|hub:news|hub:vol|hub:sector|story:news|story:kr-news|story:kr-sector|story:kr-flow|report:)/;
+function uxCatOf(ctx, text) { return UX_ISSUE_RE.test(String(ctx || "")) || /이슈|급등|급락|뉴스|기사|수급|거래대금|주도 섹터/.test(String(text || "")) ? "issue" : "card"; }
+function uxSplitMaker(root) {
+  var grid = root.querySelector(".wbGrid"); if (!grid || grid.querySelector(".uxCatH")) return;
+  var rows = Array.prototype.slice.call(grid.querySelectorAll(".wbRow")), blocks = { issue: [], card: [] }, cnt = { issue: 0, card: 0 };
+  rows.forEach(function (r) {
+    var label = r.querySelector(".wbRowL"), chips = Array.prototype.slice.call(r.querySelectorAll(".wbChip")), lt = label ? label.textContent : "";
+    if (/오늘 추천/.test(lt)) { blocks.issue.unshift(r); return; }   // 추천 줄은 위에 그대로
+    var parts = { issue: [], card: [] }; chips.forEach(function (c) { parts[uxCatOf(c.getAttribute("data-wsel"), c.textContent + " " + lt)].push(c); });
+    ["issue", "card"].forEach(function (k) { if (!parts[k].length) return; var nr = document.createElement("div"); nr.className = "wbRow"; nr.innerHTML = '<div class="wbRowL">' + escapeHtml(lt) + '</div><div class="wbRowC"></div>'; var cc = nr.querySelector(".wbRowC"); parts[k].forEach(function (c) { cc.appendChild(c); }); blocks[k].push(nr); cnt[k] += parts[k].length; });
+    r.remove();
+  });
+  var mk = function (k, title, sub) { var h = document.createElement("div"); h.className = "wbRow uxCatH " + k; h.innerHTML = '<div class="wbRowL">' + title + '</div><div class="wbRowC"><span>' + sub + ' · <b>' + cnt[k] + '</b>개</span></div>'; return h; };
+  grid.innerHTML = "";
+  grid.appendChild(mk("issue", "🔥 오늘 이슈", "매일 새로 생기는 것 — 핵심 이슈 · 급등락 · 기사 · 수급 · 주도 섹터 · 리포트")); blocks.issue.forEach(function (r) { grid.appendChild(r); });
+  grid.appendChild(mk("card", "🗂️ 오늘 카드", "매일 올릴 수 있는 것 — 데일리 · 마감 한 장 · 관찰 · 데이터 시리즈 · 정기 발행 · 용어·일정")); blocks.card.forEach(function (r) { grid.appendChild(r); });
+}
+(function () {
+  if (typeof makerRender === "function") { var m0 = makerRender; makerRender = function () { var r = m0.apply(this, arguments); try { var root = document.getElementById("mkBody"); if (root) uxSplitMaker(root); } catch (e) { console.warn("ux maker", e); } return r; }; }
+  if (typeof renderOps === "function") { var o0 = renderOps; renderOps = function () { var r = o0.apply(this, arguments); try { Array.prototype.forEach.call(document.querySelectorAll('#opsBody button[data-ops^="make:"], #opsBody button[data-ops^="report:"]'), function (b) { if (b.querySelector(".uxTag")) return; var ctx = b.getAttribute("data-ops").replace(/^make:/, ""), k = uxCatOf(ctx, b.textContent); var t = document.createElement("i"); t.className = "uxTag " + k; t.textContent = k === "issue" ? "이슈" : "카드"; b.insertBefore(t, b.firstChild); }); } catch (e) {} return r; }; }
+  var st = document.createElement("style"); st.textContent = ".wbRow.uxCatH{background:#14161c;color:#f3efe6}.wbRow.uxCatH .wbRowL{color:#e6c57a;font-weight:800;border-right-color:#333}.wbRow.uxCatH .wbRowC{padding:8px 10px;font-size:12px;color:#c9c4b8}.wbRow.uxCatH.card{background:#1f2a44}.uxTag{font-style:normal;font-size:10px;font-weight:800;border-radius:5px;padding:1px 5px;margin-right:5px;vertical-align:1px;background:#fcefef;color:#c03b3b}.uxTag.card{background:#eef2fa;color:#1f3a68}"; document.head.appendChild(st);
+})();
