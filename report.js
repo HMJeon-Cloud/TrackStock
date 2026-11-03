@@ -187,7 +187,7 @@ function rpMacro(condId) {
   var stance = !r.now.on ? "조건 밖 · 대기" : good ? "역발상 매수 검토" : bad ? "방어 · 미국 비중 점검" : "중립";
   return { kind: "macro", id: "macro:" + condId, title: c.tag + ", 그래서 어떻게 보나", sym: null, name: c.tag, asOf: cDate(Date.now()), price: null, situation: [r.now.txt, c.mean, "과거 " + r.ev.length + "번 · 1년 뒤 코스피 상승 " + ks.win + "/" + ks.n], exhibits: ex, scen: scen,
     view: { stance: stance, score: good ? 3 : bad ? 0 : 1, why: [ks.n ? "코스피 1년 중앙값 " + rpPct(ks.med, 0) + (bk ? " vs 평소 " + rpPct(bk.med, 0) : "") : "표본 부족", st.spk[2].n ? "미국(원화) 1년 중앙값 " + rpPct(st.spk[2].med, 0) : ""].filter(Boolean), txt: !r.now.on ? "지금은 이 조건에 해당하지 않는다. 조건이 나오면 다시 본다." : good ? c.short + " 뉴스는 무섭게 들리지만, 과거 이 조건 뒤 1년 코스피는 평소보다 좋았다. 공포 헤드라인은 역발상의 재료였다. 다만 사례가 " + ks.n + "번뿐이다." : bad ? "이 조건 뒤 1년은 평소보다 나빴다. 새로 사기보다 비중과 환율 노출을 점검할 때다." : "이 조건만으로 방향을 말하긴 어렵다. 평소와 비슷했다.", plan: c.s === "krw" ? ["미국 주식은 환율이 높을 때 몰아 사지 않는다 — 환율 1,400원 위에서는 나눠서", "원화 자산(코스피)과 달러 자산을 같이 들고 환율 변동을 서로 상쇄", "환헤지(H) 상품은 환율 영향을 줄이지만 비용이 있다"] : ["금리 방향은 몇 달 뒤에야 주가에 반영된다 — 서두르지 않는다", "장기채 ETF는 금리 인하 '시작'보다 '장기금리 하락'을 확인하고", "조건이 겹칠 때(환율+금리) 과거 사례를 다시 본다"] },
-    watch: ["다음 금리 결정(한은·연준)", "환율 1,400원 · 1,300원 선", "미 10년 금리 4.5% 선", "코스피 20일선 위 종목 비율"], src: "한국은행 ECOS · 미국 FRED · 야후 종가 · StockMind 계산", numbers: { ksUp: ks.win, ksN: ks.n, ksMed: ks.med, now: r.now.v }, thr: { up: 0.1, dn: -0.1 } };
+    watch: ["다음 금리 결정(한은·연준)", "환율 1년 평균 ±5% · 위기선 1,400원", "미 10년 금리 4.5% 선", "코스피 20일선 위 종목 비율"], src: "한국은행 ECOS · 미국 FRED · 야후 종가 · StockMind 계산", numbers: { ksUp: ks.win, ksN: ks.n, ksMed: ks.med, now: r.now.v }, thr: { up: 0.1, dn: -0.1 } };
 }
 
 /* ④ 시점: "이번 달, 사야 하나 (계절성 · 최악의 날 · 적립)" */

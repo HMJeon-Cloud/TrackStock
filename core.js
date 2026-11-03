@@ -107,7 +107,8 @@ function coreVars() {
   if (typeof macroCompute === "function" && typeof macReady === "function" && macReady()) {
     macroCompute().forEach(function (r) {
       var ks = r.st && r.st.ks && r.st.ks[2], ks3 = r.st && r.st.ks && r.st.ks[0];
-      V.push({ id: r.c.id, icon: r.c.icon, name: r.c.tag, on: !!(r.now && r.now.on), now: r.now ? r.now.txt : "", n: r.ev.length, y1: ks && ks.n ? ks : null, m3: ks3 && ks3.n ? ks3 : null, mean: r.c.mean || "", resp: CORE_RESP[r.c.id] || "" });
+      var onNow = !!(r.now && r.now.on), legacy = r.c.id === "krw1300";   // v12.76 1,300원선은 '예전 기준' — 켜진 변수로 세지 않고 참고(주의)로만
+      V.push({ id: r.c.id, icon: r.c.icon, name: r.c.tag + (legacy ? " (예전 기준)" : ""), on: legacy ? false : onNow, warn: legacy && onNow, now: (r.now ? r.now.txt : "") + (legacy && onNow ? " · 지금은 '예전 보통' — 아래 환율 자리 보기 참고" : ""), n: r.ev.length, y1: ks && ks.n ? ks : null, m3: ks3 && ks3.n ? ks3 : null, mean: r.c.mean || "", resp: CORE_RESP[r.c.id] || "" });
     });
   }
   var vix = R && (R.numbers || []).filter(function (n) { return n.sym === "^VIX"; })[0], vv = vix ? parseFloat(String(vix.v).replace(/[^\d.]/g, "")) : null;
