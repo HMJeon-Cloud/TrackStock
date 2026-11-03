@@ -218,3 +218,48 @@ function uxSplitMaker(root) {
   if (typeof renderOps === "function") { var o0 = renderOps; renderOps = function () { var r = o0.apply(this, arguments); try { Array.prototype.forEach.call(document.querySelectorAll('#opsBody button[data-ops^="make:"], #opsBody button[data-ops^="report:"]'), function (b) { if (b.querySelector(".uxTag")) return; var ctx = b.getAttribute("data-ops").replace(/^make:/, ""), k = uxCatOf(ctx, b.textContent); var t = document.createElement("i"); t.className = "uxTag " + k; t.textContent = k === "issue" ? "이슈" : "카드"; b.insertBefore(t, b.firstChild); }); } catch (e) {} return r; }; }
   var st = document.createElement("style"); st.textContent = ".wbRow.uxCatH{background:#14161c;color:#f3efe6}.wbRow.uxCatH .wbRowL{color:#e6c57a;font-weight:800;border-right-color:#333}.wbRow.uxCatH .wbRowC{padding:8px 10px;font-size:12px;color:#c9c4b8}.wbRow.uxCatH.card{background:#1f2a44}.uxTag{font-style:normal;font-size:10px;font-weight:800;border-radius:5px;padding:1px 5px;margin-right:5px;vertical-align:1px;background:#fcefef;color:#c03b3b}.uxTag.card{background:#eef2fa;color:#1f3a68}"; document.head.appendChild(st);
 })();
+
+/* ============================================================ v12.77 카드 작업대 즐겨찾기 — 주제 + 모양(분량·크기·그리기·자료)을 저장, '오늘 편성'보다 위에 크게. 서버(kv cfg:fav)에도 같이 둔다 ============================================================ */
+var FAV = { list: null, synced: false };
+function favLoad() { if (FAV.list) return FAV.list; try { FAV.list = JSON.parse(localStorage.getItem("sm.fav") || "[]"); } catch (e) { FAV.list = []; } if (!Array.isArray(FAV.list)) FAV.list = []; return FAV.list; }
+function favSave() { try { localStorage.setItem("sm.fav", JSON.stringify(FAV.list)); } catch (e) {} if (typeof smKvPut === "function") smKvPut("cfg:fav", { list: FAV.list, at: Date.now() }, 365 * 86400).catch(function () {}); }
+function favSync() { if (FAV.synced || typeof smKvGet !== "function") return; FAV.synced = true; smKvGet("cfg:fav").then(function (r) { if (r && Array.isArray(r.list) && r.list.length && (!favLoad().length || (r.at || 0) > (FAV.at || 0))) { FAV.list = r.list; FAV.at = r.at; try { localStorage.setItem("sm.fav", JSON.stringify(FAV.list)); } catch (e) {} if (currentTab === "onecard" && typeof makerRender === "function") makerRender(); } }); }
+function favKey(f) { return f.ctx + "|" + f.n + "|" + f.size + "|" + f.draw + "|" + f.src; }
+function favCur() { if (!MK.sel) return null; var cap = MK._cap[MK.sel + "|" + MK.size], sh = typeof mkShapeFor === "function" ? mkShapeFor(MK.sel, cap) : MK.shape, t = typeof hubTitleOf === "function" ? hubTitleOf(MK.sel) : MK.sel; return { ctx: MK.sel, n: sh.n, size: MK.size === "reel" ? "reel" : "post", draw: sh.draw, src: sh.src || "app", t: t, mk: MK.mk || "all", at: Date.now() }; }
+function favHas(f) { var k = favKey(f); return favLoad().some(function (x) { return favKey(x) === k; }); }
+function favToggle(f) { var k = favKey(f), L = favLoad(), i = L.findIndex(function (x) { return favKey(x) === k; }); if (i >= 0) L.splice(i, 1); else L.unshift(f); FAV.list = L.slice(0, 24); FAV.at = Date.now(); favSave(); }
+function favShapeTxt(f) { return [f.n === "one" ? "한 장" : "여러 장", f.size === "reel" ? "릴스 9:16" : "게시 4:5", { app: "우리 양식", ai1: "AI 한 장", aiN: "AI 여러 장" }[f.draw] || f.draw, f.src === "today" ? "오늘 자료 취합" : "기존 데이터"].join(" · "); }
+function favRun(f, btn) {
+  MK.sel = f.ctx; MK.size = f.size; try { localStorage.setItem("sm.cardSize", f.size); } catch (e) {} MK.shapeBy[f.ctx] = { n: f.n, draw: f.draw, src: f.src }; if (f.mk && f.mk !== MK.mk && typeof MK !== "undefined") { MK.mk = f.mk; MK._T = null; if (typeof smSetMk === "function") try { smSetMk(f.mk); } catch (e) {} }
+  makerRender(); var b = document.querySelector("#mkBody [data-make]"); if (b && !b.disabled) { mkMakeGo(f.ctx, b); setTimeout(function () { var r = document.querySelector("#mkResult"); if (r) try { r.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 400); } else { smToast("모양을 확인하는 중이에요 — 잠시 뒤 ③ 만들기를 눌러 주세요"); }
+}
+function favHtml() {
+  var L = favLoad(), done = {}; (typeof hubDoneLoad === "function" ? hubDoneLoad() : []).forEach(function (d) { done[d.ctx] = 1; });
+  var cards = L.map(function (f, i) { return '<div class="favCard' + (done[f.ctx] ? " done" : "") + (f.ctx === MK.sel ? " on" : "") + '" data-favi="' + i + '"><div class="favT"><i>★</i><b>' + escapeHtml(typeof hubTitleOf === "function" ? hubTitleOf(f.ctx) : f.t) + '</b>' + (done[f.ctx] ? '<em>오늘 만듦 ✓</em>' : '') + '</div><div class="favS">' + escapeHtml(favShapeTxt(f)) + (f.mk && f.mk !== "all" ? ' · ' + ({ kr: "국내", us: "미국", coin: "코인" })[f.mk] : '') + '</div><div class="favA"><button class="primary" data-favgo="' + i + '">▶ 이 모양으로 바로 만들기</button><button class="chip" data-favsel="' + i + '">모양 보기</button><button class="chip favX" data-favdel="' + i + '" title="즐겨찾기에서 빼기">✕</button></div></div>'; }).join("");
+  return '<section class="wbFav"><div class="wbTodayH"><b>★ 즐겨찾기</b><small>매일 꼭 만드는 카드 — 주제 + 모양이 저장돼 한 번에 만들어져요 · ' + L.length + '개</small></div>' + (L.length ? '<div class="favGrid">' + cards + '</div>' : '<div class="favEmpty">아직 없어요 — 아래에서 주제를 고르고 ② 모양을 정한 뒤 <b>☆ 즐겨찾기에 추가</b>를 누르면 여기에 가장 크게 올라와요. 오늘 편성보다 먼저 보여요.</div>') + '</section>';
+}
+(function () {
+  if (typeof makerRender !== "function") return;
+  var m0 = makerRender; makerRender = function () {
+    var r = m0.apply(this, arguments);
+    try {
+      favSync();
+      var root = document.getElementById("mkBody"); if (!root || root.querySelector(".wbFav")) return r;
+      var today = root.querySelector(".wbToday"); if (today) { var d = document.createElement("div"); d.innerHTML = favHtml(); today.parentNode.insertBefore(d.firstChild, today); }
+      // ② 모양 정하기 안에 추가/빼기 버튼
+      var go = root.querySelector(".wbGo"); if (go && MK.sel) { var cur = favCur(), has = cur && favHas(cur), b = document.createElement("button"); b.className = "chip favBtn" + (has ? " on" : ""); b.textContent = has ? "★ 즐겨찾기 됨 — 빼기" : "☆ 이 주제 + 모양을 즐겨찾기에 추가"; b.onclick = function () { var c = favCur(); if (!c) return; favToggle(c); smToast(favHas(c) ? "즐겨찾기에 넣었어요 — 작업대 맨 위" : "즐겨찾기에서 뺐어요"); makerRender(); }; go.appendChild(b); }
+      Array.prototype.forEach.call(root.querySelectorAll("[data-favgo]"), function (x) { x.onclick = function () { var f = favLoad()[+x.getAttribute("data-favgo")]; if (f) favRun(f, x); }; });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-favsel]"), function (x) { x.onclick = function () { var f = favLoad()[+x.getAttribute("data-favsel")]; if (!f) return; MK.sel = f.ctx; MK.size = f.size; MK.shapeBy[f.ctx] = { n: f.n, draw: f.draw, src: f.src }; makerRender(); var s = document.querySelector("#mkBody .wbShape"); if (s) try { s.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }; });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-favdel]"), function (x) { x.onclick = function () { var f = favLoad()[+x.getAttribute("data-favdel")]; if (f && (window.__SM_TEST || confirm("즐겨찾기에서 뺄까요? — " + (f.t || f.ctx)))) { favToggle(f); makerRender(); } }; });
+    } catch (e) { console.warn("fav", e); }
+    return r;
+  };
+  var st = document.createElement("style"); st.textContent = [
+    ".wbFav{border:2px solid #c9a24f;background:linear-gradient(180deg,#fff8e6,#fffdf7);border-radius:16px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 14px rgba(201,162,79,.18)}.wbFav .wbTodayH b{font-size:17px;color:#7a5520}",
+    ".favGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:10px}.favCard{background:#fff;border:1px solid #e6d3a3;border-radius:14px;padding:12px 14px;position:relative}.favCard.on{outline:2px solid #14161c}.favCard.done{background:#f7f9f7}",
+    ".favT{display:flex;align-items:center;gap:6px;font-size:15px}.favT i{font-style:normal;color:#c9a24f;font-size:18px}.favT b{flex:1;min-width:0}.favT em{font-style:normal;font-size:11px;color:#1d7f55;font-weight:700;background:#eef8f2;border-radius:6px;padding:1px 6px}",
+    ".favS{font-size:12px;color:#667;margin:4px 0 8px}.favA{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.favA{flex-wrap:nowrap}.favA .primary{flex:1 1 120px;min-height:36px;padding-left:8px;padding-right:8px;font-size:13px}.favX{color:#999;padding:4px 9px}.favEmpty{font-size:13px;color:#556;margin-top:6px;line-height:1.6}",
+    ".favBtn{margin-left:8px}.favBtn.on{background:#fff3cf;border-color:#c9a24f;color:#7a5520;font-weight:700}",
+    "@media(max-width:640px){.favGrid{grid-template-columns:1fr}}"
+  ].join(""); document.head.appendChild(st);
+})();
