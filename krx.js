@@ -177,25 +177,36 @@ function themeRows(mk, n) {
 /* 관심 테마 격자 3×2 — 상자마다 평균 · 종목 3개 · (이유) */
 function kxThemeGrid(c, rows, y, hTotal, per) {
   var g = c.g, gap = 16, cols = 3, bw = (KX.W - KX.P * 2 - gap * 2) / cols, bh = Math.floor((hTotal - gap) / 2);
+  var mx = 0.01; rows.forEach(function (t) { t.items.slice(0, per || 4).forEach(function (it) { mx = Math.max(mx, Math.abs(it.ret)); }); });   // 막대 길이 기준(격자 전체 공통)
   rows.forEach(function (t, i) {
     var x = KX.P + (i % cols) * (bw + gap), yy = y + Math.floor(i / cols) * (bh + gap), col = t.avg == null ? KX.sub : t.avg >= 0 ? KX.up : KX.dn;
-    cRound(g, x, yy, bw, bh, 18, KX.box, KX.line); cRound(g, x + 16, yy + 14, bw - 32, 40, 10, KX.ink); cText(g, cFit(g, t.name, bw - 60, 20, 900), x + bw / 2, yy + 42, 20, 900, KX.gold, "center");
-    cText(g, t.avg == null ? "자료 없음" : "평균 " + usPct(t.avg) + " · " + t.up + "/" + t.n + " 상승", x + bw / 2, yy + 76, 14, 700, col, "center");
-    var y2 = yy + 92; if (t.why) y2 = cWrap(g, t.why, x + 14, y2 + 2, bw - 28, 13, 600, KX.sub, 17, 2) + 4;
-    var L = t.items.slice(0, per || 3), rh = Math.min(52, Math.floor((yy + bh - 12 - y2) / Math.max(1, L.length)));
+    cRound(g, x, yy, bw, bh, 18, KX.box, KX.line);
+    // 머리: 테마 이름 + 평균(색 띠) — 평균이 클수록 띠가 진해진다
+    var hdr = t.avg == null ? "#8a8f9c" : t.avg >= 0 ? (Math.abs(t.avg) >= 0.02 ? "#b4302f" : "#d9775f") : (Math.abs(t.avg) >= 0.02 ? "#1f4bb0" : "#5a7fd0");
+    cRound(g, x, yy, bw, 54, 18, hdr); g.fillStyle = hdr; g.fillRect(x, yy + 30, bw, 24);
+    cText(g, cFit(g, t.name, bw - 120, 20, 900), x + 16, yy + 36, 20, 900, "#fff"); cText(g, t.avg == null ? "-" : usPct(t.avg), x + bw - 16, yy + 36, 20, 900, "#fff", "right");
+    cText(g, t.n ? t.up + "/" + t.n + " 상승" : "자료 없음", x + 16, yy + 74, 13, 700, KX.sub);
+    var y2 = yy + 84; if (t.why) y2 = cWrap(g, t.why, x + 14, y2 + 4, bw - 28, 13, 600, KX.sub, 17, 2) + 2;
+    var L = t.items.slice(0, per || 4), rh = Math.min(66, Math.floor((yy + bh - 10 - y2) / Math.max(1, L.length))), barW = bw - 32;
     if (!L.length) cText(g, "시세 없음", x + bw / 2, y2 + 40, 15, 600, KX.sub, "center");
-    L.forEach(function (it, k) { var ry = y2 + k * rh + rh / 2 + 7; cText(g, cFit(g, it.name, bw - 130, 19, 800), x + 16, ry, 19, 800, KX.ink); cText(g, usPct(it.ret), x + bw - 16, ry, 18, 900, it.ret >= 0 ? KX.up : KX.dn, "right"); g.fillStyle = KX.line; g.fillRect(x + 16, ry + 12, bw - 32, 1); });
+    L.forEach(function (it, k) {
+      var ry = y2 + k * rh, up = it.ret >= 0, w = Math.max(6, Math.round(barW * Math.min(1, Math.abs(it.ret) / mx)));
+      cText(g, cFit(g, it.name, bw - 120, 17, 800), x + 16, ry + 20, 17, 800, KX.ink); cText(g, usPct(it.ret), x + bw - 16, ry + 20, 16, 900, up ? KX.up : KX.dn, "right");
+      cRound(g, x + 16, ry + 28, barW, 8, 4, "#eef0f4"); cRound(g, x + 16, ry + 28, w, 8, 4, up ? "rgba(192,59,59,.75)" : "rgba(36,86,183,.75)");
+    });
   });
   return y + bh * 2 + gap;
 }
-/* 급등·급락 한 줄 띠 (자리 남을 때만) */
+/* 급등·급락·거래대금 급증 — 알약(칩)으로 (자리 남을 때만) */
 function kxMoverStrip(c, R, y, nameFn) {
-  var g = c.g, mv = R && R.movers || { up: [], down: [] }, h = KX.H - 60 - y - 10; if (h < 70 || !(mv.up.length || mv.down.length)) return y;
+  var g = c.g, mv = R && R.movers || { up: [], down: [] }, hv = (R && R.hotVol) || [], h = KX.H - 60 - y - 8; if (h < 56 || !(mv.up.length || mv.down.length || hv.length)) return y;
   var nm = function (r) { return (nameFn || function (r) { return typeof briefName === "function" ? briefName(r) : r.sym; })(r); };
-  var line = function (lab, L, col, yy) { cText(g, lab, KX.P, yy, 15, 900, col); cText(g, cFit(g, L.slice(0, 4).map(function (r) { return nm(r) + " " + usPct(r.ret); }).join("   "), KX.W - KX.P * 2 - 70, 15, 700), KX.P + 60, yy, 15, 700, KX.ink); };
-  cRound(g, KX.P, y, KX.W - KX.P * 2, Math.min(h, 84), 14, KX.soft);
-  line("급등", mv.up, KX.up, y + 32); if (h >= 64) line("급락", mv.down, KX.dn, y + 62);
-  return y + Math.min(h, 84);
+  var rowsN = h >= 128 ? 3 : h >= 92 ? 2 : 1, rh = Math.min(40, Math.floor(h / rowsN)), sets = [["급등", mv.up, "#fcefef", KX.up, function (r) { return usPct(r.ret); }], ["급락", mv.down, "#e9eefb", KX.dn, function (r) { return usPct(r.ret); }], ["거래대금", hv, "#f3efe6", "#7a5520", function (r) { return r.amtX ? r.amtX.toFixed(1) + "배" : usPct(r.ret); }]].filter(function (s) { return s[1].length; }).slice(0, rowsN);
+  sets.forEach(function (sset, i) {
+    var yy = y + i * rh, x = KX.P; cText(g, sset[0], x, yy + rh / 2 + 5, 14, 900, sset[3]); x += 64;
+    sset[1].slice(0, 6).forEach(function (r) { var label = nm(r) + " " + sset[4](r), w = cW(g, label, 14, 700) + 22; if (x + w > KX.W - KX.P) return; cRound(g, x, yy + 4, w, rh - 8, (rh - 8) / 2, sset[2]); cText(g, label, x + 11, yy + rh / 2 + 5, 14, 700, sset[3]); x += w + 8; });
+  });
+  return y + rowsN * rh;
 }
 /* ---------- 마감 한 장 (국내·미국 공통 뼈대): 시장 마감 → 관심 테마 6 → 급등·급락 한 줄 ---------- */
 function closeDeck(mk) {
@@ -220,8 +231,8 @@ function closeDeck(mk) {
   y += bh + 22;
   var tag = [], vix = st("^VIX"), krw = st("KRW=X"), dxy = st("DX-Y.NYB"); if (vix) tag.push("VIX " + vix.last.toFixed(1)); if (krw) tag.push("원/달러 " + Math.round(krw.last).toLocaleString()); if (isUS && dxy) tag.push("달러인덱스 " + dxy.last.toFixed(1)); if (R && R.temp && R.temp.total) tag.push("오른 종목 " + Math.round(R.temp.upPct * 100) + "% (" + R.temp.up + "/" + R.temp.total + ")");
   cText(g, "관심 테마", KX.P, y + 6, 20, 900, KX.ink); g.fillStyle = KX.gold; g.fillRect(KX.P, y + 16, 90, 4); if (tag.length) cText(g, cFit(g, tag.join(" · "), KX.W - KX.P * 2 - 130, 14, 600), KX.W - KX.P, y + 6, 14, 600, KX.sub, "right"); y += 30;
-  var rows = themeRows(mk, 3), stripH = 84 + 16, gridH = KX.H - 60 - y - 12 - stripH;
-  y = kxThemeGrid(c, rows, y, gridH, 3) + 14;
+  var rows = themeRows(mk, 4), hasMv = R && ((R.movers && (R.movers.up.length || R.movers.down.length)) || (R.hotVol || []).length), stripH = hasMv ? 92 + 14 : 0, gridH = KX.H - 60 - y - 12 - stripH;
+  y = kxThemeGrid(c, rows, y, gridH, 4) + 12;
   kxMoverStrip(c, R, y, isUS ? function (r) { return usKo(typeof briefName === "function" ? briefName(r) : r.sym, r.sym); } : null);
   kxFoot(c, isUS ? "야후 파이낸스 종가 · S&P500 전 종목 폭 · 본 자료는 주가에 대한 판단이나 투자 권유를 포함하지 않습니다" : "네이버 증권 · 야후 파이낸스 종가 · 본 자료는 주가에 대한 판단이나 투자 권유를 포함하지 않습니다");
   return [{ name: isUS ? "미국마감" : "마감한장", cv: c.cv }];
@@ -257,7 +268,7 @@ function krxSectorDeck() { return sectorDeck("kr"); }
 function usSectorDeck() { return sectorDeck("us"); }
 /* ---------- 연구노트 목록·실행에 끼워 넣기 ---------- */
 var KRX_DECKS = [
-  { key: "kr-close", t: "🏁 오늘의 간단 시황 — 마감 한 장", d: "코스피·코스닥 종가·등락·20일 흐름 · 관심 테마 6(반도체·조선·로봇·에너지·바이오·방산) 각 3종목 · 급등·급락 한 줄", fn: krxCloseDeck, need: "kr" },
+  { key: "kr-close", t: "🏁 오늘의 간단 시황 — 마감 한 장", d: "코스피·코스닥 종가·등락·20일 흐름 · 관심 테마 6(반도체·조선·로봇·에너지·바이오·방산) 각 4종목 막대 · 급등·급락·거래대금 알약", fn: krxCloseDeck, need: "kr" },
   { key: "kr-sector", t: "🧭 오늘의 주도 섹터 — 업종별 급등 상위", d: "1장 관심 테마 6(각 5종목) · 2장 종목 수 많은 큰 업종 6 — 변동이 큰 업종이 아니라 늘 보는 업종 순", fn: krxSectorDeck, need: "kr" },
   { key: "kr-flow", t: "💰 주체별 수급 — 외국인·기관 순매수·순매도", d: "외국인·기관 순매수/순매도 상위 12 · 지수 수급(개인·외국인·기관) · 개인 상위는 네이버 미제공", fn: krxFlowDeck, need: "kr" },
   { key: "us-close", t: "🇺🇸 오늘의 간단 시황 — 미국 마감 한 장", d: "S&P500·나스닥·다우 종가·등락·20일 흐름 · 관심 테마 6(반도체·빅테크·AI소프트·방산·에너지·바이오) · 급등·급락 한 줄", fn: usCloseDeck, need: "us" },
