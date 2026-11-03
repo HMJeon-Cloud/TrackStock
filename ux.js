@@ -289,3 +289,20 @@ function favHtml() {
     "[data-theme=dark] .uxSheetBox{background:#1b2130}[data-theme=dark] .uxSheetGrid button{background:#232a38;border-color:#2b3447;color:#dde}"
   ].join(""); document.head.appendChild(st);
 })();
+
+/* ============================================================ v12.84 운영자용 오류 표시 — 화면이 비면 왜 비었는지 바로 보이게 (window.onerror + 주요 화면 그리기 함수 감싸기) ============================================================ */
+(function () {
+  var box = null, list = [];
+  function show(msg) {
+    if (!(typeof isOwner === "function" && isOwner())) return;
+    if (!box) { box = document.createElement("div"); box.className = "uxErr"; box.innerHTML = '<b>⚠ 화면 오류</b> <span></span> <button class="chip" data-copy>복사</button><button class="chip" data-x>닫기</button>'; document.body.appendChild(box); box.querySelector("[data-x]").onclick = function () { box.remove(); box = null; list = []; }; box.querySelector("[data-copy]").onclick = function () { chCopy(list.join("\n"), this); }; }
+    list.push(msg); box.querySelector("span").textContent = list[list.length - 1] + (list.length > 1 ? " (+" + (list.length - 1) + ")" : "");
+  }
+  window.addEventListener("error", function (e) { try { var f = String(e.filename || "").split("/").pop(); show((e.message || "오류") + " — " + f + ":" + (e.lineno || "?")); } catch (x) {} });
+  window.addEventListener("unhandledrejection", function (e) { try { var r = e.reason; if (r && r.message && !/Failed to fetch|NetworkError|abort/i.test(r.message)) show("비동기 오류: " + r.message + (r.stack ? " — " + String(r.stack).split("\n")[1] : "")); } catch (x) {} });
+  ["renderBrief", "renderOps", "renderReport", "renderAnalyst", "makerRender", "renderCore", "renderChannel", "renderDataHub"].forEach(function (fn) {
+    if (typeof window[fn] !== "function") return; var f0 = window[fn];
+    window[fn] = function () { try { return f0.apply(this, arguments); } catch (e) { show(fn + " 실패: " + e.message + (e.stack ? " — " + String(e.stack).split("\n")[1] : "")); console.error(fn, e); throw e; } };
+  });
+  var st = document.createElement("style"); st.textContent = ".uxErr{position:fixed;left:12px;right:12px;bottom:calc(84px + var(--sab,0px));z-index:500;background:#fff3f3;border:1px solid #e5a3a3;color:#7a1f1f;border-radius:12px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;box-shadow:0 4px 14px rgba(0,0,0,.12)}.uxErr span{flex:1;min-width:0;word-break:break-all}@media(min-width:701px){.uxErr{bottom:16px;left:auto;max-width:640px}}"; document.head.appendChild(st);
+})();
