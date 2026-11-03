@@ -196,7 +196,7 @@ function uxAnRail(root) {
 ].join(""); document.head.appendChild(st); })();
 
 /* ============================================================ v12.72 카드 작업대 · 작업실: '오늘 이슈'(매일 새로 생기는 것) vs '오늘 카드'(매일 올릴 수 있는 것) 두 묶음으로 ============================================================ */
-var UX_ISSUE_RE = /^(issues|hub:news|hub:vol|hub:sector|story:news|story:kr-news|story:kr-sector|story:kr-flow|report:)/;
+var UX_ISSUE_RE = /^(issues|hub:news|hub:vol|hub:sector|story:news|story:kr-news|story:kr-sector|story:kr-flow|story:us-sector|report:)/;
 function uxCatOf(ctx, text) { return UX_ISSUE_RE.test(String(ctx || "")) || /이슈|급등|급락|뉴스|기사|수급|거래대금|주도 섹터/.test(String(text || "")) ? "issue" : "card"; }
 function uxSplitMaker(root) {
   var grid = root.querySelector(".wbGrid"); if (!grid || grid.querySelector(".uxCatH")) return;
@@ -262,5 +262,30 @@ function favHtml() {
     ".favS{font-size:12px;color:#667;margin:4px 0 6px}.favMk{display:flex;gap:4px;align-items:center;margin-bottom:8px;flex-wrap:wrap}.favMk button{border:1px solid #e5e7eb;background:#fff;border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer}.favMk button.on{background:#14161c;color:#fff;border-color:#14161c}.favMk small{font-size:11px;color:#99a;margin-left:4px}.favA{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.favA{flex-wrap:nowrap}.favA .primary{flex:1 1 120px;min-height:36px;padding-left:8px;padding-right:8px;font-size:13px}.favX{color:#999;padding:4px 9px}.favEmpty{font-size:13px;color:#556;margin-top:6px;line-height:1.6}",
     ".favBtn{margin-left:8px}.favBtn.on{background:#fff3cf;border-color:#c9a24f;color:#7a5520;font-weight:700}",
     "@media(max-width:640px){.favGrid{grid-template-columns:1fr}}"
+  ].join(""); document.head.appendChild(st);
+})();
+
+/* ============================================================ v12.80 모바일 하단 탭 정리 — 13개 → 5개 + '더보기' (운영자일 때). 비운영자는 공개 탭 6개 그대로 ============================================================ */
+(function () {
+  var MAIN = ["home", "ops", "onecard", "report", "analyst"];   // 손이 가장 자주 가는 다섯
+  var nav = document.querySelector(".tabs"); if (!nav) return;
+  var more = document.createElement("button"); more.className = "ownerOnly uxMore"; more.setAttribute("data-more", "1"); more.innerHTML = "<i>⋯</i><span>더보기</span>"; nav.appendChild(more);
+  var sheet = document.createElement("div"); sheet.className = "uxSheet hidden"; sheet.innerHTML = '<div class="uxSheetBg"></div><div class="uxSheetBox"><div class="uxSheetH"><b>모든 화면</b><button class="chip" data-close>닫기</button></div><div class="uxSheetGrid"></div></div>'; document.body.appendChild(sheet);
+  function paint() {
+    var owner = typeof isOwner === "function" && isOwner(), mobile = window.matchMedia("(max-width: 700px)").matches, cur = typeof currentTab !== "undefined" ? currentTab : "home";
+    Array.prototype.forEach.call(nav.querySelectorAll("button[data-tab]"), function (b) { var t = b.getAttribute("data-tab"); b.classList.toggle("uxHideM", owner && mobile && MAIN.indexOf(t) < 0); });
+    more.classList.toggle("active", owner && mobile && MAIN.indexOf(cur) < 0);
+    var grid = sheet.querySelector(".uxSheetGrid"); grid.innerHTML = "";
+    Array.prototype.forEach.call(nav.querySelectorAll("button[data-tab]"), function (b) { var t = b.getAttribute("data-tab"); if (!owner && b.classList.contains("ownerOnly")) return; var x = document.createElement("button"); x.className = (t === cur ? "on" : ""); x.innerHTML = b.innerHTML; x.onclick = function () { sheet.classList.add("hidden"); if (typeof navTo === "function") navTo(t); else switchTab(t); }; grid.appendChild(x); });
+  }
+  more.onclick = function () { paint(); sheet.classList.remove("hidden"); };
+  sheet.querySelector(".uxSheetBg").onclick = sheet.querySelector("[data-close]").onclick = function () { sheet.classList.add("hidden"); };
+  if (typeof switchTab === "function") { var s0 = switchTab; switchTab = function () { var r = s0.apply(this, arguments); try { paint(); } catch (e) {} return r; }; }
+  window.addEventListener("resize", paint); setTimeout(paint, 800); setTimeout(paint, 3000);
+  var st = document.createElement("style"); st.textContent = [
+    "@media(max-width:700px){.tabs button.uxHideM{display:none}}@media(min-width:701px){.tabs .uxMore{display:none!important}}",
+    ".uxSheet{position:fixed;inset:0;z-index:400}.uxSheet.hidden{display:none}.uxSheetBg{position:absolute;inset:0;background:rgba(0,0,0,.35)}.uxSheetBox{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:14px 14px calc(18px + var(--sab,0px));max-height:70vh;overflow:auto}",
+    ".uxSheetH{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:15px}.uxSheetGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.uxSheetGrid button{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid #e5e7eb;background:#fafafa;border-radius:12px;padding:10px 4px;font-size:12px;font-weight:600;color:#445}.uxSheetGrid button i{font-style:normal;font-size:22px}.uxSheetGrid button.on{background:#14161c;color:#fff;border-color:#14161c}",
+    "[data-theme=dark] .uxSheetBox{background:#1b2130}[data-theme=dark] .uxSheetGrid button{background:#232a38;border-color:#2b3447;color:#dde}"
   ].join(""); document.head.appendChild(st);
 })();

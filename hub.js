@@ -61,6 +61,14 @@ function hubFillRest(c, p) {
   var g = c.g, P = NB.PAD, W = NB.W - P * 2, nl0 = cWrapCount(g, p.note, W - 64, 30, 700), want = Math.max(150, nl0 * 30 * 1.5 + 60), h = Math.min(left - 20, Math.max(260, Math.min(620, want + 60)));
   cRound(g, P, c.y + 10, W, h, 16, NB_C.box || "#efe9dc");
   g.fillStyle = NB_C.gold2; g.fillRect(P, c.y + 10, 8, h);
+  var S = hubSentences(p.note);
+  if (S.length >= 2 && p.note.length > 70) {   // v12.79 문장마다 한 줄(금색 점) — 읽기 쉽게
+    var fs2 = h > 400 ? 30 : 26, cnt = function (f) { var n = 0; S.forEach(function (x) { n += cWrapCount(g, x, W - 96, f, 700); }); return n * f * 1.5 + (S.length - 1) * 10; };
+    while (fs2 > 19 && cnt(fs2) > h - 40) fs2 -= 1;
+    var yy = c.y + 10 + (h - cnt(fs2)) / 2 + fs2 * 0.95;
+    S.forEach(function (x) { g.fillStyle = NB_C.gold2 || NB_C.gold; g.fillRect(P + 32, yy - fs2 * 0.62, 10, 10); var n = cWrapCount(g, x, W - 96, fs2, 700); cWrap(g, x, P + 56, yy, W - 96, fs2, 700, NB_C.txt, fs2 * 1.5, 6); yy += n * fs2 * 1.5 + 10; });
+    c.y += h + 20; return;
+  }
   var fs = h > 400 ? 34 : 30; while (fs > 19 && cWrapCount(g, p.note, W - 64, fs, 700) * fs * 1.5 > h - 36) fs -= 1;
   var nl = cWrapCount(g, p.note, W - 64, fs, 700), th = nl * fs * 1.5, y0 = c.y + 10 + (h - th) / 2 + fs * 0.95;   // v11.8 세로 가운데 정렬
   cWrap(g, p.note, P + 32, y0, W - 64, fs, 700, NB_C.txt, fs * 1.5, 8);
@@ -100,13 +108,27 @@ function hubTableFill(c, d) {
   if (d.note && NB.H - 100 - c.y > 30) cText(g, cFit(g, "※ " + d.note, W, 20, 600), P, c.y + 22, 20, 600, NB_C.sub);
 }
 /* 글 문단 (기사 본문 등) — 남은 높이에 맞게 글씨 크기 조절 */
+/* v12.79 긴 문단은 문장 단위로 끊는다 — 카드에서 4~5줄짜리 문단은 아무도 읽지 않으므로: 첫 문장 = 결론, 나머지 문장 = 항목 */
+function hubSentences(t) { return String(t || "").replace(/\s+/g, " ").split(/(?<=[.!?。])\s+(?=[^\s)\]'"”])/).map(function (x) { return x.trim(); }).filter(Boolean); }
+function hubSplitParas(paras) {
+  var out = [], split = false;
+  paras.forEach(function (p, i) {
+    var bullet = /^■/.test(p), txt = p.replace(/^■\s*/, ""), S = hubSentences(txt);
+    if (S.length >= 2 && txt.length > 70) { split = true; if (i === 0 && !bullet) { out.push(S[0]); S.slice(1).forEach(function (x) { out.push("■ " + x); }); } else S.forEach(function (x) { out.push("■ " + x); }); }
+    else out.push(p);
+  });
+  if (split) out = out.map(function (p, i) { return i === 0 || /^■/.test(p) ? p : "■ " + p; });   // 끊었으면 번호·점이 섞이지 않게 전부 점으로
+  return out;
+}
 function hubTextFill(c, d) {
   /* v12.60 흰 상자에 문단을 넣던 양식 → 다른 장과 같은 문법으로: 첫 문단은 금색 세로선이 붙은 큰 결론, 나머지는 가는 줄로 나눈 항목(■ 로 시작하면 금색 점 항목) */
-  var g = c.g, P = NB.PAD, W = NB.W - P * 2, paras = (d.paras || []).filter(Boolean).map(function (p) { return String(p); });
-  var avail = NB.H - 100 - c.y - (d.tiles ? 200 : 0) - (d.after ? 150 : 0);
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, paras = hubSplitParas((d.paras || []).filter(Boolean).map(function (p) { return String(p); }));
+  var afterLines = d.after ? Math.min(3, cWrapCount(g, String(d.after[1] || ""), W - 48, 22, 600)) : 0, afterH = d.after ? 70 + afterLines * 30 : 0;
+  var avail = NB.H - 100 - c.y - (d.tiles ? 200 : 0) - (d.after ? afterH + 20 : 0);
   if (!paras.length) { c.y += 20; return; }
   var lead = paras[0], rest = paras.slice(1), L = Math.min(44, 40), B = 32;
-  function need(ls, bs) { var n = cWrapCount(g, lead, W - 40, ls, 800) * ls * 1.4 + 36; rest.forEach(function (p) { n += cWrapCount(g, p.replace(/^■\s*/, ""), W - 56, bs, 600) * bs * 1.5 + 30; }); return n; }
+  var padI = rest.length > 5 ? 20 : 30;   // v12.79 항목이 많으면 줄 간격을 줄여 글씨를 키운다
+  function need(ls, bs) { var n = cWrapCount(g, lead, W - 40, ls, 800) * ls * 1.4 + 36; rest.forEach(function (p) { n += cWrapCount(g, p.replace(/^■\s*/, ""), W - 56, bs, 600) * bs * 1.5 + padI; }); return n; }
   while (need(L, B) > avail && (L > 26 || B > 20)) { if (B > 20) B -= 1; if (L > 26 && B <= 24) L -= 1; }
   while (need(L + 1, B + 1) < avail * 0.8 && L < 48 && B < 36) { L += 1; B += 1; }
   // 결론
@@ -122,11 +144,16 @@ function hubTextFill(c, d) {
     if (bullet) { g.fillStyle = NB_C.gold; g.fillRect(P + 4, c.y + 16 + B * 0.25, 12, 12); }
     else { cText(g, String(k + 1).padStart(2, "0"), P + 2, c.y + 16 + B * 0.95, 18, 900, NB_C.gold2 || NB_C.gold); }
     cWrap(g, txt, P + 40, c.y + 16 + B * 0.95, W - 56, B, 600, NB_C.txt, B * 1.5, 12);
-    c.y += th + 30;
+    c.y += th + padI;
   });
   if (rest.length) { g.strokeStyle = NB_C.line; g.lineWidth = 1.5; g.beginPath(); g.moveTo(P, c.y); g.lineTo(P + W, c.y); g.stroke(); c.y += 16; }
   if (d.tiles && d.tiles.length) { var keep = c.y; c.y -= 30; nbTiles(c, d.tiles); c.y = Math.max(c.y - 30, keep + 170); }
-  if (d.after) { var g2 = c.g, ah = Math.min(130, NB.H - 96 - c.y); if (ah > 60) { c.y += 10; cRound(g2, P, c.y, W, ah - 10, 14, NB_INK); cText(g2, d.after[0], P + 24, c.y + 40, 20, 800, NB_C.gold); cWrap(g2, d.after[1], P + 24, c.y + 76, W - 48, 22, 600, "#f3efe6", 30, 2); c.y += ah; } }
+  if (d.after) {   // v12.80 검정 상자는 글 길이만큼(최대 3줄) — 잘리지 않게, 자리가 모자라면 글씨를 줄인다
+    var g2 = c.g, room = NB.H - 96 - c.y - 10, fsA = 22, nA = cWrapCount(g2, String(d.after[1] || ""), W - 48, fsA, 600);
+    while ((70 + nA * fsA * 1.36) > room && fsA > 16) { fsA -= 1; nA = cWrapCount(g2, String(d.after[1] || ""), W - 48, fsA, 600); }
+    var ah = Math.min(room, 70 + nA * fsA * 1.36);
+    if (ah > 60) { c.y += 10; cRound(g2, P, c.y, W, ah, 14, NB_INK); cText(g2, d.after[0], P + 24, c.y + 38, 19, 800, NB_C.gold); cWrap(g2, d.after[1], P + 24, c.y + 38 + fsA * 1.36, W - 48, fsA, 600, "#f3efe6", fsA * 1.36, 3); c.y += ah + 10; }
+  }
 }
 
 /* ============================================================ v12.18 새 양식 4종 — 선(추이) · 분포 · 짝 막대(둘 비교) · 게이지(지금 위치) ============================================================ */
@@ -575,7 +602,7 @@ function hubTopics() {
   // 정기 발행
   if (typeof PER_SETS !== "undefined") { var td = typeof perToday === "function" ? perToday() : []; Object.keys(PER_SETS).forEach(function (k) { add({ ctx: "per:" + k, g: "정기 발행", t: PER_SETS[k].t, d: PER_SETS[k].when + " 발행", multi: function () { perOpen(k); }, score: function () { return td.indexOf(k) >= 0 ? { s: 10, why: "오늘이 '" + cPlain(PER_SETS[k].t).replace(/^\S+\s/, "") + "' 발행일 (" + PER_SETS[k].when + ")" } : { s: 0, why: PER_SETS[k].when + " 발행" }; } }); }); }
   // 연구노트 (국면 · 낙폭 · 적립 · 오늘의 관찰 · 기사 vs 숫자)
-  if (typeof storyDecks === "function") { var dk = []; try { dk = storyDecks(); } catch (e) {} dk.filter(function (x) { return x.key !== "news"; }).forEach(function (x) { add({ ctx: "story:" + x.key, g: x.group === "국내 마감" ? "국내 마감" : "국면 · 연구노트", t: x.t, d: x.d, multi: function () { storyOpen(x.key); }, score: function () { var KW = { "scene:rateUp": /장기채/, "scene:rateDown": /장기채/, "scene:panic": /VIX|고점/, "scene:oilUp": /원유/, "scene:dollarUp": /달러/, drawdown: /고점|VIX/ }, w = now.why.filter(function (z) { return !KW[x.key] || KW[x.key].test(z); }); return x.now ? { s: x.key === "today" ? 7 : 9, why: x.key === "today" ? "매일 구성이 바뀌는 관찰 덱 — 오늘 가장 이례적인 것부터" : "지금 신호와 맞는 국면" + (w.length ? " — " + w.map(function (z) { return String(z).split(" → ").pop(); }).join(" · ") : "") } : { s: x.key === "dca" ? (dow === 5 ? 7 : 3) : 2, why: x.key === "dca" ? (dow === 5 ? "금요일 — 주말에 천천히 보는 '적금처럼' 시리즈" : "적립식 상시 콘텐츠") : "신호가 오면 추천돼요" }; } }); }); }
+  if (typeof storyDecks === "function") { var dk = []; try { dk = storyDecks(); } catch (e) {} dk.filter(function (x) { return x.key !== "news"; }).forEach(function (x) { add({ ctx: "story:" + x.key, g: x.group === "국내 마감" || x.group === "미국 마감" ? x.group : "국면 · 연구노트", t: x.t, d: x.d, multi: function () { storyOpen(x.key); }, score: function () { var KW = { "scene:rateUp": /장기채/, "scene:rateDown": /장기채/, "scene:panic": /VIX|고점/, "scene:oilUp": /원유/, "scene:dollarUp": /달러/, drawdown: /고점|VIX/ }, w = now.why.filter(function (z) { return !KW[x.key] || KW[x.key].test(z); }); return x.now ? { s: x.key === "today" ? 7 : 9, why: x.key === "today" ? "매일 구성이 바뀌는 관찰 덱 — 오늘 가장 이례적인 것부터" : "지금 신호와 맞는 국면" + (w.length ? " — " + w.map(function (z) { return String(z).split(" → ").pop(); }).join(" · ") : "") } : { s: x.key === "dca" ? (dow === 5 ? 7 : 3) : 2, why: x.key === "dca" ? (dow === 5 ? "금요일 — 주말에 천천히 보는 '적금처럼' 시리즈" : "적립식 상시 콘텐츠") : "신호가 오면 추천돼요" }; } }); }); }
   // 매크로
   if (typeof macDeckList === "function" && typeof MAC !== "undefined" && MAC.doc && !MAC.doc.none) { var R2 = MAC.px && MAC.px.ks ? macroCompute() : []; (MAC.px && MAC.px.ks ? macDeckList() : []).forEach(function (x) { add({ ctx: "macro:" + x.id, g: "매크로 · 환율·금리", t: x.t, d: x.d, multi: function () { macroDeckOpen(x.id); }, score: function () { var r = R2.filter(function (z) { return z.c.id === x.id; })[0], l = r && r.ev[r.ev.length - 1]; if (r && r.now.on && l && Date.now() - l.t < 30 * 86400e3) return { s: 9, why: r.c.tag + " — 최근 30일 안에 새로 나온 조건 (" + r.now.txt + ")" }; if (r && r.now.on) return { s: 6, why: "지금 해당: " + r.now.txt }; return { s: x.id === "all" ? 3 : 1, why: x.id === "all" ? "조건 11개를 한 장에 — 상시 저장용" : "조건이 나오면 추천돼요" }; } }); }); }
   // 배당 · 공시 · 구루 · 공모주
