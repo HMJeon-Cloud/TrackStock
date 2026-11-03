@@ -4,6 +4,7 @@ import { redisConf, getJsonGzText, setJsonGz, redisCmd, KEY } from "./_redis.js"
 import { composeDaily } from "./_compose.js";
 import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
+import { krHandler } from "./_kr.js";
 import { collectAll, saveGurusFromUpload } from "./_disc.js";
 import { copyHandler } from "./_copy.js";
 import { claudeHandler } from "./_claude.js";
@@ -41,6 +42,7 @@ export default async function handler(req, res) {
   if (req.query.op === "claude") return claudeHandler(req, res);
   if (req.query.op === "kv") return kvHandler(req, res);
   if (req.query.op === "verify") return verifyHandler(req, res);
+  if (req.query.op === "kr") return krHandler(req, res);   // v12.71 국내 마감 자료(급등락 순위·업종, 외국인·기관 순매수, 지수 수급)
   if (req.query.op === "disc") return discHandler(req, res);   // v11.2 공시·구루 수동 수집 (운영자) — 크론과 같은 수집기를 시간 넉넉히
   if (req.query.op === "lib") return libHandler(req, res);
   if (req.query.op === "archive") return archiveHandler(req, res);   // v12.5 분석 자산(아카이브) — AI 답변·앱 데이터 스냅샷을 서버(Redis)에 쌓아 다음 분석에 재사용   // v10.7 AI 보관함 (배경·스타일·구성·아이콘) — 서버(Redis) 저장   // v9.5 대표 카드 문구 (OpenAI) — 새 함수 파일을 만들 수 없어(무료 12개 한도) 여기에 붙임

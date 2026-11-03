@@ -254,6 +254,8 @@ function dlxCheck(D) {
   var issWhy = (D.issues || []).filter(function (x) { return x.why; }).length, long = [];
   (D.issues || []).forEach(function (x) { ["why", "so", "next"].forEach(function (k) { if (x[k] && x[k].length > 90) long.push("이슈 " + x.i + " " + k); }); }); picks.forEach(function (p) { if (p.hook && p.hook.length > 40) long.push("훅 '" + p.hook.slice(0, 12) + "…'"); });
   var rows = [["해설", story + "/3줄" + (bymk ? " · 시장별 " + bymk + "/3" : " · 시장별 없음"), story >= 3 ? 1 : 0], ["이슈 이유", issWhy + "/" + nIss, issWhy ? 1 : 0], ["급등락 이유", (D.movers || []).filter(function (x) { return x.why; }).length + "개", 1], ["내일 볼 것", (D.tomorrow || []).length + "개", (D.tomorrow || []).length ? 1 : 0], ["카드 편성", picks.length + "개" + (badCtx.length ? " · 후보에 없는 ctx " + badCtx.length + "개(무시됨)" : " · ctx 모두 일치"), picks.length && !badCtx.length ? 1 : picks.length ? 2 : 0], ["리포트", reps.length + "개" + (badId.length ? " · 후보에 없는 id " + badId.length + "(이름으로 찾음)" : ""), reps.length ? 1 : 0]];
+  rows.push(["주요 뉴스", (D.news || []).length + "개" + ((D.points || []).length ? " · 핵심 포인트 " + D.points.length : ""), (D.news || []).length >= 8 ? 1 : (D.news || []).length ? 2 : 0]);
+  rows.push(["주도 섹터", (D.sectors || []).length + "개" + ((D.sectors || []).filter(function (x) { return x.why; }).length ? "" : " · 이유 없음"), (D.sectors || []).length ? 1 : 2]);
   if (long.length) rows.push(["글자 수 초과", long.slice(0, 4).join(", ") + (long.length > 4 ? " 외 " + (long.length - 4) : "") + " — 카드에서 잘릴 수 있어요", 2]);
   return { rows: rows, ok: story > 0 || issWhy > 0 || picks.length > 0, badCtx: badCtx, empty: typeof smDailyEmpty === "function" ? smDailyEmpty(D) : false };
 }
