@@ -37,6 +37,9 @@ async function ranking(dir, mk) {
 
 /* ---------- (2) 외국인·기관 순매수·순매도 상위 — PC 네이버 금융 표 (개인 상위는 네이버가 주지 않음) ---------- */
 async function dealRank(sosok, gubun, type) {
+  // v12.81 모바일 JSON 후보 먼저 (끝점 이름이 확실치 않아 여러 개 시도 — 종목 배열이 오면 채택)
+  const mk = sosok === "02" ? "KOSDAQ" : "KOSPI", inv = gubun === "1000" ? "foreigner" : "institution", cands = ["https://m.stock.naver.com/api/stocks/" + inv + (type === "buy" ? "Buy" : "Sell") + "/" + mk + "?page=1&pageSize=20", "https://m.stock.naver.com/api/stocks/investor/" + mk + "?investorType=" + (gubun === "1000" ? "FOREIGN" : "INSTITUTION") + "&tradeType=" + type.toUpperCase() + "&page=1&pageSize=20"];
+  for (const u of cands) { try { const rows = arrOf(await getJson(u)).map((x) => { const r = stockRow(x); if (!r) return null; r.amt = num(x.netBuyAmount || x.pureBuyAmount || x.netBuyingAmount || x.tradingValue || x.amount); if (r.amt != null && Math.abs(r.amt) > 1e7) r.amt = Math.round(r.amt / 1e6); return r; }).filter(Boolean); if (rows.length) return { rows: rows.slice(0, 20), src: u }; } catch (e) {} }
   const urls = ["https://finance.naver.com/sise/sise_deal_rank_iframe.naver?sosok=" + sosok + "&investor_gubun=" + gubun + "&type=" + type, "https://finance.naver.com/sise/sise_deal_rank.naver?sosok=" + sosok + "&investor_gubun=" + gubun + "&type=" + type];
   let err = "";
   for (const u of urls) {
@@ -80,6 +83,13 @@ async function indexFlow(code) {   // code: KOSPI | KOSDAQ
       if (out.close == null) { const m = html.match(/id="now_value"[^>]*>([\d,.]+)/); if (m) out.close = num(m[1]); const r = html.match(/id="change_value_and_rate"[^>]*>([\s\S]*?)<\/span>/); if (r) { const rr = strip(r[1]).match(/([+-]?[\d.]+)%/); if (rr) out.ret = num(rr[1]); } }
       out.src = out.src || "sise_index"; out.unit = "억원";
     } catch (e) { out.err = String(e.message).slice(0, 60); }
+  }
+  // 3) PC 투자자별 매매동향(일별) — 개인·외국인·기관계 순매수 (억원) 첫 행
+  if (out.foreign == null) {
+    try {
+      const html = await getHtml("https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=" + kstDay().replace(/-/g, "") + "&sosok=" + (code === "KOSDAQ" ? "02" : "01")), rows = html.split(/<tr[^>]*>/).slice(1);
+      for (const r of rows) { const cells = r.split(/<td[^>]*>/).slice(1).map(strip); if (cells.length < 4 || !/^\d{2}\.\d{2}\.\d{2}/.test(cells[0])) continue; const v = cells.slice(1).map(num); if (v[0] == null) continue; out.indiv = v[0]; out.foreign = v[1]; out.inst = v[2]; out.src = "investorDealTrendDay"; out.unit = "억원"; out.flowDate = cells[0]; break; }
+    } catch (e) { out.err2 = String(e.message).slice(0, 60); }
   }
   return out;
 }
