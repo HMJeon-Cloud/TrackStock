@@ -57,10 +57,11 @@ function hubBody(c, p) {
 /* 남은 칸을 비우지 않는다: 아래 '한 줄 정리' 상자로 채움 */
 function hubFillRest(c, p) {
   var left = NB.H - 100 - c.y; if (left < 90 || !p.note) return;
-  var g = c.g, P = NB.PAD, W = NB.W - P * 2, h = Math.min(left - 20, 260);
+  /* v12.78 남는 칸이 크면 상자도 키우고 글씨도 키운다(최대 30px) — 빈 종이 대신 읽기 좋은 정리 상자 */
+  var g = c.g, P = NB.PAD, W = NB.W - P * 2, nl0 = cWrapCount(g, p.note, W - 64, 30, 700), want = Math.max(150, nl0 * 30 * 1.5 + 60), h = Math.min(left - 20, Math.max(260, Math.min(620, want + 60)));
   cRound(g, P, c.y + 10, W, h, 16, NB_C.box || "#efe9dc");
   g.fillStyle = NB_C.gold2; g.fillRect(P, c.y + 10, 8, h);
-  var fs = 26; while (fs > 19 && cWrapCount(g, p.note, W - 64, fs, 700) * fs * 1.5 > h - 36) fs -= 1;
+  var fs = h > 400 ? 34 : 30; while (fs > 19 && cWrapCount(g, p.note, W - 64, fs, 700) * fs * 1.5 > h - 36) fs -= 1;
   var nl = cWrapCount(g, p.note, W - 64, fs, 700), th = nl * fs * 1.5, y0 = c.y + 10 + (h - th) / 2 + fs * 0.95;   // v11.8 세로 가운데 정렬
   cWrap(g, p.note, P + 32, y0, W - 64, fs, 700, NB_C.txt, fs * 1.5, 8);
   c.y += h + 20;
@@ -574,7 +575,7 @@ function hubTopics() {
   // 정기 발행
   if (typeof PER_SETS !== "undefined") { var td = typeof perToday === "function" ? perToday() : []; Object.keys(PER_SETS).forEach(function (k) { add({ ctx: "per:" + k, g: "정기 발행", t: PER_SETS[k].t, d: PER_SETS[k].when + " 발행", multi: function () { perOpen(k); }, score: function () { return td.indexOf(k) >= 0 ? { s: 10, why: "오늘이 '" + cPlain(PER_SETS[k].t).replace(/^\S+\s/, "") + "' 발행일 (" + PER_SETS[k].when + ")" } : { s: 0, why: PER_SETS[k].when + " 발행" }; } }); }); }
   // 연구노트 (국면 · 낙폭 · 적립 · 오늘의 관찰 · 기사 vs 숫자)
-  if (typeof storyDecks === "function") { var dk = []; try { dk = storyDecks(); } catch (e) {} dk.filter(function (x) { return x.key !== "news"; }).forEach(function (x) { add({ ctx: "story:" + x.key, g: "국면 · 연구노트", t: x.t, d: x.d, multi: function () { storyOpen(x.key); }, score: function () { var KW = { "scene:rateUp": /장기채/, "scene:rateDown": /장기채/, "scene:panic": /VIX|고점/, "scene:oilUp": /원유/, "scene:dollarUp": /달러/, drawdown: /고점|VIX/ }, w = now.why.filter(function (z) { return !KW[x.key] || KW[x.key].test(z); }); return x.now ? { s: x.key === "today" ? 7 : 9, why: x.key === "today" ? "매일 구성이 바뀌는 관찰 덱 — 오늘 가장 이례적인 것부터" : "지금 신호와 맞는 국면" + (w.length ? " — " + w.map(function (z) { return String(z).split(" → ").pop(); }).join(" · ") : "") } : { s: x.key === "dca" ? (dow === 5 ? 7 : 3) : 2, why: x.key === "dca" ? (dow === 5 ? "금요일 — 주말에 천천히 보는 '적금처럼' 시리즈" : "적립식 상시 콘텐츠") : "신호가 오면 추천돼요" }; } }); }); }
+  if (typeof storyDecks === "function") { var dk = []; try { dk = storyDecks(); } catch (e) {} dk.filter(function (x) { return x.key !== "news"; }).forEach(function (x) { add({ ctx: "story:" + x.key, g: x.group === "국내 마감" ? "국내 마감" : "국면 · 연구노트", t: x.t, d: x.d, multi: function () { storyOpen(x.key); }, score: function () { var KW = { "scene:rateUp": /장기채/, "scene:rateDown": /장기채/, "scene:panic": /VIX|고점/, "scene:oilUp": /원유/, "scene:dollarUp": /달러/, drawdown: /고점|VIX/ }, w = now.why.filter(function (z) { return !KW[x.key] || KW[x.key].test(z); }); return x.now ? { s: x.key === "today" ? 7 : 9, why: x.key === "today" ? "매일 구성이 바뀌는 관찰 덱 — 오늘 가장 이례적인 것부터" : "지금 신호와 맞는 국면" + (w.length ? " — " + w.map(function (z) { return String(z).split(" → ").pop(); }).join(" · ") : "") } : { s: x.key === "dca" ? (dow === 5 ? 7 : 3) : 2, why: x.key === "dca" ? (dow === 5 ? "금요일 — 주말에 천천히 보는 '적금처럼' 시리즈" : "적립식 상시 콘텐츠") : "신호가 오면 추천돼요" }; } }); }); }
   // 매크로
   if (typeof macDeckList === "function" && typeof MAC !== "undefined" && MAC.doc && !MAC.doc.none) { var R2 = MAC.px && MAC.px.ks ? macroCompute() : []; (MAC.px && MAC.px.ks ? macDeckList() : []).forEach(function (x) { add({ ctx: "macro:" + x.id, g: "매크로 · 환율·금리", t: x.t, d: x.d, multi: function () { macroDeckOpen(x.id); }, score: function () { var r = R2.filter(function (z) { return z.c.id === x.id; })[0], l = r && r.ev[r.ev.length - 1]; if (r && r.now.on && l && Date.now() - l.t < 30 * 86400e3) return { s: 9, why: r.c.tag + " — 최근 30일 안에 새로 나온 조건 (" + r.now.txt + ")" }; if (r && r.now.on) return { s: 6, why: "지금 해당: " + r.now.txt }; return { s: x.id === "all" ? 3 : 1, why: x.id === "all" ? "조건 11개를 한 장에 — 상시 저장용" : "조건이 나오면 추천돼요" }; } }); }); }
   // 배당 · 공시 · 구루 · 공모주

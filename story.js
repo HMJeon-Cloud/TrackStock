@@ -8,7 +8,7 @@
      news        뉴스 덱 — 오늘 아침 기사 제목 → 그 자산의 실제 숫자 (말과 숫자 비교)
    v10.0: deep.js의 조건부 통계 카드(승률·중앙값·최악, 닮은 날, 분할 vs 일시, 시작 시점 분포)가 각 덱 마무리 앞에 붙고, "데이터 기준 제안"을 명시한다.
    ============================================================ */
-var NB = { W: 1080, H: 1350, PAD: 60, SPLIT: 540 };   // 위 검정 0~540 / 아래 밝은 540~1350
+var NB = { W: 1080, H: 1350, PAD: 60, SPLIT: 450 };   // v12.78 위 결론 영역 0~450 / 아래 근거 450~1350 (제목 공간을 줄이고 내용을 더)
 var NB_C = { black: "#111111", light: "#f7f5f0", navy: "#1f2a44", txt: "#1c2333", sub: "#6b7280", line: "#e4dfd3", gold: "#e6c57a", gold2: "#c9a24f", up: "#d9342b", down: "#2f6fd6", teal: "#5b9bb5", white: "#ffffff", grey: "#9aa3b2", box: "#eeeae1" };
 var NB_ASSETS = { "SPY": "S&P500", "QQQ": "나스닥100", "^KS11": "코스피", "SCHD": "미국 배당주", "TLT": "장기채", "IEF": "중기채", "SHY": "단기채", "GLD": "금", "DBC": "원자재", "BTC-USD": "비트코인", "KRW=X": "달러/원", "USO": "원유", "^GSPC": "S&P500", "^IXIC": "나스닥", "005930.KS": "삼성전자", "000660.KS": "SK하이닉스" };
 var NB_WORD = { label: "연구노트", obs: "관찰", next: "다음 장 →", save: "저장해 두기", cta: "댓글로 생각 남기기" };
@@ -20,7 +20,7 @@ function nbName(sym) { return NB_ASSETS[sym] || (typeof chName === "function" ? 
    위 검정 띠(로고 + 진행 눈금) → 번호 알약 + 가는 줄 → 핵심 숫자(큰 글씨, 왼쪽) + 결론 문장(오른쪽) → 금색 시작 줄 → 근거 제목 → 본문 → 종이 발 (출처 · @uphill.lab 알약)
    예전 '관찰 NN · 문장 아래 정렬 · 우상향 꺾은선 · 검정 발' 배치를 버렸다. 본문 채우기 함수들은 c.y / NB.H-96 그대로 쓰므로 영향 없음. */
 var NB_PAPER = "#fbf8f1", NB_INK = "#14161c", NB_HI = "#b8913f";
-var NB_HOOK_TOP = 200, NB_RULE = NB.SPLIT - 20;   // 결론 영역 시작 · 구분선 위치
+var NB_HOOK_TOP = 160, NB_RULE = NB.SPLIT - 20;   // 결론 영역 시작 · 구분선 위치
 function nbBand(g, page, total) {
   g.fillStyle = NB_PAPER; g.fillRect(0, 0, NB.W, NB.H);
   nbTopBand(g, page, total);
@@ -167,8 +167,8 @@ function nbClose(q, lines, foot) {
 /* ---------- 시각 자료 (밝은 패널 안, c.y부터) ---------- */
 function nbTiles(c, tiles) {
   var g = c.g, P = NB.PAD, W = NB.W - P * 2, n = tiles.length, tw = W / n, y = c.y + 40;
-  // v11.8 값이 길면 칸 안에 들어가도록 글씨를 줄인다 (칸끼리 겹치지 않게) — 모든 칸이 같은 크기로
-  var vs = 62; tiles.forEach(function (t) { while (vs > 26 && cW(g, String(t.v), vs, 800) > tw - 24) vs -= 2; });
+  // v11.8 값이 길면 칸 안에 들어가도록 글씨를 줄인다 (칸끼리 겹치지 않게) — 모든 칸이 같은 크기로 · v12.78 칸이 셋 이하면 숫자를 더 크게
+  var vs = n <= 3 ? 76 : 62; tiles.forEach(function (t) { while (vs > 26 && cW(g, String(t.v), vs, 800) > tw - 24) vs -= 2; });
   tiles.forEach(function (t, i) { var x = P + tw * i + tw / 2; cText(g, t.v, x, y + 70, vs, 800, t.color || NB_C.navy, "center"); cWrap(g, t.l, x, y + 116, tw - 20, 22, 500, NB_C.sub, 30, 2, "center"); });
   g.strokeStyle = NB_C.line; g.lineWidth = 2; g.beginPath(); g.moveTo(P, y + 196); g.lineTo(P + W, y + 196); g.stroke();
   c.y = y + 226;

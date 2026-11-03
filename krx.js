@@ -35,13 +35,13 @@ function krxSectors(K, n) {
 var KX = { W: 1080, H: 1350, P: 56, ink: "#14161c", gold: "#c9a24f", paper: "#fbf8f1", up: "#c03b3b", dn: "#2456b7", sub: "#6b7280", line: "#e4dfd3", box: "#ffffff", soft: "#f3efe6" };
 function kxNew(title, sub, page, total) {
   var cv = document.createElement("canvas"); cv.width = KX.W; cv.height = KX.H; var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
-  g.fillStyle = KX.paper; g.fillRect(0, 0, KX.W, KX.H); g.fillStyle = KX.ink; g.fillRect(0, 0, KX.W, 150);
+  g.fillStyle = KX.paper; g.fillRect(0, 0, KX.W, KX.H); g.fillStyle = KX.ink; g.fillRect(0, 0, KX.W, 112);
   if (typeof cBrandMark === "function") cBrandMark(g, KX.P, 34, 30); cText(g, "우상향연구소", KX.P + 42, 58, 22, 900, "#f3efe6"); cText(g, "UPHILL.LAB", KX.P + 190, 58, 15, 700, KX.gold);
   cText(g, cDate(Date.now()) + " · 국내 마감", KX.W - KX.P, 58, 18, 700, "#b9b3a8", "right");
-  cText(g, cFit(g, title, KX.W - KX.P * 2 - 200, 40, 900), KX.P, 118, 40, 900, "#f3efe6");
-  if (sub) cText(g, cFit(g, sub, 190, 17, 600), KX.W - KX.P, 118, 17, 600, KX.gold, "right");
-  if (total > 1) { var bw = (KX.W - KX.P * 2 - (total - 1) * 6) / total; for (var i = 0; i < total; i++) { g.fillStyle = i < page ? KX.gold : "#3a3f4c"; g.fillRect(KX.P + i * (bw + 6), 142, bw, 4); } }
-  return { cv: cv, g: g, y: 150 + 36 };
+  cText(g, cFit(g, title, KX.W - KX.P * 2 - 220, 34, 900), KX.P, 94, 34, 900, "#f3efe6");
+  if (sub) cText(g, cFit(g, sub, 210, 16, 600), KX.W - KX.P, 94, 16, 600, KX.gold, "right");
+  if (total > 1) { var bw = (KX.W - KX.P * 2 - (total - 1) * 6) / total; for (var i = 0; i < total; i++) { g.fillStyle = i < page ? KX.gold : "#3a3f4c"; g.fillRect(KX.P + i * (bw + 6), 104, bw, 4); } }
+  return { cv: cv, g: g, y: 112 + 30 };
 }
 function kxFoot(c, src) {
   var g = c.g, y0 = KX.H - 60; g.fillStyle = KX.ink; g.fillRect(KX.P, y0, KX.W - KX.P * 2, 2);
@@ -88,8 +88,8 @@ function krxSectorDeck() {
       cRound(g, x + 20, y + 18, cW(g, s.name, 24, 900) + 36, 40, 10, KX.ink); cText(g, s.name, x + 38, y + 46, 24, 900, KX.gold);
       cText(g, s.n + "종목", x + bw - 20, y + 46, 17, 700, KX.sub, "right");
       var yy = y + 78; if (s.why) { yy = cWrap(g, s.why, x + 20, yy + 4, bw - 40, 17, 600, KX.up, 22, 2) + 6; } else yy += 8;
-      var rows = s.items.slice(0, 4), rh = Math.min(50, Math.floor((y + bh - 16 - yy) / Math.max(1, rows.length)));
-      rows.forEach(function (it, k) { var ry = yy + k * rh + rh / 2 + 8; cText(g, cFit(g, it.name, bw - 190, 23, 800), x + 20, ry, 23, 800, KX.ink); cText(g, krxPct(it.ret), x + bw - 20, ry, 24, 900, it.ret >= 29.5 ? "#d9480f" : KX.up, "right"); g.fillStyle = KX.line; g.fillRect(x + 20, ry + 14, bw - 40, 1); });
+      var rows = s.items.slice(0, 5), rh = Math.min(66, Math.floor((y + bh - 16 - yy) / Math.max(1, rows.length))), fs = rh >= 56 ? 27 : 23;
+      rows.forEach(function (it, k) { var ry = yy + k * rh + rh / 2 + 8; cText(g, cFit(g, it.name, bw - 190, fs, 800), x + 20, ry, fs, 800, KX.ink); cText(g, krxPct(it.ret), x + bw - 20, ry, fs + 1, 900, it.ret >= 29.5 ? "#d9480f" : KX.up, "right"); g.fillStyle = KX.line; g.fillRect(x + 20, ry + 14, bw - 40, 1); });
     });
     kxFoot(c, "네이버 증권 급등 상위(코스피·코스닥) · 업종은 네이버 분류 · 이유는 Claude 정리 · 투자 권유 아님"); out.push({ name: "섹터" + (p + 1), cv: c.cv });
   }
@@ -147,14 +147,22 @@ function krxCloseDeck() {
   });
   y += bh + 36;
   cText(g, "핫테마", KX.P, y + 6, 22, 900, KX.ink); g.fillStyle = KX.gold; g.fillRect(KX.P, y + 16, 80, 4); y += 40;
-  var S = krxSectors(K, 3), cw = (KX.W - KX.P * 2 - gap * 2) / 3, ch = KX.H - 60 - y - 12;
+  var I = K.investor || {}, hasInv = I.foreign && I.foreign.buy && I.foreign.buy.length, S = krxSectors(K, 3), cw = (KX.W - KX.P * 2 - gap * 2) / 3;
+  var maxRows = Math.max.apply(null, [3].concat(S.map(function (x) { return Math.min(6, x.items.length); }))), rh = 54, ch = Math.min(KX.H - 60 - y - 12 - (hasInv ? 190 : 0), 96 + maxRows * rh + 14);
   if (!S.length) cText(g, "급등 상위 자료 없음", KX.W / 2, y + 100, 20, 700, KX.sub, "center");
   S.forEach(function (s, i) {
     var x = KX.P + i * (cw + gap); cRound(g, x, y, cw, ch, 20, KX.box, KX.line); cRound(g, x + 20, y + 18, cw - 40, 44, 10, KX.ink); cText(g, cFit(g, s.name, cw - 60, 22, 900), x + cw / 2, y + 48, 22, 900, KX.gold, "center");
     var yy = y + 80; if (s.why) yy = cWrap(g, s.why, x + 18, yy + 2, cw - 36, 15, 600, KX.sub, 20, 2) + 4;
-    var rows = s.items.slice(0, 6), rh = Math.min(46, Math.floor((y + ch - 14 - yy) / Math.max(1, rows.length)));
-    rows.forEach(function (it, k) { var ry = yy + k * rh + rh / 2 + 7; cText(g, cFit(g, it.name, cw - 150, 20, 800), x + 18, ry, 20, 800, KX.ink); cText(g, "(" + krxPct(it.ret) + ")", x + cw - 18, ry, 19, 800, KX.up, "right"); g.fillStyle = KX.line; g.fillRect(x + 18, ry + 12, cw - 36, 1); });
+    var rows = s.items.slice(0, 6), rr = Math.min(rh, Math.floor((y + ch - 14 - yy) / Math.max(1, rows.length)));
+    rows.forEach(function (it, k) { var ry = yy + k * rr + rr / 2 + 7; cText(g, cFit(g, it.name, cw - 150, 21, 800), x + 18, ry, 21, 800, KX.ink); cText(g, "(" + krxPct(it.ret) + ")", x + cw - 18, ry, 20, 800, KX.up, "right"); g.fillStyle = KX.line; g.fillRect(x + 18, ry + 12, cw - 36, 1); });
   });
+  y += ch + 30;
+  /* 남는 자리에 수급 상위 — 외국인·기관 순매수 · 외국인 순매도 (자료 있을 때만) */
+  if (hasInv && KX.H - 60 - y > 150) {
+    cText(g, "수급 상위", KX.P, y + 6, 22, 900, KX.ink); g.fillStyle = KX.gold; g.fillRect(KX.P, y + 16, 90, 4); y += 36;
+    var cols = [["외국인 순매수", (I.foreign || {}).buy || [], KX.up], ["기관 순매수", (I.inst || {}).buy || [], KX.up], ["외국인 순매도", (I.foreign || {}).sell || [], KX.dn]], hh = KX.H - 60 - y - 10, nrow = Math.max(3, Math.min(5, Math.floor((hh - 50) / 32)));
+    cols.forEach(function (col, i) { var x = KX.P + i * (cw + gap); cRound(g, x, y, cw, hh, 16, KX.soft); cText(g, col[0], x + 16, y + 30, 17, 900, col[2]); cText(g, "백만원", x + cw - 16, y + 30, 12, 600, KX.sub, "right"); col[1].slice(0, nrow).forEach(function (r, k) { var ry = y + 58 + k * 32; cText(g, cFit(g, (k + 1) + " " + r.name, cw - 130, 17, 700), x + 16, ry, 17, 700, KX.ink); cText(g, r.amt != null ? Math.round(Math.abs(r.amt)).toLocaleString() : "-", x + cw - 16, ry, 16, 800, col[2], "right"); }); });
+  }
   kxFoot(c, "네이버 증권 · 야후 파이낸스 종가 · 본 자료는 주가에 대한 판단이나 투자 권유를 포함하지 않습니다");
   return [{ name: "마감한장", cv: c.cv }];
 }
