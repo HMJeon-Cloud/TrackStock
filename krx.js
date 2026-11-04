@@ -60,7 +60,12 @@ function kxFoot(c, src) {
 function kxEmpty(c, msg) { cText(c.g, msg, KX.W / 2, c.y + 120, 24, 700, KX.sub, "center"); }
 var KX_CAT = { 반도체: "#2456b7", 정책: "#1d7f55", 금리: "#7a4ea8", 환율: "#b9600f", 실적: "#c03b3b", 수급: "#1f3a68", 부동산: "#8a6d2b", 코인: "#d97706", 해외: "#0e7490", 산업: "#4b5563" };
 /* v12.85 뉴스 개수는 격자에 맞게 12 또는 16 (많으면 자르고, 모자라면 있는 만큼) */
-function krxNewsList() { var F = krxFull(), N = F && F.data ? (F.data.news || []).filter(function (x) { return x && x.title; }) : []; return N.length >= 16 ? N.slice(0, 16) : N.length >= 12 ? N.slice(0, 12) : N; }
+function krxNewsList() {
+  var F = krxFull(), N = F && F.data ? (F.data.news || []).filter(function (x) { return x && x.title; }) : []; N = N.length >= 16 ? N.slice(0, 16) : N.length >= 12 ? N.slice(0, 12) : N;
+  /* v12.86 같은 분류끼리 묶어 번호를 다시 — 분류 순서는 Claude가 처음 쓴 순서(대개 중요도 순) */
+  var order = [], key = function (x) { return String(x.cat || "기타").trim(); }; N.forEach(function (x) { if (order.indexOf(key(x)) < 0) order.push(key(x)); });
+  return N.map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) { return order.indexOf(key(a.x)) - order.indexOf(key(b.x)) || a.i - b.i; }).map(function (o) { return o.x; });
+}
 /* 한 장 핵심 요약 — 전부 한 장에: 12개 = 3×4, 16개 = 4×4, 그 밖 = 2×n · 아래 핵심 포인트 띠 */
 function krxNewsOne() {
   var N = krxNewsList(), F = krxFull(), PT = F && F.data ? (F.data.points || []).slice(0, 5) : [];
@@ -176,16 +181,26 @@ var THEMES_US = [
   { name: "에너지 · 전력", syms: ["XOM", "CVX", "COP", "NEE", "VST", "CEG", "GEV"], re: /Energy|Utilities/ },
   { name: "바이오 · 헬스", syms: ["LLY", "UNH", "JNJ", "ABBV", "MRK", "PFE", "AMGN"], re: /Health|Pharma|Biotech/ }
 ];
+var THEMES_COIN = [
+  { name: "메이저", syms: ["BTC-USD", "ETH-USD", "XRP-USD", "BNB-USD", "SOL-USD"] },
+  { name: "레이어1", syms: ["ADA-USD", "AVAX-USD", "SUI20947-USD", "TON11419-USD", "NEAR-USD", "APT21794-USD", "DOT-USD", "TRX-USD"] },
+  { name: "레이어2", syms: ["ARB11841-USD", "OP-USD"] },
+  { name: "디파이", syms: ["LINK-USD", "UNI7083-USD", "AAVE-USD", "ONDO-USD"] },
+  { name: "AI", syms: ["RENDER-USD", "FET-USD", "TAO22974-USD"] },
+  { name: "밈", syms: ["DOGE-USD", "SHIB-USD", "PEPE24478-USD"] }
+];
+function coinFrame() { var F = typeof smMkFrame === "function" ? smMkFrame("coin") : null; return F && F.R ? F.R : null; }
+function mkFrame(mk) { return mk === "us" ? usFrame() : mk === "coin" ? coinFrame() : krFrame(); }
 function themeName(sym, fallback) { var k = String(sym), n = (typeof BRIEF_KO !== "undefined" && BRIEF_KO[k]) || usKo(fallback || k, k); return String(n).replace(/\s*\(.*?\)\s*/g, "").trim() || k; }
 /* 종목 하나의 오늘 숫자 — 앱 시세 → 유니버스(코스피200·S&P500) → 네이버 급등락 목록 순서로 찾는다 */
 function themeStat(sym, mk) {
   var S = typeof nbStat === "function" ? nbStat(sym) : null; if (S) return { sym: sym, name: themeName(sym, S.name), ret: S.ret1, m1: S.m1, src: "app" };
-  var R = mk === "us" ? usFrame() : krFrame(), u = R && (R.uniStocks || []).filter(function (x) { return x.sym === sym; })[0]; if (u) return { sym: sym, name: themeName(sym, u.name), ret: u.ret1 != null ? u.ret1 : u.ret, m1: u.m1, src: "uni" };
-  if (mk !== "us") { var K = KRX.data || krxCached(), code = sym.replace(/\.K[SQ]$/, ""), hit = K && [].concat(K.up.kospi || [], K.up.kosdaq || [], K.down.kospi || [], K.down.kosdaq || []).filter(function (x) { return x.code === code; })[0]; if (hit && hit.ret != null) return { sym: sym, name: hit.name, ret: hit.ret / 100, src: "naver" }; }
+  var R = mkFrame(mk), u = R && (R.uniStocks || []).filter(function (x) { return x.sym === sym; })[0]; if (u) return { sym: sym, name: themeName(sym, u.name), ret: u.ret1 != null ? u.ret1 : u.ret, m1: u.m1, src: "uni" };
+  if (mk === "kr") { var K = KRX.data || krxCached(), code = sym.replace(/\.K[SQ]$/, ""), hit = K && [].concat(K.up.kospi || [], K.up.kosdaq || [], K.down.kospi || [], K.down.kosdaq || []).filter(function (x) { return x.code === code; })[0]; if (hit && hit.ret != null) return { sym: sym, name: hit.name, ret: hit.ret / 100, src: "naver" }; }
   return null;
 }
 function themeRows(mk, n) {
-  var T = mk === "us" ? THEMES_US : THEMES_KR, R = mk === "us" ? usFrame() : krFrame(), uni = (R && R.uniStocks) || [], K = mk === "us" ? null : (KRX.data || krxCached());
+  var T = mk === "us" ? THEMES_US : mk === "coin" ? THEMES_COIN : THEMES_KR, R = mkFrame(mk), uni = (R && R.uniStocks) || [], K = mk === "kr" ? (KRX.data || krxCached()) : null;
   var F = krxFull(), W = {}; ((F && F.data && F.data.sectors) || []).forEach(function (x) { W[x.name] = x; });
   return T.map(function (t) {
     var seen = {}, items = [];
@@ -236,16 +251,16 @@ function kxMoverStrip(c, R, y, nameFn) {
 }
 /* ---------- 마감 한 장 (국내·미국 공통 뼈대): 시장 마감 → 관심 테마 6 → 급등·급락 한 줄 ---------- */
 function closeDeck(mk) {
-  var isUS = mk === "us", R = isUS ? usFrame() : krFrame(), K = isUS ? null : (KRX.data || krxCached());
-  if (!R && !K) throw new Error((isUS ? "미국" : "국내") + " 시장 데이터를 아직 준비하는 중이에요");
-  var c = kxNew(isUS ? "오늘의 간단 시황 — 미국" : "오늘의 간단 시황", isUS ? "S&P500 · 나스닥 · 다우" : "코스피 · 코스닥", 1, 1, isUS ? "미국 마감" : "국내 마감"), g = c.g, y = c.y, st = function (s) { return typeof nbStat === "function" ? nbStat(s) : null; }, gap = 16;
+  var isUS = mk === "us", isCoin = mk === "coin", R = mkFrame(mk), K = mk === "kr" ? (KRX.data || krxCached()) : null;
+  if (!R && !K) throw new Error(({ kr: "국내", us: "미국", coin: "코인" })[mk] + " 시장 데이터를 아직 준비하는 중이에요");
+  var c = kxNew(isCoin ? "오늘의 간단 시황 — 코인" : isUS ? "오늘의 간단 시황 — 미국" : "오늘의 간단 시황", isCoin ? "비트코인 · 이더리움 · 리플" : isUS ? "S&P500 · 나스닥 · 다우" : "코스피 · 코스닥", 1, 1, isCoin ? "코인 9시 마감" : isUS ? "미국 마감" : "국내 마감"), g = c.g, y = c.y, st = function (s) { return typeof nbStat === "function" ? nbStat(s) : null; }, gap = 16;
   cText(g, "시장 마감", KX.P, y + 6, 20, 900, KX.ink); g.fillStyle = KX.gold; g.fillRect(KX.P, y + 16, 90, 4); y += 34;
-  var boxes = isUS ? [["S&P500", "^GSPC"], ["나스닥", "^IXIC"], ["다우", "^DJI"]] : [["코스피", "^KS11", K && K.index && K.index.kospi], ["코스닥", "^KQ11", K && K.index && K.index.kosdaq]], bw = (KX.W - KX.P * 2 - gap * (boxes.length - 1)) / boxes.length, bh = 250;
+  var boxes = isCoin ? [["비트코인", "BTC-USD"], ["이더리움", "ETH-USD"], ["리플", "XRP-USD"]] : isUS ? [["S&P500", "^GSPC"], ["나스닥", "^IXIC"], ["다우", "^DJI"]] : [["코스피", "^KS11", K && K.index && K.index.kospi], ["코스닥", "^KQ11", K && K.index && K.index.kosdaq]], bw = (KX.W - KX.P * 2 - gap * (boxes.length - 1)) / boxes.length, bh = 250;
   boxes.forEach(function (b, i) {
     var x = KX.P + i * (bw + gap), S = st(b[1]), ix = b[2] || {}, close = ix.close != null ? ix.close : S ? S.last : null, ret = ix.ret != null ? ix.ret / 100 : S ? S.ret1 : null;
     cRound(g, x, y, bw, bh, 18, KX.box, KX.line); cText(g, b[0], x + 18, y + 36, 20, 900, KX.ink);
-    if (close != null) cText(g, close.toLocaleString(undefined, { maximumFractionDigits: 2 }), x + 18, y + 78, isUS ? 30 : 34, 900, KX.ink);
-    if (ret != null) cText(g, (ret >= 0 ? "▲ " : "▼ ") + usPct(ret), x + bw - 18, y + 78, isUS ? 19 : 22, 900, ret >= 0 ? KX.up : KX.dn, "right");
+    if (close != null) cText(g, (isCoin ? "$" : "") + close.toLocaleString(undefined, { maximumFractionDigits: 2 }), x + 18, y + 78, boxes.length > 2 ? 30 : 34, 900, KX.ink);
+    if (ret != null) cText(g, (ret >= 0 ? "▲ " : "▼ ") + usPct(ret), x + bw - 18, y + 78, boxes.length > 2 ? 19 : 22, 900, ret >= 0 ? KX.up : KX.dn, "right");
     if (!krxSpark(g, b[1], x + 18, y + 96, bw - 36, 70)) cText(g, "흐름 자료 없음", x + bw / 2, y + 135, 14, 600, KX.sub, "center");
     var l1 = S ? ["1개월 " + usPct(S.m1), "1년 " + usPct(S.y1), "고점 대비 " + usPct(S.vsHi)] : [], l2 = [];
     if (ix.indiv != null || ix.foreign != null) l2 = ["개인 " + krxEok(ix.indiv), "외국인 " + krxEok(ix.foreign), "기관 " + krxEok(ix.inst)];
@@ -260,13 +275,13 @@ function closeDeck(mk) {
   var rows = themeRows(mk, 4), hasMv = R && ((R.movers && (R.movers.up.length || R.movers.down.length)) || (R.hotVol || []).length), stripH = hasMv ? 92 + 14 : 0, gridH = KX.H - 60 - y - 12 - stripH;
   y = kxThemeGrid(c, rows, y, gridH, 4) + 12;
   kxMoverStrip(c, R, y, isUS ? function (r) { return usKo(typeof briefName === "function" ? briefName(r) : r.sym, r.sym); } : null);
-  kxFoot(c, isUS ? "야후 파이낸스 종가 · S&P500 전 종목 폭 · 본 자료는 주가에 대한 판단이나 투자 권유를 포함하지 않습니다" : "네이버 증권 · 야후 파이낸스 종가 · 본 자료는 주가에 대한 판단이나 투자 권유를 포함하지 않습니다");
-  return [{ name: isUS ? "미국마감" : "마감한장", cv: c.cv }];
+  kxFoot(c, isCoin ? "야후 파이낸스 · 한국시간 오전 9시 마감 기준 · 투자 권유 아님" : isUS ? "야후 파이낸스 종가 · S&P500 전 종목 폭 · 본 자료는 주가에 대한 판단이나 투자 권유를 포함하지 않습니다" : "네이버 증권 · 야후 파이낸스 종가 · 본 자료는 주가에 대한 판단이나 투자 권유를 포함하지 않습니다");
+  return [{ name: isCoin ? "코인마감" : isUS ? "미국마감" : "마감한장", cv: c.cv }];
 }
 /* ---------- 주요 섹터 (국내·미국 공통): 1장 = 관심 테마 6(종목 5) · 2장 = 큰 업종 6(종목 수 기준) ---------- */
 function sectorDeck(mk) {
-  var isUS = mk === "us", R = isUS ? usFrame() : krFrame(), K = isUS ? null : (KRX.data || krxCached());
-  if (!R && !K) throw new Error((isUS ? "미국" : "국내") + " 시장 데이터를 아직 준비하는 중이에요");
+  var isUS = mk === "us", isCoin = mk === "coin", R = mkFrame(mk), K = mk === "kr" ? (KRX.data || krxCached()) : null;
+  if (!R && !K) throw new Error(({ kr: "국내", us: "미국", coin: "코인" })[mk] + " 시장 데이터를 아직 준비하는 중이에요");
   var idx = R ? (R.indexRow || []).slice(0, 3).map(function (x) { return x.name + " " + usPct(x.ret); }).join(" · ") : "", out = [];
   var draw = function (title, sub, rows, page, total, per) {
     var c = kxNew(title, sub, page, total, isUS ? "미국 마감" : "국내 마감"), g = c.g, cols = 2, gap = 18, bw = (KX.W - KX.P * 2 - gap) / cols, bh = Math.floor((KX.H - 60 - c.y - 10 - gap * 2) / 3);
@@ -282,9 +297,9 @@ function sectorDeck(mk) {
     kxFoot(c, isUS ? "S&P500 전 종목 · 야후 파이낸스 종가 · 섹터는 GICS · 투자 권유 아님" : "코스피200 유니버스 · 네이버 급등 상위 · 업종은 거래소·네이버 분류 · 투자 권유 아님"); return c.cv;
   };
   var T = themeRows(mk, 5).map(function (t) { return { name: t.name, items: t.all, avg: t.avg, up: t.up, n: t.n, why: t.why }; });
-  var big = R && (R.uniStocks || []).length ? usSectors(R, 40).sort(function (a, b) { return b.n - a.n; }).slice(0, 6) : [];
+  var big = !isCoin && R && (R.uniStocks || []).length ? usSectors(R, 40).sort(function (a, b) { return b.n - a.n; }).slice(0, 6) : [];
   var total = big.length ? 2 : 1;
-  out.push({ name: "관심테마", cv: draw(isUS ? "미국 관심 테마" : "오늘의 관심 테마", idx || "매일 같은 여섯 묶음", T, 1, total, 5) });
+  out.push({ name: "관심테마", cv: draw(isCoin ? "코인 관심 테마" : isUS ? "미국 관심 테마" : "오늘의 관심 테마", idx || "매일 같은 여섯 묶음", T, 1, total, 5) });
   if (big.length) out.push({ name: "큰업종", cv: draw(isUS ? "미국 큰 업종 — S&P500" : "국내 큰 업종 — 코스피200", "종목 수가 많은 업종 순 · 상위 5종목", big, 2, total, 5) });
   return out;
 }
@@ -293,20 +308,23 @@ function usCloseDeck() { return closeDeck("us"); }
 function krxSectorDeck() { return sectorDeck("kr"); }
 function usSectorDeck() { return sectorDeck("us"); }
 /* ---------- 연구노트 목록·실행에 끼워 넣기 ---------- */
+/* v12.86 시장별로 따로 있던 주제를 하나로 — 고른 시장(카드 작업대 · 즐겨찾기)대로. 전체 = 국내 + 미국 */
+function deckMk() { var m = (typeof MK !== "undefined" && MK.mk) || (typeof smMk === "function" ? smMk() : "all"); return m || "all"; }
+function closeAny() { var m = deckMk(); if (m === "all") { var out = []; ["kr", "us"].forEach(function (x) { try { out = out.concat(closeDeck(x)); } catch (e) {} }); if (!out.length) throw new Error("국내·미국 시장 데이터를 아직 준비하는 중이에요"); return out; } return closeDeck(m); }
+function sectorAny() { var m = deckMk(); if (m === "all") { var out = []; ["kr", "us"].forEach(function (x) { try { out = out.concat(sectorDeck(x)); } catch (e) {} }); if (!out.length) throw new Error("국내·미국 시장 데이터를 아직 준비하는 중이에요"); return out; } return sectorDeck(m); }
 var KRX_DECKS = [
-  { key: "kr-close", t: "🏁 오늘의 간단 시황 — 마감 한 장", d: "코스피·코스닥 종가·등락·20일 흐름 · 관심 테마 6(반도체·조선·로봇·에너지·바이오·방산) 각 4종목 막대 · 급등·급락·거래대금 알약", fn: krxCloseDeck, need: "kr" },
-  { key: "kr-sector", t: "🧭 오늘의 주도 섹터 — 업종별 급등 상위", d: "1장 관심 테마 6(각 5종목) · 2장 종목 수 많은 큰 업종 6 — 변동이 큰 업종이 아니라 늘 보는 업종 순", fn: krxSectorDeck, need: "kr" },
-  { key: "kr-flow", t: "💰 주체별 수급 — 외국인·기관 순매수·순매도", d: "외국인·기관 순매수/순매도 상위 12 · 지수 수급(개인·외국인·기관) · 개인 상위는 네이버 미제공", fn: krxFlowDeck, need: "kr" },
-  { key: "us-close", t: "🇺🇸 오늘의 간단 시황 — 미국 마감 한 장", d: "S&P500·나스닥·다우 종가·등락·20일 흐름 · 관심 테마 6(반도체·빅테크·AI소프트·방산·에너지·바이오) · 급등·급락 한 줄", fn: usCloseDeck, need: "us" },
-  { key: "us-sector", t: "🇺🇸 미국 주도 섹터 — S&P500 섹터별", d: "1장 관심 테마 6(각 5종목) · 2장 종목 수 많은 GICS 섹터 6", fn: usSectorDeck, need: "us" },
-  { key: "kr-news", t: "📰 오늘의 주요 뉴스 — 핵심만 12 · 16개", d: "오늘 브리핑(직접 질문)의 news 12 또는 16개 + 핵심 포인트 5 · 여러 장(한 장에 4개) 또는 한 장(3×4 · 4×4 격자)", fn: krxNewsDeck, need: "daily" }
+  { key: "close", t: "🏁 오늘의 간단 시황 — 마감 한 장", d: "고른 시장(국내 · 미국 · 코인 · 전체=국내+미국) 지수 · 20일 흐름 · 관심 테마 6 × 4종목 막대 · 급등·급락·거래대금 알약", fn: closeAny, need: "any" },
+  { key: "sector", t: "🧭 오늘의 관심 테마 · 큰 업종", d: "고른 시장 1장 관심 테마 6(각 5종목) · 2장 종목 수 많은 업종 6(국내 코스피200 / 미국 GICS)", fn: sectorAny, need: "any" },
+  { key: "kr-flow", t: "💰 주체별 수급 — 외국인·기관 순매수·순매도", d: "외국인·기관 순매수/순매도 상위 12 · 지수 수급(개인·외국인·기관) · 국내만", fn: krxFlowDeck, need: "kr" },
+  { key: "kr-news", t: "📰 오늘의 주요 뉴스 — 핵심만 12 · 16개", d: "오늘 브리핑(직접 질문)의 news 12 또는 16개(분류별로 묶어 번호) + 핵심 포인트 5 · 여러 장 또는 한 장(3×4 · 4×4)", fn: krxNewsDeck, need: "daily" }
 ];
+var KRX_ALIAS = { "kr-close": function () { return closeDeck("kr"); }, "us-close": function () { return closeDeck("us"); }, "kr-sector": function () { return sectorDeck("kr"); }, "us-sector": function () { return sectorDeck("us"); } };   // 예전 주소(편성·즐겨찾기)도 계속 동작
 (function () {
   if (typeof storyDecks !== "function") return;
-  var d0 = storyDecks; storyDecks = function () { var out = d0.apply(this, arguments); var F = krxFull(), hasNews = !!(F && F.data && (F.data.news || []).length), K = KRX.data || krxCached(); var hasInv = !!(K && K.investor && K.investor.foreign && K.investor.foreign.buy && K.investor.foreign.buy.length), j = 0; KRX_DECKS.forEach(function (x) { if (x.key === "kr-flow" && K && !hasInv) return;   /* v12.82 네이버가 수급을 안 주는 날은 목록에서 뺀다 */ out.splice(1 + (j++), 0, { key: x.key, t: x.t, d: x.d, now: true, ready: x.key === "kr-flow" ? hasInv : x.need === "kr" ? !!(K || krFrame()) : x.need === "us" ? !!usFrame() : hasNews, group: x.need === "us" ? "미국 마감" : "국내 마감" }); }); return out; };
-  var r0 = storyReady; storyReady = function (kind) { if (/^(kr|us)-/.test(kind)) { var x = KRX_DECKS.filter(function (d) { return d.key === kind; })[0]; return x && x.need === "daily" ? !!(krxFull() && (krxFull().data.news || []).length) : x && x.need === "us" ? !!usFrame() : x && x.key === "kr-flow" ? !!(KRX.data || krxCached()) : !!(KRX.data || krxCached() || krFrame()); } return r0.apply(this, arguments); };
-  var p0 = storyPrepare; storyPrepare = function (key) { if (/^(kr|us)-/.test(key)) { var x = KRX_DECKS.filter(function (d) { return d.key === key; })[0]; var ps = [x && x.need === "kr" ? krxLoad(false).catch(function (e) { console.warn("kr", e); return null; }) : x && x.need === "us" && typeof dlUniLoad === "function" ? dlUniLoad("us").catch(function () { return null; }) : null, x && x.need === "kr" && typeof dlUniLoad === "function" ? dlUniLoad("kr").catch(function () { return null; }) : null]; if (typeof nbRecent === "function" && !nbRecent() && typeof fetchRecent === "function") ps.push(Promise.resolve(typeof dataReady === "function" ? dataReady() : null).then(function () { return fetchRecent(); }).then(function (r) { if (r && typeof briefState !== "undefined" && !briefState.recent) briefState.recent = r; }).catch(function () {})); return Promise.all(ps); } return p0.apply(this, arguments); };
-  var c0 = storyCards; storyCards = function (key) { var x = KRX_DECKS.filter(function (d) { return d.key === key; })[0]; if (x) return x.fn(); return c0.apply(this, arguments); };
+  var d0 = storyDecks; storyDecks = function () { var out = d0.apply(this, arguments); var F = krxFull(), hasNews = !!(F && F.data && (F.data.news || []).length), K = KRX.data || krxCached(); var hasInv = !!(K && K.investor && K.investor.foreign && K.investor.foreign.buy && K.investor.foreign.buy.length), j = 0; KRX_DECKS.forEach(function (x) { if (x.key === "kr-flow" && K && !hasInv) return;   /* v12.82 네이버가 수급을 안 주는 날은 목록에서 뺀다 */ out.splice(1 + (j++), 0, { key: x.key, t: x.t, d: x.d, now: true, ready: x.key === "kr-flow" ? hasInv : x.need === "any" ? !!(K || krFrame() || usFrame()) : x.need === "kr" ? !!(K || krFrame()) : hasNews, group: "마감 · 테마" }); }); return out; };
+  var r0 = storyReady; storyReady = function (kind) { if (/^(kr|us)-|^(close|sector)$/.test(kind)) { var x = KRX_DECKS.filter(function (d) { return d.key === kind; })[0]; if (!x) return !!(KRX.data || krxCached() || krFrame() || usFrame()); if (x.need === "daily") return !!(krxFull() && (krxFull().data.news || []).length); if (x.key === "kr-flow") return !!(KRX.data || krxCached()); var m = deckMk(); return m === "all" ? !!(krFrame() || usFrame() || KRX.data || krxCached()) : m === "kr" ? !!(KRX.data || krxCached() || krFrame()) : !!mkFrame(m); } return r0.apply(this, arguments); };
+  var p0 = storyPrepare; storyPrepare = function (key) { if (/^(kr|us)-|^(close|sector)$/.test(key)) { var m = deckMk(), wantKr = /^kr-/.test(key) || ((key === "close" || key === "sector") && (m === "kr" || m === "all")), wantUs = /^us-/.test(key) || ((key === "close" || key === "sector") && (m === "us" || m === "all")); var ps = [wantKr ? krxLoad(false).catch(function (e) { console.warn("kr", e); return null; }) : null, wantKr && typeof dlUniLoad === "function" ? dlUniLoad("kr").catch(function () { return null; }) : null, wantUs && typeof dlUniLoad === "function" ? dlUniLoad("us").catch(function () { return null; }) : null]; if (typeof nbRecent === "function" && !nbRecent() && typeof fetchRecent === "function") ps.push(Promise.resolve(typeof dataReady === "function" ? dataReady() : null).then(function () { return fetchRecent(); }).then(function (r) { if (r && typeof briefState !== "undefined" && !briefState.recent) briefState.recent = r; }).catch(function () {})); return Promise.all(ps); } return p0.apply(this, arguments); };
+  var c0 = storyCards; storyCards = function (key) { var x = KRX_DECKS.filter(function (d) { return d.key === key; })[0]; if (x) return x.fn(); if (KRX_ALIAS[key]) return KRX_ALIAS[key](); return c0.apply(this, arguments); };
   if (typeof hubTitleOf === "function") { var t0 = hubTitleOf; hubTitleOf = function (ctx) { var x = KRX_DECKS.filter(function (d) { return "story:" + d.key === ctx; })[0]; return x ? x.t.replace(/^\S+\s/, "") : t0.apply(this, arguments); }; }
 })();
 /* 오늘 브리핑 프롬프트에 '국내 급등 상위(업종)'를 넣어 sectors.why 를 쓰게 한다 */
@@ -337,7 +355,7 @@ var KRX_DECKS = [
   if (typeof hubOneMake !== "function") return;
   var o0 = hubOneMake; hubOneMake = function (ctx) {
     if (ctx === "story:kr-news") return Promise.resolve(function () { return krxNewsOne(); });
-    if (ctx === "story:kr-close" || ctx === "story:us-close") { var mk = ctx === "story:us-close" ? "us" : "kr"; return Promise.resolve(storyPrepare(ctx.slice(6))).then(function () { return function () { return closeDeck(mk)[0].cv; }; }); }
+    if (ctx === "story:kr-close" || ctx === "story:us-close" || ctx === "story:close") { var mk = ctx === "story:us-close" ? "us" : ctx === "story:kr-close" ? "kr" : deckMk(); if (mk === "all") mk = "kr"; return Promise.resolve(storyPrepare(ctx.slice(6))).then(function () { return function () { return closeDeck(mk)[0].cv; }; }); }
     return o0.apply(this, arguments);
   };
 })();

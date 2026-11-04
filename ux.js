@@ -196,7 +196,7 @@ function uxAnRail(root) {
 ].join(""); document.head.appendChild(st); })();
 
 /* ============================================================ v12.72 카드 작업대 · 작업실: '오늘 이슈'(매일 새로 생기는 것) vs '오늘 카드'(매일 올릴 수 있는 것) 두 묶음으로 ============================================================ */
-var UX_ISSUE_RE = /^(issues|hub:news|hub:vol|hub:sector|story:news|story:kr-news|story:kr-sector|story:kr-flow|story:us-sector|report:)/;
+var UX_ISSUE_RE = /^(issues|hub:news|hub:vol|hub:sector|story:news|story:kr-news|story:kr-sector|story:kr-flow|story:us-sector|story:sector|report:)/;
 function uxCatOf(ctx, text) { return UX_ISSUE_RE.test(String(ctx || "")) || /이슈|급등|급락|뉴스|기사|수급|거래대금|주도 섹터/.test(String(text || "")) ? "issue" : "card"; }
 function uxSplitMaker(root) {
   var grid = root.querySelector(".wbGrid"); if (!grid || grid.querySelector(".uxCatH")) return;
@@ -221,7 +221,8 @@ function uxSplitMaker(root) {
 
 /* ============================================================ v12.77 카드 작업대 즐겨찾기 — 주제 + 모양(분량·크기·그리기·자료)을 저장, '오늘 편성'보다 위에 크게. 서버(kv cfg:fav)에도 같이 둔다 ============================================================ */
 var FAV = { list: null, synced: false };
-function favLoad() { if (FAV.list) return FAV.list; try { FAV.list = JSON.parse(localStorage.getItem("sm.fav") || "[]"); } catch (e) { FAV.list = []; } if (!Array.isArray(FAV.list)) FAV.list = []; return FAV.list; }
+var FAV_MERGE = { "story:kr-close": ["story:close", "kr"], "story:us-close": ["story:close", "us"], "story:kr-sector": ["story:sector", "kr"], "story:us-sector": ["story:sector", "us"] };   // v12.86 시장별로 따로 있던 주제를 하나로
+function favLoad() { if (FAV.list) return FAV.list; try { FAV.list = JSON.parse(localStorage.getItem("sm.fav") || "[]"); } catch (e) { FAV.list = []; } if (!Array.isArray(FAV.list)) FAV.list = []; FAV.list.forEach(function (f) { var m = FAV_MERGE[f.ctx]; if (m) { f.ctx = m[0]; f.mk = m[1]; } }); return FAV.list; }
 function favSave() { try { localStorage.setItem("sm.fav", JSON.stringify(FAV.list)); } catch (e) {} if (typeof smKvPut === "function") smKvPut("cfg:fav", { list: FAV.list, at: Date.now() }, 365 * 86400).catch(function () {}); }
 function favSync() { if (FAV.synced || typeof smKvGet !== "function") return; FAV.synced = true; smKvGet("cfg:fav").then(function (r) { if (r && Array.isArray(r.list) && r.list.length && (!favLoad().length || (r.at || 0) > (FAV.at || 0))) { FAV.list = r.list; FAV.at = r.at; try { localStorage.setItem("sm.fav", JSON.stringify(FAV.list)); } catch (e) {} if (currentTab === "onecard" && typeof makerRender === "function") makerRender(); } }); }
 function favKey(f) { return f.ctx + "|" + f.n + "|" + f.size + "|" + f.draw + "|" + f.src; }
@@ -230,8 +231,19 @@ function favHas(f) { var k = favKey(f); return favLoad().some(function (x) { ret
 function favToggle(f) { var k = favKey(f), L = favLoad(), i = L.findIndex(function (x) { return favKey(x) === k; }); if (i >= 0) L.splice(i, 1); else L.unshift(f); FAV.list = L.slice(0, 24); FAV.at = Date.now(); favSave(); }
 function favShapeTxt(f) { return [f.n === "one" ? "한 장" : "여러 장", f.size === "reel" ? "릴스 9:16" : "게시 4:5", { app: "우리 양식", ai1: "AI 한 장", aiN: "AI 여러 장" }[f.draw] || f.draw, f.src === "today" ? "오늘 자료 취합" : "기존 데이터"].join(" · "); }
 function favRun(f, btn) {
-  MK.sel = f.ctx; MK.size = f.size; try { localStorage.setItem("sm.cardSize", f.size); } catch (e) {} MK.shapeBy[f.ctx] = { n: f.n, draw: f.draw, src: f.src }; if (f.mk && f.mk !== MK.mk && typeof MK !== "undefined") { MK.mk = f.mk; MK._T = null; if (typeof smSetMk === "function") try { smSetMk(f.mk); } catch (e) {} }
-  makerRender(); var b = document.querySelector("#mkBody [data-make]"); if (b && !b.disabled) { mkMakeGo(f.ctx, b); setTimeout(function () { var r = document.querySelector("#mkResult"); if (r) try { r.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 400); } else { smToast("모양을 확인하는 중이에요 — 잠시 뒤 ③ 만들기를 눌러 주세요"); }
+  /* v12.86 시장을 늘 다시 맞춘다(카드 작업대 · 브리핑 화면 · 편성이 같은 시장) — 예전 시장으로 그린 미리보기 캐시도 버린다 */
+  var mk = f.mk || "all";
+  if (typeof smSetMk === "function") try { smSetMk(mk, true); } catch (e) {}
+  if (typeof briefState !== "undefined" && briefState.market !== mk && typeof switchBriefMarket === "function") try { switchBriefMarket(mk, true); } catch (e) {}
+  MK.mk = mk; MK._T = null; Object.keys(MK._cap || {}).forEach(function (k) { if (k.indexOf(f.ctx + "|") === 0) delete MK._cap[k]; });
+  MK.sel = f.ctx; MK.size = f.size; try { localStorage.setItem("sm.cardSize", f.size); } catch (e) {} MK.shapeBy[f.ctx] = { n: f.n, draw: f.draw, src: f.src };
+  makerRender();
+  var old = btn ? btn.innerHTML : ""; if (btn) { btn.disabled = true; btn.textContent = "만드는 중… (" + ({ all: "전체", kr: "국내", us: "미국", coin: "코인" })[mk] + ")"; }
+  setTimeout(function () {   // 미리보기 확인을 기다리지 않고 저장된 모양 그대로 바로 만든다
+    try { mkMakeGo(f.ctx, document.querySelector("#mkBody [data-make]") || btn); } catch (e) { smToast("만들지 못했어요: " + e.message, "bad"); }
+    if (btn && document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; }
+    setTimeout(function () { var r = document.querySelector("#mkResult"); if (r && !r.hidden) try { r.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 600);
+  }, 60);
 }
 function favHtml() {
   var L = favLoad(), done = {}; (typeof hubDoneLoad === "function" ? hubDoneLoad() : []).forEach(function (d) { done[d.ctx] = 1; });
