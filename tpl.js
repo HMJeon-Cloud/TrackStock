@@ -374,7 +374,7 @@ function tplSrc(R) { return "야후 파이낸스 종가 · " + tplDateTxt(R) + "
 function tplPct(x, d) { return x == null ? "-" : (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 2 : d) + "%"; }
 function tplFmt(sym, v) { return typeof cPrice === "function" ? cPrice(sym, v) : String(v); }
 var TPL_SOURCES = {
-  market: [{ id: "today", t: "오늘 마감 (현재 시장)" }],
+  market: [{ id: "today", t: "오늘 마감 (현재 시장)" }, { id: "bar", t: "오늘 마감 — 막대형 (지수 · 크게 움직인 종목 · 관심 종목)" }],
   rank: [{ id: "m1", t: "1개월 수익률 TOP12" }, { id: "amt", t: "거래대금 평소 대비 TOP12" }, { id: "pop", t: "인기 종목 TOP12 (전일 등락)" }, { id: "sale", t: "고점 대비 할인 TOP12" }],
   table: [{ id: "picks", t: "선별 종목 판정표 (매수 후보)" }, { id: "picksWarn", t: "선별 종목 판정표 (주의)" }, { id: "themes", t: "업종 성적표" }, { id: "idx", t: "주요 지수·자산 한눈에" }],
   compare: [{ id: "y1", t: "1년 전 vs 지금 (대표 자산)" }, { id: "hi", t: "고점 vs 지금 (가장 많이 빠진 4)" }],
@@ -407,6 +407,7 @@ function tplSpec(cat, srcId, mkSel) {
     var hiN0 = S.filter(function (s) { return s.newHigh; }).length;
     var flag = R.market === "us" || R.market === "kr" ? R.market : null, caps = flag && typeof cCap8 === "function" ? cCap8(R.market) : null, etf = flag && typeof cEtfPop === "function" ? cEtfPop(R.market) : null;
     if (flag) ft = mv.slice(0, tplN(4, 6)).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; });
+    if (srcId === "bar") { caps = null; etf = null; ft = mv.slice(0, tplN(5, 7)).map(function (s) { return { name: briefName(s), pct: tplPct(r1(s)) }; }); }   // v12.88 막대형(지수 → 크게 움직인 종목 막대 → 관심 종목 타일)
     return { meta: { title: mkName === "미국" ? "새벽의 미장" : mkName === "코인" ? "오늘의 코인" : mkName === "국내" ? "오늘의 국장" : "오늘의 시장", sub: date + " · 전일 대비" + (caps ? " · 시총 상위 8: " + caps.src : ""), source: src, catName: mkName + " 마감", flag: flag }, spec: { indexes: ix, features: ft, chips: pop, caps: caps && caps.rows.length >= 4 ? caps.rows.map(function (c) { return { sym: c.sym, name: c.name, pct: tplPct(c.ret) }; }) : null, etfs: etf && etf.length ? etf.map(function (e) { return { name: e.name, pct: tplPct(e.ret) }; }) : null, foot: "오른 " + unit + " " + Math.round(R.temp.upPct * 100) + "%  ·  20일선 위 " + Math.round(R.temp.abovePct * 100) + "%  ·  52주 신고가 " + hiN0 + "개" } };
   }
   if (cat === "rank") {

@@ -359,3 +359,10 @@ var KRX_ALIAS = { "kr-close": function () { return closeDeck("kr"); }, "us-close
     return o0.apply(this, arguments);
   };
 })();
+
+/* v12.88 '오늘의 국장 · 새벽의 미장' 막대형 한 장 — 직접 쓰기의 마감 브리핑 양식을 카드 작업대 주제로도 */
+(function () {
+  if (typeof hubTopics === "function") { var t0 = hubTopics; hubTopics = function () { var T = t0.apply(this, arguments); try { if (!T.some(function (x) { return x.ctx === "mkbar"; })) T.splice(1, 0, { ctx: "mkbar", g: "오늘 시장", t: "📈 오늘의 국장 · 새벽의 미장 — 막대형 한 장", d: "지수 2줄 → 오늘 가장 크게 움직인 종목 막대 → 그 밖의 관심 종목 타일 → 시장 폭 띠 (고른 시장: 국내=오늘의 국장 · 미국=새벽의 미장 · 코인)", multi: function (b) { hubOne("mkbar", b); }, score: function () { return { s: 7, why: "매일 올리는 마감 한 장" }; } }); } catch (e) {} return T; }; }
+  if (typeof hubOneMake === "function") { var o0 = hubOneMake; hubOneMake = function (ctx) { if (ctx === "mkbar") { var mk = deckMk(); return Promise.resolve((mk === "kr" || mk === "us") && typeof dlUniLoad === "function" ? dlUniLoad(mk).then(function () { if (typeof TPL_RC !== "undefined") Object.keys(TPL_RC).forEach(function (k) { delete TPL_RC[k]; }); }).catch(function () {}) : null).then(function () { return typeof tplPrep === "function" ? tplPrep("market", mk) : null; }).then(function () { return function () { var cv = tplBuild("market", "bar", mk); if (!cv) throw new Error("전체 시장 숫자가 아직 맞지 않아 만들지 않았어요"); return cv; }; }); } return o0.apply(this, arguments); }; }
+  if (typeof hubTitleOf === "function") { var h0 = hubTitleOf; hubTitleOf = function (ctx) { if (ctx === "mkbar") { var m = deckMk(); return m === "us" ? "새벽의 미장" : m === "coin" ? "오늘의 코인" : m === "kr" ? "오늘의 국장" : "오늘의 시장"; } return h0.apply(this, arguments); }; }
+})();

@@ -797,7 +797,7 @@ function hubOneMake(ctx) {
   if (kind === "cal") return Promise.resolve(function () { return pubCalCard(); });
   if (kind === "term") return Promise.resolve(function () { return pubTermCard(pubTerm(typeof pubState !== "undefined" ? pubState.termOffset || 0 : 0)); });
   if (kind === "onepage") return aiDeck(ctx).then(function (d) { var cv = d.list && d.list[0] && d.list[0].cv; if (!cv) throw new Error("데이터가 아직 없어요"); return function () { return cv; }; });
-  if (kind === "brief") return aiDeck("onepage").then(function (d) { if (!d.list || !d.list[0]) throw new Error("데이터가 아직 없어요"); return function () { return d.list[0].cv; }; });
+  /* v12.87 오늘의 브리핑 한 장은 브리핑 묶음(10장)의 핵심 숫자 목록 — '오늘 한 장'(9칸)과 다른 카드가 되게 아래 공통 경로로 */
   if (kind === "macro") return macroEnsure().then(macPxLoad).then(function () {
     if (!macReady()) throw new Error("매크로 데이터가 아직 없어요");
     if (!arg || arg === "all") return function () { return tplBuild("table", "hxMacro"); };
