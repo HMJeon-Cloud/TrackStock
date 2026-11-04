@@ -737,7 +737,7 @@ function loadBriefNews(R) {
 
 function loadBrief(force) {
   var st = $("briefStatus");
-  if (briefState.result && !force) { renderBrief(); return; }
+  if (briefState.result && !force) { st.textContent = ""; $("briefBody").classList.remove("hidden"); try { renderBrief(); } catch (e) { console.warn("brief", e); loadBrief(true); } return; }   // v12.90 다른 화면이 먼저 계산해 둔 결과로 들어와도 본문을 연다
   st.textContent = "전 종목 데이터 정리 중… (한 번만 받아요)";
   $("briefBody").classList.add("hidden");
   var popP = fetch("/api/snap?popular=1").then(function (r) { return r.json(); }).then(function (j) { return (j && j.items) || []; }).catch(function () { return []; });
