@@ -59,9 +59,35 @@ function kxFoot(c, src) {
 }
 function kxEmpty(c, msg) { cText(c.g, msg, KX.W / 2, c.y + 120, 24, 700, KX.sub, "center"); }
 var KX_CAT = { 반도체: "#2456b7", 정책: "#1d7f55", 금리: "#7a4ea8", 환율: "#b9600f", 실적: "#c03b3b", 수급: "#1f3a68", 부동산: "#8a6d2b", 코인: "#d97706", 해외: "#0e7490", 산업: "#4b5563" };
+/* v12.85 뉴스 개수는 격자에 맞게 12 또는 16 (많으면 자르고, 모자라면 있는 만큼) */
+function krxNewsList() { var F = krxFull(), N = F && F.data ? (F.data.news || []).filter(function (x) { return x && x.title; }) : []; return N.length >= 16 ? N.slice(0, 16) : N.length >= 12 ? N.slice(0, 12) : N; }
+/* 한 장 핵심 요약 — 전부 한 장에: 12개 = 3×4, 16개 = 4×4, 그 밖 = 2×n · 아래 핵심 포인트 띠 */
+function krxNewsOne() {
+  var N = krxNewsList(), F = krxFull(), PT = F && F.data ? (F.data.points || []).slice(0, 5) : [];
+  if (!N.length) throw new Error("오늘 브리핑에 뉴스 목록(news)이 없어요");
+  var c = kxNew("오늘의 주요 뉴스", "핵심만 " + N.length + "개", 1, 1, "오늘"), g = c.g, n = N.length, cols = n === 16 ? 4 : n === 12 || n === 9 ? 3 : n <= 4 ? 1 : 2, rows = Math.ceil(n / cols), gap = 12;
+  var ptH = PT.length ? 64 + Math.ceil(PT.length / (cols >= 3 ? 5 : 3)) * 58 : 0, top = c.y - 8, bottom = KX.H - 60 - 10 - ptH, cw = (KX.W - KX.P * 2 - gap * (cols - 1)) / cols, ch = Math.floor((bottom - top - gap * (rows - 1)) / rows);
+  var tf = Math.max(16, Math.min(cols >= 4 ? 21 : cols === 3 ? 24 : 28, Math.round(ch / 10))), pf = Math.max(12, Math.min(cols >= 4 ? 15 : cols === 3 ? 17 : 19, Math.round(tf * 0.74)));   // v12.85 칸 높이에 맞춰 글씨를 키운다
+  N.forEach(function (it, i) {
+    var x = KX.P + (i % cols) * (cw + gap), y = top + Math.floor(i / cols) * (ch + gap), catT = String(it.cat || "뉴스").slice(0, 6), col = KX_CAT[Object.keys(KX_CAT).filter(function (k) { return catT.indexOf(k) >= 0; })[0]] || "#4b5563";
+    cRound(g, x, y, cw, ch, 14, KX.box, KX.line); g.fillStyle = col; g.fillRect(x, y + 12, 5, ch - 24);
+    cRound(g, x + 14, y + 12, 34, 28, 8, KX.up); cText(g, String(i + 1), x + 31, y + 32, 17, 900, "#fff", "center");
+    var cw2 = cW(g, catT, 13, 800) + 18; cRound(g, x + 54, y + 14, cw2, 24, 6, col); cText(g, catT, x + 54 + cw2 / 2, y + 31, 13, 800, "#fff", "center");
+    if (it.press && cols <= 3) cText(g, cFit(g, String(it.press), cw - 80 - cw2, 12, 600), x + cw - 12, y + 31, 12, 600, KX.sub, "right");
+    var ty = y + 48 + tf, ly = cWrap(g, String(it.title || ""), x + 16, ty, cw - 28, tf, 900, KX.ink, tf * 1.3, cols >= 3 ? 3 : 2);
+    var room = y + ch - 10 - ly, maxP = Math.max(0, Math.min(3, Math.floor(room / (pf * 1.55))));
+    (it.pts || []).slice(0, maxP).forEach(function (pt, k) { var py = ly + 4 + k * pf * 1.55; g.fillStyle = KX.gold; g.fillRect(x + 16, py - pf * 0.55, 5, 5); cText(g, cFit(g, String(pt), cw - 40, pf, 600), x + 26, py, pf, 600, "#2a2f3a"); });
+  });
+  if (PT.length) {
+    var y0 = bottom + 10; cRound(g, KX.P, y0, KX.W - KX.P * 2, ptH - 6, 16, KX.ink); cText(g, "오늘의 핵심 포인트", KX.P + 20, y0 + 34, 18, 900, KX.gold);
+    var per = cols >= 3 ? 5 : 3, pw = (KX.W - KX.P * 2 - 40 - (per - 1) * 10) / per;
+    PT.forEach(function (pt, i) { var x = KX.P + 20 + (i % per) * (pw + 10), y = y0 + 48 + Math.floor(i / per) * 58; cRound(g, x, y, pw, 50, 10, "#232733"); cText(g, cFit(g, "✓ " + String(pt.t || ""), pw - 16, 14, 900), x + 8, y + 20, 14, 900, "#f3efe6"); cText(g, cFit(g, String(pt.d || ""), pw - 16, 11, 600), x + 8, y + 40, 11, 600, "#b9b3a8"); });
+  }
+  kxFoot(c, "기사 요약 · 출처 각 언론사 · 투자 권유 아님"); return c.cv;
+}
 /* ---------- 1) 오늘의 주요 뉴스 ---------- */
 function krxNewsDeck() {
-  var F = krxFull(), N = F && F.data ? (F.data.news || []) : [], PT = F && F.data ? (F.data.points || []) : [];
+  var N = krxNewsList(), F = krxFull(), PT = F && F.data ? (F.data.points || []) : [];
   if (!N.length) throw new Error("오늘 브리핑에 뉴스 목록(news)이 없어요 — 작업실 ②에서 새 프롬프트로 다시 받으세요");
   var per = 4, pages = Math.ceil(N.length / per), total = pages + (PT.length ? 1 : 0), out = [];
   for (var p = 0; p < pages; p++) {
@@ -273,7 +299,7 @@ var KRX_DECKS = [
   { key: "kr-flow", t: "💰 주체별 수급 — 외국인·기관 순매수·순매도", d: "외국인·기관 순매수/순매도 상위 12 · 지수 수급(개인·외국인·기관) · 개인 상위는 네이버 미제공", fn: krxFlowDeck, need: "kr" },
   { key: "us-close", t: "🇺🇸 오늘의 간단 시황 — 미국 마감 한 장", d: "S&P500·나스닥·다우 종가·등락·20일 흐름 · 관심 테마 6(반도체·빅테크·AI소프트·방산·에너지·바이오) · 급등·급락 한 줄", fn: usCloseDeck, need: "us" },
   { key: "us-sector", t: "🇺🇸 미국 주도 섹터 — S&P500 섹터별", d: "1장 관심 테마 6(각 5종목) · 2장 종목 수 많은 GICS 섹터 6", fn: usSectorDeck, need: "us" },
-  { key: "kr-news", t: "📰 오늘의 주요 뉴스 — 핵심만 13개", d: "오늘 브리핑(직접 질문)의 news 12~13개 + 핵심 포인트 5 · 한 장에 4개", fn: krxNewsDeck, need: "daily" }
+  { key: "kr-news", t: "📰 오늘의 주요 뉴스 — 핵심만 12 · 16개", d: "오늘 브리핑(직접 질문)의 news 12 또는 16개 + 핵심 포인트 5 · 여러 장(한 장에 4개) 또는 한 장(3×4 · 4×4 격자)", fn: krxNewsDeck, need: "daily" }
 ];
 (function () {
   if (typeof storyDecks !== "function") return;
@@ -305,3 +331,13 @@ var KRX_DECKS = [
 })();
 /* 운영자면 하루 한 번 자동으로 받아 둔다 (장 마감 후) */
 (function () { var tries = 0, go = function () { if (typeof isOwner === "function" && isOwner()) { var h = new Date(Date.now() + 9 * 3600e3).getUTCHours(); if (!krxCached() && h >= 16) krxLoad(false).catch(function () {}); return; } if (++tries < 10) setTimeout(go, 1500); }; setTimeout(go, 4000); })();
+
+/* v12.85 '한 장 · 핵심 요약' — 뉴스는 격자 한 장, 마감 한 장은 그대로 */
+(function () {
+  if (typeof hubOneMake !== "function") return;
+  var o0 = hubOneMake; hubOneMake = function (ctx) {
+    if (ctx === "story:kr-news") return Promise.resolve(function () { return krxNewsOne(); });
+    if (ctx === "story:kr-close" || ctx === "story:us-close") { var mk = ctx === "story:us-close" ? "us" : "kr"; return Promise.resolve(storyPrepare(ctx.slice(6))).then(function () { return function () { return closeDeck(mk)[0].cv; }; }); }
+    return o0.apply(this, arguments);
+  };
+})();
