@@ -243,6 +243,7 @@ async function runAudit(redis, res) {
 
 export default async function handler(req, res) {
   const started = Date.now();
+  yahooStats.ok = 0; yahooStats.http = {}; yahooStats.timeout = 0; yahooStats.error = 0;   // v12.91 실행마다 0부터 — 전엔 서버가 살아 있는 동안 앞 실행 횟수가 계속 더해졌음
   const uniOnly = (req.query.universe === "us" || req.query.universe === "kr") && req.query.only === "1";   // v12.9 유니버스만 지금 받기 — 운영자 토큰으로도 가능
   const ownerRun = req.query.run === "1" && reqIsOwner(req);   // v12.15 앱 운영자 화면 '아침 수집 지금 실행' — 크론과 같은 전체 수집(운영자 토큰)
   const ownerOk = (req.query.audit === "1" || uniOnly || ownerRun) && reqIsOwner(req);   // 데이터 점검·유니버스·전체 수집은 운영자 토큰으로도 실행 가능
@@ -338,10 +339,10 @@ export default async function handler(req, res) {
       } catch (e) { /* 건너뛴다 */ }
     }));
   }
-  let kept = 0;
+  let kept = 0; const keptSyms = [];
   if (prevRecent && prevRecent.symbols) {
     for (const sym of symbols) {
-      if (!recent.symbols[sym] && prevRecent.symbols[sym]) { recent.symbols[sym] = prevRecent.symbols[sym]; kept++; }
+      if (!recent.symbols[sym] && prevRecent.symbols[sym]) { recent.symbols[sym] = prevRecent.symbols[sym]; kept++; keptSyms.push(sym); }
     }
   }
   /* v12.27 뒤처진 종목 메우기 + 점검.
@@ -416,7 +417,11 @@ export default async function handler(req, res) {
     const m = mktOf(sym), d = lastD(sym), b = bench[m];
     if ((m === "us" || m === "kr") && d && b && d < b) behind.push(sym + " " + d.slice(5) + (recent.flags[sym] ? " (" + recent.flags[sym] + ")" : ""));
   }
-  recent.check = { bench, behind: behind.length, repaired };
+  /* v12.91 코인도 늦은 것을 센다(전엔 미국·국내만) + 이번에 새로 못 받아 지난 값을 그대로 둔 종목 수를 남긴다 */
+  let coinBench = null; for (const sym of Object.keys(recent.symbols)) { if (mktOf(sym) === "coin") { const d = lastD(sym); if (d && (!coinBench || d > coinBench)) coinBench = d; } }
+  if (coinBench) for (const sym of Object.keys(recent.symbols)) { if (mktOf(sym) === "coin") { const d = lastD(sym); if (d && d < coinBench) behind.push(sym + " " + d.slice(5) + " (코인)"); } }
+  if (coinBench) bench.coin = coinBench;
+  recent.check = { bench, behind: behind.length, repaired, kept: keptSyms.length };
   let recentSaved = null;
   if (recentOk > 0) {
     try {
@@ -500,9 +505,33 @@ export default async function handler(req, res) {
     symbols: symbols.length, symbolsFrom: symSource, recentOk, kept, flagged, flags: recent.flags, recentSaved, bench: recent.check && recent.check.bench, behind: behind.slice(0, 30), behindN: behind.length, repaired, historyUpdated: done.length,
     historyFailed: failed.length, withHistory, manifestOk, yahoo: yahooStats,
     universe: universe && { ok: universe.ok, mkt: universe.mkt, n: universe.n, fresh: universe.fresh, kept: universe.kept, failed: universe.failed, list: universe.list, h429: universe.stats && universe.stats.h429, skipped: universe.skipped, error: universe.error || universe.reason, elapsedMs: universe.elapsedMs },
-    failedSample: failed.slice(0, 5), disc: disc && { dart: disc.dart && { ok: disc.dart.ok, added: disc.dart.added, reason: disc.dart.reason }, sec: disc.sec && { ok: disc.sec.ok, updated: disc.sec.updated }, skipped: disc.skipped }
+    failedSample: failed.slice(0, 5), keptSample: keptSyms.slice(0, 12),
+    disc: disc && { dart: disc.dart && { ok: disc.dart.ok, added: disc.dart.added, reason: disc.dart.reason || disc.dart.error }, sec: disc.sec && { ok: disc.sec.ok, updated: disc.sec.updated, reason: disc.sec.reason || disc.sec.error },
+      macro: disc.macro && { ok: disc.macro.ok, got: disc.macro.got, skipped: disc.macro.skipped, errors: (disc.macro.errors || []).slice(0, 3), error: disc.macro.error },   // v12.91 매크로·공모주 결과도 기록(전엔 빠져 있었음)
+      ipo: disc.ipo && { ok: disc.ipo.ok, found: disc.ipo.found, reason: disc.ipo.reason || disc.ipo.error, progress: disc.ipo.progress }, skipped: disc.skipped, error: disc.error }
   };
   try { await redisCmd(redis, ["SET", "sm:cronlog", JSON.stringify(log), "EX", String(14 * 86400)]); } catch (e) {}
+  /* v12.91 실행 이력 — 최근 30번의 요약과 '문제'를 남겨 데이터 센터에서 언제 무엇이 잘못됐는지 본다 (새 키 하나, 40일 보관) */
+  try {
+    const P = [], D = log.disc || {}, U = log.universe;
+    if (recentSaved && !recentSaved.ok) P.push("시세 저장 실패: " + (recentSaved.error || ""));
+    if (kept > symbols.length * 0.1) P.push("새로 못 받은 종목 " + kept + "개(지난 값 유지)");
+    if (behind.length) P.push("지수보다 늦은 종목 " + behind.length + "개");
+    const yFail = Object.keys(yahooStats.http).reduce((a, k) => a + yahooStats.http[k], 0) + yahooStats.timeout + yahooStats.error; if (yFail > Math.max(20, yahooStats.ok * 0.1)) P.push("야후 실패 " + yFail + "회" + (yahooStats.http[429] ? " (429 " + yahooStats.http[429] + ")" : ""));
+    if (failed.length) P.push("과거 전체 실패 " + failed.length + "종목");
+    if (!manifestOk) P.push("목록 저장 실패");
+    if (U && (U.error || U.ok === false)) P.push("전체 시장 요약: " + (U.error || "실패")); else if (U && U.skipped) P.push("전체 시장 요약 건너뜀: " + U.skipped);
+    if (D.skipped) P.push("공시·매크로 건너뜀: " + D.skipped);
+    if (D.macro && D.macro.ok === false) P.push("매크로: " + ((D.macro.errors || [])[0] || D.macro.error || "실패"));
+    if (D.dart && D.dart.ok === false) P.push("공시: " + (D.dart.reason || "실패"));
+    if (D.sec && D.sec.ok === false) P.push("구루 13F: " + (D.sec.reason || "실패"));
+    if (D.ipo && D.ipo.ok === false) P.push("공모주: " + (D.ipo.reason || "실패"));
+    const run = { at: log.at, ms: log.elapsedMs, by: ownerRun ? "manual" : "cron", ok: recentOk, kept, behind: behind.length, bench: log.bench, hist: done.length, yOk: yahooStats.ok, yFail,
+      uni: U ? (U.skipped ? "skip" : U.ok === false || U.error ? "fail" : String(U.mkt || "ok")) : null,
+      macro: D.macro ? (D.macro.skipped ? "same" : D.macro.ok === false ? "fail" : "ok") : D.skipped ? "skip" : null, dart: D.dart ? (D.dart.ok === false ? "fail" : "ok") : D.skipped ? "skip" : null,
+      sec: D.sec ? (D.sec.ok === false ? "fail" : "ok") : D.skipped ? "skip" : null, ipo: D.ipo ? (D.ipo.ok === false ? "fail" : "ok") : D.skipped ? "skip" : null, p: P.map((x) => String(x).slice(0, 140)).slice(0, 8) };
+    await redisCmd(redis, ["LPUSH", "sm:cronlog:hist", JSON.stringify(run)]); await redisCmd(redis, ["LTRIM", "sm:cronlog:hist", "0", "29"]); await redisCmd(redis, ["EXPIRE", "sm:cronlog:hist", String(40 * 86400)]);
+  } catch (e) {}
 
   res.status(200).json({
     ok: true,

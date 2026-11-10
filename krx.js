@@ -7,6 +7,15 @@
    ============================================================ */
 var KRX = { data: null, busy: false };
 function krxDay() { return smKstDay(); }
+/* v12.91 카드에 쓸 수 있는 네이버 자료인지 — 장중 값이거나 앱 종가와 날짜가 다르면 쓰지 않는다(다른 날 숫자가 한 장에 섞이지 않게) */
+function krxWhy(K) {
+  if (!K) return "아직 못 받음"; if (!K.tradeDay) return "";   // 예전 서버 응답: 날짜 정보가 없어 그대로 사용
+  if (K.live) return "지금은 장중이라 마감 값이 아니에요 (15:45 이후 다시 받기)";
+  var R = typeof krFrame === "function" ? krFrame() : null, d = R && R.asOfKr ? new Date(R.asOfKr + 9 * 3600e3).toISOString().slice(0, 10) : "";
+  if (d && d !== K.tradeDay) return "네이버 자료는 " + K.tradeDay.slice(5) + " 장 · 앱 종가는 " + d.slice(5) + " — 날짜가 달라 섞지 않아요 (데이터 센터에서 아침 수집 후 다시)";
+  return "";
+}
+function krxData() { var K = KRX.data || krxCached(); return K && !krxWhy(K) ? K : null; }
 function krxCached() { try { var j = JSON.parse(localStorage.getItem("sm.kr:" + krxDay()) || "null"); return j && j.ok ? j : null; } catch (e) { return null; } }
 function krxLoad(fresh) {
   if (!fresh) { var c = KRX.data || krxCached(); if (c && Date.now() - (c.at || 0) < 20 * 60e3) { KRX.data = c; return Promise.resolve(c); } }
@@ -118,7 +127,7 @@ function krxNewsDeck() {
 /* ---------- 2) 섹터별 주도주 ---------- */
 /* ---------- 3) 수급 ---------- */
 function krxFlowDeck() {
-  var K = KRX.data || krxCached(); if (!K) throw new Error("국내 마감 자료를 아직 못 받았어요");
+  var K = krxData(); if (!K) throw new Error("국내 수급 자료를 쓸 수 없어요 — " + krxWhy(KRX.data || krxCached()));
   var I = K.investor || {}, ik = K.index && K.index.kospi, iq = K.index && K.index.kosdaq, out = [];
   var has = function (a, b) { return I[a] && I[a][b] && I[a][b].length; };
   if (!has("foreign", "buy") && !has("inst", "buy")) throw new Error("외국인·기관 순매매 자료를 못 읽었어요 — " + (K.miss || []).filter(function (m) { return /investor/.test(m); }).join(" / "));
@@ -196,11 +205,11 @@ function themeName(sym, fallback) { var k = String(sym), n = (typeof BRIEF_KO !=
 function themeStat(sym, mk) {
   var S = typeof nbStat === "function" ? nbStat(sym) : null; if (S) return { sym: sym, name: themeName(sym, S.name), ret: S.ret1, m1: S.m1, src: "app" };
   var R = mkFrame(mk), u = R && (R.uniStocks || []).filter(function (x) { return x.sym === sym; })[0]; if (u) return { sym: sym, name: themeName(sym, u.name), ret: u.ret1 != null ? u.ret1 : u.ret, m1: u.m1, src: "uni" };
-  if (mk === "kr") { var K = KRX.data || krxCached(), code = sym.replace(/\.K[SQ]$/, ""), hit = K && [].concat(K.up.kospi || [], K.up.kosdaq || [], K.down.kospi || [], K.down.kosdaq || []).filter(function (x) { return x.code === code; })[0]; if (hit && hit.ret != null) return { sym: sym, name: hit.name, ret: hit.ret / 100, src: "naver" }; }
+  if (mk === "kr") { var K = krxData(), code = sym.replace(/\.K[SQ]$/, ""), hit = K && [].concat(K.up.kospi || [], K.up.kosdaq || [], K.down.kospi || [], K.down.kosdaq || []).filter(function (x) { return x.code === code; })[0]; if (hit && hit.ret != null) return { sym: sym, name: hit.name, ret: hit.ret / 100, src: "naver" }; }
   return null;
 }
 function themeRows(mk, n) {
-  var T = mk === "us" ? THEMES_US : mk === "coin" ? THEMES_COIN : THEMES_KR, R = mkFrame(mk), uni = (R && R.uniStocks) || [], K = mk === "kr" ? (KRX.data || krxCached()) : null;
+  var T = mk === "us" ? THEMES_US : mk === "coin" ? THEMES_COIN : THEMES_KR, R = mkFrame(mk), uni = (R && R.uniStocks) || [], K = mk === "kr" ? krxData() : null;
   var F = krxFull(), W = {}; ((F && F.data && F.data.sectors) || []).forEach(function (x) { W[x.name] = x; });
   return T.map(function (t) {
     var seen = {}, items = [];
@@ -251,7 +260,7 @@ function kxMoverStrip(c, R, y, nameFn) {
 }
 /* ---------- 마감 한 장 (국내·미국 공통 뼈대): 시장 마감 → 관심 테마 6 → 급등·급락 한 줄 ---------- */
 function closeDeck(mk) {
-  var isUS = mk === "us", isCoin = mk === "coin", R = mkFrame(mk), K = mk === "kr" ? (KRX.data || krxCached()) : null;
+  var isUS = mk === "us", isCoin = mk === "coin", R = mkFrame(mk), K = mk === "kr" ? krxData() : null;
   if (!R && !K) throw new Error(({ kr: "국내", us: "미국", coin: "코인" })[mk] + " 시장 데이터를 아직 준비하는 중이에요");
   var c = kxNew(isCoin ? "오늘의 간단 시황 — 코인" : isUS ? "오늘의 간단 시황 — 미국" : "오늘의 간단 시황", isCoin ? "비트코인 · 이더리움 · 리플" : isUS ? "S&P500 · 나스닥 · 다우" : "코스피 · 코스닥", 1, 1, isCoin ? "코인 9시 마감" : isUS ? "미국 마감" : "국내 마감"), g = c.g, y = c.y, st = function (s) { return typeof nbStat === "function" ? nbStat(s) : null; }, gap = 16;
   cText(g, "시장 마감", KX.P, y + 6, 20, 900, KX.ink); g.fillStyle = KX.gold; g.fillRect(KX.P, y + 16, 90, 4); y += 34;
@@ -280,7 +289,7 @@ function closeDeck(mk) {
 }
 /* ---------- 주요 섹터 (국내·미국 공통): 1장 = 관심 테마 6(종목 5) · 2장 = 큰 업종 6(종목 수 기준) ---------- */
 function sectorDeck(mk) {
-  var isUS = mk === "us", isCoin = mk === "coin", R = mkFrame(mk), K = mk === "kr" ? (KRX.data || krxCached()) : null;
+  var isUS = mk === "us", isCoin = mk === "coin", R = mkFrame(mk), K = mk === "kr" ? krxData() : null;
   if (!R && !K) throw new Error(({ kr: "국내", us: "미국", coin: "코인" })[mk] + " 시장 데이터를 아직 준비하는 중이에요");
   var idx = R ? (R.indexRow || []).slice(0, 3).map(function (x) { return x.name + " " + usPct(x.ret); }).join(" · ") : "", out = [];
   var draw = function (title, sub, rows, page, total, per) {
@@ -338,9 +347,9 @@ var KRX_ALIAS = { "kr-close": function () { return closeDeck("kr"); }, "us-close
     var r = r0.apply(this, arguments);
     try {
       var step = document.querySelector('#opsBody .opsStep[data-step="data"] .opsStepBody'); if (!step || step.querySelector(".krxLine")) return r;
-      var K = KRX.data || krxCached(), d = document.createElement("div"); d.className = "opsMk krxLine " + (K ? (K.miss && K.miss.length ? "warn" : "ok") : "");
+      var K = KRX.data || krxCached(), d = document.createElement("div"); var why = K ? krxWhy(K) : ""; d.className = "opsMk krxLine " + (K ? (why || (K.miss && K.miss.length) ? "warn" : "ok") : "");
       var n = K ? ((K.up.kospi || []).length + (K.up.kosdaq || []).length) : 0, inv = K && K.investor && K.investor.foreign && K.investor.foreign.buy ? K.investor.foreign.buy.length : 0, ix = K && K.index && K.index.kospi && (K.index.kospi.foreign != null || K.index.kospi.up != null);
-      d.innerHTML = '<b>마감 자료</b><span>' + (K ? new Date(K.at).toTimeString().slice(0, 5) + " · 급등 " + n + " · 수급 " + inv + " · 지수 " + (ix ? "✓" : "✗") : "아직 안 받음") + '</span><em>' + (K && K.miss && K.miss.length ? '못 읽음 ' + K.miss.length + '칸' : K ? '정상' : '') + ' <button class="opsLink" data-krx>' + (K ? "다시 받기" : "받기") + '</button></em>';
+      d.innerHTML = '<b>마감 자료</b><span>' + (K ? new Date(K.at).toTimeString().slice(0, 5) + " · 급등 " + n + " · 수급 " + inv + " · 지수 " + (ix ? "✓" : "✗") : "아직 안 받음") + '</span><em>' + (why ? escapeHtml(why) + ' — 카드엔 앱 종가만 써요' : K && K.miss && K.miss.length ? '못 읽음 ' + K.miss.length + '칸' : K ? '정상' : '') + ' <button class="opsLink" data-krx>' + (K ? "다시 받기" : "받기") + '</button></em>';
       step.appendChild(d); d.querySelector("[data-krx]").onclick = function (ev) { ev.stopPropagation(); this.textContent = "받는 중…"; krxLoad(true).then(function (j) { smToast("국내 마감 자료 " + (j.miss && j.miss.length ? "일부만 " : "") + "받았어요" + (j.miss && j.miss.length ? " — " + j.miss.join(" / ") : "")); renderOps(); }).catch(function (e) { smToast("마감 자료 실패: " + e.message, "bad"); renderOps(); }); };
       if (K && K.miss && K.miss.length) { var m = document.createElement("div"); m.className = "opsMuted"; m.style.fontSize = "11.5px"; m.textContent = "못 읽은 칸: " + K.miss.join(" / "); step.appendChild(m); }
     } catch (e) { console.warn("krx ops", e); }

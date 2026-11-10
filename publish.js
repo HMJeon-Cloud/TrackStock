@@ -103,9 +103,9 @@ function pubChecklist() {
   // 기준일: 평일이면 미국은 전날(어제 밤 마감)이어야 '오늘 데이터'
   var yest = new Date(Date.parse(today + "T00:00:00+09:00") - 86400e3).toISOString().slice(0, 10);
   var gap = Math.round((Date.parse(today) - Date.parse(asUs || today)) / 86400e3);
-  var usFresh = dow === 0 || dow === 1 ? gap <= 3 : gap <= 1;
-  out.push({ ok: usFresh, t: "미국 데이터 기준일 " + (asUs || "-").slice(5).replace("-", ".") + (usFresh ? " — 최신" : " — " + gap + "일 전 데이터예요. 아침 수집(08:30)이 끝났는지 확인"), w: !usFresh });
-  var gk = Math.round((Date.parse(today) - Date.parse(asKr || today)) / 86400e3), krFresh = krHol ? true : (dow === 0 || dow === 1 ? gk <= 3 : gk <= 1);
+  var usFresh = dow === 0 || dow === 1 ? gap <= 3 : gap <= 1; if (typeof dxExpected === "function" && asUs) usFresh = asUs >= dxExpected("us");   /* v12.91 주말·미국 휴장까지 반영한 '있어야 할 날짜'와 비교 */
+  out.push({ ok: usFresh, t: "미국 데이터 기준일 " + (asUs || "-").slice(5).replace("-", ".") + (usFresh ? " — 최신" : " — " + gap + "일 전 데이터예요. 아침 수집(07:00 · 09:00)이 끝났는지 데이터 센터에서 확인"), w: !usFresh });
+  var gk = Math.round((Date.parse(today) - Date.parse(asKr || today)) / 86400e3), krFresh = typeof dxExpected === "function" && asKr ? asKr >= dxExpected("kr") : krHol ? true : (dow === 0 || dow === 1 ? gk <= 3 : gk <= 1);
   out.push({ ok: krFresh, t: "한국 데이터 기준일 " + (asKr || "-").slice(5).replace("-", ".") + (krHol ? " — 오늘 " + krHol + ", 전 거래일 값이 정상" : krFresh ? " — 최신" : " — " + gk + "일 전"), w: !krFresh });
   var qn = R.quality ? R.quality.stale.length + R.quality.spike.length : 0;
   out.push({ ok: qn === 0, t: qn ? "데이터 확인 필요 " + qn + "개 — 자동 제외됨 (" + (R.quality.stale.concat(R.quality.spike).slice(0, 3).map(function (s) { return briefName(s); }).join(", ")) + ")" : "데이터 점검 이상 없음", w: qn > 3 });

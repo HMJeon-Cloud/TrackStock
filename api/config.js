@@ -29,6 +29,8 @@ export default async function handler(req, res) {
     // 마지막 자동 수집 결과 (문제 진단용)
     try { const l = await redisCmd(redis, ["GET", "sm:cronlog"]); if (l) { out.lastRun = JSON.parse(l); if (out.lastRun.at) out.lastRun.at = kst(out.lastRun.at); } } catch (e) {}
     try { out.recentExists = !!(await redisCmd(redis, ["EXISTS", KEY.recent])); } catch (e) {}
+    // v12.91 최근 실행 이력(최대 30번) — 데이터 센터 '수집 이력'
+    try { const h = await redisCmd(redis, ["LRANGE", "sm:cronlog:hist", "0", "29"]); out.runs = (h || []).map((x) => { try { const r = JSON.parse(x); r.at = kst(r.at) || r.at; return r; } catch (e) { return null; } }).filter(Boolean); } catch (e) {}
   }
 
   out.news = !!((process.env.NAVER_HUB_KEY_ID && process.env.NAVER_HUB_KEY) ||

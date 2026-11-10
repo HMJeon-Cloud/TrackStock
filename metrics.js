@@ -37,6 +37,11 @@ function rsiWilder(vals, n) {
   return 100 - 100 / (1 + rs);
 }
 
+/* v12.91 1년의 봉 수 — 주식 252 · 코인 365. 화면이 그리기 전에 종목에 맞게 정한다(전엔 코인도 252로 연환산해 변동성·샤프가 작게 나왔음) */
+var METRIC_PPY = 252;
+function metricPpy(rows) { if (!rows || rows.length < 60) return 252; var yrs = (rows[rows.length - 1].t - rows[0].t) / (365.25 * 86400e3); return yrs > 0 && rows.length / yrs > 300 ? 365 : 252; }
+/* 실제 최대 낙폭 — 고점 대비 가장 깊었던 곳(문턱 없이) */
+function trueMaxDd(rows) { var pk = -Infinity, w = 0; for (var i = 0; i < rows.length; i++) { var c = rows[i].c; if (c == null) continue; if (c > pk) pk = c; if (pk > 0 && c / pk - 1 < w) w = c / pk - 1; } return w; }
 /* 일간 수익률 배열 */
 function dailyReturns(vals) {
   var out = [];
@@ -54,7 +59,7 @@ function annualizedStats(vals) {
   var sq = 0;
   for (var j = 0; j < r.length; j++) sq += (r[j] - mean) * (r[j] - mean);
   var sd = Math.sqrt(sq / (r.length - 1));
-  return { annReturn: mean * 252, annVol: sd * Math.sqrt(252), rets: r };
+  return { annReturn: mean * METRIC_PPY, annVol: sd * Math.sqrt(METRIC_PPY), rets: r };
 }
 
 /* 샤프 비율: (연수익률 - 무위험수익률) / 연변동성 */
@@ -68,7 +73,7 @@ function sharpeRatio(vals, rf) {
 function sortinoRatio(vals, rf) {
   var s = annualizedStats(vals);
   if (!s) return null;
-  var rfDaily = rf / 252;
+  var rfDaily = rf / METRIC_PPY;
   var sq = 0, n = 0;
   for (var i = 0; i < s.rets.length; i++) {
     var d = s.rets[i] - rfDaily;
@@ -76,14 +81,14 @@ function sortinoRatio(vals, rf) {
     n++;
   }
   if (n < 30) return null;
-  var dd = Math.sqrt(sq / n) * Math.sqrt(252);
+  var dd = Math.sqrt(sq / n) * Math.sqrt(METRIC_PPY);
   if (dd === 0) return null;
   return (s.annReturn - rf) / dd;
 }
 
 /* 52주(최근 252거래일) 고가/저가와 현재 위치 */
 function week52Stats(rows) {
-  var start = Math.max(0, rows.length - 252);
+  var start = Math.max(0, rows.length - metricPpy(rows));
   var hi = -Infinity, lo = Infinity, hiT = 0, loT = 0;
   for (var i = start; i < rows.length; i++) {
     if (rows[i].h > hi) { hi = rows[i].h; hiT = rows[i].t; }
@@ -115,6 +120,7 @@ function renderMetrics() {
   $("metricsCard").classList.remove("hidden");
 
   var rows = state.rows;
+  METRIC_PPY = metricPpy(rows);
   var closes = rows.map(function (r) { return r.c; });
   var rf = numVal("rfRate");
   if (!isFinite(rf)) rf = 3.0;
@@ -127,8 +133,7 @@ function renderMetrics() {
   var sortino = sortinoRatio(closes, rf);
   var ann = annualizedStats(closes);
   var eps = state.eps || drawdownEpisodes(rows, 0.10);
-  var worstDd = 0;
-  for (var i = 0; i < eps.length; i++) if (eps[i].dd < worstDd) worstDd = eps[i].dd;
+  var worstDd = trueMaxDd(rows);   // v12.91 10% 미만 낙폭도 그대로(전엔 0.0%로 보였음)
 
   function rsiLabel(v) {
     if (v == null) return ["-", "var(--sub)"];

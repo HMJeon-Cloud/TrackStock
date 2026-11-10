@@ -68,7 +68,7 @@ function dlUniLoad(mkt) {
   var c = DL_UNI[mkt]; if (c && c.at && Date.now() - c.at < 30 * 60e3) return Promise.resolve(c.doc);
   var own = false; try { own = !!localStorage.getItem("sm.owner"); } catch (e) {}
   var cfgV = typeof DATA !== "undefined" && DATA.config && DATA.config.updated;   // v12.29 새로 수집되면 주소가 바뀌어 CDN 옛 사본을 건너뛴다
-  return fetch("/api/snap?universe=" + mkt + (own ? "&fresh=" + Date.now() : cfgV ? "&v=" + encodeURIComponent(cfgV) : "")).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { var doc = d && d.rows && d.rows.length >= 50 ? d : null; DL_UNI[mkt] = { at: Date.now(), doc: doc }; return doc; }).catch(function () { DL_UNI[mkt] = { at: Date.now(), doc: null }; return null; });
+  return fetch("/api/snap?universe=" + mkt + (own ? "&fresh=" + Date.now() : cfgV ? "&v=" + encodeURIComponent(cfgV) : "")).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { var doc = d && d.rows && d.rows.length >= 50 ? d : null; DL_UNI[mkt] = { at: Date.now(), doc: doc }; return doc; }).catch(function () { DL_UNI[mkt] = { at: Date.now() - 29 * 60e3, doc: null }; return null; });   /* v12.91 실패는 1분만 기억(전엔 30분 동안 '없음') */
 }
 function dlUni(R) { return R && R.basis && R.basis.kind === "uni" ? R.uni : null; }   // v12.29 날짜·완성도 검증을 통과한 요약만
 function dlUniStocks(U) { return U.rows.filter(function (r) { return r && isFinite(r.r1) && r.c > 0; }).map(function (r) { return { sym: r.s, name: r.n || r.s, sec: r.sec || "", last: r.c, ret1: r.r1, ret: r.r1, m1: r.m1, above20: r.a20, above50: r.a50, above200: r.a200, newHigh: !!r.nh, newLow: !!r.nl, vsHi: r.vh, vsLo: r.vl, hi250: r.hi, lo250: r.lo, longEnough: r.hi != null, amt: r.amt, amtX: r.ax, stale: !!r.stale, uni: true }; }); }

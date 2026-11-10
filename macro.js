@@ -43,7 +43,7 @@ function macroEnsure(fresh) {
   if (MAC.doc && !fresh) return Promise.resolve(MAC.doc);
   if (MAC.loading) return MAC.loading;
   MAC.loading = fetch("/api/snap?macro=1" + (fresh ? "&fresh=" + Date.now() : "")).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-    .then(function (d) { MAC.doc = d && d.series ? d : { series: {}, none: true }; MAC.loading = null; MAC.res = null; return MAC.doc; });
+    .then(function (d) { MAC.doc = d && d.series ? d : { series: {}, none: true }; MAC.loading = null; MAC.res = null; if (MAC.doc.none) { var keep = MAC.doc; setTimeout(function () { if (MAC.doc === keep) MAC.doc = null; }, 60000); } return MAC.doc; });   /* v12.91 못 받았으면 1분 뒤 다시 시도 */
   return MAC.loading;
 }
 function macSer(id) {
@@ -234,7 +234,8 @@ function macDeck(id) {
   cv = nbNew(); pg++; n++;
   var K = macKpis(), pick = /us10y|fed|m2/.test(c.s) ? ["us10y", "fed", "m2y"] : c.s === "gap" ? ["fed", "bok", "krw"] : ["krw", "bok", "fed"], tiles = pick.map(function (k) { return K.filter(function (x) { return x.id === k; })[0]; }).filter(Boolean);
   nbTop(cv, n, ["지금 [[" + (r.now.big || "-") + "]]", r.now.on ? "조건에 [[해당]]한다." : "아직 조건 밖이지만, 미리 알아 둔다.", "", c.type === "turn" ? r.now.txt.replace(/^지금 [^·]+· /, "") : c.mean.split(" — ")[0] + "."], pg, total);
-  nbBody(cv, "지금 매크로 숫자", cDate(Date.now()) + " 기준 · 한국은행 ECOS · 미국 FRED");
+  var dAt = Math.max.apply(null, K.filter(function (x) { return /^(krw|us10y)$/.test(x.id) && x.at; }).map(function (x) { return x.at; }).concat([0]));   /* v12.91 오늘 날짜가 아니라 자료의 마지막 날짜를 적는다 */
+  nbBody(cv, "지금 매크로 숫자", (dAt ? cDate(dAt) + " 자료까지" : "최근 자료") + " · 금리는 마지막 변경값 · 한국은행 ECOS · 미국 FRED");
   nbTiles(cv, tiles.map(function (k) { return { v: k.v, l: k.l, color: NB_C.navy }; }));
   nbGoldLine(cv, "기준: " + c.tag, tiles.map(function (k) { return k.l.replace(/\(.*\)/, "") + " " + k.sub; }).join(" · "));
   nbFoot(cv, "한국은행 ECOS · 미국 FRED · 과거 자료이며 투자 권유 아님"); out.push({ name: "지금숫자", cv: cv.cv });

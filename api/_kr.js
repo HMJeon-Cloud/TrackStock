@@ -103,17 +103,21 @@ export async function krHandler(req, res) {
   const [upK, upQ, dnK, dnQ] = await Promise.all([ranking("up", "KOSPI"), ranking("up", "KOSDAQ"), ranking("down", "KOSPI"), ranking("down", "KOSDAQ")]);
   [["up.kospi", upK], ["up.kosdaq", upQ], ["down.kospi", dnK], ["down.kosdaq", dnQ]].forEach(([k, r]) => { if (r.err) miss.push(k + ": " + r.err); else src[k] = r.src; });
   const inv = {};
-  for (const [name, gubun] of [["foreign", "1000"], ["inst", "9000"]]) {
-    inv[name] = {};
-    for (const type of ["buy", "sell"]) {
-      const a = await dealRank("01", gubun, type), b = await dealRank("02", gubun, type);
-      inv[name][type] = a.rows.map((x) => Object.assign({ mk: "kospi" }, x)).concat(b.rows.map((x) => Object.assign({ mk: "kosdaq" }, x))).sort((p, q) => (q.amt || 0) - (p.amt || 0)).slice(0, 20);
-      if (!inv[name][type].length) miss.push("investor." + name + "." + type + ": " + (a.err || b.err || "없음")); else src["investor." + name + "." + type] = a.src || b.src;
-    }
-  }
+  /* v12.91 8번 호출을 한꺼번에(전엔 하나씩 차례로) · 순매도는 '많이 판 순'(절댓값)으로 — 음수로 오는 날 작은 것부터 잘리던 문제 */
+  const combos = []; for (const [name, gubun] of [["foreign", "1000"], ["inst", "9000"]]) for (const type of ["buy", "sell"]) combos.push([name, gubun, type]);
+  const got = await Promise.all(combos.map(([name, gubun, type]) => Promise.all([dealRank("01", gubun, type), dealRank("02", gubun, type)])));
+  combos.forEach(([name, gubun, type], i) => {
+    const [a, b] = got[i]; inv[name] = inv[name] || {};
+    inv[name][type] = a.rows.map((x) => Object.assign({ mk: "kospi" }, x)).concat(b.rows.map((x) => Object.assign({ mk: "kosdaq" }, x))).sort((p, q) => Math.abs(q.amt || 0) - Math.abs(p.amt || 0)).slice(0, 20);
+    if (!inv[name][type].length) miss.push("investor." + name + "." + type + ": " + (a.err || b.err || "없음")); else src["investor." + name + "." + type] = a.src || b.src;
+  });
   const [ik, iq] = await Promise.all([indexFlow("KOSPI"), indexFlow("KOSDAQ")]);
   [["index.kospi", ik], ["index.kosdaq", iq]].forEach(([k, x]) => { if (x.foreign == null && x.up == null) miss.push(k + ": " + (x.err || "읽지 못함")); else src[k] = x.src; });
-  const doc = { ok: true, day, at: Date.now(), up: { kospi: upK.rows, kosdaq: upQ.rows }, down: { kospi: dnK.rows, kosdaq: dnQ.rows }, investor: inv, index: { kospi: ik, kosdaq: iq }, src, miss };
+  /* v12.91 이 자료가 '며칠 장'의 것인지 · 장중인지 — 화면이 앱 종가 날짜와 다르면 쓰지 않도록 */
+  const kn = new Date(Date.now() + 9 * 3600e3), dow = kn.getUTCDay(), mins = kn.getUTCHours() * 60 + kn.getUTCMinutes(), wk = dow >= 1 && dow <= 5;
+  const prevWk = () => { const d = new Date(kn.getTime()); do { d.setUTCDate(d.getUTCDate() - 1); } while (d.getUTCDay() === 0 || d.getUTCDay() === 6); return d.toISOString().slice(0, 10); };
+  const tradeDay = wk && mins >= 9 * 60 ? day : prevWk(), live = wk && mins >= 9 * 60 && mins < 15 * 60 + 45;
+  const doc = { ok: true, day, tradeDay, live, at: Date.now(), up: { kospi: upK.rows, kosdaq: upQ.rows }, down: { kospi: dnK.rows, kosdaq: dnQ.rows }, investor: inv, index: { kospi: ik, kosdaq: iq }, src, miss };
   if (rc) { try { await setJsonGz(rc, key, doc, 2 * 86400); } catch (e) {} }
   return res.status(200).json(doc);
 }

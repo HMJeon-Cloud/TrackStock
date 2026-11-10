@@ -69,7 +69,8 @@ function briefStats(sym, d, mode) {
   var c = d.c || [], v = d.v || [], n = c.length;
   if (n < 22 || c[n - 1] == null) return null;
   var last = c[n - 1], start = null, winFrom = null, winTo = null;
-  var back = mode === "week" ? 5 : mode === "month" ? 21 : 1;
+  var isCoin = /-USD$/.test(sym), D1M = isCoin ? 30 : 21, D3M = isCoin ? 91 : 63, D1Y = isCoin ? 365 : 250;   // v12.91 코인은 하루도 안 쉬므로 한 달=30봉 · 1년=365봉 (전엔 주식처럼 21·250봉이라 '52주'가 8개월이었음)
+  var back = mode === "week" ? (isCoin ? 7 : 5) : mode === "month" ? D1M : 1;
   if (BRIEF_WIN && d.t) {
     var iN = -1, i0 = -1;
     for (var k = n - 1; k >= 0; k--) { if (c[k] == null) continue; if (iN < 0 && d.t[k] * 1000 <= BRIEF_WIN.to) iN = k; if (d.t[k] * 1000 < BRIEF_WIN.from) { i0 = k; break; } }
@@ -84,14 +85,13 @@ function briefStats(sym, d, mode) {
   var iL = BRIEF_WIN && typeof iN === "number" && iN >= 0 ? iN : n - 1;
   var ret1 = last / c[iL - 1] - 1, ret5 = iL > 5 ? last / c[iL - 5] - 1 : null;
   // v8.9: 스냅샷이 1년치(약 250거래일)로 늘어 '최근 90일' 계산은 마지막 64거래일로, 52주 고·저가는 자체 데이터로 센다 (야후 meta는 보조)
-  var iL0 = BRIEF_WIN && typeof iN === "number" && iN >= 0 ? iN : n - 1, i90 = Math.max(0, iL0 - 63), i250 = Math.max(0, iL0 - 249);
+  var iL0 = BRIEF_WIN && typeof iN === "number" && iN >= 0 ? iN : n - 1, i90 = Math.max(0, iL0 - D3M), i250 = Math.max(0, iL0 - (D1Y - 1));
   if (iL0 < 21) return null;
-  var m1 = last / c[Math.max(0, iL0 - 21)] - 1, m3 = last / c[i90] - 1, y1 = iL0 - 250 >= 0 ? last / c[iL0 - 250] - 1 : null;
-  var ma20 = 0; for (var i = iL0 - 19; i <= iL0; i++) ma20 += c[i]; ma20 /= 20;
-  var ma5 = 0; for (i = iL0 - 4; i <= iL0; i++) ma5 += c[i]; ma5 /= 5;
-  var ma50 = null, ma200 = null;
-  if (iL0 >= 49) { ma50 = 0; for (i = iL0 - 49; i <= iL0; i++) ma50 += c[i]; ma50 /= 50; }
-  if (iL0 >= 199) { ma200 = 0; for (i = iL0 - 199; i <= iL0; i++) ma200 += c[i]; ma200 /= 200; }
+  var m1 = last / c[Math.max(0, iL0 - D1M)] - 1, m3 = last / c[i90] - 1, y1 = iL0 - D1Y >= 0 ? last / c[iL0 - D1Y] - 1 : null;
+  if (!isFinite(m1)) m1 = null; if (!isFinite(m3)) m3 = null; if (y1 != null && !isFinite(y1)) y1 = null;
+  var maOf = function (len) { var sum = 0, cnt = 0; for (var q = iL0 - len + 1; q <= iL0; q++) { if (c[q] != null) { sum += c[q]; cnt++; } } return cnt >= len * 0.9 ? sum / cnt : null; };   // v12.91 빈 날(null)은 0으로 더하지 않고 건너뛴다
+  var i, ma20 = maOf(20), ma5 = maOf(5), ma50 = iL0 >= 49 ? maOf(50) : null, ma200 = iL0 >= 199 ? maOf(200) : null;
+  if (ma20 == null || ma5 == null) return null;
   var hi90 = -Infinity, hi250 = -Infinity, lo250 = Infinity, hiPrev = -Infinity, loPrev = Infinity;
   for (i = i250; i <= iL0; i++) { var cv = c[i]; if (cv == null) continue; if (i >= i90 && cv > hi90) hi90 = cv; if (cv > hi250) hi250 = cv; if (cv < lo250) lo250 = cv; if (i < iL0) { if (cv > hiPrev) hiPrev = cv; if (cv < loPrev) loPrev = cv; } }
   var longEnough = iL0 - i250 >= 200;   // 1년치가 있을 때만 '52주'라고 부른다
@@ -276,8 +276,9 @@ function briefCompute(recent, opts) {
   var temp = { total: stocks.length, up: up, upPct: stocks.length ? up / stocks.length : 0, above20: above, abovePct: stocks.length ? above / stocks.length : 0,
     above50: a50, n50: n50, above50Pct: n50 ? a50 / n50 : null, above200: a200, n200: n200, above200Pct: n200 ? a200 / n200 : null,
     newHigh: nh, newLow: nl, nearHigh: nearH, nearLow: nearL };
-  temp.word = temp.upPct >= 0.65 ? "훈풍" : temp.upPct >= 0.5 ? "미지근" : temp.upPct >= 0.35 ? "쌀쌀" : "한파";
-  temp.desc = temp.upPct >= 0.65 ? "대부분이 올랐어요. 이런 날엔 '나만 못 번 것 같은' 조급함을 조심하세요."
+  temp.empty = !stocks.length;
+  temp.word = temp.empty ? "자료 없음" : temp.upPct >= 0.65 ? "훈풍" : temp.upPct >= 0.5 ? "미지근" : temp.upPct >= 0.35 ? "쌀쌀" : "한파";
+  temp.desc = temp.empty ? "집계할 종목이 없어 시장 온도를 계산하지 않았어요. 데이터 센터에서 수집 상태를 확인해 주세요." : temp.upPct >= 0.65 ? "대부분이 올랐어요. 이런 날엔 '나만 못 번 것 같은' 조급함을 조심하세요."
     : temp.upPct >= 0.5 ? "오른 종목과 내린 종목이 반반이에요. 종목별 이유가 갈리는 장이에요."
     : temp.upPct >= 0.35 ? "내린 종목이 더 많아요. 개별 악재보다 시장 전체 분위기일 가능성이 커요."
     : "거의 다 내렸어요. 이런 날은 내 종목만의 문제가 아니에요. 과거 기록을 보고 판단하세요.";
@@ -305,7 +306,7 @@ function briefCompute(recent, opts) {
   rows.forEach(function (s) {
     if (!s.lastT) return;
     if (/\.K[SQ]$|^\^KS|^\^KQ/.test(s.sym)) { if (s.lastT > asOfKr) asOfKr = s.lastT; }
-    else if (!/-USD$|=X$|=F$|^\^(N225|HSI|VIX)$/.test(s.sym) && s.lastT > asOfUs) asOfUs = s.lastT;   // 코인·환율은 주말에도 움직여 기준일이 앞서 보이므로 뺀다
+    else if (!/-USD$|=X$|=F$|^\^(N225|HSI|VIX|STOXX50E|FTSE|GDAXI|SSEC|FCHI)$|^DX-Y/.test(s.sym) && s.lastT > asOfUs) asOfUs = s.lastT;   /* v12.91 달러지수·유럽·중국 지수도 뺀다(미국 휴장일에 날짜가 앞서 보이던 원인) */   // 코인·환율은 주말에도 움직여 기준일이 앞서 보이므로 뺀다
   });
 
   /* 4. 참고 종목 (규칙) */
@@ -342,8 +343,8 @@ function briefCompute(recent, opts) {
   ].map(function (p) { p.items = p.items.map(function (s) { return { s: s, why: why(p.id, s) }; }); return p; });
 
   /* 4-b. 인기 종목 + 거래대금 순위 */
-  var fx = bySym["KRW=X"] ? bySym["KRW=X"].last : 1400;
-  function amtKrw(s) { return s.amt * (/\.K[SQ]$/.test(s.sym) || s.cur === "KRW" ? 1 : fx); }
+  var fx = bySym["KRW=X"] ? bySym["KRW=X"].last : (typeof smFxAny === "function" ? smFxAny() : null);   /* v12.91 고정값 1,400원 대신 마지막으로 읽은 실제 환율 — 그것도 없으면 달러 종목은 환산에서 뺀다 */
+  function amtKrw(s) { var krw = /\.K[SQ]$/.test(s.sym) || s.cur === "KRW"; return krw ? s.amt : fx ? s.amt * fx : 0; }
   var withAmt = rows.filter(function (s) { return s.amt > 0 && !/^\^|=X$|=F$/.test(s.sym) && !BRIEF_EXCLUDE.test(s.sym) && !quality.bad[s.sym] && !BRIEF_DUP[s.sym]; });
   var turnover = {
     kr: withAmt.filter(function (s) { return /\.K[SQ]$/.test(s.sym); }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, BRIEF_MAX.turnover),
@@ -568,7 +569,7 @@ function renderBrief() {
       { l: "오른 종목", v: isFinite(t.upPct) ? Math.round(t.upPct * 100) + "%" : "–", s: isFinite(t.upPct) ? t.up + "/" + t.total : "준비 중", p: t.upPct, cls: t.upPct >= 0.5 ? "up" : "down" },
       { l: "20일선 위", v: isFinite(t.abovePct) ? Math.round(t.abovePct * 100) + "%" : "–", s: !isFinite(t.abovePct) ? "준비 중" : t.abovePct >= 0.6 ? "상승 우세" : t.abovePct <= 0.4 ? "하락 우세" : "반반", p: t.abovePct, cls: t.abovePct >= 0.5 ? "up" : "down" },
       { l: "신고가 : 신저가", v: t.n200 ? nh + " : " + nl : "–", s: R.marketWideOff ? "준비 중" : t.n200 ? "52주 종가 기준" + (t.stale ? " · " + t.stale + "개 전일값" : "") : "1년치 후", p: t.n200 ? nh / Math.max(1, nh + nl) : 0, cls: nh > nl ? "up" : nl > nh ? "down" : "" },
-      { l: vixN ? "공포지수" : (idx0 ? idx0.name : "지수"), v: vixN ? vixN.v : (idx0 ? briefPct(idx0.ret) : "–"), s: vixN ? (parseFloat(vixN.v) >= 25 ? "공포" : parseFloat(vixN.v) >= 20 ? "불안" : "평온") : "", p: vixN ? Math.min(1, parseFloat(vixN.v) / 40) : 0.5, cls: vixN ? (parseFloat(vixN.v) >= 25 ? "down" : "") : (idx0 && idx0.ret < 0 ? "down" : "up") }
+      { l: vixN ? "공포지수" : (idx0 ? idx0.name : "지수"), v: vixN ? vixN.v : (idx0 ? briefPct(idx0.ret) : "–"), s: vixN ? (parseFloat(vixN.v) >= 30 ? "공포" : parseFloat(vixN.v) >= 20 ? "불안" : "평온") : "", p: vixN ? Math.min(1, parseFloat(vixN.v) / 40) : 0.5, cls: vixN ? (parseFloat(vixN.v) >= 25 ? "down" : "") : (idx0 && idx0.ret < 0 ? "down" : "up") }
     ].map(function (k) { return '<div class="kpi ' + k.cls + '"><div class="kl">' + k.l + '</div><div class="kv">' + k.v + '<small>' + k.s + '</small></div><div class="kb"><i style="width:' + Math.round((isFinite(k.p) ? k.p : 0) * 100) + '%"></i></div></div>'; }).join("");
   }
   if ($("briefTempBox")) $("briefTempBox").innerHTML = '<div class="briefTemp">' +
@@ -639,7 +640,7 @@ function renderBrief() {
   } else {
     var list = R.turnover[mt] || [];
     moneyHtml = list.length ? rowHead("거래대금 · 평소比") + briefCollapsible("to-" + mt, list.map(function (s, i) { return row(s, i, '<b>' + briefFmtAmt(R.amtKrw(s)) + '</b> · ' + heat(s)); }), BRIEF_SHOW.turnover, "개") : '<div class="briefDim">데이터 없음</div>';
-    note = "거래대금 = 종가 × 거래량 (코인은 24시간 거래액), 달러는 " + Math.round(R.fx).toLocaleString() + "원으로 환산";
+    note = "거래대금 = 종가 × 거래량 (코인은 24시간 거래액), " + (R.fx ? "달러는 " + Math.round(R.fx).toLocaleString() + "원으로 환산" : "환율을 못 읽어 달러 종목은 원화 환산에서 뺐어요");
   }
   $("briefMoney").innerHTML = moneyHtml;
   $("briefToNote").textContent = note;

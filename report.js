@@ -59,7 +59,7 @@ function rpSimilar(rows, curDd) {
   for (var i = 1; i < rows.length - 1; i++) {
     if (rows[i].c >= rows[pk].c) { pk = i; dd = 0; armed = true; continue; }
     var d = rows[i].c / rows[pk].c - 1;
-    if (armed && d <= th) { armed = false; var f = {}; [[63, "m3"], [126, "m6"], [252, "y1"]].forEach(function (h) { var j = i + h[0]; f[h[1]] = j < rows.length ? rows[j].c / rows[i].c - 1 : null; }); out.push({ t: rows[i].t, dd: d, f: f }); }
+    if (armed && d <= th) { armed = false; var f = {}; [[91, "m3"], [182, "m6"], [365, "y1"]].forEach(function (h) { var tt = rows[i].t + h[0] * 86400e3, j = i; if (tt > rows[rows.length - 1].t) { f[h[1]] = null; return; } while (j < rows.length - 1 && rows[j].t < tt) j++; f[h[1]] = rows[j].c / rows[i].c - 1; });   /* v12.91 3·6·12개월을 '날짜'로 센다 — 코인(매일 거래)도 같은 기간이 되게 */ out.push({ t: rows[i].t, dd: d, f: f }); }
     if (d < dd) dd = d;
   }
   var last = rows.length - 1, cur = out.filter(function (x) { return last - rpIdx(rows, x.t) > 20 || x.f.m3 != null; });
@@ -69,7 +69,7 @@ function rpSimilar(rows, curDd) {
 /* 기술: RSI14 · 볼린저(20,2) · 이동평균 */
 function rpTech(rows) {
   var n = rows.length; if (n < 60) return null; var c = rows.map(function (r) { return r.c; });
-  var g = 0, l = 0; for (var i = n - 14; i < n; i++) { var d = c[i] - c[i - 1]; if (d > 0) g += d; else l -= d; } var rsi = l === 0 ? 100 : 100 - 100 / (1 + (g / 14) / (l / 14));
+  var g = 0, l = 0; for (var i = n - 14; i < n; i++) { var d = c[i] - c[i - 1]; if (d > 0) g += d; else l -= d; } var rsi = l === 0 ? 100 : 100 - 100 / (1 + (g / 14) / (l / 14)); if (typeof rsiWilder === "function") { var rw = rsiWilder(c, 14); if (rw != null && isFinite(rw)) rsi = rw; }   /* v12.91 종목 화면과 같은 방식(와일더 RSI)으로 통일 — 같은 종목의 RSI가 화면마다 다르던 문제 */
   var s20 = c.slice(-20), ma20 = rpAvg(s20), sd = Math.sqrt(rpAvg(s20.map(function (x) { return (x - ma20) * (x - ma20); }))), lo = ma20 - 2 * sd, hi = ma20 + 2 * sd;
   var ma60 = rpAvg(c.slice(-60)), ma200 = n >= 200 ? rpAvg(c.slice(-200)) : null;
   var rs = []; for (i = Math.max(1, n - 250); i < n; i++) rs.push(Math.abs(c[i] / c[i - 1] - 1)); var vol = rpAvg(rs);
@@ -101,9 +101,9 @@ function rpStock(sym) {
   if (fwdPer != null && (fwdPer < 1 || fwdPer > 500)) fwdPer = null; if (per != null && (per <= 0 || per > 1000)) per = null; if (tgt != null && (tgt / last > 5 || tgt / last < 0.2)) tgt = null;   // 통화·단위가 안 맞는 값은 버린다
   var ex = [], k = 0;
   // Exhibit 1 낙폭 vs 평소
-  ex.push({ no: ++k, title: name + ", 평소보다 얼마나 더 빠졌나", sub: "최근 10년 연도별 최대 낙폭 평균 vs 지금 고점 대비", kind: "bars", data: [{ l: "10년 평균 MDD", v: avgMdd, color: NB_C.grey }, { l: "지금 고점 대비", v: cur, color: NB_C.up }], big: rpPct(cur, 1), read: cur <= avgMdd * 1.5 ? "지금 낙폭은 평소 해의 " + (cur / avgMdd).toFixed(1) + "배. 평범한 조정이 아니라 큰 하락 구간이다." : cur <= avgMdd ? "평소 해보다 깊지만 1.5배 안. 흔히 오는 조정의 깊은 쪽이다." : "평소 해의 최대 낙폭보다 얕다. 아직 '많이 빠졌다'고 하긴 이르다." });
+  ex.push({ no: ++k, title: name + ", 평소보다 얼마나 더 빠졌나", sub: "최근 " + ym.length + "년 연도별 최대 낙폭 평균 vs 지금 고점 대비", kind: "bars", data: [{ l: "10년 평균 MDD", v: avgMdd, color: NB_C.grey }, { l: "지금 고점 대비", v: cur, color: NB_C.up }], big: rpPct(cur, 1), read: cur <= avgMdd * 1.5 ? "지금 낙폭은 평소 해의 " + (cur / avgMdd).toFixed(1) + "배. 평범한 조정이 아니라 큰 하락 구간이다." : cur <= avgMdd ? "평소 해보다 깊지만 1.5배 안. 흔히 오는 조정의 깊은 쪽이다." : "평소 해의 최대 낙폭보다 얕다. 아직 '많이 빠졌다'고 하긴 이르다." });
   // Exhibit 2 10년 중 몇 번
-  ex.push({ no: ++k, title: "최근 10년, 이만큼 빠진 해는", sub: "연도별 최대 낙폭 · 지금보다 깊었던 해 " + deeperYears + "번", kind: "bars", data: ym.slice(-10).map(function (x) { return { l: String(x.y).slice(2) + "년", v: x.mdd, color: x.mdd <= cur ? NB_C.up : NB_C.navy, txt: rpPct(x.mdd, 0) }; }), big: deeperYears + "/" + ym.length, read: deeperYears === 0 ? "10년 중 처음 보는 깊이다. 드문 일은 기회이기도, 구조가 바뀐 신호이기도 하다." : deeperYears <= 2 ? "10년 중 " + deeperYears + "번뿐인 깊이. 역사적으로 드문 구간이다." : "10년 중 " + deeperYears + "번 있었던 깊이. 몇 년에 한 번 오는 수준이다." });
+  ex.push({ no: ++k, title: "최근 " + Math.min(10, ym.length) + "년, 이만큼 빠진 해는", sub: "연도별 최대 낙폭 · 지금보다 깊었던 해 " + deeperYears + "번", kind: "bars", data: ym.slice(-10).map(function (x) { return { l: String(x.y).slice(2) + "년", v: x.mdd, color: x.mdd <= cur ? NB_C.up : NB_C.navy, txt: rpPct(x.mdd, 0) }; }), big: deeperYears + "/" + ym.length, read: deeperYears === 0 ? "10년 중 처음 보는 깊이다. 드문 일은 기회이기도, 구조가 바뀐 신호이기도 하다." : deeperYears <= 2 ? "10년 중 " + deeperYears + "번뿐인 깊이. 역사적으로 드문 구간이다." : "10년 중 " + deeperYears + "번 있었던 깊이. 몇 년에 한 번 오는 수준이다." });
   // Exhibit 3 과매도
   if (tech) ex.push({ no: ++k, title: "과매도 신호는 들어왔나", sub: "RSI14 (30 아래 = 과매도) · 볼린저 밴드 안 위치 (0 = 하단)", kind: "tiles", data: [{ v: tech.rsi.toFixed(1), l: "RSI14", color: tech.rsi < 30 ? NB_C.up : tech.rsi > 70 ? NB_C.down : NB_C.navy }, { v: tech.bPos == null ? "-" : Math.round(tech.bPos * 100) + "%", l: "볼린저 위치(하단 0 · 상단 100)", color: NB_C.navy }, { v: rpPrice(sym, tech.bLo), l: "볼린저 하단", color: NB_C.sub }], big: tech.rsi.toFixed(0), read: tech.rsi < 30 ? "RSI " + tech.rsi.toFixed(0) + " — 매도가 강하게 몰린 상태. 단기 반등이 나오기 쉬운 자리지만, 추세 전환과는 다르다." : tech.rsi > 70 ? "RSI " + tech.rsi.toFixed(0) + " — 과열. 쫓아 사기엔 늦은 자리." : "RSI " + tech.rsi.toFixed(0) + " — 과매도도 과열도 아니다. 기술 신호만으로는 판단이 안 선다." });
   // Exhibit 4 전고점까지

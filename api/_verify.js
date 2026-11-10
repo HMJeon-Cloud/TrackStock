@@ -20,8 +20,11 @@ async function naverRows(url) {
 }
 export async function verifyHandler(req, res, snapshotLoader) {
   res.setHeader("Cache-Control", "no-store");
-  const rc = redisConf(), ck = "sm:verify:" + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 13);
+  const rc = redisConf();
   let body = req.body; if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = null; } }
+  /* v12.91 캐시 키에 앱이 보낸 날짜·종가를 넣는다 — 전엔 같은 시간대면 다른 값으로 물어도 예전 대조 결과가 돌아왔음 */
+  const sig = (() => { const a = (body && body.app) || {}; let h = 0; const t = Object.keys(a).sort().map((k) => k + ":" + (a[k] && a[k].d) + ":" + (a[k] && a[k].c)).join("|"); for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); })();
+  const ck = "sm:verify:" + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 13) + ":" + sig;
   if (rc && !(body && body.fresh)) { try { const t = await getJsonGzText(rc, ck); if (t) return res.status(200).json(Object.assign(JSON.parse(t), { cached: true })); } catch (e) {} }
   // 앱 쪽 종가: 클라이언트가 보내 준 {key:{d,c}} (스냅샷을 다시 읽지 않아 가볍다)
   const app = (body && body.app) || {};

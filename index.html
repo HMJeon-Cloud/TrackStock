@@ -2746,7 +2746,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "12.90"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "12.91"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -3389,6 +3389,7 @@ function fmtPrice(v) {
   return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: digits });
 }
 function fmtPct(v) {
+  if (v == null || !isFinite(v)) return "-";   // v12.91 값이 없으면 0.0%·NaN% 대신 '-' (없는 숫자를 0으로 보이지 않게)
   var s = (v * 100).toFixed(1) + "%";
   return v > 0 ? "+" + s : s;
 }
@@ -3688,7 +3689,8 @@ function fetchRecent() {
     return fetch("/api/snap?recent=1" + v, own ? { cache: "no-store" } : undefined);
   })
     .then(function (r) { if (!r.ok) throw new Error("recent " + r.status); return r.json(); })
-    .catch(function () { return null; });   // 없으면 과거 파일만 쓴다
+    .catch(function () { return null; })   // 없으면 과거 파일만 쓴다
+    .then(function (r) { if (!r) setTimeout(function () { DATA.recentPromise = null; }, 15000); return r; });   // v12.91 실패는 15초 뒤 다시 시도할 수 있게(전엔 접속 내내 '데이터 없음'으로 남았음)
   return DATA.recentPromise;
 }
 
@@ -5146,7 +5148,7 @@ setTimeout(smBootDone, 3000);
 <!-- v12.13 앱 스크립트 한 곳에서 로드 — 버전은 SM_VER 하나만 올리면 전 파일 캐시가 같이 갱신된다(파일마다 ?v= 손으로 올리던 실수 방지). 순서는 의존 관계 그대로 -->
 <script>
 (function () {
-  var files = ["metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js","pro.js","tg.js","anx.js","ux.js","krx.js","core.js","admin.js"];
+  var files = ["dataq.js","metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js","pro.js","tg.js","anx.js","ux.js","krx.js","core.js","edge.js","admin.js","datax.js"];
   document.write(files.map(function (f) { return '<script src="' + f + '?v=' + SM_VER + '"><\/script>'; }).join(""));
 })();
 </script>

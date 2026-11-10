@@ -44,7 +44,7 @@ async function listKR(rc) {
       const r = await fetchT("https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=" + page + "&pageSize=100", { headers: { "User-Agent": UA, Accept: "application/json", Referer: "https://m.stock.naver.com/" } }, 10000);
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = await r.json(), L = (j && (j.stocks || j.items || j.result || j)) || [];
-      (Array.isArray(L) ? L : []).forEach((x) => { const code = String(x.itemCode || x.code || x.reutersCode || "").replace(/\D/g, ""); if (code.length === 6 && !seen[code]) { seen[code] = 1; const it = x.industryCodeType || x.industry || {}; items.push({ s: code + ".KS", n: String(x.stockName || x.name || code).slice(0, 30), sec: String(it.industryGroupKor || it.name || x.industryName || "").slice(0, 30) }); } /* v12.29 업종 이름이 오면 같이 (없으면 빈칸 → 화면은 테마로 대신) */ });
+      (Array.isArray(L) ? L : []).forEach((x) => { const code = String(x.itemCode || x.code || x.reutersCode || "").replace(/\D/g, ""); const nm0 = String(x.stockName || x.name || ""); if (code.length === 6 && !seen[code] && !(/[^0]$/.test(code) && /우[A-C]?$/.test(nm0))) { seen[code] = 1;   /* v12.91 우선주(코드 끝자리 0 아님 + 이름 끝 '우')는 뺀다 — 같은 회사를 두 번 세지 않게 */ const it = x.industryCodeType || x.industry || {}; items.push({ s: code + ".KS", n: String(x.stockName || x.name || code).slice(0, 30), sec: String(it.industryGroupKor || it.name || x.industryName || "").slice(0, 30) }); } /* v12.29 업종 이름이 오면 같이 (없으면 빈칸 → 화면은 테마로 대신) */ });
       if (!(Array.isArray(L) && L.length)) break;
     }
     if (items.length < 150) throw new Error("종목 " + items.length + "개뿐");

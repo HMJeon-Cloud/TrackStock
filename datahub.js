@@ -37,7 +37,9 @@ function dhMarket(mk, recent) {
   var out = { mk: mk, R: R, date: date, count: R.count, stale: stale, spike: spike, idx: R.indexRow || [], basis: R.basis || {}, off: !!R.marketWideOff };
   if (mk === "coin") { var b = recent.symbols && recent.symbols["BTC-USD"]; if (b && b.t && b.t.length) { var lt = b.t[b.t.length - 1] * 1000, close = Math.floor(lt / 86400e3) * 86400e3 + 86400e3; out.date = new Date(close + 9 * 3600e3).toISOString().slice(0, 10); out.coinLate = close < Math.floor((Date.now() - 20 * 60e3) / 86400e3) * 86400e3; } }
   var U = typeof DL_UNI !== "undefined" && DL_UNI[mk] && DL_UNI[mk].doc; out.uni = U || null;
-  out.level = out.err ? "bad" : (mk !== "coin" && out.off) || stale.length || spike.length || out.coinLate ? "warn" : "ok";
+  /* v12.91 '있어야 할 마지막 거래일'과 비교 — 전엔 자료 전체가 며칠 묵어도 서로 날짜만 같으면 '정상'이었음 */
+  if (mk !== "coin" && typeof dxExpected === "function" && out.date) { var ex = dxExpected(mk); if (ex && out.date < ex) { out.late = true; out.exp = ex; } }
+  out.level = out.err ? "bad" : (mk !== "coin" && out.off) || stale.length || spike.length || out.coinLate || out.late ? "warn" : "ok";
   return out;
 }
 
@@ -46,6 +48,7 @@ function dhMarketCard(M) {
   if (M.err) return '<div class="dhMk"><h4>' + NM + '</h4>' + dhBadge("bad", "계산 실패") + '<div class="briefDim">' + dhEsc(M.err) + '</div></div>';
   var h = '<div class="dhMk"><div class="dhMkHead"><h4>' + NM + '</h4>' + (M.level === "ok" ? dhBadge("ok", "정상") : dhBadge("warn", "확인 필요")) + '</div>';
   h += '<div class="dhBig">' + (M.mk === "coin" ? dhMD(M.date) + ' 오전 9시 마감' : dhMD(M.date) + ' 종가') + '<small>' + (M.mk === "coin" ? "코인 일봉은 한국 오전 9시(UTC 0시) 마감" : M.mk === "us" ? "미국 현지 날짜 · 한국 새벽 5~6시 마감" : "한국 오후 3시 30분 마감") + '</small></div>';
+  if (M.late) h += '<div class="dhWarn" style="margin:4px 0">⚠️ ' + dhMD(M.exp) + ' 장까지 있어야 하는데 ' + dhMD(M.date) + '까지뿐이에요 — 아침 수집이 실패했거나 아직 안 돌았어요</div>';
   h += '<div class="dhIdx">' + M.idx.slice(0, 3).map(function (x) { return '<span><b>' + dhEsc(x.name) + '</b> ' + (typeof briefPct === "function" ? briefPct(x.ret) : "") + '</span>'; }).join("") + '</div>';
   var rows = [];
   rows.push(["대표 목록 (1년치 시세)", M.count + "개 · " + (M.stale.length ? '<span class="dhWarn">늦은 ' + M.stale.length + '개: ' + dhEsc(M.stale.slice(0, 5).map(function (s) { return briefName(s); }).join(", ")) + '</span>' : M.spike.length ? '<span class="dhWarn">급변 의심 ' + M.spike.length + '개</span>' : '<span class="dhOk">모두 같은 날까지</span>'), "야후 파이낸스 일봉 → Redis(최근 400일 + 과거 25년)"]);
@@ -67,7 +70,7 @@ function dhExtRows() {
   var st = function (doc, maxH) { if (!doc) return dhBadge("warn", "없음"); var u = doc.updated || doc.generated || doc.at; if (!u) return dhBadge("", "-"); var h = (Date.now() - new Date(u).getTime()) / 3600e3; return dhBadge(h <= maxH ? "ok" : "warn", dhAgo(u)); };
   // 매크로: 지표마다 마지막 날짜
   var M = E.macro, ser = (M && M.series) || {}, nm = { krw: "원/달러", bok: "한국 기준금리", fed: "미 기준금리", us10y: "미 10년 금리", m2: "미 M2" };
-  var last = Object.keys(nm).map(function (k) { var s = ser[k], arr = s && (Array.isArray(s) ? s : s.rows); var r = arr && arr.length ? arr[arr.length - 1] : null; var d = r ? String(r[0]) : ""; return nm[k] + " " + (d ? d.slice(4, 6) + "/" + d.slice(6, 8) : "없음"); }).join(" · ");
+  var last = Object.keys(nm).map(function (k) { var s = ser[k], arr = s && (Array.isArray(s) ? s : s.d || s.rows);   /* v12.91 서버는 d 칸에 저장 — 전엔 rows만 읽어 늘 '없음'으로 보였음 */ var r = arr && arr.length ? arr[arr.length - 1] : null; var d = r ? String(r[0]) : ""; return nm[k] + " " + (d ? d.slice(4, 6) + "/" + d.slice(6, 8) : "없음"); }).join(" · ");
   var merr = M && M.log && M.log.errors && M.log.errors.length ? '<div class="dhWarn">오류: ' + dhEsc(M.log.errors.slice(0, 3).join(" / ")) + '</div>' : "";
   rows.push(["매크로 (환율·금리·M2)", st(M, 30) + '<div>' + last + '</div>' + merr, "ECOS(한국은행) · FRED", "매일 07:00 크론 · 기준금리는 바뀐 날만 기록", "FRED 오류가 계속되면 FRED_API_KEY 등록 · 매크로 지금 수집"]);
   rows.push(["국내 공시 (지분·자사주)", st(E.disc, 30) + (E.disc && E.disc.n != null ? '<div>' + E.disc.n + '건</div>' : ""), "DART", "매일 크론 끝 남는 시간", "건너뛴 날만 공시 지금 수집"]);
@@ -77,7 +80,7 @@ function dhExtRows() {
   var cal = typeof PUB_CAL !== "undefined" ? PUB_CAL : [], lastEv = cal.length ? cal.map(function (e) { return e.d; }).sort().slice(-1)[0] : "", today = typeof pubToday === "function" ? pubToday() : "";
   var days = lastEv ? Math.round((Date.parse(lastEv) - Date.parse(today)) / 86400e3) : -1;
   rows.push(["경제 일정 (FOMC·CPI·금통위·휴장)", (days >= 45 ? dhBadge("ok", dhMD(lastEv) + "까지") : dhBadge("warn", lastEv ? dhMD(lastEv) + "까지뿐" : "없음")) + '<div>' + cal.length + '건</div>', "연준·BLS·BEA·한국은행 발표 일정 (손으로 입력)", "자동 아님", "<b>손으로</b>: publish.js 맨 위 PUB_CAL에 다음 달 일정 추가 · 결과(동결·인상)는 n칸에 메모"]);
-  rows.push(["뉴스·기사", K.naverHub || K.naverDev ? dhBadge("ok", K.naverHub ? "HUB 키" : "구 키") : dhBadge("bad", "키 없음"), "네이버 검색 API", "화면을 열 때 실시간 (10분 캐시)", K.naverHub ? "-" : "구 키는 2027-06 종료 → HUB 키로 교체"]);
+  rows.push(["뉴스·기사", K.naverHub || K.naverDev ? dhBadge("ok", K.naverHub ? "HUB 키" : "구 키") : dhBadge("bad", "키 없음"), "네이버 검색 API", "화면을 열 때 실시간 (30분 캐시)", K.naverHub ? "-" : "구 키는 2027-06 종료 → HUB 키로 교체"]);
   rows.push(["종목 지표·재무·수급", dhBadge("", "요청할 때"), "네이버 증권 공개 API", "화면에서 열 때 실시간", "-"]);
   return '<div class="tableWrap"><table class="dgT"><thead><tr><th>데이터</th><th>지금 상태</th><th>어디서</th><th>자동 주기</th><th>손으로 할 일</th></tr></thead><tbody>' +
     rows.map(function (r) { return '<tr><td class="dgName"><b>' + r[0] + '</b></td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td><td>' + r[4] + '</td></tr>'; }).join("") + '</tbody></table></div>';
@@ -120,6 +123,7 @@ function dhBind(box) {
 
 /* 다시 확인: 캐시를 비우고 서버 최신값으로 */
 function dhRefresh(quiet) {
+  if (typeof smCacheClear === "function") smCacheClear("refresh");   // v12.91 다른 화면이 들고 있던 옛 시세·지표도 같이 비운다
   if (typeof DATA !== "undefined") { DATA.ready = null; DATA.recentPromise = null; }
   if (typeof DL_UNI !== "undefined") { delete DL_UNI.us; delete DL_UNI.kr; }
   if (typeof BRIEF_UNI_PENDING !== "undefined") { delete BRIEF_UNI_PENDING.us; delete BRIEF_UNI_PENDING.kr; }
@@ -142,13 +146,15 @@ function renderDataHub(force, quiet) {
     if (lr.at) h += '<div class="briefDim" style="margin:4px 0 0">마지막 서버 실행 ' + dhEsc(String(lr.at).slice(0, 16)) + (lr.repaired ? ' · 빈 날 메운 종목 ' + lr.repaired + '개' : '') + (lr.behindN ? ' · <span class="dhWarn">늦은 종목 ' + lr.behindN + '개</span>' : '') + (lr.yahoo ? ' · 야후 성공 ' + (lr.yahoo.ok || 0) + '회' : '') + '</div>';
     /* v12.61 처음 보는 사람용: 지금 할 일 한 줄 + 바로 누를 버튼 */
     var todo = [];
-    Ms.forEach(function (M) { var nm = { kr: "국내", us: "미국", coin: "코인" }[M.mk]; if (M.err) todo.push({ t: nm + " 계산 실패 — ☀️ 아침 수집을 눌러 보세요", b: "snap" }); else if (M.mk !== "coin" && M.off) todo.push({ t: nm + " 전체 시장 숫자가 숨김 — " + (M.mk === "us" ? "🇺🇸 S&P 500 요약" : "🇰🇷 코스피 200 요약") + " 받기", b: "uni-" + M.mk }); else if (M.stale && M.stale.length) todo.push({ t: nm + " 늦은 종목 " + M.stale.length + "개 — ☀️ 아침 수집 뒤에도 남으면 ✨ 원인 확인", b: "snap" }); else if (M.coinLate) todo.push({ t: "코인 어제 마감분 없음 — ☀️ 아침 수집", b: "snap" }); else if (M.spike && M.spike.length) todo.push({ t: nm + " 급변 의심 " + M.spike.length + "개 — ✨ 원인 확인(아래 카드)", b: null }); });
+    Ms.forEach(function (M) { var nm = { kr: "국내", us: "미국", coin: "코인" }[M.mk]; if (M.err) todo.push({ t: nm + " 계산 실패 — ☀️ 아침 수집을 눌러 보세요", b: "snap" }); else if (M.late) todo.push({ t: nm + " 시세가 " + dhMD(M.date) + "까지뿐 (" + dhMD(M.exp) + " 장이 있어야 함) — ☀️ 아침 수집", b: "snap" }); else if (M.mk !== "coin" && M.off) todo.push({ t: nm + " 전체 시장 숫자가 숨김 — " + (M.mk === "us" ? "🇺🇸 S&P 500 요약" : "🇰🇷 코스피 200 요약") + " 받기", b: "uni-" + M.mk }); else if (M.stale && M.stale.length) todo.push({ t: nm + " 늦은 종목 " + M.stale.length + "개 — ☀️ 아침 수집 뒤에도 남으면 ✨ 원인 확인", b: "snap" }); else if (M.coinLate) todo.push({ t: "코인 어제 마감분 없음 — ☀️ 아침 수집", b: "snap" }); else if (M.spike && M.spike.length) todo.push({ t: nm + " 급변 의심 " + M.spike.length + "개 — ✨ 원인 확인(아래 카드)", b: null }); });
     h += '<div class="dhTodo ' + (todo.length ? "warn" : "ok") + '"><b>지금 할 일</b>' + (todo.length ? '<ul>' + todo.map(function (x) { return '<li>' + dhEsc(x.t) + (x.b ? ' <button class="chip" data-dh="' + x.b + '">' + dhEsc((DH_BTNS.filter(function (y) { return y.id === x.b; })[0] || {}).t || "실행") + '</button>' : '') + '</li>'; }).join("") + '</ul>' : '<span>없음 — 세 시장 모두 최신이에요. 작업실로 돌아가 ② 오늘 브리핑을 진행하세요.</span> <button class="chip" onclick="navTo(\'ops\')">작업실로</button>') + '</div>';
+    if (typeof dxTopHtml === "function") { try { h += dxTopHtml(Ms, recent); } catch (e) { console.warn("dx", e); } }
     h += '<h3 class="dhH">① 시장별로 지금 보여주는 데이터</h3><div class="dhMks">' + Ms.map(dhMarketCard).join("") + '</div>';
     h += '<h3 class="dhH">② 최신화 버튼 <small>운영자 토큰으로 실행 · 키는 화면에 나오지 않아요</small></h3>' + dhBtnsHtml();
     h += '<h3 class="dhH">③ 그 밖의 데이터 · 손으로 할 일</h3><div id="dhExt">' + dhExtRows() + '</div>';
     h += '<h3 class="dhH">④ 연동 안내 <small>API 키 · 출처 · 주기 전체 표</small></h3><details class="dhGuide"><summary>펼쳐 보기 — 키가 필요한 연동 · 키 없이 오는 데이터 · 운영자가 할 일</summary><div class="dgWrap">' + (typeof chDataGuideHtml === "function" ? chDataGuideHtml() : "") + '</div></details>';
-    box.innerHTML = h;
+    if (typeof dxBottomHtml === "function") { try { h += dxBottomHtml(); } catch (e) { console.warn("dx", e); } }
+    box.innerHTML = h; if (typeof dxBind === "function") { try { dxBind(box); } catch (e) { console.warn("dx", e); } }
     $("dhReload").onclick = function () { dhRefresh(false); };
     dhBind(box);
     Array.prototype.forEach.call(box.querySelectorAll("[data-dhanom]"), function (b) { b.onclick = function () { dhAnomRun(b.getAttribute("data-dhanom"), b); }; });

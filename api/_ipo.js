@@ -144,8 +144,8 @@ export function parseEstk(j) {
     if (!L.length) continue; const first = L[0], last = L[L.length - 1];
     if (/일반/.test(g.title)) { const sbd = parseDates(rowGet(last, ["sbd"], /sbd/)); if (sbd.length) out.sbd = [sbd[0], sbd[sbd.length - 1]]; const py = parseDates(rowGet(last, ["pymd"], /pymd/)); if (py.length) out.pymd = py[0]; }
     if (/증권의\s*종류|증권종류/.test(g.title)) {
-      const pick = (r) => r && /보통|주식/.test(String(r.stksen || "")) ? r : r;
-      const a = pick(first), b = pick(last);
+      const common = L.filter((r) => /보통/.test(String(r.stksen || "")) && !/우선/.test(String(r.stksen || ""))), CL = common.length ? common : L;   /* v12.91 보통주 행만 — 전엔 우선주·기타 행의 공모가가 들어갈 수 있었음 */
+      const a = CL[0], b = CL[CL.length - 1];
       out.offer0 = num(rowGet(a, ["slprc"], /prc/)); out.offer = num(rowGet(b, ["slprc"], /prc/)); out.amt = num(rowGet(b, ["slta"], /slta|amt/)); out.shares = num(rowGet(b, ["stkcnt"], /cnt/));
     }
     if (/인수인/.test(g.title)) {

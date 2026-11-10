@@ -845,7 +845,7 @@ function cardsOpen(kind) {
     try { list = make(); } catch (e) { console.warn(e); list = []; }
     CARD_STYLE = "regular"; CARD_SERIES = ""; CARD_UNIT = ""; CARD_MKT = null;
     if (!list.length) { alert("아직 데이터가 다 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요."); return; }
-    var day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    var day = (typeof kstToday === "function" ? kstToday() : new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)).replace(/-/g, "");   /* v12.91 파일 이름 날짜를 한국 날짜로(전엔 오전 9시 전에 만들면 어제 날짜) */
     var box = document.createElement("div");
     var mk = mkt;
     var mkHtml = mk ? '<div class="pills" style="margin-bottom:10px">' + Object.keys(BRIEF_MKT).map(function (k) {

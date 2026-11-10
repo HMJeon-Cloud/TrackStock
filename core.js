@@ -9,8 +9,8 @@ var CORE = { busy: false, ess: null, fund: {}, ans: null, prompt: "", open: {} }
 var CORE_GROUPS = [
   { g: "지수 · ETF", syms: ["SPY", "QQQ", "^KS11", "GLD", "SCHD", "TLT"] },
   { g: "코인", syms: ["BTC-USD", "ETH-USD", "XRP-USD", "SOL-USD"] },
-  { g: "미국 Top10", syms: ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "AVGO", "TSLA", "BRK-B", "LLY"] },
-  { g: "국내 Top5", syms: ["005930.KS", "000660.KS", "373220.KS", "207940.KS", "005380.KS"] },
+  { g: "미국 시총 상위 10 (2026-10 기준 고정 목록)", syms: ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "AVGO", "TSLA", "BRK-B", "LLY"] },
+  { g: "국내 시총 상위 5", syms: ["005930.KS", "000660.KS", "373220.KS", "207940.KS", "005380.KS"] },
   { g: "내 관심 · 보유", syms: [] }
 ];
 function coreEsc(s) { return escapeHtml(String(s == null ? "" : s)); }
@@ -18,7 +18,9 @@ function corePct(v, d) { return v == null || !isFinite(v) ? "-" : (v > 0 ? "+" :
 function coreName(s) { return typeof nbName === "function" ? nbName(s) : s; }
 function coreIsStock(s) { return /\.K[SQ]$/.test(s) || (/^[A-Z][A-Z\-]{0,5}$/.test(s) && ["SPY", "QQQ", "GLD", "SCHD", "TLT", "SLV", "USO", "DBC", "IWM", "VTI", "VOO"].indexOf(s) < 0); }
 function coreGroups() {
-  var seen = {}, out = CORE_GROUPS.map(function (G) { return { g: G.g, syms: G.syms.filter(function (s) { if (seen[s]) return false; seen[s] = 1; return true; }) }; }), mine = out[out.length - 1];
+  /* v12.91 국내 상위 5는 전체 시장 요약(네이버 시가총액 순)이 있으면 그 순서로 — 없을 때만 고정 목록 */
+  var krTop = null; try { var U = typeof DL_UNI !== "undefined" && DL_UNI.kr && DL_UNI.kr.doc; if (U && U.rows && U.rows.length >= 50) krTop = U.rows.filter(function (r) { return !(/[^0]\.KS$/.test(r.s) && /우[A-C]?$/.test(r.n || "")); }).slice(0, 5).map(function (r) { return r.s; }); } catch (e) {}
+  var seen = {}, out = CORE_GROUPS.map(function (G) { if (krTop && /^국내 시총/.test(G.g)) return { g: G.g + " (오늘 순위)", syms: krTop.slice() }; return G; }).map(function (G) { return { g: G.g, syms: G.syms.filter(function (s) { if (seen[s]) return false; seen[s] = 1; return true; }) }; }), mine = out[out.length - 1];
   var add = function (s) { if (s && !seen[s] && mine.syms.length < 10) { seen[s] = 1; mine.syms.push(s); } };
   try { (loadHoldings().lots || []).forEach(function (L) { add(L.s); }); } catch (e) {}
   try { loadWatch().forEach(function (w) { add(w.s); }); } catch (e) {}
@@ -41,8 +43,10 @@ function coreLong(sym) {
   var eps = typeof drawdownEpisodes === "function" ? drawdownEpisodes(rows, 0.20) : [], open = eps.filter(function (e) { return e.recoverI == null; }).length;
   var recs = eps.filter(function (e) { return e.recoverI != null; }).map(function (e) { return Math.round((rows[e.recoverI].t - rows[e.peakI].t) / 86400e3); }).sort(function (a, b) { return a - b; }), recMed = recs.length ? recs[Math.floor(recs.length / 2)] : null, recMax = recs.length ? recs[recs.length - 1] : null;
   var sum = 0, n = 0; for (var i = Math.max(0, rows.length - 200); i < rows.length; i++) { sum += rows[i].c; n++; } var ma200 = n ? sum / n : null;
-  var hi = -Infinity, lo = Infinity; for (var k = Math.max(0, rows.length - 250); k < rows.length; k++) { hi = Math.max(hi, rows[k].c); lo = Math.min(lo, rows[k].c); }
-  var sd = null; if (rows.length > 260) { var rs = []; for (var q = rows.length - 250; q < rows.length; q++) rs.push(rows[q].c / rows[q - 1].c - 1); var m = rs.reduce(function (a, b) { return a + b; }, 0) / rs.length; sd = Math.sqrt(rs.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / rs.length) * Math.sqrt(252); }
+  /* v12.91 52주·연변동성은 '날짜로 1년' — 코인(연 365봉)도 주식(연 250봉)도 같은 1년이 되게 (전엔 코인이 250봉 = 8개월이었음) */
+  var t1y = last.t - 365 * 86400e3, i1y = rows.length - 1; while (i1y > 0 && rows[i1y - 1].t >= t1y) i1y--;
+  var hi = -Infinity, lo = Infinity; for (var k = i1y; k < rows.length; k++) { hi = Math.max(hi, rows[k].c); lo = Math.min(lo, rows[k].c); }
+  var sd = null; if (rows.length - i1y > 200 && i1y > 0) { var rs = []; for (var q = i1y; q < rows.length; q++) rs.push(rows[q].c / rows[q - 1].c - 1); var m = rs.reduce(function (a, b) { return a + b; }, 0) / rs.length; sd = Math.sqrt(rs.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / rs.length) * Math.sqrt(rs.length); }
   return { sym: sym, name: coreName(sym), yrs: Math.round(yrs), span: span, cagr: cagr, c3: c(3), c5: c(5), c10: c(10), ret1: last.c / atY(1).c - 1, cur: dd ? dd.cur : null, worst: dd ? dd.worst : null, worstY: dd ? dd.worstY : null, dd20: eps.length, dd20open: open, recMed: recMed, recMax: recMax, above200: ma200 != null ? last.c >= ma200 : null, vs200: ma200 != null ? last.c / ma200 - 1 : null, pos52: hi > lo ? (last.c - lo) / (hi - lo) : null, vol: sd, f1: coreFwd(rows, 365), f3: coreFwd(rows, 3 * 365) };
 }
 function coreFund(sym) {
@@ -73,8 +77,8 @@ function coreVerdict(L, F) {
   if (L.above200 != null) { if (L.above200) { good++; why.push("✓ 200일선 위 " + corePct(L.vs200, 1)); } else why.push("– 200일선 아래 " + corePct(L.vs200, 1) + " (추세 쉬는 중)"); }
   if (F) {
     if (F.opNeg) { bad += 2; why.push("✗ 영업이익 적자"); }
-    if (F.revG != null) { if (F.revG > 0.05) { good++; why.push("✓ 매출 3년 연 " + corePct(F.revG, 0)); } else if (F.revG < 0) { bad++; why.push("✗ 매출 3년 감소"); } else why.push("– 매출 정체"); }
-    if (F.opG != null && !F.opNeg) { if (F.opG > 0.05) { good++; why.push("✓ 영업이익 3년 연 " + corePct(F.opG, 0)); } else if (F.opG < 0) { bad++; why.push("✗ 영업이익 3년 감소"); } }
+    if (F.revG != null) { if (F.revG > 0.05) { good++; why.push("✓ 매출 최근 3개 연도 연 " + corePct(F.revG, 0)); } else if (F.revG < 0) { bad++; why.push("✗ 매출 3년 감소"); } else why.push("– 매출 정체"); }
+    if (F.opG != null && !F.opNeg) { if (F.opG > 0.05) { good++; why.push("✓ 영업이익 최근 3개 연도 연 " + corePct(F.opG, 0)); } else if (F.opG < 0) { bad++; why.push("✗ 영업이익 3년 감소"); } }
     if (F.roe != null) { if (F.roe >= 10) { good++; why.push("✓ ROE " + F.roe.toFixed(1) + "%"); } else why.push("– ROE " + F.roe.toFixed(1) + "% (10% 미만)"); }
     if (F.margin != null && F.margin >= 0.15) { good++; why.push("✓ 영업이익률 " + Math.round(F.margin * 100) + "%"); }
   }
@@ -172,7 +176,7 @@ function coreIssues() { var out = []; try { var iss = (typeof briefState !== "un
 /* ---------- ③ 프롬프트 · 답 ---------- */
 function coreText() {
   var L = [], E = CORE.ess || [], V = coreVars(), G = coreGroups();
-  L.push("[본질 — 묶음별 장기 숫자]  이름 | 연수익 3년/5년/10년 | 1년 | 아무 날 사서 1년 뒤: 플러스 확률·중앙값·최악 (최근 10년) | 고점 대비 | 역대 최대 낙폭 | -20% 낙폭 수(미회복) · 회복 보통/최장 | 200일선 | 52주 위치(0=저점,100=고점) | 연변동성 | (종목) 매출·영업이익 3년 연증가율 · 영업이익률 · ROE · PER · PBR · 배당 | 규칙 판정(좋음/나쁨 수)");
+  L.push("[본질 — 묶음별 장기 숫자]  이름 | 연수익 3년/5년/10년 | 1년 | 아무 날 사서 1년 뒤: 플러스 확률·중앙값·최악 (최근 10년) | 고점 대비 | 역대 최대 낙폭 | -20% 낙폭 수(미회복) · 회복 보통/최장 | 200일선 | 52주 위치(0=저점,100=고점) | 연변동성 | (종목) 매출·영업이익 연증가율(최근 3개 회계연도 사이, 2년 구간) · 영업이익률 · ROE · PER · PBR · 배당 | 규칙 판정(좋음/나쁨 수)");
   G.forEach(function (g) { L.push("· " + g.g); g.syms.forEach(function (s) { var x = E.filter(function (e) { return e.sym === s; })[0]; if (!x) return; var l = x.L, f = x.F; L.push("- " + x.name + "(" + x.sym + ") | " + (l ? corePct(l.c3, 1) + "/" + corePct(l.c5, 1) + "/" + corePct(l.c10, 1) + " | " + corePct(l.ret1, 1) + " | " + (l.f1 ? Math.round(l.f1.win * 100) + "% · " + corePct(l.f1.med, 0) + " · 최악 " + corePct(l.f1.worst, 0) : "-") + " | " + corePct(l.cur, 1) + " | " + corePct(l.worst, 0) + (l.worstY ? "(" + l.worstY + ")" : "") + " | " + l.dd20 + "(" + l.dd20open + ") · " + (l.recMed ? Math.round(l.recMed / 30) + "개월/" + Math.round(l.recMax / 30) + "개월" : "-") + " | " + (l.above200 == null ? "-" : (l.above200 ? "위 " : "아래 ") + corePct(l.vs200, 1)) + " | " + (l.pos52 == null ? "-" : Math.round(l.pos52 * 100)) + " | " + (l.vol == null ? "-" : Math.round(l.vol * 100) + "%") : "장기 자료 없음") + (f ? " | 매출 " + corePct(f.revG, 0) + " · 영업이익 " + corePct(f.opG, 0) + (f.opNeg ? "(적자)" : "") + " · 영업이익률 " + (f.margin == null ? "-" : Math.round(f.margin * 100) + "%") + " · ROE " + (f.roe == null ? "-" : f.roe) + " · PER " + (f.per == null ? "-" : f.per) + " · PBR " + (f.pbr == null ? "-" : f.pbr) + " · 배당 " + (f.divY == null ? "-" : f.divY + "%") : "") + " | " + x.V.t + "(" + x.V.good + "/" + x.V.bad + ")"); }); });
   L.push("", "[변수 — 매크로 조건]  조건 | 지금 켜짐? | 지금 값 | 과거 발생 n번 → 코스피 1년 뒤 중앙값/승률");
   V.forEach(function (v) { L.push("- " + v.name + " | " + (v.on ? "켜짐" : v.warn ? "주의" : "꺼짐") + " | " + v.now + (v.y1 ? " | " + v.n + "번 → " + corePct(v.y1.med, 0) + " / 승률 " + Math.round(v.y1.win * 100) + "%" : "")); });
@@ -203,12 +207,12 @@ function coreSave(J, raw) { var rec = { day: smKstDay(), at: Date.now(), j: J, r
 function coreLoadAns() { try { var r = JSON.parse(localStorage.getItem("sm.core") || "null"); if (r && r.j) CORE.ans = r; } catch (e) {} if (!CORE.ans && typeof smKvGet === "function") smKvGet("cfg:core:last").then(function (r) { if (r && r.j && !CORE.ans) { CORE.ans = r; if (currentTab === "core") renderCore(); } }); }
 /* ---------- 화면 ---------- */
 var CORE_ST = { good: ["우상향 유지", "#1d7f55"], mid: ["주의", "#b9600f"], bad: ["훼손", "#c03b3b"], na: ["자료 부족", "#889"] };
-var CORE_COLS = [["판정", "규칙으로 매긴 결론 — 아래 '근거'의 ✓(좋음)·✗(나쁨) 개수로"], ["연수익", "3년/5년/10년, 매년 평균 몇 % 늘었나(복리). 7% 이상이면 10년에 두 배"], ["1년 뒤", "최근 10년 동안 '아무 날이나 사서 1년 들고 있었다면' 플러스였던 비율 · 중앙값 · 최악 — 본질이 좋은 자산은 70% 이상"], ["낙폭", "고점 대비 지금 몇 % 아래인지 · 역대 최대 낙폭(연도)"], ["회복", "-20% 넘게 빠진 적이 몇 번이고 모두 회복했는지 · 회복에 보통 몇 개월"], ["200일선", "최근 200일 평균 가격 — 위면 추세 유지, 아래면 쉬는 중"], ["52주 위치", "1년 중 최저가 0 ~ 최고가 100 사이 지금 자리"], ["본질(종목)", "매출·영업이익 3년 연평균 증가율 · 영업이익률 · ROE(자기자본 대비 이익) · PER(이익 대비 가격) · PBR(장부가 대비 가격) · 배당률"]];
+var CORE_COLS = [["판정", "규칙으로 매긴 결론 — 아래 '근거'의 ✓(좋음)·✗(나쁨) 개수로"], ["연수익", "3년/5년/10년, 매년 평균 몇 % 늘었나(복리). 7% 이상이면 10년에 두 배"], ["1년 뒤", "최근 10년 동안 '아무 날이나 사서 1년 들고 있었다면' 플러스였던 비율 · 중앙값 · 최악 — 본질이 좋은 자산은 70% 이상"], ["낙폭", "고점 대비 지금 몇 % 아래인지 · 역대 최대 낙폭(연도)"], ["회복", "-20% 넘게 빠진 적이 몇 번이고 모두 회복했는지 · 회복에 보통 몇 개월"], ["200일선", "최근 200일 평균 가격 — 위면 추세 유지, 아래면 쉬는 중"], ["52주 위치", "1년 중 최저가 0 ~ 최고가 100 사이 지금 자리"], ["본질(종목)", "매출·영업이익 연평균 증가율(최근 3개 회계연도 사이 = 2년 구간) · 영업이익률 · ROE(자기자본 대비 이익) · PER(이익 대비 가격) · PBR(장부가 대비 가격) · 배당률"]];
 function coreEssHtml() {
   var E = CORE.ess; if (!E) return '<div class="briefDim">장기 데이터를 계산하는 중… (10년치 시세 · 종목 재무 — 처음엔 30초쯤)</div>';
   var g = E.filter(function (x) { return x.V.st === "good"; }).length, by = {}; E.forEach(function (x) { by[x.sym] = x; });
   var h = '<div class="coreSum"><b>' + g + '/' + E.length + '</b> 자산이 <i>우상향 유지</i> — 본질이 유지되는 것은 변수가 와도 들고 간다 <button class="chip" data-corehelp="ess">이 표 읽는 법</button></div>' +
-    '<div class="coreHelp" data-help="ess" hidden><ul>' + CORE_COLS.map(function (c) { return '<li><b>' + c[0] + '</b> — ' + c[1] + '</li>'; }).join("") + '<li><b>판정 규칙</b> — 연수익 7%↑ · 1년 뒤 플러스 70%↑ · -20% 낙폭 모두 회복 · 200일선 위 · (종목) 매출·영업이익 3년 연 5%↑ · ROE 10%↑ · 영업이익률 15%↑ 가 ✓. ✓가 셋 미만이면 <i>주의</i>, ✗가 둘 이상이거나 장기 수익이 마이너스·영업적자면 <i>훼손</i>.</li></ul></div>';
+    '<div class="coreHelp" data-help="ess" hidden><ul>' + CORE_COLS.map(function (c) { return '<li><b>' + c[0] + '</b> — ' + c[1] + '</li>'; }).join("") + '<li><b>판정 규칙</b> — 연수익 7%↑ · 1년 뒤 플러스 70%↑ · -20% 낙폭 모두 회복 · 200일선 위 · (종목) 매출·영업이익 최근 3개 연도 연 5%↑ · ROE 10%↑ · 영업이익률 15%↑ 가 ✓. ✓가 셋 미만이면 <i>주의</i>, ✗가 둘 이상이거나 장기 수익이 마이너스·영업적자면 <i>훼손</i>.</li></ul></div>';
   coreGroups().forEach(function (G) {
     var rows = G.syms.map(function (s) { return by[s]; }).filter(Boolean); if (!rows.length) return;
     h += '<div class="coreGH">' + coreEsc(G.g) + ' <small>' + rows.filter(function (x) { return x.V.st === "good"; }).length + '/' + rows.length + ' 유지</small></div><div class="coreTW"><table class="coreT"><thead><tr><th>자산</th><th title="' + CORE_COLS[0][1] + '">판정 <i>?</i></th><th title="' + CORE_COLS[1][1] + '">연수익 3/5/10년 <i>?</i></th><th>최근 1년</th><th title="' + CORE_COLS[2][1] + '">아무 날 사서 1년 뒤<br>+확률 · 중앙값 · 최악 <i>?</i></th><th title="' + CORE_COLS[3][1] + '">낙폭<br>지금 · 역대 최대 <i>?</i></th><th title="' + CORE_COLS[4][1] + '">-20% 회복 <i>?</i></th><th title="' + CORE_COLS[5][1] + '">200일선 <i>?</i></th><th title="' + CORE_COLS[6][1] + '">52주 위치 <i>?</i></th><th title="' + CORE_COLS[7][1] + '">장사는 잘되나 (종목) <i>?</i></th></tr></thead><tbody>' +

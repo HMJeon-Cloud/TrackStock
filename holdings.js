@@ -225,7 +225,7 @@ function renderHoldingsBody(H, groups, syms) {
   var fx = hState.fx;
   var fxNow = fx ? fx.rates[fx.rates.length - 1] : null;
   var list = [], totalCost = 0, totalVal = 0, totalReal = 0, totalInvested = 0, flows = [];
-  var missingFx = false;
+  var missingFx = false, noPxList = [];
 
   syms.forEach(function (s) {
     var rows = hState.series[s] || [];
@@ -234,13 +234,12 @@ function renderHoldingsBody(H, groups, syms) {
     var pos = positionFromLots(groups[s]);
     var last = rows.length ? rows[rows.length - 1] : null;
     var rate = krw ? 1 : (fxNow || 1);
-    var val = last ? pos.qty * last.c * rate : 0;
+    /* v12.91 시세나 환율을 못 읽은 종목은 매입 금액으로 넣는다(전엔 0원 = -100% 손실, 또는 1달러=1원으로 계산) */
+    var noPx = !last || (!krw && !fxNow); if (noPx) noPxList.push(typeof cmpLabel === "function" ? cmpLabel(s) : s);
+    var val = noPx ? pos.costK : pos.qty * last.c * rate;
 
     // 이 종목의 과거 최대 낙폭 (조회 가능한 전 기간)
-    var mdd = 0;
-    if (rows.length > 30 && typeof drawdownEpisodes === "function") {
-      drawdownEpisodes(rows, 0.05).forEach(function (e) { if (e.dd < mdd) mdd = e.dd; });
-    }
+    var mdd = rows.length > 30 && typeof trueMaxDd === "function" ? trueMaxDd(rows) : 0;
     var peak = 0;
     rows.forEach(function (r) { if (r.c > peak) peak = r.c; });
 
@@ -335,7 +334,7 @@ function renderHoldingsBody(H, groups, syms) {
     lines.push("<b>" + cmpLabel(top.s) + "</b> 한 종목이 전체의 " + (top.val / totalVal * 100).toFixed(0) +
       "%입니다. 이 종목의 하락이 곧 계좌 전체의 하락이 됩니다.");
   }
-  if (missingFx) lines.push("<span style='color:var(--up)'>환율 데이터를 불러오지 못해 해외 자산은 1달러=1원으로 계산됐습니다. 새로고침해 주세요.</span>");
+  if (noPxList.length) lines.push("<span style='color:var(--up)'>시세" + (missingFx ? "·환율" : "") + "을 못 읽은 " + noPxList.length + "종목(" + noPxList.slice(0, 5).join(", ") + ")은 평가 대신 <b>매입 금액</b>으로 넣었어요 — 이 종목의 수익률은 0%로 보여요. 새로고침해 주세요.</span>");
   $("hInsight").innerHTML = lines.length ? "<ul>" + lines.map(function (l) { return "<li>" + l + "</li>"; }).join("") + "</ul>" : "";
 
   renderHoldChart(tl);

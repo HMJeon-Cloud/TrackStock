@@ -64,7 +64,7 @@ function fetchQuote(sym) {
         vsHi: last.c / hi - 1, vsPeak: last.c / peak - 1,
         m1: (function () { var r = returnOverDays(rows, 30); return r ? r.ret : null; })(),
         y1: rows[0] ? last.c / rows[0].c - 1 : null,
-        dd: eps.length ? Math.min.apply(null, eps.map(function (e) { return e.dd; })) : 0,
+        dd: typeof trueMaxDd === "function" ? trueMaxDd(rows) : (eps.length ? Math.min.apply(null, eps.map(function (e) { return e.dd; })) : null),
         date: last.t
       };
       watchState.quotes[sym] = q;

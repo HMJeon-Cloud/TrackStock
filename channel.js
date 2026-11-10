@@ -96,6 +96,7 @@ function chRunSnapshot(btn) {
     btn.disabled = false; btn.innerHTML = old;
     if (j._st !== 200 || j.error) { out.innerHTML = '<span style="color:#b45309">실패: ' + escapeHtml(j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + '</span>'; return; }
     try { var dk = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("sm.chart.") === 0) dk.push(k); } dk.forEach(function (k) { localStorage.removeItem(k); }); } catch (e2) {}   // v12.26 이 기기의 종목 캐시 비우기
+    if (typeof smCacheClear === "function") smCacheClear("snapshot");   // v12.91 모든 화면의 옛 값 비우기
     if (typeof DATA !== "undefined") { DATA.ready = null; DATA.recentPromise = null; DATA.recentData = null; }
     try { if (typeof briefState !== "undefined") briefState.recent = null; if (typeof nbHist !== "undefined") Object.keys(nbHist).forEach(function (k) { delete nbHist[k]; }); } catch (e3) {}   // 이번 접속 안의 옛 값도 비운다
     setTimeout(function () { chUniHeal(j.bench, out); }, 300);   // v12.31 전체 시장 요약 날짜가 다르면 이어서 자동으로 받기
@@ -156,7 +157,7 @@ function chDataGuideHtml() {
     ['<b>애널리스트 답변 저장</b>', '분석 탭 → 프롬프트 복사 → AI 답변 붙여넣기 → 저장', '분석할 때마다 — 쌓일수록 과거 기록·적중률·보정이 정확해짐'],
     ['<b>분석 기록 백업</b>', '분석 탭 ⑥ → 백업 내려받기(JSON)', '월 1회 권장 (서버 최대 500건)'],
     ['<b>글·주제·일정·정책 데이터</b>', '채널 운영 → 글·참고 (주제 은행 · 일정 목록 · 정책 데이터 편집)', '정책·일정이 바뀔 때'],
-    ['<b>Vercel 환경변수·키 갱신</b>', 'Vercel → Settings → Environment Variables → Redeploy', '네이버 구 키 2027-06 만료 · OpenAI 잔액 · DART/ECOS 키는 만료 없음']
+    ['<b>Vercel 환경변수·키 갱신</b>', 'Vercel → Settings → Environment Variables → Redeploy', '키별 만료 규칙과 남은 날은 데이터 센터 ⑥ 키 · 유효기간에서 확인']
   ], ["작업", "어디서", "언제"]);
   h += '<div class="dgIntro" style="margin-top:10px"><b>연동하지 않는 것(의도적)</b>: 미국 10-Q/10-K 원문·실적 발표 PDF·컨퍼런스콜 — 무료 연동이 없거나 용량이 커서 제외. 애널리스트 프롬프트에 "첨부 자료가 있으면 같이 보라"는 문구만 넣어요. 텔레그램·푸시 알림 없음.</div>';
   return h;

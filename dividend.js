@@ -323,7 +323,7 @@ function dvCalRender(pane) {
   var scope = DV.cal.scope, rows = scope === "mine" ? mySyms.map(function (s) { return by[s]; }) : DV.rows.filter(dvOk);
   var krNeed = rows.filter(function (r) { return r.krw && !DV.fund[r.sym]; }).map(function (r) { return r.sym; });
   if (scope === "mine" && krNeed.length && !DV.cal.fetching) { DV.cal.fetching = true; Promise.all(krNeed.slice(0, 20).map(dvFund)).then(function () { DV.cal.fetching = false; if (DV.tab === "cal") renderDiv(); }); }
-  var ev = dvEvents(rows, 12), now = Date.now(), fx = DV.fx || 1350;
+  var ev = dvEvents(rows, 12), now = Date.now(), fx = DV.fx || (typeof smFxAny === "function" ? smFxAny() : null) || 0;   /* v12.91 고정 1,350원 제거 — 환율을 못 읽으면 달러 배당은 합계에서 뺀다 */
   function amt(e) { var q = mine.qty[e.r.sym]; if (!q) return 0; return q * e.a * (e.r.krw ? 1 : fx); }
   var months = []; for (var i = 0; i < 12; i++) months.push({ s: dvMonthStart(now, i), e: dvMonthStart(now, i + 1), list: [], sum: 0 });
   ev.forEach(function (e) { for (var i = 0; i < 12; i++) if (e.t >= months[i].s && e.t < months[i].e) { months[i].list.push(e); months[i].sum += amt(e); break; } });

@@ -235,7 +235,7 @@ function mindAfterStep() {
   var card = $("mindCard"); if (card) window.scrollTo({ top: Math.max(0, card.offsetTop - 70), behavior: "smooth" });
 }
 function mindSendPoll() {
-  var today = new Date().toISOString().slice(0, 10);
+  var today = typeof kstToday === "function" ? kstToday() : new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   try { if (localStorage.getItem("sm.mind.sent") === today) return; localStorage.setItem("sm.mind.sent", today); } catch (e) {}
   var a = mindState.a, t = mindAxes(a).code;
   fetch("/api/poll?m=" + encodeURIComponent((a.m || []).join(",")) + "&s=" + a.s + "&b=" + a.b + "&f=" + a.f + "&q=" + a.q + "&t=" + t).catch(function () {});
