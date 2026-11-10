@@ -57,18 +57,52 @@ async function dealRank(sosok, gubun, type) {
   return { rows: [], err };
 }
 
+/* v12.92 네이버가 증권 화면을 새로 만들면서(2026) 예전 순매매 표 주소가 빈 화면이 됨 → 새 화면이 쓰는 JSON을 먼저 읽는다.
+   한 번 호출에 순매수·순매도 상위가 같이 온다. 금액 단위는 응답에 적혀 있지 않아 '순매매 수량 × 현재가'와 견줘 원/천원/백만원/억원 중 맞는 것을 골라 백만원으로 맞춘다 — 못 고르면 버린다(틀린 단위로 보여 주지 않기 위해). */
+const SN_HEAD = { "User-Agent": UA, Accept: "application/json", Referer: "https://stock.naver.com/" };
+async function getJsonS(url) { const r = await fetchT(url, { headers: SN_HEAD }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+function scaleToMillion(items) {
+  const cand = [1, 1e3, 1e6, 1e8], votes = {};
+  for (const x of items) { const amt = Math.abs(num(x.accTradeAmount) || 0), vol = Math.abs(num(x.accTradeVolume) || 0), px = Math.abs(num(x.nowPrice) || 0); if (!amt || !vol || !px) continue; let best = null, bd = Infinity; for (const c of cand) { const d = Math.abs(Math.log((amt * c) / (vol * px))); if (d < bd) { bd = d; best = c; } } if (bd < Math.log(1.6)) votes[best] = (votes[best] || 0) + 1; }
+  const ks = Object.keys(votes).sort((a, b) => votes[b] - votes[a]); if (!ks.length) return null;
+  const top = +ks[0], total = ks.reduce((a, k) => a + votes[k], 0); return votes[ks[0]] >= Math.max(3, total * 0.7) ? top / 1e6 : null;   // 백만원으로 바꾸는 곱수
+}
+async function dealBoth(mk, inv) {   // mk: KOSPI|KOSDAQ · inv: FOREIGNER|ORGANIZATION
+  const u = "https://stock.naver.com/api/domestic/market/trend/trendForeignOrg?investorType=" + inv + "&tradeType=KRX&marketType=" + mk + "&startIdx=0&pageSize=50&periodType=DAY";
+  try {
+    const j = await getJsonS(u), S = (j && j.sections) || {}, buy = Array.isArray(S.buyRankList) ? S.buyRankList : [], sell = Array.isArray(S.sellRankList) ? S.sellRankList : [];
+    if (!buy.length && !sell.length) return { err: "새 주소 빈 응답" };
+    const k = scaleToMillion(buy.concat(sell)); if (k == null) return { err: "금액 단위를 확인하지 못함" };
+    const row = (x) => { const code = String(x.itemcode || x.itemCode || "").replace(/\D/g, ""); if (code.length !== 6) return null; const a = num(x.accTradeAmount); let ret = num(x.prevChangeRate); const pc = num(x.prevChangePrice); if (ret != null && pc != null && pc < 0 && ret > 0) ret = -ret; if (ret != null && /^(4|5)$|FALL|LOWER/i.test(String(x.type || "")) && ret > 0) ret = -ret;
+      return a == null ? null : { code, name: String(x.itemname || x.itemName || code).slice(0, 30), amt: Math.round(Math.abs(a) * k), price: num(x.nowPrice), ret }; };
+    const d = (buy[0] || sell[0] || {}).bizdateTo, date = d && /^\d{8}$/.test(String(d)) ? String(d).slice(0, 4) + "-" + String(d).slice(4, 6) + "-" + String(d).slice(6, 8) : null;
+    return { buy: buy.map(row).filter(Boolean).slice(0, 20), sell: sell.map(row).filter(Boolean).slice(0, 20), date, src: u };
+  } catch (e) { return { err: "새 주소 " + String(e.message).slice(0, 50) }; }
+}
+
 /* ---------- (3) 지수 수급·상승/하락 종목 수 ---------- */
 function pickNum(text, label) { const m = text.match(new RegExp(label + "[^0-9+\\-−]{0,40}([+\\-−]?[\\d,]+(?:\\.\\d+)?)")); return m ? num(m[1]) : null; }
 async function indexFlow(code) {   // code: KOSPI | KOSDAQ
   const out = { indiv: null, foreign: null, inst: null, up: null, down: null, flat: null, upLimit: null, downLimit: null, amount: null, close: null, ret: null }, tried = [];
+  // 0) v12.92 새 증권 화면의 JSON — 지수 기본(종가·등락률) + 통합(상승/하락 종목 수 · 개인/외국인/기관 순매수)
+  try {
+    const B = "https://stock.naver.com/api/securityFe/api/index/" + code, [bs, ig] = await Promise.all([getJsonS(B + "/basic").catch(() => null), getJsonS(B + "/integration").catch(() => null)]);
+    if (bs) { if (bs.closePrice != null) out.close = num(bs.closePrice); if (bs.fluctuationsRatio != null) { let r = num(bs.fluctuationsRatio); const nm = String(bs.compareToPreviousPrice && (bs.compareToPreviousPrice.name || bs.compareToPreviousPrice.code) || ""); if (r != null && /FALL|LOWER|^(4|5)$/i.test(nm) && r > 0) r = -r; out.ret = r; } if (bs.localTradedAt) out.tradedAt = String(bs.localTradedAt).slice(0, 19); }
+    if (ig) {
+      const ud = ig.upDownStockInfo; if (ud && ud.riseCount != null) { out.up = num(ud.riseCount); out.down = num(ud.fallCount); out.flat = num(ud.steadyCount); out.upLimit = num(ud.upperCount); out.downLimit = num(ud.lowerCount); }
+      const dt = ig.dealTrendInfo, pure = (v) => (v != null && /^[+\-−]?[\d,]+(\.\d+)?$/.test(String(v).trim()) ? num(v) : null);   // 숫자만 있는 값만 인정(조·억 글자가 섞이면 버림)
+      if (dt) { const f = pure(dt.foreignValue), o = pure(dt.institutionalValue), i = pure(dt.personalValue); if (f != null || o != null || i != null) { out.foreign = f; out.inst = o; out.indiv = i; out.unit = "억원"; } }
+      if (out.up != null || out.foreign != null) out.src = B + "/integration";
+    }
+  } catch (e) {}
   // 1) 모바일 JSON 후보 — 키 이름이 맞는 것이 오면 쓴다
-  for (const u of ["https://m.stock.naver.com/api/index/" + code + "/investor?pageSize=1&page=1", "https://m.stock.naver.com/api/index/" + code + "/trend?pageSize=1", "https://m.stock.naver.com/api/index/" + code + "/basic"]) {
+  for (const u of (out.foreign != null && out.up != null) ? [] : ["https://m.stock.naver.com/api/index/" + code + "/investor?pageSize=1&page=1", "https://m.stock.naver.com/api/index/" + code + "/trend?pageSize=1", "https://m.stock.naver.com/api/index/" + code + "/basic"]) {
     try {
       const j = await getJson(u), x = arrOf(j)[0] || j; tried.push(u.split("/").slice(-1)[0].split("?")[0]);
       const f = num(x.foreignerPureBuyQuant || x.foreignPureBuy || x.foreignerNetBuy || x.foreigner), o = num(x.organPureBuyQuant || x.institutionPureBuy || x.organNetBuy || x.organ), i = num(x.individualPureBuyQuant || x.individualPureBuy || x.individualNetBuy || x.individual);
-      if (f != null || o != null || i != null) { out.foreign = f; out.inst = o; out.indiv = i; out.src = u; }
-      if (x.closePrice != null) out.close = num(x.closePrice); if (x.fluctuationsRatio != null) out.ret = num(x.fluctuationsRatio);
-      if (x.upStockCount != null || x.riseCount != null) { out.up = num(x.upStockCount || x.riseCount); out.down = num(x.downStockCount || x.fallCount); out.flat = num(x.flatStockCount || x.steadyCount); }
+      if (out.foreign == null && (f != null || o != null || i != null)) { out.foreign = f; out.inst = o; out.indiv = i; out.src = u; }
+      if (out.close == null && x.closePrice != null) out.close = num(x.closePrice); if (out.ret == null && x.fluctuationsRatio != null) out.ret = num(x.fluctuationsRatio);
+      if (out.up == null && (x.upStockCount != null || x.riseCount != null)) { out.up = num(x.upStockCount || x.riseCount); out.down = num(x.downStockCount || x.fallCount); out.flat = num(x.flatStockCount || x.steadyCount); }
       if (x.accumulatedTradingValue != null) out.amount = num(x.accumulatedTradingValue);
       if (out.foreign != null && out.up != null) break;
     } catch (e) {}
@@ -103,21 +137,32 @@ export async function krHandler(req, res) {
   const [upK, upQ, dnK, dnQ] = await Promise.all([ranking("up", "KOSPI"), ranking("up", "KOSDAQ"), ranking("down", "KOSPI"), ranking("down", "KOSDAQ")]);
   [["up.kospi", upK], ["up.kosdaq", upQ], ["down.kospi", dnK], ["down.kosdaq", dnQ]].forEach(([k, r]) => { if (r.err) miss.push(k + ": " + r.err); else src[k] = r.src; });
   const inv = {};
-  /* v12.91 8번 호출을 한꺼번에(전엔 하나씩 차례로) · 순매도는 '많이 판 순'(절댓값)으로 — 음수로 오는 날 작은 것부터 잘리던 문제 */
-  const combos = []; for (const [name, gubun] of [["foreign", "1000"], ["inst", "9000"]]) for (const type of ["buy", "sell"]) combos.push([name, gubun, type]);
-  const got = await Promise.all(combos.map(([name, gubun, type]) => Promise.all([dealRank("01", gubun, type), dealRank("02", gubun, type)])));
-  combos.forEach(([name, gubun, type], i) => {
-    const [a, b] = got[i]; inv[name] = inv[name] || {};
-    inv[name][type] = a.rows.map((x) => Object.assign({ mk: "kospi" }, x)).concat(b.rows.map((x) => Object.assign({ mk: "kosdaq" }, x))).sort((p, q) => Math.abs(q.amt || 0) - Math.abs(p.amt || 0)).slice(0, 20);
-    if (!inv[name][type].length) miss.push("investor." + name + "." + type + ": " + (a.err || b.err || "없음")); else src["investor." + name + "." + type] = a.src || b.src;
-  });
+  let invDate = null;
+  const pairs = [["foreign", "1000", "FOREIGNER"], ["inst", "9000", "ORGANIZATION"]];
+  const nb = await Promise.all(pairs.map(([name, gubun, code]) => Promise.all([dealBoth("KOSPI", code), dealBoth("KOSDAQ", code)])));
+  for (let i = 0; i < pairs.length; i++) {
+    const [name, gubun] = pairs[i], [a, b] = nb[i]; inv[name] = {};
+    for (const type of ["buy", "sell"]) {
+      let ra = a[type], rb = b[type], sA = a.src, sB = b.src, eA = a.err, eB = b.err;
+      if (!ra || !rb) {   // 새 주소가 안 되면 예전 표 주소로 한 번 더
+        const [oa, ob] = await Promise.all([ra ? null : dealRank("01", gubun, type), rb ? null : dealRank("02", gubun, type)]);
+        if (oa) { ra = oa.rows; sA = oa.src; eA = (eA ? eA + " / " : "") + (oa.err || ""); } if (ob) { rb = ob.rows; sB = ob.src; eB = (eB ? eB + " / " : "") + (ob.err || ""); }
+      }
+      inv[name][type] = (ra || []).map((x) => Object.assign({ mk: "kospi" }, x)).concat((rb || []).map((x) => Object.assign({ mk: "kosdaq" }, x))).sort((p, q) => Math.abs(q.amt || 0) - Math.abs(p.amt || 0)).slice(0, 20);
+      if (!inv[name][type].length) miss.push("investor." + name + "." + type + ": " + (eA || eB || "없음")); else src["investor." + name + "." + type] = sA || sB;
+    }
+    if (a.date || b.date) invDate = a.date || b.date;
+  }
   const [ik, iq] = await Promise.all([indexFlow("KOSPI"), indexFlow("KOSDAQ")]);
   [["index.kospi", ik], ["index.kosdaq", iq]].forEach(([k, x]) => { if (x.foreign == null && x.up == null) miss.push(k + ": " + (x.err || "읽지 못함")); else src[k] = x.src; });
   /* v12.91 이 자료가 '며칠 장'의 것인지 · 장중인지 — 화면이 앱 종가 날짜와 다르면 쓰지 않도록 */
   const kn = new Date(Date.now() + 9 * 3600e3), dow = kn.getUTCDay(), mins = kn.getUTCHours() * 60 + kn.getUTCMinutes(), wk = dow >= 1 && dow <= 5;
   const prevWk = () => { const d = new Date(kn.getTime()); do { d.setUTCDate(d.getUTCDate() - 1); } while (d.getUTCDay() === 0 || d.getUTCDay() === 6); return d.toISOString().slice(0, 10); };
-  const tradeDay = wk && mins >= 9 * 60 ? day : prevWk(), live = wk && mins >= 9 * 60 && mins < 15 * 60 + 45;
-  const doc = { ok: true, day, tradeDay, live, at: Date.now(), up: { kospi: upK.rows, kosdaq: upQ.rows }, down: { kospi: dnK.rows, kosdaq: dnQ.rows }, investor: inv, index: { kospi: ik, kosdaq: iq }, src, miss };
+  const ixDay = (ik.tradedAt || iq.tradedAt || "").slice(0, 10);
+  const tradeDay = /^\d{4}-\d{2}-\d{2}$/.test(ixDay) ? ixDay : invDate || (wk && mins >= 9 * 60 ? day : prevWk()), live = wk && mins >= 9 * 60 && mins < 15 * 60 + 45;
+  const liveNow = live && tradeDay === day;   // 평일 휴장일에는 장중이 아님
+  if (invDate && invDate !== tradeDay) miss.push("investor: 순매매 자료는 " + invDate + " 장 (지수는 " + tradeDay + ")");
+  const doc = { ok: true, day, tradeDay, invDate, live: liveNow, at: Date.now(), up: { kospi: upK.rows, kosdaq: upQ.rows }, down: { kospi: dnK.rows, kosdaq: dnQ.rows }, investor: inv, index: { kospi: ik, kosdaq: iq }, src, miss };
   if (rc) { try { await setJsonGz(rc, key, doc, 2 * 86400); } catch (e) {} }
   return res.status(200).json(doc);
 }
