@@ -57,27 +57,44 @@ async function dealRank(sosok, gubun, type) {
   return { rows: [], err };
 }
 
-/* v12.92 네이버가 증권 화면을 새로 만들면서(2026) 예전 순매매 표 주소가 빈 화면이 됨 → 새 화면이 쓰는 JSON을 먼저 읽는다.
-   한 번 호출에 순매수·순매도 상위가 같이 온다. 금액 단위는 응답에 적혀 있지 않아 '순매매 수량 × 현재가'와 견줘 원/천원/백만원/억원 중 맞는 것을 골라 백만원으로 맞춘다 — 못 고르면 버린다(틀린 단위로 보여 주지 않기 위해). */
+/* v12.92 네이버가 증권 화면을 새로 만들면서(2026) 예전 순매매 표 주소가 빈 화면이 됨 → 새 화면이 쓰는 JSON을 먼저 읽는다. 한 번 호출에 순매수·순매도 상위가 같이 온다.
+   v12.93 단위 맞추기: 응답에 단위가 적혀 있지 않다. 그래서 앱이 이미 가진 같은 날 일봉(sm:recent의 거래량·종가)과 견줘
+   ① 수량 단위(주/천주)를 '당일 거래량'으로 정하고 ② 금액 단위(원/천원/백만원/억원)를 '순매매 수량 × 종가'로 정한다. 정하지 못하면 버리고, 이유에 실제 숫자 예시를 남긴다. */
 const SN_HEAD = { "User-Agent": UA, Accept: "application/json", Referer: "https://stock.naver.com/" };
 async function getJsonS(url) { const r = await fetchT(url, { headers: SN_HEAD }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
-function scaleToMillion(items) {
-  const cand = [1, 1e3, 1e6, 1e8], votes = {};
-  for (const x of items) { const amt = Math.abs(num(x.accTradeAmount) || 0), vol = Math.abs(num(x.accTradeVolume) || 0), px = Math.abs(num(x.nowPrice) || 0); if (!amt || !vol || !px) continue; let best = null, bd = Infinity; for (const c of cand) { const d = Math.abs(Math.log((amt * c) / (vol * px))); if (d < bd) { bd = d; best = c; } } if (bd < Math.log(1.6)) votes[best] = (votes[best] || 0) + 1; }
-  const ks = Object.keys(votes).sort((a, b) => votes[b] - votes[a]); if (!ks.length) return null;
-  const top = +ks[0], total = ks.reduce((a, k) => a + votes[k], 0); return votes[ks[0]] >= Math.max(3, total * 0.7) ? top / 1e6 : null;   // 백만원으로 바꾸는 곱수
-}
-async function dealBoth(mk, inv) {   // mk: KOSPI|KOSDAQ · inv: FOREIGNER|ORGANIZATION
+async function dealRaw(mk, inv) {   // mk: KOSPI|KOSDAQ · inv: FOREIGNER|ORGANIZATION
   const u = "https://stock.naver.com/api/domestic/market/trend/trendForeignOrg?investorType=" + inv + "&tradeType=KRX&marketType=" + mk + "&startIdx=0&pageSize=50&periodType=DAY";
   try {
     const j = await getJsonS(u), S = (j && j.sections) || {}, buy = Array.isArray(S.buyRankList) ? S.buyRankList : [], sell = Array.isArray(S.sellRankList) ? S.sellRankList : [];
     if (!buy.length && !sell.length) return { err: "새 주소 빈 응답" };
-    const k = scaleToMillion(buy.concat(sell)); if (k == null) return { err: "금액 단위를 확인하지 못함" };
-    const row = (x) => { const code = String(x.itemcode || x.itemCode || "").replace(/\D/g, ""); if (code.length !== 6) return null; const a = num(x.accTradeAmount); let ret = num(x.prevChangeRate); const pc = num(x.prevChangePrice); if (ret != null && pc != null && pc < 0 && ret > 0) ret = -ret; if (ret != null && /^(4|5)$|FALL|LOWER/i.test(String(x.type || "")) && ret > 0) ret = -ret;
-      return a == null ? null : { code, name: String(x.itemname || x.itemName || code).slice(0, 30), amt: Math.round(Math.abs(a) * k), price: num(x.nowPrice), ret }; };
-    const d = (buy[0] || sell[0] || {}).bizdateTo, date = d && /^\d{8}$/.test(String(d)) ? String(d).slice(0, 4) + "-" + String(d).slice(4, 6) + "-" + String(d).slice(6, 8) : null;
-    return { buy: buy.map(row).filter(Boolean).slice(0, 20), sell: sell.map(row).filter(Boolean).slice(0, 20), date, src: u };
+    const d = String((buy[0] || sell[0] || {}).bizdateTo || "");
+    return { buy, sell, biz: /^\d{8}$/.test(d) ? d : null, mk, src: u };
   } catch (e) { return { err: "새 주소 " + String(e.message).slice(0, 50) }; }
+}
+function vote(pairs, cands, tol, minN) {   // pairs: [실제값, 응답값] → 응답값 × 곱수 ≈ 실제값 이 되는 곱수
+  const v = {}; let n = 0;
+  for (const [real, raw] of pairs) { if (!(real > 0) || !(raw > 0)) continue; let best = null, bd = Infinity; for (const c of cands) { const d = Math.abs(Math.log((raw * c) / real)); if (d < bd) { bd = d; best = c; } } if (bd < Math.log(tol)) { v[best] = (v[best] || 0) + 1; n++; } }
+  const ks = Object.keys(v).sort((a, b) => v[b] - v[a]); return ks.length && v[ks[0]] >= Math.max(minN, n * 0.75) ? +ks[0] : null;
+}
+async function dealUnits(rc, raws) {
+  const items = [], biz = (raws.find((r) => r && r.biz) || {}).biz; raws.forEach((r) => { if (r && !r.err) r.buy.concat(r.sell).forEach((x) => items.push({ x, mk: r.mk })); });
+  if (!items.length) return { err: "자료 없음" };
+  const ex = (() => { const it = items[0].x; return "예: " + String(it.itemname || "").slice(0, 10) + " 금액 " + it.accTradeAmount + " · 수량 " + it.accTradeVolume + " · 거래량 " + it.dailyTradeVolume + " · 가격 " + it.nowPrice; })();
+  let recent = null; if (rc) { try { const t = await getJsonGzText(rc, "sm:recent"); if (t) recent = JSON.parse(t); } catch (e) {} }
+  if (!recent || !recent.symbols || !biz) return { err: "단위 대조용 일봉을 못 읽음 (" + ex + ")" };
+  const bar = (code, mk) => { const d = recent.symbols[code + (mk === "KOSDAQ" ? ".KQ" : ".KS")] || recent.symbols[code + ".KS"] || recent.symbols[code + ".KQ"]; if (!d || !d.t) return null; for (let i = d.t.length - 1; i >= 0 && i >= d.t.length - 12; i--) { const ms = d.t[i] < 1e11 ? d.t[i] * 1000 : d.t[i]; if (new Date(ms + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "") === biz) return { v: d.v && d.v[i], c: d.c && d.c[i] }; } return null; };
+  const vp = [], rows = [];
+  for (const { x, mk } of items) { const code = String(x.itemcode || x.itemCode || "").replace(/\D/g, ""), b = bar(code, mk); if (!b) continue; rows.push({ x, b }); vp.push([b.v, Math.abs(num(x.dailyTradeVolume) || 0)]); }
+  if (rows.length < 2) return { err: "대조할 종목이 일봉에 없음 (" + ex + ")" };
+  const volMul = vote(vp, [1, 1e3], 3, 2); if (volMul == null) return { err: "수량 단위를 확인하지 못함 (" + ex + " · 그날 실제 거래량 " + rows[0].b.v + ")" };
+  const ap = []; for (const { x, b } of rows) { const q = Math.abs(num(x.accTradeVolume) || 0), a = Math.abs(num(x.accTradeAmount) || 0); if (q >= 20 && a > 0 && b.c > 0) ap.push([q * volMul * b.c, a]); }
+  const amtMul = vote(ap, [1, 1e3, 1e6, 1e8], 2.5, 2); if (amtMul == null) return { err: "금액 단위를 확인하지 못함 (" + ex + " · 그날 종가 " + rows[0].b.c + ")" };
+  return { k: amtMul / 1e6, unit: (volMul === 1e3 ? "천주" : "주") + "·" + ({ 1: "원", 1e3: "천원", 1e6: "백만원", 1e8: "억원" })[amtMul], n: rows.length };
+}
+function dealRow(x, k) {
+  const code = String(x.itemcode || x.itemCode || "").replace(/\D/g, ""); if (code.length !== 6) return null; const a = num(x.accTradeAmount); if (a == null) return null;
+  let ret = num(x.prevChangeRate); const pc = num(x.prevChangePrice); if (ret != null && pc != null && pc < 0 && ret > 0) ret = -ret; if (ret != null && /^(4|5)$|FALL|LOWER/i.test(String(x.type || "")) && ret > 0) ret = -ret;
+  return { code, name: String(x.itemname || x.itemName || code).slice(0, 30), amt: Math.round(Math.abs(a) * k), price: num(x.nowPrice), ret };
 }
 
 /* ---------- (3) 지수 수급·상승/하락 종목 수 ---------- */
@@ -138,12 +155,13 @@ export async function krHandler(req, res) {
   [["up.kospi", upK], ["up.kosdaq", upQ], ["down.kospi", dnK], ["down.kosdaq", dnQ]].forEach(([k, r]) => { if (r.err) miss.push(k + ": " + r.err); else src[k] = r.src; });
   const inv = {};
   let invDate = null;
-  const pairs = [["foreign", "1000", "FOREIGNER"], ["inst", "9000", "ORGANIZATION"]];
-  const nb = await Promise.all(pairs.map(([name, gubun, code]) => Promise.all([dealBoth("KOSPI", code), dealBoth("KOSDAQ", code)])));
+  const pairs = [["foreign", "9000", "FOREIGNER"], ["inst", "1000", "ORGANIZATION"]];   // 예전 표 주소의 구분값: 9000 외국인 · 1000 기관(전엔 서로 바뀌어 있었음)
+  const raws = await Promise.all([dealRaw("KOSPI", "FOREIGNER"), dealRaw("KOSDAQ", "FOREIGNER"), dealRaw("KOSPI", "ORGANIZATION"), dealRaw("KOSDAQ", "ORGANIZATION")]);
+  const U = raws.some((r) => !r.err) ? await dealUnits(rc, raws) : { err: (raws[0] && raws[0].err) || "새 주소 실패" };
   for (let i = 0; i < pairs.length; i++) {
-    const [name, gubun] = pairs[i], [a, b] = nb[i]; inv[name] = {};
+    const [name, gubun] = pairs[i], a = raws[i * 2], b = raws[i * 2 + 1]; inv[name] = {};
     for (const type of ["buy", "sell"]) {
-      let ra = a[type], rb = b[type], sA = a.src, sB = b.src, eA = a.err, eB = b.err;
+      let ra = !U.err && !a.err ? a[type].map((x) => dealRow(x, U.k)).filter(Boolean) : null, rb = !U.err && !b.err ? b[type].map((x) => dealRow(x, U.k)).filter(Boolean) : null, sA = a.src, sB = b.src, eA = U.err || a.err, eB = U.err || b.err;
       if (!ra || !rb) {   // 새 주소가 안 되면 예전 표 주소로 한 번 더
         const [oa, ob] = await Promise.all([ra ? null : dealRank("01", gubun, type), rb ? null : dealRank("02", gubun, type)]);
         if (oa) { ra = oa.rows; sA = oa.src; eA = (eA ? eA + " / " : "") + (oa.err || ""); } if (ob) { rb = ob.rows; sB = ob.src; eB = (eB ? eB + " / " : "") + (ob.err || ""); }
@@ -151,8 +169,9 @@ export async function krHandler(req, res) {
       inv[name][type] = (ra || []).map((x) => Object.assign({ mk: "kospi" }, x)).concat((rb || []).map((x) => Object.assign({ mk: "kosdaq" }, x))).sort((p, q) => Math.abs(q.amt || 0) - Math.abs(p.amt || 0)).slice(0, 20);
       if (!inv[name][type].length) miss.push("investor." + name + "." + type + ": " + (eA || eB || "없음")); else src["investor." + name + "." + type] = sA || sB;
     }
-    if (a.date || b.date) invDate = a.date || b.date;
+    const bz = a.biz || b.biz; if (bz && !U.err) invDate = bz.slice(0, 4) + "-" + bz.slice(4, 6) + "-" + bz.slice(6, 8);
   }
+  if (!U.err) src["investor.unit"] = U.unit + " (일봉 " + U.n + "종목과 대조)";
   const [ik, iq] = await Promise.all([indexFlow("KOSPI"), indexFlow("KOSDAQ")]);
   [["index.kospi", ik], ["index.kosdaq", iq]].forEach(([k, x]) => { if (x.foreign == null && x.up == null) miss.push(k + ": " + (x.err || "읽지 못함")); else src[k] = x.src; });
   /* v12.91 이 자료가 '며칠 장'의 것인지 · 장중인지 — 화면이 앱 종가 날짜와 다르면 쓰지 않도록 */
@@ -161,7 +180,6 @@ export async function krHandler(req, res) {
   const ixDay = (ik.tradedAt || iq.tradedAt || "").slice(0, 10);
   const tradeDay = /^\d{4}-\d{2}-\d{2}$/.test(ixDay) ? ixDay : invDate || (wk && mins >= 9 * 60 ? day : prevWk()), live = wk && mins >= 9 * 60 && mins < 15 * 60 + 45;
   const liveNow = live && tradeDay === day;   // 평일 휴장일에는 장중이 아님
-  if (invDate && invDate !== tradeDay) miss.push("investor: 순매매 자료는 " + invDate + " 장 (지수는 " + tradeDay + ")");
   const doc = { ok: true, day, tradeDay, invDate, live: liveNow, at: Date.now(), up: { kospi: upK.rows, kosdaq: upQ.rows }, down: { kospi: dnK.rows, kosdaq: dnQ.rows }, investor: inv, index: { kospi: ik, kosdaq: iq }, src, miss };
   if (rc) { try { await setJsonGz(rc, key, doc, 2 * 86400); } catch (e) {} }
   return res.status(200).json(doc);

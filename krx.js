@@ -55,7 +55,7 @@ function kxNew(title, sub, page, total, tag) {
   var cv = document.createElement("canvas"); cv.width = KX.W; cv.height = KX.H; var g = cv.getContext("2d"); g.textBaseline = "alphabetic";
   g.fillStyle = KX.paper; g.fillRect(0, 0, KX.W, KX.H); g.fillStyle = KX.ink; g.fillRect(0, 0, KX.W, 112);
   if (typeof cBrandMark === "function") cBrandMark(g, KX.P, 34, 30); cText(g, "우상향연구소", KX.P + 42, 58, 22, 900, "#f3efe6"); cText(g, "UPHILL.LAB", KX.P + 190, 58, 15, 700, KX.gold);
-  cText(g, cDate(Date.now()) + " · " + (tag || "국내 마감"), KX.W - KX.P, 58, 18, 700, "#b9b3a8", "right");
+  cText(g, cDate(KX.dayT || Date.now()) + " · " + (tag || "국내 마감"), KX.W - KX.P, 58, 18, 700, "#b9b3a8", "right");
   cText(g, cFit(g, title, KX.W - KX.P * 2 - 220, 34, 900), KX.P, 94, 34, 900, "#f3efe6");
   if (sub) cText(g, cFit(g, sub, 210, 16, 600), KX.W - KX.P, 94, 16, 600, KX.gold, "right");
   if (total > 1) { var bw = (KX.W - KX.P * 2 - (total - 1) * 6) / total; for (var i = 0; i < total; i++) { g.fillStyle = i < page ? KX.gold : "#3a3f4c"; g.fillRect(KX.P + i * (bw + 6), 104, bw, 4); } }
@@ -127,10 +127,15 @@ function krxNewsDeck() {
 /* ---------- 2) 섹터별 주도주 ---------- */
 /* ---------- 3) 수급 ---------- */
 function krxFlowDeck() {
-  var K = krxData(); if (!K) throw new Error("국내 수급 자료를 쓸 수 없어요 — " + krxWhy(KRX.data || krxCached()));
-  var I = K.investor || {}, ik = K.index && K.index.kospi, iq = K.index && K.index.kosdaq, out = [];
+  /* v12.93 순매매 순위는 그 자체로 한 장짜리 자료라 '자기 날짜'만 맞게 적으면 된다 — 네이버는 장 마감 뒤 저녁까지 전날 순위를 주므로 지수(오늘)와 날짜가 다를 수 있다.
+     지수 수급 한 줄은 순매매 순위와 같은 날이고 장중이 아닐 때만 같이 싣는다. */
+  var K = KRX.data || krxCached(); if (!K) throw new Error("국내 수급 자료를 아직 못 받았어요 — 작업실 ①에서 받기");
+  var invD = K.invDate || K.tradeDay || "", same = !K.tradeDay || (invD === K.tradeDay && !K.live);
+  if (K.live && !K.invDate) throw new Error("지금은 장중이라 마감 순매매가 아니에요 (15:45 이후 다시 받기)");
+  var I = K.investor || {}, ik = same && K.index && K.index.kospi, iq = same && K.index && K.index.kosdaq, out = [];
   var has = function (a, b) { return I[a] && I[a][b] && I[a][b].length; };
   if (!has("foreign", "buy") && !has("inst", "buy")) throw new Error("외국인·기관 순매매 자료를 못 읽었어요 — " + (K.miss || []).filter(function (m) { return /investor/.test(m); }).join(" / "));
+  KX.dayT = invD ? Date.parse(invD + "T00:00:00+09:00") : 0;
   [["buy", "순매수 상위"], ["sell", "순매도 상위"]].forEach(function (t, pi) {
     var c = kxNew("주체별 " + t[1], "외국인 · 기관 (금액 기준)", pi + 1, 2), g = c.g, y0 = c.y;
     // 지수 수급 머리
@@ -145,6 +150,7 @@ function krxFlowDeck() {
     });
     kxFoot(c, "네이버 증권 투자자별 순매매 상위 · ᴷ는 코스닥 · 개인 상위는 제공되지 않아요 · 투자 권유 아님"); out.push({ name: t[0] === "buy" ? "순매수" : "순매도", cv: c.cv });
   });
+  KX.dayT = 0;
   return out;
 }
 /* ---------- 4) 마감 한 장 ---------- */
