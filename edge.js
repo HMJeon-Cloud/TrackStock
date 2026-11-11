@@ -314,3 +314,71 @@ function egAnalogDeck() {
 "@media(max-width:560px){.egTwo{grid-template-columns:1fr}.egAH em{margin-left:0}}",
 "[data-theme=dark] .egBox{background:#161b24;border-color:#263041}[data-theme=dark] .egCell,[data-theme=dark] .egPath,[data-theme=dark] .egHi,[data-theme=dark] .egRoad>div,[data-theme=dark] .egNote,[data-theme=dark] .egMine{background:#1e2533;color:#dde}[data-theme=dark] .egTwo>div{background:#161b24}[data-theme=dark] .egCell>b{color:#9db8ff}"
 ].join(""); document.head.appendChild(st); })();
+
+/* ============================================================
+   v12.94 장기 평균선 이탈 사례 — "200주선(주봉 200) 아래로 내려온 적이 몇 번이었고, 그 뒤 어떻게 됐나"
+   · 이탈 = 평균선 위에 8주 이상 있다가 주봉 종가가 선 아래로 내려온 주 (하루 이틀 스친 것은 세지 않는다)
+   · 끝 = 다시 선 위에서 4주 연속 마감
+   · 사례마다: 이탈 시점 · 선 아래 머문 기간 · 이탈한 가격에서 더 빠진 폭(최저) · 이탈 시점에 샀다면 1·2·3년 뒤
+   · 사례가 5번 미만이면 '확률'이 아니라 '사례 목록'으로만 보여 준다. 레버리지 상품은 따로 경고한다.
+   ============================================================ */
+function egWeekly(rows) { var out = [], k0 = null; for (var i = 0; i < rows.length; i++) { var k = Math.floor((rows[i].t / EG_DAY + 3) / 7); if (k === k0) out[out.length - 1] = rows[i]; else { out.push(rows[i]); k0 = k; } } return out; }
+function egLev(sym) { var n = egName(sym) || ""; return /[23]배|레버리지|인버스|곱버스/.test(n) || /^(SOXL|SOXS|TQQQ|SQQQ|UPRO|SPXL|SPXS|TECL|FNGU|LABU|TNA|NVDL|TSLL|SSO|QLD)$/.test(sym); }
+function egMaBreak(sym, mode) {
+  var rows = typeof nbHist !== "undefined" && nbHist[sym]; if (!rows || rows.length < 400) return null; mode = mode || "w200";
+  var key = "mb:" + mode + ":" + sym + ":" + rows[rows.length - 1].t + ":" + rows.length; if (EG.memo[key] !== undefined) return EG.memo[key];
+  var wk = mode === "w200", S = wk ? egWeekly(rows) : rows, LEN = 200, ARM = wk ? 8 : 40, END = wk ? 4 : 20, n = S.length; if (n < LEN + 20) return (EG.memo[key] = null);
+  var ma = new Array(n), sum = 0; for (var i = 0; i < n; i++) { sum += S[i].c; if (i >= LEN) sum -= S[i - LEN].c; ma[i] = i >= LEN - 1 ? sum / LEN : null; }
+  var last = rows[rows.length - 1], fwd = function (t0, c0, days) { var tt = t0 + days * EG_DAY; if (tt > last.t) return null; var lo = 0, hi = rows.length - 1; while (lo < hi) { var m = (lo + hi) >> 1; if (rows[m].t < tt) lo = m + 1; else hi = m; } return rows[lo].c / c0 - 1; };
+  var eps = [], above = 0, cur = null, back = 0;
+  for (i = LEN - 1; i < n; i++) {
+    var b = S[i].c < ma[i];
+    if (!cur) { if (b && above >= ARM) { cur = { i0: i, t0: S[i].t, c0: S[i].c, lowC: S[i].c, lowT: S[i].t, gap: S[i].c / ma[i] - 1 }; back = 0; } above = b ? 0 : above + 1; }
+    else {
+      if (S[i].c < cur.lowC) { cur.lowC = S[i].c; cur.lowT = S[i].t; } var g = S[i].c / ma[i] - 1; if (g < cur.gap) cur.gap = g;
+      if (!b) { back++; if (back >= END) { cur.t1 = S[i - END + 1].t; eps.push(cur); cur = null; above = END; } } else back = 0;
+    }
+  }
+  if (cur) { cur.open = true; eps.push(cur); }
+  eps.forEach(function (e) { e.ym = egYm(e.t0); e.drop = e.lowC / e.c0 - 1; e.days = Math.round(((e.t1 || last.t) - e.t0) / EG_DAY); e.r1 = fwd(e.t0, e.c0, 365); e.r2 = fwd(e.t0, e.c0, 730); e.r3 = fwd(e.t0, e.c0, 1095); e.lowYm = egYm(e.lowT); });
+  var gapNow = ma[n - 1] ? S[n - 1].c / ma[n - 1] - 1 : null, done = eps.filter(function (e) { return !e.open; }), open = eps.filter(function (e) { return e.open; })[0] || null;
+  return (EG.memo[key] = { sym: sym, name: egName(sym), mode: mode, label: wk ? "200주선" : "200일선", from: egYm(S[LEN - 1].t), years: Math.round((last.t - S[LEN - 1].t) / (365.25 * EG_DAY) * 10) / 10, eps: eps, done: done, open: open, below: gapNow != null && gapNow < 0, gapNow: gapNow, lev: egLev(sym) });
+}
+function egDur(d) { return d < 7 ? "1주 미만" : d >= 60 ? Math.round(d / 30.4) + "개월" : Math.round(d / 7) + "주"; }
+function egMaLine(sym, mode) {
+  var M = egMaBreak(sym, mode); if (!M) return null;
+  var head = "- " + M.name + " · " + M.label + " (" + M.from + "부터 " + M.years + "년치 관찰" + (M.lev ? " · 레버리지 상품" : "") + "): 지금 선 " + (M.below ? "아래" : "위") + " " + egPct(M.gapNow) + " | 과거 이탈 " + M.done.length + "번" + (M.open ? " + 이번(진행 중, " + M.open.ym + " 이탈 · " + egDur(M.open.days) + "째 · 이탈가 대비 최저 " + egPct(M.open.drop) + ")" : "");
+  if (!M.done.length) return head + " | 끝난 사례 없음";
+  return head + " | " + M.done.slice(-6).map(function (e) { return e.ym + " 이탈→" + egDur(e.days) + " 머묾·이탈가에서 최저 " + egPct(e.drop) + "(" + e.lowYm + ")·1년 뒤 " + egPct(e.r1) + "·2년 뒤 " + egPct(e.r2) + "·3년 뒤 " + egPct(e.r3); }).join(" / ") + (M.done.length < 5 ? " | ※ 사례 " + M.done.length + "번뿐 — 확률로 말하지 말 것" : "");
+}
+function egMaHtml(syms, title) {
+  var Ms = []; syms.forEach(function (s) { var w = egMaBreak(s, "w200"); if (w) Ms.push(w); });
+  if (!Ms.length) return "";
+  var h = '<div class="egBox"><div class="egH">' + egEsc(title || "장기 평균선(200주선) 이탈 사례") + ' <small>주봉 종가가 200주 평균 아래로 내려온 때와 그 뒤 — 선 위에 8주 이상 있다가 내려온 것만 세고, 다시 4주 연속 선 위면 끝난 것으로 봐요</small></div>';
+  Ms.forEach(function (M) {
+    var st = M.open ? '<em class="egThin">지금 선 아래 ' + egPct(M.gapNow) + ' · ' + M.open.ym + ' 이탈 · ' + egDur(M.open.days) + '째</em>' : '<em>지금 선 ' + (M.below ? "아래" : "위") + ' ' + egPct(M.gapNow) + '</em>';
+    h += '<div class="egA"><div class="egAH"><b>' + egEsc(M.name) + '</b><span>' + M.from + '부터 ' + M.years + '년치 · 과거 이탈 ' + M.done.length + '번' + (M.open ? ' + 이번' : '') + '</span>' + st + '</div>';
+    if (M.eps.length) {
+      h += '<div class="dxWrap"><table class="dgT egMaT"><thead><tr><th>이탈 시점</th><th>선 아래 머문 기간</th><th>이탈가에서 더 빠진 폭</th><th>1년 뒤</th><th>2년 뒤</th><th>3년 뒤</th></tr></thead><tbody>' + M.eps.map(function (e) { var c = function (v) { return v == null ? '<span class="briefDim">아직</span>' : '<b class="' + (v >= 0 ? "up" : "dn") + '">' + egPct(v) + '</b>'; }; return '<tr' + (e.open ? ' class="egNow"' : '') + '><td><b>' + e.ym + '</b>' + (e.open ? ' <small>이번 · 진행 중</small>' : '') + '</td><td>' + egDur(e.days) + (e.open ? '째' : '') + '</td><td><b class="dn">' + egPct(e.drop) + '</b> <small>' + e.lowYm + (e.open ? ' 현재까지' : '') + '</small></td><td>' + c(e.r1) + '</td><td>' + c(e.r2) + '</td><td>' + c(e.r3) + '</td></tr>'; }).join("") + '</tbody></table></div>';
+      var note = [];
+      if (M.done.length) { var wd = Math.min.apply(null, M.done.map(function (e) { return e.drop; })), ld = Math.max.apply(null, M.done.map(function (e) { return e.days; })); note.push('<b>읽는 법</b> — 1·2·3년 뒤는 "선을 깨고 내려온 그 주에 샀다면"의 결과예요. 과거 ' + M.done.length + '번 모두에서 이탈한 가격보다 더 내려간 구간이 있었고, 가장 깊었을 때 ' + egPct(wd) + ', 가장 길었을 때 ' + egDur(ld) + ' 동안 선 아래였어요.'); }
+      if (M.done.length < 5) note.push('<b>사례가 ' + M.done.length + '번뿐</b>이라 "확률"이 아니라 "이런 적이 있었다"로만 봐야 해요. 관찰 기간(' + M.from + '~, ' + M.years + '년)에 없던 종류의 긴 약세장은 이 표에 들어 있지 않아요.');
+      if (M.lev) note.push('<b>레버리지 상품 주의</b> — 하루 수익률의 2~3배를 따라가서, 지수가 오르내리며 제자리로 돌아와도 원금은 줄어요(변동성 손실). 기초 지수가 하루 -33%면 3배 상품은 원금 대부분을 잃을 수 있고, 과거에 회복했다는 사실이 다음에도 회복한다는 뜻은 아니에요. 한 번에 사기보다 "더 빠질 수 있는 폭"을 견딜 금액만 나눠서 보는 근거로 쓰세요.');
+      h += '<div class="egNote">' + note.join('<br>') + '</div>';
+    } else h += '<div class="briefDim">이 기간에 200주선 아래로 내려온 적이 없어요.</div>';
+    h += '</div>';
+  });
+  return h + '</div>';
+}
+/* 프롬프트 · 화면에 끼워 넣기 */
+(function () {
+  var b0 = egBlock; egBlock = function (syms, withPort) {
+    var t = b0.apply(this, arguments), L = []; (syms || []).forEach(function (s) { var a = egMaLine(s, "w200"), d = egMaLine(s, "d200"); if (a) L.push(a); if (d) L.push(d); });
+    var add = ["", "[장기 평균선 이탈 사례 — 앱 계산] 평균선 위에 오래 있다가 종가가 선 아래로 내려온 때(200주선 = 주봉 200개 평균, 200일선 = 일봉 200개 평균)와 그 뒤. 수익률은 '이탈한 그때 샀다면' 기준"];
+    add = add.concat(L.length ? L : ["- 계산할 만큼 긴 일봉이 없음"]);
+    add.push("→ edge.history에 이 사례를 반드시 쓴다: 이탈 뒤 '더 빠진 폭'과 '선 아래 머문 기간'을 먼저, 그다음 1~3년 뒤 결과. 사례 5번 미만이면 확률·승률이라는 말을 쓰지 않는다. 레버리지 상품이면 기초 지수의 같은 시점과 비교하고 변동성 손실 · 상장 이후 기간이 짧다는 점(큰 약세장을 겪지 않았을 수 있음)을 꼭 쓴다. edge.protect에는 '이탈가에서 과거 최대 추가 하락'을 견디는 분할 계획(횟수·간격·한도)을 숫자로.");
+    var mark = "\n=== 예측 · 대응 · 방향 (edge)"; var i = t.indexOf(mark); return i >= 0 ? t.slice(0, i) + "\n" + add.join("\n") + t.slice(i) : t + "\n" + add.join("\n");
+  };
+  var a0 = egAnalogHtml; egAnalogHtml = function (syms) { var h = a0.apply(this, arguments); try { h += egMaHtml(syms); } catch (e) { console.warn("eg", e); } return h; };
+  var st = document.createElement("style"); st.textContent = ".egMaT td,.egMaT th{text-align:center;font-size:12.5px;padding:7px 8px}.egMaT td:first-child,.egMaT th:first-child{text-align:left}.egMaT b.up{color:#c0392b}.egMaT b.dn{color:#1f5fbf}.egMaT small{color:#6b7686;font-size:11px}.egMaT tr.egNow td{background:#fff6e8}[data-theme=dark] .egMaT tr.egNow td{background:#2a2114}"; document.head.appendChild(st);
+})();
