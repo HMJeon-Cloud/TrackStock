@@ -412,7 +412,7 @@ function egScore(sym) {
   var px = function (v) { return egPx(sym, v); }, needUp = last.c > 0 ? pk / last.c - 1 : null;
   var cur = ddArr[n - 1], eps = drawdownEpisodes(rows, 0.2), closed = eps.filter(function (e) { return e.recoverI != null; }), openEp = eps.filter(function (e) { return e.recoverI == null; })[0] || null;
   var recs = closed.map(function (e) { return (rows[e.recoverI].t - rows[e.peakI].t) / (365.25 * EG_DAY); }).sort(function (a, b) { return a - b; }), recMed = recs.length ? egMed(recs) : null, recMax = recs.length ? recs[recs.length - 1] : null;
-  var cagr = yrsAll >= 3 ? Math.pow(last.c / rows[0].c, 1 / yrsAll) - 1 : null, f3 = typeof coreFwd === "function" ? coreFwd(rows, 3 * 365) : null, f1 = typeof coreFwd === "function" ? coreFwd(rows, 365) : null;
+  var cagr = yrsAll >= 3 ? Math.pow(last.c / rows[0].c, 1 / yrsAll) - 1 : null, f3 = egFwdAll(rows, 3 * 365), f1 = egFwdAll(rows, 365);   // v12.98 전 기간으로(전엔 최근 10년만 세면서 그렇게 적지 않았음)
   /* ① 회복력 */
   var rate = eps.length ? closed.length / eps.length : null;
   cat("res", "회복력 — 오래 살아남고 위기마다 돌아왔나", "body", 0.6, [
@@ -420,7 +420,7 @@ function egScore(sym) {
     it("큰 하락(-20% 이상) 뒤 회복", eps.length ? closed.length + " / " + eps.length + "번 회복" + (openEp ? " (지금 1번 진행 중)" : "") : "큰 하락 없음", eps.length ? 35 + 65 * (closed.length / eps.length) * Math.min(1, closed.length / 3) : 55, !eps.length ? "큰 하락을 겪은 적이 없어 회복력은 아직 확인되지 않았어요" : closed.length === eps.length ? "큰 하락 " + eps.length + "번을 모두 전고점까지 회복했어요" : openEp && closed.length === eps.length - 1 ? "끝난 하락 " + closed.length + "번은 모두 회복했고, 지금 한 번이 진행 중이에요(" + egPct(openEp.dd) + ")" : "회복하지 못한 하락이 있어요"),
     it("전고점 회복까지 (보통 · 가장 길게)", recMed != null ? (recMed < 1 ? Math.round(recMed * 12) + "개월" : recMed.toFixed(1) + "년") + " · " + (recMax < 1 ? Math.round(recMax * 12) + "개월" : recMax.toFixed(1) + "년") : "-", egStep(recMed, [[1, 100], [2, 80], [4, 55], [99, 30]], true), recMed == null ? "" : recMax >= 5 ? "가장 길 때는 " + recMax.toFixed(1) + "년이 걸렸어요 — 그만큼 기다릴 수 있는 돈이어야 해요" : "회복이 비교적 빨랐어요 — 가장 길 때 " + (recMax < 1 ? Math.round(recMax * 12) + "개월" : recMax.toFixed(1) + "년")),
     it("전 기간 연평균 수익", cagr != null ? egPct(cagr, 1) : "-", egStep(cagr, [[0.12, 100], [0.08, 85], [0.05, 68], [0.02, 50], [0, 35], [-9, 12]]), cagr == null ? "" : cagr >= 0.08 ? "길게 보면 뚜렷한 우상향이에요" : cagr >= 0.02 ? "길게 보면 완만한 우상향이에요" : cagr >= 0 ? "길게 봐도 거의 제자리예요" : "길게 보면 내려왔어요 — 우상향 자산이 아니에요"),
-    it("아무 날 사서 3년 뒤 플러스였던 비율", f3 ? Math.round(f3.win * 100) + "% (최악 " + egPct(f3.worst) + ")" : "-", f3 ? f3.win * 100 : null, !f3 ? "" : f3.win >= 0.85 ? "언제 샀어도 3년 들고 있으면 대부분 플러스였어요" : f3.win >= 0.65 ? "3년을 들고 있어도 3번 중 1번쯤은 손실이었어요" : "3년 보유로도 손실이 잦았어요 — 사는 시점이 중요했던 자산이에요")
+    it("아무 날 사서 3년 뒤 플러스였던 비율 (전 기간)", f3 ? Math.round(f3.win * 100) + "% (" + f3.n + "번 · 최악 " + egPct(f3.worst) + ")" : "-", f3 ? f3.win * 100 : null, !f3 ? "" : f3.win >= 0.85 ? "언제 샀어도 3년 들고 있으면 대부분 플러스였어요" : f3.win >= 0.65 ? "3년을 들고 있어도 3번 중 1번쯤은 손실이었어요" : "3년 보유로도 손실이 잦았어요 — 사는 시점이 중요했던 자산이에요")
   ], lev ? "레버리지 상품이라 회복력 점수를 최대 60점으로 눌렀어요 — 지수는 회복해도 이 상품은 원금이 줄 수 있고(변동성 손실), 하루 급락에 구조적으로 약해요." : coin ? "코인은 이익이 없는 자산이라 '기업 정보' 없이 회복력만으로 체력을 봐요. 기록도 주식보다 짧아요." : "");
   if (lev && cats.length && cats[cats.length - 1].id === "res") cats[cats.length - 1].score = Math.min(60, cats[cats.length - 1].score);
   /* ② 기업 정보 */
@@ -452,7 +452,7 @@ function egScore(sym) {
     D && d1.length >= 3 ? it("200일선 이탈 뒤 1년 (과거)", d1p + " / " + d1.length + "번 플러스", 35 + 60 * (d1p / d1.length), "200일선은 더 자주 깨져서 사례가 많아요 — " + (d1p / d1.length >= 0.7 ? "깨진 뒤에도 1년 뒤엔 대체로 회복했어요" : "깨진 뒤 1년 안에 회복하지 못한 적이 적지 않아요")) : null
   ]);
   /* ⑤ 기술 지표 */
-  var c = rows.map(function (r) { return r.c; }), rsi = typeof rsiWilder === "function" && n > 30 ? rsiWilder(c.slice(-120), 14) : null, avg = function (k) { if (n < k) return null; var s = 0; for (var q = n - k; q < n; q++) s += c[q]; return s / k; }, m20 = avg(20), m60 = avg(60), m200 = avg(200);
+  var c = rows.map(function (r) { return r.c; }), rsi = typeof rsiWilder === "function" && n > 30 ? rsiWilder(c.slice(-300), 14) : null, avg = function (k) { if (n < k) return null; var s = 0; for (var q = n - k; q < n; q++) s += c[q]; return s / k; }, m20 = avg(20), m60 = avg(60), m200 = avg(200);
   var at = function (days) { var tt = last.t - days * EG_DAY, j = n - 1; while (j > 0 && rows[j].t > tt) j--; return rows[j].c; }, r12 = yrsAll >= 1 ? last.c / at(365) - 1 : null, r3 = last.c / at(91) - 1;
   var i1 = n - 1; while (i1 > 0 && rows[i1 - 1].t >= last.t - 365 * EG_DAY) i1--; var rs = []; for (var q2 = Math.max(1, i1); q2 < n; q2++) rs.push(c[q2] / c[q2 - 1] - 1); var mu = rs.reduce(function (a, b) { return a + b; }, 0) / (rs.length || 1), vol = rs.length > 100 ? Math.sqrt(rs.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / rs.length) * Math.sqrt(rs.length) : null;
   var arr = m20 && m60 && m200 ? (m20 > m60 && m60 > m200 ? "정배열" : m20 < m60 && m60 < m200 ? "역배열" : "혼조") : null;
@@ -637,7 +637,7 @@ function egScanRun(onTick) {
   var vix = egEnsure(["^VIX"]), mac = typeof macroEnsure === "function" ? macroEnsure().catch(function () {}) : null;
   var one = function () {
     if (idx >= list.length) return Promise.resolve(); var sym = list[idx++];
-    return egEnsure([sym]).then(function () { try { var r = egScanRow(sym); if (r) rows.push(r); } catch (e) {} if (!had[sym]) { delete nbHist[sym]; Object.keys(EG.memo).forEach(function (k) { if (k.indexOf(":" + sym + ":") > 0 || k.indexOf(sym + ":") === 0) delete EG.memo[k]; }); } EGS.done++; if (onTick) onTick(); }).then(one);
+    return egEnsure([sym]).then(function () { return typeof egSeamLoad === "function" ? egSeamLoad(sym) : null; }).then(function () { try { var r = egScanRow(sym); if (r) rows.push(r); } catch (e) {} if (!had[sym]) { delete nbHist[sym]; Object.keys(EG.memo).forEach(function (k) { if (k.indexOf(":" + sym + ":") > 0 || k.indexOf(sym + ":") === 0) delete EG.memo[k]; }); } EGS.done++; if (onTick) onTick(); }).then(one);
   };
   return Promise.all([vix, mac]).then(function () { var ws = []; for (var i = 0; i < 5; i++) ws.push(one()); return Promise.all(ws); }).then(function () {
     /* 2단계: 체력 · 싼 정도가 좋은 주식 상위 40개만 기업 정보를 받아 다시 계산 (네이버 호출을 아끼려고) */
@@ -670,7 +670,7 @@ function egScanHtml() {
     h += '<div class="egChips">' + FL.map(function (f) { return '<button class="chip' + (EGS.flt === f[0] ? " on" : "") + '" data-egflt="' + f[0] + '">' + f[1] + '</button>'; }).join("") + '<div style="flex:1"></div>' + MK.map(function (m) { return '<button class="chip' + (EGS.mk === m[0] ? " on" : "") + '" data-egmk="' + m[0] + '">' + m[1] + '</button>'; }).join("") + '</div>';
     h += rows.length ? '<div class="dxWrap egScanW"><table class="dgT egScanT"><thead><tr><th>#</th><th>종목</th><th>종합</th><th>체력</th><th>싼 정도</th><th>흐름</th><th>지금 낙폭<br><small>역대 최대</small></th><th>200주선 대비</th><th>큰 하락 회복</th><th>기록</th><th>한 줄 판정</th></tr></thead><tbody>' + rows.slice(0, 60).map(function (r, i) {
       var sc = function (p) { return '<b style="color:' + col(p) + '">' + (p == null ? "-" : p) + '</b>'; };
-      return '<tr data-ansym2="' + egEsc(r.s) + '"><td>' + (i + 1) + '</td><td class="dgName"><b>' + egEsc(r.n) + '</b>' + (r.lev ? ' <small class="dgNo">레버리지</small>' : '') + (r.f ? '' : ' <small class="briefDim" title="기업 정보 없이 회복력만으로 체력을 봤어요">회복력만</small>') + '<br><small>' + egEsc(r.s) + ' · ' + egPx(r.s, r.px) + '</small></td><td>' + sc(r.t) + '</td><td>' + sc(r.b) + '</td><td>' + sc(r.ch) + '</td><td>' + sc(r.tech) + '</td><td><b class="dn">' + egPct(r.cur) + '</b><br><small>' + egPct(r.worst) + '</small></td><td>' + (r.wGap == null ? '-' : '<b class="' + (r.wGap < 0 ? "dn" : "") + '">' + egPct(r.wGap) + '</b>' + (r.wOpen ? '<br><small>이탈 중</small>' : '')) + '</td><td>' + r.rec + '번</td><td>' + r.yrs + '년' + (r.cagr != null ? '<br><small>연 ' + egPct(r.cagr, 1) + '</small>' : '') + '</td><td class="egScanR">' + egEsc(r.read) + '</td></tr>';
+      return '<tr data-ansym2="' + egEsc(r.s) + '"><td>' + (i + 1) + '</td><td class="dgName"><b>' + egEsc(r.n) + '</b>' + (r.lev ? ' <small class="dgNo">레버리지</small>' : '') + (r.q === "bad" ? ' <small class="dgNo" title="' + egEsc(r.qw || "") + '">검증 실패</small>' : r.q === "warn" ? ' <small style="color:#b9600f">검증 주의</small>' : '') + (r.f ? '' : ' <small class="briefDim" title="기업 정보 없이 회복력만으로 체력을 봤어요">회복력만</small>') + '<br><small>' + egEsc(r.s) + ' · ' + egPx(r.s, r.px) + '</small></td><td>' + sc(r.t) + '</td><td>' + sc(r.b) + '</td><td>' + sc(r.ch) + '</td><td>' + sc(r.tech) + '</td><td><b class="dn">' + egPct(r.cur) + '</b><br><small>' + egPct(r.worst) + '</small></td><td>' + (r.wGap == null ? '-' : '<b class="' + (r.wGap < 0 ? "dn" : "") + '">' + egPct(r.wGap) + '</b>' + (r.wOpen ? '<br><small>이탈 중</small>' : '')) + '</td><td>' + r.rec + '번</td><td>' + r.yrs + '년' + (r.cagr != null ? '<br><small>연 ' + egPct(r.cagr, 1) + '</small>' : '') + '</td><td class="egScanR">' + egEsc(r.read) + '</td></tr>';
     }).join("") + '</tbody></table></div><div class="briefDim" style="margin-top:6px">줄을 누르면 그 종목의 평가표 · 이탈 사례 · 프롬프트로 넘어가요. ' + (rows.length > 60 ? "상위 60개만 보여요. " : "") + '기록 3년 미만 종목은 점수 대신 아래 "신규 상장 점검표"로 봐요.</div>' : '<div class="briefDim" style="padding:10px 0">이 조건에 맞는 종목이 오늘은 없어요. 다른 조건을 눌러 보세요.</div>';
     h += '<div class="egNote"><b>이 목록을 쓰는 법</b> — 「튼튼한데 싸진 것」은 체력 65점 이상이면서 MDD · 장기 평균선으로 본 "싼 정도"가 62점 이상인 종목이에요. 여기 올랐다고 사는 게 아니라, ① 줄을 눌러 왜 빠졌는지(평가표 · 이탈 사례) 보고 ② 프롬프트로 Claude에게 배경과 반론을 묻고 ③ 견딜 수 있는 금액과 분할 계획을 정하는 순서예요. 싸진 데에는 늘 이유가 있어요 — 그 이유가 "일시적"인지 "구조적"인지가 판단의 전부예요.</div>';
   }
@@ -780,3 +780,144 @@ function egScanBind(root) {
   };
   var st = document.createElement("style"); st.textContent = ".egNewB .egScT th:nth-child(3){width:64px}.egNewB .dhBadge{white-space:nowrap}"; document.head.appendChild(st);
 })();
+
+/* 아무 날(5거래일 간격) 사서 days 뒤 — 전 기간 */
+function egFwdAll(rows, days) {
+  var n = rows.length, out = [], j = 0; for (var i = 0; i < n; i += 5) { var tt = rows[i].t + days * EG_DAY; if (tt > rows[n - 1].t) break; if (j < i) j = i; while (j < n - 1 && rows[j].t < tt) j++; out.push(rows[j].c / rows[i].c - 1); }
+  if (out.length < 30) return null; var s = out.slice().sort(function (a, b) { return a - b; });
+  return { n: out.length, win: out.filter(function (x) { return x > 0; }).length / out.length, med: s[Math.floor(s.length / 2)], worst: s[0], best: s[s.length - 1] };
+}
+
+/* ============================================================
+   v12.98 데이터 검증 — 분석에 쓰는 숫자를 세 방향으로 확인한다
+   ① 자료 자체: 최신인가 · 날짜가 빠지거나 겹치지 않았나 · 0/빈 값 · 하루 급변(분할 미반영 의심) · 같은 값 반복 · 한 해 봉 수 · 종가가 고가~저가 안인가
+   ② 다른 출처와 대조: 과거 파일 vs 아침 수집 스냅샷(같은 날 종가) · 기업 정보(PER × EPS vs 주가, 영업이익률 vs 영업이익/매출, 실적 연도)
+   ③ 계산 검산: 같은 값을 다른 방법으로 다시 계산해 맞는지(최대 낙폭 · 200주선 · 이탈 사례 수익률 · 점수 합산)
+   결과: 통과 / 주의 / 실패. v12.99: '실패'가 있어도 값은 그대로 보여 주고, 무엇이 실패했는지를 평가표 맨 위와 스캔 줄에 알린다(판단은 사용자가).
+   ============================================================ */
+function egVerify(sym) {
+  var rows = typeof nbHist !== "undefined" && nbHist[sym]; if (!rows || !rows.length) return null;
+  var n = rows.length, last = rows[n - 1], rec = EG.seam && EG.seam[sym] ? 1 : 0, F = typeof CORE !== "undefined" && CORE.fund ? CORE.fund[sym] : null;
+  var key = "vf:" + sym + ":" + last.t + ":" + n + ":" + (rec ? 1 : 0) + ":" + (F ? 1 : 0); if (EG.memo[key] !== undefined) return EG.memo[key];
+  var coin = /-USD$/.test(sym), kr = /\.K[SQ]$|^\^K/.test(sym), lev = egLev(sym), C = [], ymd = function (t) { return new Date(t + (kr || coin ? 9 : -5) * 3600e3).toISOString().slice(0, 10); }, px = function (v) { return egPx(sym, v); };
+  var add = function (g, k, lv, v, t) { C.push({ g: g, k: k, lv: lv, v: v, t: t }); };
+  /* ① 자료 자체 */
+  var lastD = ymd(last.t), exp = coin ? null : typeof dxExpected === "function" ? dxExpected(kr ? "kr" : "us") : null, lag = coin ? Math.floor((Date.now() - last.t) / EG_DAY) : exp ? Math.max(0, Math.round((Date.parse(exp) - Date.parse(lastD)) / EG_DAY)) : 0;
+  add("자료", "최신성", coin ? (lag <= 2 ? "ok" : lag <= 5 ? "warn" : "bad") : lag <= 0 ? "ok" : lag <= 4 ? "warn" : "bad", "마지막 봉 " + lastD + (exp ? " · 있어야 할 날 " + exp : ""), lag <= 0 || (coin && lag <= 2) ? "가장 최근 거래일까지 들어 있어요." : "최근 " + lag + "일치가 비어 있어요 — 지금 가격 · 낙폭 · 평균선 위치가 실제와 다를 수 있어요. 데이터 센터에서 아침 수집을 확인하세요.");
+  var dup = 0, back = 0, bad0 = 0, maxGap = 0, gapAt = 0, jumps = [], flat = 0, flatMax = 0, flatAt = 0, hlBad = 0, hlN = 0, adjBreak = [];
+  for (var i = 0; i < n; i++) {
+    var r = rows[i]; if (!(r.c > 0) || !isFinite(r.c)) bad0++;
+    if (i) { var p = rows[i - 1], dt = r.t - p.t; if (dt === 0) dup++; else if (dt < 0) back++; var gd = dt / EG_DAY; if (gd > maxGap) { maxGap = gd; gapAt = p.t; }
+      if (p.c > 0 && r.c > 0) { var ch = r.c / p.c - 1; if (Math.abs(ch) > (coin || lev ? 0.6 : 0.4)) jumps.push({ t: r.t, v: ch }); if (r.c === p.c) { flat++; if (flat > flatMax) { flatMax = flat; flatAt = r.t; } } else flat = 0;
+        if (r.a > 0 && p.a > 0) { var k1 = (r.a / r.c) / (p.a / p.c); if (k1 > 1.35 || k1 < 0.74) adjBreak.push({ t: r.t, v: k1 }); } } }
+    if (i >= n - 500 && r.h != null && r.l != null && r.h > 0) { hlN++; if (r.c > r.h * 1.005 || r.c < r.l * 0.995 || r.l > r.h) hlBad++; }
+  }
+  add("자료", "날짜 순서 · 중복", dup || back ? "bad" : "ok", dup || back ? "겹친 날 " + dup + " · 거꾸로 된 날 " + back : n.toLocaleString() + "개 봉 모두 순서대로", dup || back ? "같은 날이 두 번 들어가거나 순서가 뒤집혔어요 — 수익률 · 평균선 계산이 틀어져요." : "날짜가 겹치거나 뒤집힌 곳이 없어요.");
+  add("자료", "빈 값 · 0 이하 값", bad0 ? "bad" : "ok", bad0 ? bad0 + "개" : "없음", bad0 ? "가격이 비었거나 0인 날이 있어요 — 낙폭이 -100%처럼 계산될 수 있어요." : "모든 날에 정상 가격이 있어요.");
+  var gapLim = coin ? 4 : 12; add("자료", "가장 긴 빈 구간", maxGap > gapLim * 2.5 ? "bad" : maxGap > gapLim ? "warn" : "ok", Math.round(maxGap) + "일 (" + ymd(gapAt) + " 뒤)", maxGap > gapLim ? "거래가 없는 날이 길게 이어졌어요(거래 정지 · 자료 누락 가능). 이 구간을 지나는 수익률 · 이동평균은 실제와 다를 수 있어요." : "연휴 수준을 넘는 빈 구간이 없어요.");
+  var jl = jumps.slice(-4).map(function (j) { return ymd(j.t) + " " + egPct(j.v); }).join(", ");
+  var splitLike = function (v) { var k = 1 + v; return [2, 3, 4, 5, 10, 20, 0.5, 1 / 3, 0.25, 0.2, 0.1, 0.05].some(function (x) { return Math.abs(k / x - 1) < 0.04; }); }, jBad = jumps.some(function (j) { return last.t - j.t < 3 * 365 * EG_DAY && splitLike(j.v); });
+  add("자료", "하루 급변 (±" + (coin || lev ? 60 : 40) + "% 초과)", jumps.length ? (jBad ? "bad" : "warn") : "ok", jumps.length ? jumps.length + "번: " + jl : "없음", jumps.length ? "하루에 이만큼 움직이는 일은 드물어요 — 액면분할 · 병합이 반영되지 않았거나 잘못된 값일 수 있어요. 이 날짜를 지나는 낙폭 · 수익률은 믿기 어려워요." + (jBad ? " 최근 3년 안에 분할 비율(2·3·5·10배 등)과 딱 맞는 급변이 있어요 — 그 날짜 앞뒤의 가격 기준이 다를 수 있어요." : " 분할 비율과 맞지 않아 실제 급등락일 수 있어요 — 그날 뉴스를 확인하세요.") : "분할 미반영으로 보이는 급변이 없어요.");
+  if (adjBreak.length) add("자료", "수정주가 비율이 끊긴 날", "warn", adjBreak.length + "번: " + adjBreak.slice(-3).map(function (j) { return ymd(j.t); }).join(", "), "배당 · 분할 반영 비율이 하루 사이 크게 바뀌었어요 — 큰 특별배당이나 분할 처리 차이일 수 있어요. 앱은 분할 반영 종가(배당 제외)를 쓰므로 배당이 큰 종목은 장기 수익이 실제(배당 재투자)보다 낮게 나와요.");
+  add("자료", "같은 종가가 이어진 날", flatMax >= 10 ? "bad" : flatMax >= 5 ? "warn" : "ok", flatMax ? flatMax + "일 연속 (" + ymd(flatAt) + "까지)" : "없음", flatMax >= 5 ? "값이 그대로 복사된 것처럼 보이는 구간이 있어요(거래 정지 또는 자료 채움). 변동성 · RSI가 실제보다 낮게 나올 수 있어요." : "값이 복사된 흔적이 없어요.");
+  var i3 = 0; while (i3 < n - 1 && rows[i3].t < last.t - 3 * 365.25 * EG_DAY) i3++; var yrs3 = (last.t - rows[i3].t) / (365.25 * EG_DAY), per = yrs3 > 0.5 ? (n - i3) / yrs3 : null, perOk = per == null ? null : coin ? per >= 350 && per <= 368 : per >= 232 && per <= 262;
+  if (per != null) add("자료", "한 해 봉 수 (최근 3년)", perOk ? "ok" : "warn", Math.round(per) + "개 / 년 (정상 " + (coin ? "약 365" : "약 245~252") + ")", perOk ? "거래일 수가 정상 범위예요." : "한 해 봉 수가 평소와 달라요 — 빠진 날이 있거나 겹친 날이 있을 수 있어요.");
+  if (hlN >= 50) add("자료", "종가가 고가~저가 범위 안", hlBad > hlN * 0.02 ? "warn" : "ok", hlBad + " / " + hlN + "일 벗어남", hlBad > hlN * 0.02 ? "종가가 그날 고가 · 저가 밖에 있는 날이 있어요 — 조정 비율이 종가와 고저에 다르게 적용됐을 수 있어요(종가 기준 계산에는 영향 없음)." : "종가 · 고가 · 저가가 서로 맞아요.");
+  /* ② 다른 출처와 대조 */
+  /* 과거 파일(25년, 며칠에 한 번 새로 받음)과 아침 스냅샷(최근 400일, 매일)은 따로 받은 자료다. 화면에서는 겹치는 구간을 스냅샷으로 덮어 쓰므로,
+     덮이기 전의 과거 파일 원본을 다시 읽어 같은 날 종가를 견준다(egSeamLoad). 분할이 한쪽에만 반영됐으면 여기서 드러난다. */
+  var SE = EG.seam && EG.seam[sym];
+  if (SE && SE.n) add("대조", "과거 파일 vs 아침 수집 스냅샷 (따로 받은 두 자료)", SE.big >= 3 ? "bad" : Math.abs(SE.max) > 0.004 ? "warn" : "ok", "같은 날 " + SE.n + "일 비교 · 최대 차이 " + egPct(SE.max, 2) + (SE.maxD ? " (" + SE.maxD + ")" : "") + " · 2% 넘게 다른 날 " + SE.big + "일 · 과거 파일 " + SE.histLast + "까지", Math.abs(SE.max) > 0.004 ? "따로 받은 두 자료의 같은 날 종가가 달라요 — 한쪽에만 분할 · 정정이 반영됐을 수 있어요. 이 경우 오래된 구간과 최근 구간의 가격 기준이 달라 낙폭 · 평균선이 틀어져요. 데이터 센터의 '과거 데이터 전체 점검'으로 다시 받으세요." : "서로 다른 날 따로 받은 두 자료의 종가가 일치해요.");
+  else add("대조", "과거 파일 vs 아침 수집 스냅샷 (따로 받은 두 자료)", "na", SE ? SE.why : "대조 중", SE ? (SE.why === "스냅샷에 없는 종목" ? "대표 목록 밖 종목이라 두 번째 자료가 없어요 — 실시간 조회 한 곳의 값만으로 계산했어요. 프롬프트의 Claude 교차 검증을 꼭 보세요." : "두 자료가 겹치는 날이 없어 대조하지 못했어요.") : "두 번째 자료를 읽는 중이에요.");
+  if (F) {
+    if (F.per > 0 && F.eps > 0) { var imp = F.per * F.eps, dv = imp / last.c - 1; add("대조", "PER × EPS vs 주가", Math.abs(dv) > 0.35 ? "warn" : "ok", px(imp) + " vs " + px(last.c) + " (" + egPct(dv) + ")", Math.abs(dv) > 0.35 ? "네이버의 PER · EPS로 거꾸로 계산한 주가가 앱 종가와 많이 달라요 — PER과 EPS의 기준(최근 4분기 / 연간 / 예상)이 다르거나 분할 전 값일 수 있어요. PER 점수는 참고로만 보세요." : "PER · EPS와 주가가 서로 맞아요."); }
+    if (F.rev && F.op && F.rev.length && F.op.length && F.margin != null) { var rv = F.rev[F.rev.length - 1], op = F.op[F.op.length - 1]; if (rv[0] === op[0] && rv[1] > 0) { var mg = op[1] / rv[1], md = Math.abs(mg - F.margin); add("대조", "영업이익률 vs 영업이익 ÷ 매출", md > 0.02 ? "warn" : "ok", (F.margin * 100).toFixed(1) + "% vs " + (mg * 100).toFixed(1) + "% (" + rv[0] + ")", md > 0.02 ? "표의 영업이익률과 직접 나눈 값이 달라요 — 연도나 단위가 섞였을 수 있어요." : "이익률이 매출 · 영업이익과 맞아요."); } }
+    var ly = parseInt(String(F.lastY || "").replace(/\D/g, "").slice(0, 4), 10), ty = new Date(Date.now() + 9 * 3600e3).getUTCFullYear(); if (ly) add("대조", "실적 기준 연도", ty - ly <= 1 ? "ok" : ty - ly === 2 ? "warn" : "bad", ly + "년 (지금 " + ty + "년)", ty - ly <= 1 ? "가장 최근 확정 실적이에요." : "실적이 " + (ty - ly) + "년 전 것이에요 — 성장률 · 이익률 점수가 지금 상황과 다를 수 있어요.");
+  }
+  /* ③ 계산 검산 — 같은 값을 다른 방법으로 */
+  try {
+    var S = egScore(sym);
+    if (S) {
+      var mn = Infinity, w2 = 0; for (i = n - 1; i >= 0; i--) { if (rows[i].c < mn) mn = rows[i].c; var d2 = mn / rows[i].c - 1; if (d2 < w2) w2 = d2; }
+      add("검산", "역대 최대 낙폭 (앞→뒤 vs 뒤→앞)", Math.abs(w2 - S.worst) < 1e-9 ? "ok" : "bad", egPct(S.worst, 2) + " vs " + egPct(w2, 2), Math.abs(w2 - S.worst) < 1e-9 ? "두 가지 방법으로 계산한 값이 같아요." : "계산 방법에 따라 값이 달라요 — 앱 계산 오류예요. 알려 주세요.");
+      var sum = Math.round(S.body * 0.55 + S.spot * 0.45); add("검산", "점수 합산", sum === S.total ? "ok" : "bad", "체력 " + S.body + " × 0.55 + 자리 " + S.spot + " × 0.45 = " + sum, sum === S.total ? "항목 점수에서 종합까지 다시 더해 맞는지 확인했어요." : "합산이 맞지 않아요 — 앱 계산 오류예요.");
+    }
+    var M = egMaY1(egMaBreak(sym, "w200"));
+    if (M) {
+      var W = egWeekly(rows), sm = 0, cnt = 0; for (i = W.length - 200; i < W.length; i++) { if (i >= 0) { sm += W[i].c; cnt++; } } var g2 = cnt === 200 ? W[W.length - 1].c / (sm / 200) - 1 : null;
+      if (g2 != null) add("검산", "200주선 대비 (누적합 vs 직접 평균)", Math.abs(g2 - M.gapNow) < 1e-6 ? "ok" : "bad", egPct(M.gapNow, 2) + " vs " + egPct(g2, 2), Math.abs(g2 - M.gapNow) < 1e-6 ? "200주 평균을 처음부터 다시 더해도 같은 값이에요." : "평균선 값이 맞지 않아요 — 앱 계산 오류예요.");
+      var bad = 0, chk = 0; M.eps.forEach(function (e) { chk++; var t1 = e.t0 + 365 * EG_DAY, r1 = null; if (t1 <= last.t) { for (var q = 0; q < n; q++) { if (rows[q].t >= t1) { r1 = rows[q].c / e.c0 - 1; break; } } } if ((r1 == null) !== (e.r1 == null) || (r1 != null && Math.abs(r1 - e.r1) > 1e-9)) bad++; if (e.y1 && (e.y1.lo.c > e.c0 * 1.0000001 || e.y1.hi.c < e.c0 * 0.9999999 || Math.abs(e.y1.lo.c / e.c0 - 1 - e.y1.lo.v) > 1e-9)) bad++; });
+      if (chk) add("검산", "이탈 사례 수익률 · 가격", bad ? "bad" : "ok", chk + "건 다시 계산 · 불일치 " + bad, bad ? "이탈 사례의 수익률이나 가격이 다시 계산한 값과 달라요 — 앱 계산 오류예요." : "이탈가 · 1년 뒤 수익 · 최저/최고 가격을 처음부터 다시 찾아 같은지 확인했어요.");
+    }
+  } catch (e) { add("검산", "계산 검산", "bad", "오류", String(e && e.message || e).slice(0, 80)); }
+  var nb = C.filter(function (c) { return c.lv === "bad"; }).length, nw = C.filter(function (c) { return c.lv === "warn"; }).length, no = C.filter(function (c) { return c.lv === "ok"; }).length;
+  return (EG.memo[key] = { sym: sym, name: egName(sym), checks: C, bad: nb, warn: nw, ok: no, level: nb ? "bad" : nw ? "warn" : "ok", lastD: lastD, n: n, from: ymd(rows[0].t) });
+}
+function egVerifyHtml(sym) {
+  var V = egVerify(sym); if (!V) return "";
+  var bd = function (lv) { return '<span class="dhBadge ' + (lv === "ok" ? "ok" : lv === "bad" ? "bad" : lv === "warn" ? "warn" : "") + '">' + (lv === "ok" ? "✓ 통과" : lv === "bad" ? "✗ 실패" : lv === "warn" ? "⚠️ 주의" : "대조 불가") + '</span>'; }, g0 = "";
+  var h = '<div class="egBox egVf"><div class="egH">데이터 검증 — ' + egEsc(V.name) + ' <small>분석에 쓰는 숫자를 세 방향으로 확인했어요: 자료 자체 · 다른 출처와 대조 · 계산 검산 · ' + V.from + ' ~ ' + V.lastD + ' · ' + V.n.toLocaleString() + '개 봉 · 분할 반영 종가(배당 제외)</small></div>';
+  h += '<div class="dxSum ' + (V.level === "ok" ? "ok" : "warn") + '"' + (V.level === "bad" ? ' style="background:#fcefef;border-color:#c03b3b"' : '') + '>' + (V.level === "ok" ? '<b>' + V.ok + '개 항목 모두 통과</b> — 아래 평가표 · 이탈 사례는 이 자료로 계산했어요.' : V.level === "warn" ? '<b>통과 ' + V.ok + ' · 주의 ' + V.warn + '</b> — 계산은 했지만 주의 항목이 닿는 숫자는 참고로만 보세요: ' + V.checks.filter(function (c) { return c.lv === "warn"; }).map(function (c) { return egEsc(c.k); }).join(" · ") : '<b>실패 ' + V.bad + '개</b> — 값은 아래에 그대로 보여 드려요. 실패 항목이 닿는 숫자는 실제와 다를 수 있으니 흐름 위주로 참고하세요: ' + V.checks.filter(function (c) { return c.lv === "bad"; }).map(function (c) { return egEsc(c.k); }).join(" · ")) + '</div>';
+  h += '<details' + (V.level === "ok" ? "" : " open") + '><summary class="egVfS">검증 항목 ' + V.checks.length + '개 보기</summary><div class="dxWrap"><table class="dgT egScT egVfT"><thead><tr><th>확인한 것</th><th>결과 값</th><th>판정</th><th>뜻</th></tr></thead><tbody>' + V.checks.map(function (c) { var head = c.g !== g0 ? '<tr class="dxG"><td colspan="4">' + ({ "자료": "① 자료 자체", "대조": "② 다른 출처와 대조", "검산": "③ 계산 검산 (같은 값을 다른 방법으로)" })[c.g] + '</td></tr>' : ""; g0 = c.g; return head + '<tr class="' + (c.lv === "bad" || c.lv === "warn" ? "dxBad" : "") + '"><td><b>' + egEsc(c.k) + '</b></td><td>' + egEsc(c.v) + '</td><td>' + bd(c.lv) + '</td><td>' + egEsc(c.t) + '</td></tr>'; }).join("") + '</tbody></table></div></details>';
+  h += '<div class="egNote"><b>앱이 확인할 수 없는 것</b> — 야후가 준 값 자체가 틀린 경우(두 자료 모두 같은 출처라 같이 틀려요), 상장 전 가격, 배당을 재투자했을 때의 실제 수익. 그래서 ③ 프롬프트에 <b>Claude 교차 검증</b>을 넣었어요 — 지금 가격 · 사상 최고가 · 역대 최대 낙폭 · 52주 고저 · PER 등을 Claude가 웹에서 따로 찾아 앱 값과 나란히 적어요. 답을 붙여넣으면 「Claude 교차 검증」 표로 나와요.</div>';
+  return h + '</div>';
+}
+function egVerifyLines(sym) {
+  var V = egVerify(sym), S = egScore(sym), rows = nbHist[sym]; if (!V || !rows) return [];
+  var last = rows[rows.length - 1], i1 = rows.length - 1; while (i1 > 0 && rows[i1 - 1].t >= last.t - 365 * EG_DAY) i1--; var hi = -Infinity, lo = Infinity; for (var i = i1; i < rows.length; i++) { hi = Math.max(hi, rows[i].c); lo = Math.min(lo, rows[i].c); }
+  var px = function (v) { return egPx(sym, v); }, F = typeof CORE !== "undefined" && CORE.fund ? CORE.fund[sym] : null, R = S && S.raw;
+  var L = ["", "[앱 데이터 검증 — " + V.name + "] 자료 " + V.from + " ~ " + V.lastD + " · " + V.n + "개 봉 · 분할 반영 종가(배당 제외) · 통과 " + V.ok + " / 주의 " + V.warn + " / 실패 " + V.bad];
+  V.checks.filter(function (c) { return c.lv === "warn" || c.lv === "bad"; }).forEach(function (c) { L.push("- " + (c.lv === "bad" ? "실패" : "주의") + ": " + c.k + " — " + c.v); });
+  L.push("[교차 검증 요청] 아래 앱 값을 웹에서 따로 확인해 edge 안에 \"check\" 배열로 넣는다. 형식: { \"item\": \"항목\", \"app\": \"앱 값\", \"web\": \"웹에서 찾은 값(날짜)\", \"src\": \"출처\", \"ok\": true|false, \"note\": \"다르면 이유(분할 · 배당 · 기준일 · 장중/종가 차이 등)\" }. 못 찾으면 web에 \"확인 못 함\", ok는 null. 앱 가격은 분할 반영 · 배당 제외 종가라는 점을 감안해 비교한다. 3% 넘게 다르면 ok:false.");
+  L.push("- 지금 가격: " + px(last.c) + " (" + V.lastD + " 종가)");
+  L.push("- 52주(종가 기준) 최고 · 최저: " + px(hi) + " · " + px(lo));
+  if (R) { L.push("- 사상 최고 종가: " + px(R.pk) + " (" + egYm(R.pkT) + ")"); L.push("- 역대 최대 낙폭: " + egPct(S.worst) + " · " + px(R.worstPk) + "(" + egYm(R.worstPkT) + ") → " + px(R.worstC) + "(" + egYm(R.worstT) + ")"); L.push("- 지금 고점 대비: " + egPct(S.cur)); if (R.wGap != null) L.push("- 200주 이동평균 대비: " + egPct(R.wGap) + " (지금 " + (R.wGap < 0 ? "아래" : "위") + ")"); }
+  L.push("- 자료 시작(상장 또는 야후 제공 시작): " + V.from);
+  if (F) { if (F.per != null) L.push("- PER: " + F.per + "배"); if (F.roe != null) L.push("- ROE: " + F.roe.toFixed(1) + "%"); if (F.rev && F.rev.length) L.push("- 최근 확정 매출: " + F.rev[F.rev.length - 1][0] + " " + F.rev[F.rev.length - 1][1]); }
+  if (egLev(sym)) L.push("- 레버리지 상품: 배수 · 기초지수 · 과거 액면병합/분할 날짜도 확인");
+  return L;
+}
+(function () {
+  /* 프롬프트: 검증 결과 + 교차 검증 요청 */
+  EG.seam = EG.seam || {};
+  var b0 = egBlock; egBlock = function (syms, withPort) { var t = b0.apply(this, arguments), L = []; if (syms && syms[0]) L = egVerifyLines(syms[0]); if (!L.length) return t; var mark = "\n=== 예측 · 대응 · 방향 (edge)", i = t.indexOf(mark); return i >= 0 ? t.slice(0, i) + "\n" + L.join("\n") + t.slice(i) : t + "\n" + L.join("\n"); };
+  var n0 = egNorm; egNorm = function (E) { var o = n0.apply(this, arguments), K = E && E.check; if (Array.isArray(K) && K.some(function (x) { return x && x.item; })) { o = o || { history: [], policy: [], paths: [], roadmap: null, protect: [], grow: [], mine: "" }; o.check = K.filter(function (x) { return x && x.item; }).slice(0, 14); } return o; };
+  var x0 = egExtraHtml; egExtraHtml = function (E, opt) {
+    var h = x0.apply(this, arguments), N = egNorm(E), K = N && N.check; if (!K) return h; var no = K.filter(function (x) { return x.ok === false; }).length, un = K.filter(function (x) { return x.ok == null; }).length;
+    var add = '<div class="anxH">Claude 교차 검증 — 앱 값 vs 웹</div><div class="dxSum ' + (no ? "warn" : "ok") + '">' + K.length + '개 항목 중 일치 <b>' + (K.length - no - un) + '</b> · 불일치 <b>' + no + '</b> · 확인 못 함 <b>' + un + '</b>' + (no ? ' — 불일치 항목이 닿는 점수는 믿지 말고 이유를 먼저 확인하세요.' : '') + '</div><div class="dxWrap"><table class="dgT egScT"><thead><tr><th>항목</th><th>앱 값</th><th>판정</th><th>웹 값 · 출처 · 이유</th></tr></thead><tbody>' + K.map(function (x) { return '<tr class="' + (x.ok === false ? "dxBad" : "") + '"><td><b>' + egEsc(x.item) + '</b></td><td>' + egEsc(x.app || "-") + '</td><td><span class="dhBadge ' + (x.ok === true ? "ok" : x.ok === false ? "bad" : "") + '">' + (x.ok === true ? "✓ 일치" : x.ok === false ? "✗ 다름" : "미확인") + '</span></td><td>' + egEsc(x.web || "-") + (x.src ? ' <small>(' + egEsc(x.src) + ')</small>' : '') + (x.note ? '<br><small>' + egEsc(x.note) + '</small>' : '') + '</td></tr>'; }).join("") + '</tbody></table></div>';
+    return h ? h.replace('<div class="egX">', '<div class="egX">' + add) : '<div class="egX">' + add + '</div>';
+  };
+  /* v12.99 실패가 있어도 값은 그대로 보여 준다 — 맨 위에 어떤 검증이 실패했는지 알리고, 판단은 보는 사람이 한다 */
+  var s0 = egScoreHtml; egScoreHtml = function (sym) {
+    var h = s0.apply(this, arguments), V = egVerify(sym); if (!h || !V || V.level !== "bad") return h;
+    var fl = V.checks.filter(function (c) { return c.lv === "bad"; }), ban = '<div class="dxSum warn" style="background:#fcefef;border-color:#c03b3b"><b>자료 검증 실패 ' + V.bad + '개</b> — 아래 점수와 숫자는 그대로 보여 드리지만, 실패 항목이 닿는 값은 실제와 다를 수 있어요. 숫자 자체보다 흐름을 참고하세요.<br>' + fl.map(function (c) { return '· <b>' + egEsc(c.k) + '</b>: ' + egEsc(c.v); }).join('<br>') + '</div>';
+    var k = h.indexOf('<div class="egScTop">'); return k >= 0 ? h.slice(0, k) + ban + h.slice(k) : ban + h;
+  };
+  var r0 = egScanRow; egScanRow = function (sym) { var r = r0.apply(this, arguments); if (r) { var V = egVerify(sym); if (V) { r.q = V.level; if (V.level === "bad") r.qw = V.checks.filter(function (c) { return c.lv === "bad"; }).map(function (c) { return c.k; }).join(", "); } } return r; };
+  /* 스캔 목록에서도 빼지 않는다 — 줄에 '검증 실패' 표시만 */
+  var h0 = egScanHtml; egScanHtml = function () { var h = h0.apply(this, arguments), R = egScanLoad(); if (!R || !R.rows) return h; var bad = R.rows.filter(function (r) { return r.q === "bad"; }), wn = R.rows.filter(function (r) { return r.q === "warn"; }).length; var add = '<div class="briefDim" style="margin:6px 0">데이터 검증: 통과 ' + (R.rows.length - bad.length - wn) + ' · 주의 ' + wn + ' · <b>실패 ' + bad.length + '</b>' + (bad.length ? ' — 실패 종목도 목록에 그대로 있고 이름 옆에 "검증 실패"로 표시돼요: ' + bad.slice(0, 12).map(function (r) { return egEsc(r.n) + '(' + egEsc(r.qw || "") + ')'; }).join(", ") + (bad.length > 12 ? " 외 " + (bad.length - 12) : "") : '') + '</div>'; var k = h.indexOf('<div class="egChips">'); return k >= 0 ? h.slice(0, k) + add + h.slice(k) : h; };
+  /* 분석 화면 ②: 맨 앞에 검증 */
+  if (typeof anxSections === "function") { var a0 = anxSections; anxSections = function (root) {
+    var r = a0.apply(this, arguments);
+    try { var sym = AN.sym, secs = root.querySelectorAll(".anSec"); if (sym && secs[1] && nbHist[sym] && EG["sd:" + sym] && !secs[1].querySelector(".egVf")) {
+      if (!EG.seam[sym] && !EG["sm:" + sym]) { EG["sm:" + sym] = 1; egSeamLoad(sym).then(function () { if (currentTab === "analyst" && AN.sym === sym) renderAnalyst(); }); }
+      var hh = egVerifyHtml(sym), first = secs[1].querySelector(".egBox"); if (hh) { if (first) first.insertAdjacentHTML("beforebegin", hh); else secs[1].insertAdjacentHTML("beforeend", hh); }
+    } } catch (e) { console.warn("eg", e); }
+    return r;
+  }; }
+  var st = document.createElement("style"); st.textContent = ".egVfS{cursor:pointer;font-weight:700;font-size:13px;margin:6px 0}.egVfT th:nth-child(3){width:86px}.egVfT .dhBadge,.egX .dhBadge{white-space:nowrap}.dhBadge.bad{background:#fcefef;color:#c03b3b}"; document.head.appendChild(st);
+})();
+
+/* 과거 파일 원본과 아침 스냅샷의 같은 날 종가를 견준다 — 두 번 따로 받은 자료의 일치 확인 */
+function egSeamLoad(sym) {
+  EG.seam = EG.seam || {}; if (EG.seam[sym]) return Promise.resolve(EG.seam[sym]);
+  var kr = /\.K[SQ]$|^\^K/.test(sym), coin = /-USD$/.test(sym), ymd = function (sec) { return new Date(sec * 1000 + (kr || coin ? 9 : -5) * 3600e3).toISOString().slice(0, 10); };
+  if (typeof fetchRecent !== "function" || typeof fetchSnapFile !== "function") return Promise.resolve((EG.seam[sym] = { n: 0, why: "대조 기능 없음" }));
+  return Promise.all([fetchRecent().catch(function () { return null; }), fetchSnapFile(sym).catch(function () { return null; })]).then(function (a) {
+    var rec = a[0] && a[0].symbols && a[0].symbols[sym], snap = a[1];
+    if (!rec || !rec.t) return (EG.seam[sym] = { n: 0, why: "스냅샷에 없는 종목" }); if (!snap || !snap.t || !snap.t.length) return (EG.seam[sym] = { n: 0, why: "과거 파일 없음 (실시간 조회로 계산)" });
+    var m = {}, n = 0, mx = 0, mxD = "", big = 0; for (var i = Math.max(0, snap.t.length - 420); i < snap.t.length - 1; i++) m[ymd(snap.t[i])] = snap.c[i];   // 과거 파일의 마지막 봉은 받는 순간 장중 값일 수 있어 뺀다
+    for (i = 0; i < rec.t.length; i++) { var d = ymd(rec.t[i]), hc = m[d]; if (hc > 0 && rec.c[i] > 0) { n++; var df = hc / rec.c[i] - 1; if (Math.abs(df) > 0.02) big++; if (Math.abs(df) > Math.abs(mx)) { mx = df; mxD = d; } } }
+    return (EG.seam[sym] = n ? { n: n, max: mx, maxD: mxD, big: big, histLast: ymd(snap.t[snap.t.length - 1]) } : { n: 0, why: "겹치는 날 없음" });
+  }).catch(function () { return (EG.seam[sym] = { n: 0, why: "대조 실패" }); });
+}
