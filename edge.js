@@ -390,3 +390,393 @@ function egMaHtml(syms, title) {
   var a0 = egAnalogHtml; egAnalogHtml = function (syms) { var h = a0.apply(this, arguments); try { h += egMaHtml(syms); } catch (e) { console.warn("eg", e); } return h; };
   var st = document.createElement("style"); st.textContent = ".egMaT td,.egMaT th{text-align:center;font-size:12.5px;padding:7px 8px}.egMaT td:first-child,.egMaT th:first-child{text-align:left}.egMaT b.up{color:#c0392b}.egMaT b.dn{color:#1f5fbf}.egMaT small{color:#6b7686;font-size:11px;display:block;font-weight:500}.egMaT td:first-child small{display:inline}.egMaT th{line-height:1.3}.egMaT tr.egNow td{background:#fff6e8}[data-theme=dark] .egMaT tr.egNow td{background:#2a2114}"; document.head.appendChild(st);
 })();
+
+/* ============================================================
+   v12.96 종합 평가표 — 여러 기법의 결과를 한 표로, 점수와 해석까지
+   두 축으로 본다:  체력(오래 살아남고 위기마다 회복했나 · 돈을 버는 회사인가)  ×  자리(지금 가격이 그 자산의 과거에 비해 싼가 · 흐름은 어떤가)
+   · 체력 = 회복력(60%) + 기업 정보(40%)     — 기업 정보가 없는 자산(ETF · 지수 · 코인)은 회복력만
+   · 자리 = MDD(30%) + 장기 평균선(25%) + 기술 지표(25%) + 닮은 과거(10%) + 매크로(10%)
+   · 종합 = 체력 55% + 자리 45%   (오래 살아남아 같은 방향으로 회복해 온 기록을 더 무겁게)
+   항목마다 실제 숫자 · 점수 · 한 줄 해석을 붙인다. 계산할 수 없는 항목은 빼고 남은 것으로만 점수를 낸다(빈칸을 0점으로 치지 않는다).
+   점수는 과거 기록과 지금 자리를 정리한 것이지 미래 수익의 약속이 아니다.
+   ============================================================ */
+function egStep(v, steps, lowBest) { if (v == null || !isFinite(v)) return null; for (var i = 0; i < steps.length; i++) { if (lowBest ? v <= steps[i][0] : v >= steps[i][0]) return steps[i][1]; } return steps[steps.length - 1][1]; }
+function egScore(sym) {
+  var rows = typeof nbHist !== "undefined" && nbHist[sym]; if (!rows || rows.length < 260) return null;
+  var n = rows.length, last = rows[n - 1], yrsAll = (last.t - rows[0].t) / (365.25 * EG_DAY), key = "sc:" + sym + ":" + last.t + ":" + n + ":" + (typeof CORE !== "undefined" && CORE.fund && CORE.fund[sym] ? 1 : 0) + ":" + (typeof MAC !== "undefined" && MAC.doc && !MAC.doc.none ? 1 : 0);
+  if (EG.memo[key] !== undefined) return EG.memo[key];
+  var lev = egLev(sym), coin = /-USD$/.test(sym), cats = [], it = function (name, val, pts, txt) { return pts === "info" ? { n: name, v: val, p: null, t: txt } : pts == null ? null : { n: name, v: val, p: Math.round(pts), t: txt }; };   // "info" = 점수 없이 참고로만
+  var cat = function (id, name, axis, w, items, note) { items = items.filter(Boolean); var sc = items.filter(function (x) { return x.p != null; }); if (!sc.length) return; var s = sc.reduce(function (a, x) { return a + x.p; }, 0) / sc.length; cats.push({ id: id, name: name, axis: axis, w: w, score: Math.round(s), items: items, note: note || "" }); };
+  /* --- 낙폭 기록 (종가 기준) --- */
+  var pk = -Infinity, pkT = 0, ddArr = new Array(n), worst = 0, worstT = 0, worstC = null, worstPk = null, worstPkT = 0; for (var i = 0; i < n; i++) { if (rows[i].c > pk) { pk = rows[i].c; pkT = rows[i].t; } ddArr[i] = rows[i].c / pk - 1; if (ddArr[i] < worst) { worst = ddArr[i]; worstT = rows[i].t; worstC = rows[i].c; worstPk = pk; worstPkT = pkT; } }
+  var px = function (v) { return egPx(sym, v); }, needUp = last.c > 0 ? pk / last.c - 1 : null;
+  var cur = ddArr[n - 1], eps = drawdownEpisodes(rows, 0.2), closed = eps.filter(function (e) { return e.recoverI != null; }), openEp = eps.filter(function (e) { return e.recoverI == null; })[0] || null;
+  var recs = closed.map(function (e) { return (rows[e.recoverI].t - rows[e.peakI].t) / (365.25 * EG_DAY); }).sort(function (a, b) { return a - b; }), recMed = recs.length ? egMed(recs) : null, recMax = recs.length ? recs[recs.length - 1] : null;
+  var cagr = yrsAll >= 3 ? Math.pow(last.c / rows[0].c, 1 / yrsAll) - 1 : null, f3 = typeof coreFwd === "function" ? coreFwd(rows, 3 * 365) : null, f1 = typeof coreFwd === "function" ? coreFwd(rows, 365) : null;
+  /* ① 회복력 */
+  var rate = eps.length ? closed.length / eps.length : null;
+  cat("res", "회복력 — 오래 살아남고 위기마다 돌아왔나", "body", 0.6, [
+    it("관찰 기간", yrsAll.toFixed(1) + "년", egStep(yrsAll, [[20, 100], [12, 85], [7, 65], [4, 45], [0, 25]]), yrsAll >= 20 ? "20년 넘는 기록 — 여러 번의 위기를 거친 자료예요" : yrsAll >= 12 ? "10년 넘는 기록 — 큰 위기를 한두 번은 겪었어요" : yrsAll >= 7 ? "기록이 길지 않아요 — 겪어 보지 않은 종류의 약세장이 있을 수 있어요" : "기록이 짧아 '살아남았다'고 말하기 일러요"),
+    it("큰 하락(-20% 이상) 뒤 회복", eps.length ? closed.length + " / " + eps.length + "번 회복" + (openEp ? " (지금 1번 진행 중)" : "") : "큰 하락 없음", eps.length ? 35 + 65 * (closed.length / eps.length) * Math.min(1, closed.length / 3) : 55, !eps.length ? "큰 하락을 겪은 적이 없어 회복력은 아직 확인되지 않았어요" : closed.length === eps.length ? "큰 하락 " + eps.length + "번을 모두 전고점까지 회복했어요" : openEp && closed.length === eps.length - 1 ? "끝난 하락 " + closed.length + "번은 모두 회복했고, 지금 한 번이 진행 중이에요(" + egPct(openEp.dd) + ")" : "회복하지 못한 하락이 있어요"),
+    it("전고점 회복까지 (보통 · 가장 길게)", recMed != null ? (recMed < 1 ? Math.round(recMed * 12) + "개월" : recMed.toFixed(1) + "년") + " · " + (recMax < 1 ? Math.round(recMax * 12) + "개월" : recMax.toFixed(1) + "년") : "-", egStep(recMed, [[1, 100], [2, 80], [4, 55], [99, 30]], true), recMed == null ? "" : recMax >= 5 ? "가장 길 때는 " + recMax.toFixed(1) + "년이 걸렸어요 — 그만큼 기다릴 수 있는 돈이어야 해요" : "회복이 비교적 빨랐어요 — 가장 길 때 " + (recMax < 1 ? Math.round(recMax * 12) + "개월" : recMax.toFixed(1) + "년")),
+    it("전 기간 연평균 수익", cagr != null ? egPct(cagr, 1) : "-", egStep(cagr, [[0.12, 100], [0.08, 85], [0.05, 68], [0.02, 50], [0, 35], [-9, 12]]), cagr == null ? "" : cagr >= 0.08 ? "길게 보면 뚜렷한 우상향이에요" : cagr >= 0.02 ? "길게 보면 완만한 우상향이에요" : cagr >= 0 ? "길게 봐도 거의 제자리예요" : "길게 보면 내려왔어요 — 우상향 자산이 아니에요"),
+    it("아무 날 사서 3년 뒤 플러스였던 비율", f3 ? Math.round(f3.win * 100) + "% (최악 " + egPct(f3.worst) + ")" : "-", f3 ? f3.win * 100 : null, !f3 ? "" : f3.win >= 0.85 ? "언제 샀어도 3년 들고 있으면 대부분 플러스였어요" : f3.win >= 0.65 ? "3년을 들고 있어도 3번 중 1번쯤은 손실이었어요" : "3년 보유로도 손실이 잦았어요 — 사는 시점이 중요했던 자산이에요")
+  ], lev ? "레버리지 상품이라 회복력 점수를 최대 60점으로 눌렀어요 — 지수는 회복해도 이 상품은 원금이 줄 수 있고(변동성 손실), 하루 급락에 구조적으로 약해요." : coin ? "코인은 이익이 없는 자산이라 '기업 정보' 없이 회복력만으로 체력을 봐요. 기록도 주식보다 짧아요." : "");
+  if (lev && cats.length && cats[cats.length - 1].id === "res") cats[cats.length - 1].score = Math.min(60, cats[cats.length - 1].score);
+  /* ② 기업 정보 */
+  var F = typeof CORE !== "undefined" && CORE.fund ? CORE.fund[sym] : null;
+  if (F && !lev) cat("fund", "기업 정보 — 돈을 벌고, 늘리고 있나", "body", 0.4, [
+    it("ROE (자기자본으로 버는 힘)", F.roe != null ? F.roe.toFixed(1) + "%" : "-", egStep(F.roe, [[20, 100], [15, 90], [10, 75], [5, 55], [0.01, 35], [-999, 10]]), F.roe == null ? "" : F.roe >= 15 ? "자본 대비 이익이 높아요 — 우량 기업의 기준(15%)을 넘어요" : F.roe >= 8 ? "평균적인 수익성이에요" : F.roe > 0 ? "수익성이 낮아요" : "적자예요"),
+    it("영업이익률", F.margin != null ? (F.margin * 100).toFixed(1) + "%" : "-", egStep(F.margin, [[0.25, 100], [0.15, 88], [0.08, 70], [0.03, 50], [0.0001, 35], [-9, 10]]), F.margin == null ? "" : F.margin >= 0.15 ? "가격 결정력이 있는 사업이에요" : F.margin >= 0.05 ? "보통 수준의 마진이에요" : F.margin > 0 ? "마진이 얇아 경기 · 원가에 민감해요" : "영업 적자예요"),
+    it("매출 성장 (최근 3개 연도 연평균)", F.revG != null ? egPct(F.revG, 1) : "-", egStep(F.revG, [[0.15, 100], [0.08, 85], [0.03, 65], [0, 50], [-0.05, 35], [-9, 15]]), F.revG == null ? "" : F.revG >= 0.08 ? "매출이 꾸준히 커지고 있어요" : F.revG >= 0 ? "매출이 정체에 가까워요" : "매출이 줄고 있어요"),
+    it("영업이익 성장 (최근 3개 연도 연평균)", F.opG != null ? egPct(F.opG, 1) : "-", egStep(F.opG, [[0.15, 100], [0.08, 85], [0.03, 65], [0, 50], [-0.1, 30], [-9, 12]]), F.opG == null ? "" : F.opG >= 0.08 ? "이익이 늘고 있어요 — 주가가 길게 오르는 근거예요" : F.opG >= 0 ? "이익이 제자리예요" : "이익이 줄고 있어요 — 주가 회복의 근거가 약해요"),
+    it("PER (이익 대비 가격)", F.per != null ? F.per.toFixed(1) + "배" : "-", F.per == null ? null : F.per <= 0 ? 15 : egStep(F.per, [[10, 85], [18, 75], [28, 60], [45, 42], [9999, 25]], true), F.per == null ? "" : F.per <= 0 ? "적자라 PER을 쓸 수 없어요" : F.per <= 12 ? "이익에 비해 가격이 낮아요 — 이익이 줄 것으로 보는 건 아닌지 확인" : F.per <= 28 ? "시장 평균 근처의 가격이에요" : "성장 기대가 가격에 많이 들어 있어요 — 기대에 못 미치면 크게 빠질 수 있어요")
+  ], F.lastY ? "확정 실적 기준 연도: " + F.lastY + " · 출처 네이버 증권" : "");
+  /* ③ MDD */
+  var deeper = 0, cnt = 0; for (i = 0; i < n; i += 3) { cnt++; if (ddArr[i] < cur) deeper++; } var pct = cnt ? deeper / cnt : null;   // 지금보다 더 깊이 빠져 있던 날의 비율
+  var byY = {}, ys = []; for (i = 0; i < n; i++) { var y = new Date(rows[i].t).getUTCFullYear(); if (!byY[y]) { byY[y] = { pk: rows[i].c, w: 0 }; ys.push(y); } var B = byY[y]; if (rows[i].c > B.pk) B.pk = rows[i].c; if (rows[i].c / B.pk - 1 < B.w) B.w = rows[i].c / B.pk - 1; }
+  var yAvg = ys.length >= 4 ? ys.slice(0, -1).reduce(function (a, y) { return a + byY[y].w; }, 0) / (ys.length - 1) : null, ratio = worst < 0 ? cur / worst : null;
+  cat("mdd", "MDD — 지금 낙폭이 이 자산의 역사에서 어느 정도인가", "spot", 0.3, [
+    it("지금 고점 대비", cur > -0.005 ? "0% (최고가 " + px(pk) + ")" : egPct(cur) + " · 고점 " + px(pk) + "(" + egYm(pkT) + ") → 지금 " + px(last.c), egStep(-cur, [[0.5, 95], [0.35, 88], [0.2, 75], [0.1, 60], [0.03, 45], [0, 32]]), cur > -0.03 ? "사상 최고가 근처예요 — 싸게 사는 자리는 아니에요" : cur > -0.1 ? "고점에서 조금 내려온 정도예요" : cur > -0.2 ? "조정 구간이에요(-10~-20%)" : "큰 하락 구간이에요 — 체력이 좋은 자산이라면 과거엔 기회였던 깊이예요"),
+    it("역대 최대 낙폭", egPct(worst) + " · " + px(worstPk) + "(" + egYm(worstPkT) + ") → " + px(worstC) + "(" + egYm(worstT) + ")" + (ratio != null ? " · 지금은 그 깊이의 " + Math.round(ratio * 100) + "%" : ""), ratio == null ? null : 30 + 65 * Math.min(1, ratio), ratio == null ? "" : ratio >= 0.8 ? "역대 최악에 가까운 깊이예요" : ratio >= 0.4 ? "역대 최악의 절반 안팎까지 내려왔어요 — 최악까지는 " + egPct((1 + worst) / (1 + cur) - 1) + " 더 빠질 여지가 있었어요" : "역대 최악과는 거리가 멀어요 — 같은 일이 오면 지금 가격에서 " + egPct((1 + worst) / (1 + cur) - 1) + "까지 내려갈 수 있다는 뜻이기도 해요"),
+    cur <= -0.03 && needUp != null ? it("전고점까지 필요한 상승", egPct(needUp) + " (" + px(last.c) + " → " + px(pk) + ")", "info", needUp >= 1 ? "원금을 되찾으려면 지금 가격이 " + (1 + needUp).toFixed(1) + "배가 돼야 해요 — 빠진 폭보다 회복에 필요한 폭이 훨씬 커요(-50%면 +100%)" : "고점까지 " + egPct(needUp) + " 올라야 해요 — 과거 회복 기간(회복력 줄)과 함께 보세요") : null,
+    it("지금보다 더 깊이 빠져 있던 날", pct != null ? "전체의 " + Math.round(pct * 100) + "%" : "-", pct == null ? null : 30 + 65 * (1 - pct), pct == null ? "" : pct <= 0.1 ? "과거 열흘 중 아흐레는 지금보다 고점에 가까웠어요 — 드문 깊이예요" : pct <= 0.4 ? "지금 정도의 낙폭은 가끔 있던 수준이에요" : "지금 정도의 낙폭은 흔했어요 — 이 자산에서는 평소 모습이에요"),
+    it("한 해 최대 낙폭 평균", yAvg != null ? egPct(yAvg) + " (" + (ys.length - 1) + "년 평균)" : "-", yAvg == null ? null : egStep(-yAvg, [[0.5, 25], [0.35, 40], [0.22, 58], [0.13, 75], [0, 90]]), yAvg == null ? "" : "해마다 이 정도는 빠졌어요 — " + (cur < yAvg ? "지금은 평년보다 깊은 하락이에요" : "지금 낙폭은 평년 범위 안이에요"))
+  ]);
+  /* ④ 장기 평균선 */
+  var W = egMaBreak(sym, "w200"), D = egMaBreak(sym, "d200"), wDone = W ? W.done : [], w1 = wDone.filter(function (e) { return e.r1 != null; }), w1p = w1.filter(function (e) { return e.r1 > 0; }).length, wLo = wDone.length ? Math.min.apply(null, wDone.map(function (e) { return e.lo.v; })) : null;
+  var d1 = D ? D.done.filter(function (e) { return e.r1 != null; }) : [], d1p = d1.filter(function (e) { return e.r1 > 0; }).length;
+  cat("ma", "장기 평균선 — 4년 평균 가격(200주선)과 견주면", "spot", 0.25, [
+    W ? it("200주선 대비", egPct(W.gapNow), egStep(W.gapNow, [[-0.2, 95], [0, 86], [0.15, 68], [0.4, 50], [0.8, 36], [99, 24]], true), W.gapNow < 0 ? "4년 평균 가격보다 싸요 — 이 자산에서 " + (wDone.length + (W.open ? 1 : 0)) + "번째로 온 자리예요" : W.gapNow < 0.15 ? "4년 평균 가격 근처예요" : W.gapNow < 0.8 ? "4년 평균보다 꽤 위예요" : "4년 평균에서 아주 멀리 올라와 있어요 — 과열 구간에서 자주 보이는 거리예요") : null,
+    W && w1.length ? it("200주선 이탈 뒤 1년 (과거)", w1p + " / " + w1.length + "번 플러스", 35 + 60 * (w1p / w1.length) * Math.min(1, w1.length / 4), (w1.length < 5 ? "사례 " + w1.length + "번뿐 — 확률이 아니라 기록으로만. " : "") + (wLo != null ? "이탈 뒤 3년 안 가장 깊었던 추가 하락 " + egPct(wLo) : "")) : null,
+    D && d1.length >= 3 ? it("200일선 이탈 뒤 1년 (과거)", d1p + " / " + d1.length + "번 플러스", 35 + 60 * (d1p / d1.length), "200일선은 더 자주 깨져서 사례가 많아요 — " + (d1p / d1.length >= 0.7 ? "깨진 뒤에도 1년 뒤엔 대체로 회복했어요" : "깨진 뒤 1년 안에 회복하지 못한 적이 적지 않아요")) : null
+  ]);
+  /* ⑤ 기술 지표 */
+  var c = rows.map(function (r) { return r.c; }), rsi = typeof rsiWilder === "function" && n > 30 ? rsiWilder(c.slice(-120), 14) : null, avg = function (k) { if (n < k) return null; var s = 0; for (var q = n - k; q < n; q++) s += c[q]; return s / k; }, m20 = avg(20), m60 = avg(60), m200 = avg(200);
+  var at = function (days) { var tt = last.t - days * EG_DAY, j = n - 1; while (j > 0 && rows[j].t > tt) j--; return rows[j].c; }, r12 = yrsAll >= 1 ? last.c / at(365) - 1 : null, r3 = last.c / at(91) - 1;
+  var i1 = n - 1; while (i1 > 0 && rows[i1 - 1].t >= last.t - 365 * EG_DAY) i1--; var rs = []; for (var q2 = Math.max(1, i1); q2 < n; q2++) rs.push(c[q2] / c[q2 - 1] - 1); var mu = rs.reduce(function (a, b) { return a + b; }, 0) / (rs.length || 1), vol = rs.length > 100 ? Math.sqrt(rs.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / rs.length) * Math.sqrt(rs.length) : null;
+  var arr = m20 && m60 && m200 ? (m20 > m60 && m60 > m200 ? "정배열" : m20 < m60 && m60 < m200 ? "역배열" : "혼조") : null;
+  cat("tech", "기술 지표 — 지금 흐름과 과열 · 침체", "spot", 0.25, [
+    it("RSI(14일)", rsi != null ? rsi.toFixed(0) : "-", egStep(rsi, [[30, 85], [45, 70], [60, 60], [70, 48], [101, 30]], true), rsi == null ? "" : rsi <= 30 ? "침체 구간(30 이하) — 단기로 많이 팔린 상태예요" : rsi >= 70 ? "과열 구간(70 이상) — 단기로 많이 오른 상태예요" : "중립 구간이에요"),
+    it("이동평균 배열 (20 · 60 · 200일)", arr || "-", arr === "정배열" ? 78 : arr === "역배열" ? 38 : arr ? 55 : null, arr === "정배열" ? "짧은 선이 긴 선 위 — 오르는 흐름이 이어지고 있어요" : arr === "역배열" ? "짧은 선이 긴 선 아래 — 내리는 흐름이에요. 반등이 선에 막히기 쉬워요" : arr ? "선들이 엉켜 있어요 — 방향이 정해지지 않았어요" : ""),
+    it("최근 3개월 · 1년 수익", egPct(r3) + " · " + egPct(r12), r12 == null ? null : egStep(r12, [[0.3, 80], [0.1, 70], [0, 58], [-0.2, 45], [-9, 32]]), r12 == null ? "" : r12 >= 0.1 ? "1년 흐름이 좋아요(모멘텀)" : r12 >= -0.2 ? "1년 흐름은 밋밋해요" : "1년 흐름이 나빠요 — 싸졌지만 떨어지는 중일 수 있어요"),
+    it("1년 변동성 (연)", vol != null ? Math.round(vol * 100) + "%" : "-", egStep(vol, [[0.18, 88], [0.3, 70], [0.5, 50], [0.8, 32], [99, 18]], true), vol == null ? "" : vol <= 0.2 ? "움직임이 차분해요 — 지수 수준" : vol <= 0.4 ? "개별 주식 수준의 흔들림이에요" : "흔들림이 매우 커요 — 하루 ±" + Math.round(vol / Math.sqrt(252) * 200) + "% 움직임이 드물지 않아요. 비중을 작게")
+  ]);
+  /* ⑥ 닮은 과거 */
+  var A = egAnalog(sym), h1 = A && !A.thin ? A.h.filter(function (x) { return x.l === "1년"; })[0] : null;
+  if (h1) cat("ana", "닮은 과거 — 지금 같은 자리 뒤 1년", "spot", 0.1, [it("1년 뒤 플러스였던 비율", Math.round(h1.win * 100) + "% (" + h1.n + "번 · 보통 " + egPct(h1.med) + " · 최악 " + egPct(h1.worst) + ")", h1.win * 100, h1.baseWin != null ? (h1.win - h1.baseWin >= 0.05 ? "아무 날(" + Math.round(h1.baseWin * 100) + "%)보다 좋았던 자리예요" : h1.win - h1.baseWin <= -0.05 ? "아무 날(" + Math.round(h1.baseWin * 100) + "%)보다 나빴던 자리예요" : "아무 날(" + Math.round(h1.baseWin * 100) + "%)과 비슷했어요") : "")]);
+  /* ⑦ 매크로 */
+  var mi = [], vx = nbHist["^VIX"], vixN = vx && vx.length ? vx[vx.length - 1].c : null;
+  if (vixN != null) mi.push(it("공포지수(VIX)", vixN.toFixed(1), vixN >= 30 ? 62 : vixN >= 20 ? 50 : 60, vixN >= 30 ? "공포 구간 — 흔들림이 크지만, 과거엔 나눠 사기 시작한 사람이 유리했던 구간이에요" : vixN >= 20 ? "불안 구간 — 변동이 커지는 중이에요" : "평온 구간 — 시장이 위험을 낮게 보고 있어요"));
+  try { var fed = typeof macSer === "function" ? macSer("fed") : null; if (fed && fed.v.length >= 2) { var dlt = fed.v[fed.v.length - 1] - fed.v[fed.v.length - 2]; mi.push(it("미국 기준금리 방향", fed.v[fed.v.length - 1].toFixed(2) + "% (마지막 변경 " + (dlt < 0 ? "인하" : dlt > 0 ? "인상" : "동결") + ")", dlt < 0 ? 70 : dlt > 0 ? 40 : 55, dlt < 0 ? "금리를 내리는 중 — 주식에는 대체로 우호적이었어요(경기 침체로 내리는 경우는 예외)" : dlt > 0 ? "금리를 올리는 중 — 성장주 · 레버리지에 부담이에요" : "")); }
+    var t10 = typeof macSer === "function" ? macSer("us10y") : null; if (t10 && t10.v.length > 260) { var nowY = t10.v[t10.v.length - 1], agoY = typeof macAt === "function" ? macAt(t10, t10.t[t10.t.length - 1] - 365 * EG_DAY) : null; if (agoY != null) mi.push(it("미 10년 금리 (1년 변화)", nowY.toFixed(2) + "% (" + (nowY - agoY >= 0 ? "+" : "") + (nowY - agoY).toFixed(2) + "%p)", nowY - agoY <= -0.3 ? 68 : nowY - agoY >= 0.5 ? 40 : 55, nowY - agoY <= -0.3 ? "장기 금리가 내려왔어요 — 주식 가격에 우호적" : nowY - agoY >= 0.5 ? "장기 금리가 올랐어요 — 비싼 주식에 부담" : "장기 금리는 1년 전과 비슷해요")); }
+    var kr = !/\.K[SQ]$|^\^K/.test(sym) && typeof macSer === "function" ? macSer("krw") : null; if (kr && kr.v.length > 260) { var k0 = kr.v[kr.v.length - 1], s1 = 0, c1 = 0; for (var z = kr.v.length - 1; z >= 0 && kr.t[z] >= kr.t[kr.t.length - 1] - 365 * EG_DAY; z--) { s1 += kr.v[z]; c1++; } var ka = s1 / c1, kg = k0 / ka - 1; mi.push(it("원/달러 (1년 평균 대비)", Math.round(k0).toLocaleString() + "원 (" + egPct(kg, 1) + ")", kg >= 0.05 ? 40 : kg <= -0.05 ? 68 : 55, kg >= 0.05 ? "환율이 1년 평균보다 높아요 — 지금 달러 자산을 사면 환율이 내려올 때 수익이 깎여요" : kg <= -0.05 ? "환율이 1년 평균보다 낮아요 — 달러 자산을 사기에 환율 부담이 적어요" : "환율은 1년 평균 근처예요")); }
+  } catch (e) {}
+  cat("mac", "매크로 — 지금 바깥 환경", "spot", 0.1, mi, "매크로는 미리 맞히기 어려운 변수라 비중을 가장 작게(자리 점수의 10%) 뒀어요.");
+  /* --- 합산 --- */
+  var axis = function (a) { var cs = cats.filter(function (x) { return x.axis === a; }), w = cs.reduce(function (s, x) { return s + x.w; }, 0); return w ? Math.round(cs.reduce(function (s, x) { return s + x.score * x.w; }, 0) / w) : null; };
+  var body = axis("body"), spot = axis("spot"); if (body == null || spot == null) return (EG.memo[key] = null);
+  var total = Math.round(body * 0.55 + spot * 0.45), grade = total >= 80 ? "매우 좋음" : total >= 68 ? "좋음" : total >= 55 ? "보통" : total >= 42 ? "주의" : "나쁨";
+  /* 한 줄 판정은 '체력'과 '싼 정도(MDD + 장기 평균선)'로 정하고, 흐름(기술 지표)은 덧붙인다 — 흐름이 좋아 자리 점수가 높은 것을 '싸다'고 읽지 않게 */
+  var byId = {}; cats.forEach(function (x) { byId[x.id] = x; });
+  var cheap = byId.mdd && byId.ma ? Math.round((byId.mdd.score * 0.3 + byId.ma.score * 0.25) / 0.55) : byId.mdd ? byId.mdd.score : spot, flow = byId.tech ? byId.tech.score : null;
+  var read = body >= 65 && cheap >= 62 ? ["튼튼한 자산이 싸진 자리", "오래 살아남아 회복해 온 기록이 있고, 지금 가격은 그 자산의 과거에 비해 낮은 편이에요. 과거 기록으로는 나눠서 모으기 좋았던 구간이에요. 다만 '더 빠질 수 있는 폭'(MDD 줄)을 견딜 금액만요."]
+    : body >= 65 ? ["튼튼하지만 싸지는 않은 자리", "체력은 검증됐지만 가격이 과거에 비해 싼 편은 아니에요. 정해 둔 적립은 이어 가되, 큰 금액은 낙폭이 깊어질 때를 기다리는 쪽이 과거엔 유리했어요."]
+    : cheap >= 62 ? ["싸 보이지만 체력 확인이 필요한 자리", "가격은 많이 내려왔는데 회복력이나 이익 기록이 약해요. 싼 데에는 이유가 있을 수 있어요 — 왜 빠졌는지, 이익이 돌아올 근거가 있는지부터 확인하세요."]
+    : ["서두를 이유가 없는 자리", "체력도 가격도 뚜렷한 강점이 없어요. 기다리며 지켜봐도 늦지 않아요."];
+  if (flow != null) read[1] += flow >= 68 ? " 흐름(기술 지표 " + flow + "점)은 오르는 쪽이에요." : flow <= 48 ? " 흐름(기술 지표 " + flow + "점)은 아직 내리는 쪽이라, 한 번에 사기보다 나눠서 보는 편이 맞아요." : " 흐름(기술 지표 " + flow + "점)은 뚜렷한 방향이 없어요.";
+  var top = cats.slice().sort(function (a, b) { return b.score - a.score; }), strong = top.slice(0, 2).map(function (x) { return x.name.split(" — ")[0] + " " + x.score; }), weak = top.slice(-2).reverse().map(function (x) { return x.name.split(" — ")[0] + " " + x.score; });
+  return (EG.memo[key] = { sym: sym, name: egName(sym), total: total, grade: grade, body: body, spot: spot, cheap: cheap, cats: cats, read: read, strong: strong, weak: weak, lev: lev, hasFund: cats.some(function (x) { return x.id === "fund"; }), asOf: last.t, worst: worst, cur: cur, raw: { pk: pk, pkT: pkT, lastC: last.c, worstC: worstC, worstPk: worstPk, worstT: worstT, worstPkT: worstPkT, needUp: needUp, yrs: yrsAll, eps: eps.length, closed: closed.length, openDd: openEp ? openEp.dd : null, recMed: recMed, recMax: recMax, cagr: cagr, f3: f3, pct: pct, yAvg: yAvg, wGap: W ? W.gapNow : null, wN: wDone.length, wOpen: !!(W && W.open), wLo: wLo, w1: w1.length, w1p: w1p, vol: vol, rsi: rsi, arr: arr } });
+}
+function egScoreLines(sym) {
+  var S = egScore(sym); if (!S) return [];
+  var L = ["- " + S.name + " 종합 " + S.total + "점(" + S.grade + ") = 체력 " + S.body + " × 55% + 자리 " + S.spot + " × 45% (자리 중 '싼 정도' " + S.cheap + ") → 「" + S.read[0] + "」" + (S.hasFund ? "" : " (기업 정보 없음 — 체력은 회복력만)") + (S.lev ? " · 레버리지 상품(회복력 60점 상한)" : "")];
+  S.cats.forEach(function (c) { L.push("  · " + c.name.split(" — ")[0] + " " + c.score + "점: " + c.items.map(function (x) { return x.n + " " + x.v + (x.p != null ? "(" + x.p + ")" : "(참고)"); }).join(" / ")); });
+  return L;
+}
+function egScoreHtml(sym) {
+  var S = egScore(sym); if (!S) return "";
+  var col = function (p) { return p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; }, bar = function (p) { return '<div class="egBar"><u style="width:' + p + '%;background:' + col(p) + '"></u></div>'; };
+  var h = '<div class="egBox egSc"><div class="egH">종합 평가표 — ' + egEsc(S.name) + ' <small>여러 기법의 결과를 한 표로 · 체력(오래 살아남고 회복했나, 돈을 버나) × 자리(지금 가격이 과거에 비해 싼가, 흐름은) · ' + (typeof cDate === "function" ? cDate(S.asOf) : "") + ' 종가 기준</small></div>';
+  h += '<div class="egScTop"><div class="egScTot" style="border-color:' + col(S.total) + '"><b style="color:' + col(S.total) + '">' + S.total + '</b><span>종합 · ' + S.grade + '</span></div><div class="egScAx"><div><small>체력 <i>55%</i></small><b>' + S.body + '</b>' + bar(S.body) + '</div><div><small>자리 <i>45%</i></small><b>' + S.spot + '</b>' + bar(S.spot) + '</div></div><div class="egScRead"><b>' + egEsc(S.read[0]) + '</b><p>' + egEsc(S.read[1]) + '</p><small>강한 곳: ' + egEsc(S.strong.join(" · ")) + ' / 약한 곳: ' + egEsc(S.weak.join(" · ")) + '</small></div></div>';
+  h += S.cats.map(function (c, i) { return '<details class="egScCat"' + (i < 1 ? " open" : "") + '><summary><span class="egScAxTag ' + c.axis + '">' + (c.axis === "body" ? "체력" : "자리") + '</span><b>' + egEsc(c.name) + '</b><em style="color:' + col(c.score) + '">' + c.score + '</em>' + bar(c.score) + '</summary><table class="dgT egScT"><thead><tr><th>기법 · 지표</th><th>지금 값</th><th>점수</th><th>해석</th></tr></thead><tbody>' + c.items.map(function (x) { return '<tr><td><b>' + egEsc(x.n) + '</b></td><td>' + egEsc(x.v) + '</td><td>' + (x.p != null ? '<b style="color:' + col(x.p) + '">' + x.p + '</b>' : '<span class="briefDim">참고</span>') + '</td><td>' + egEsc(x.t) + '</td></tr>'; }).join("") + '</tbody></table>' + (c.note ? '<div class="egNote">' + egEsc(c.note) + '</div>' : '') + '</details>'; }).join("");
+  h += '<div class="egNote"><b>점수 읽는 법</b> — 68점 이상 좋음 · 55~67 보통 · 42~54 주의 · 그 아래 나쁨. 체력 점수는 "오래 살아남아 같은 방향으로 회복해 왔는가"를, 자리 점수는 "지금이 그 자산의 과거에 비해 싼 자리인가"를 봐요. 자리 점수는 싸질수록 올라가므로, <b>체력이 낮은데 자리만 높은 경우</b>는 좋은 신호가 아니에요. 계산할 수 없는 항목은 빼고 남은 것으로 점수를 냈고' + (S.hasFund ? '' : ', 이 자산은 기업 정보가 없어 체력을 회복력만으로 봤어요') + '. 과거 기록을 정리한 점수이며 앞으로의 수익을 약속하지 않아요 — 그 시기의 정책 · 금리 · 국제 정세는 ③ 프롬프트로 Claude에게 물어 함께 보세요.</div>';
+  return h + '</div>';
+}
+(function () {
+  /* 프롬프트: 평가표를 넘기고, Claude가 동의/이견과 그 시대 배경을 쓰게 한다 */
+  var b0 = egBlock; egBlock = function (syms, withPort) {
+    var t = b0.apply(this, arguments), L = []; (syms || []).slice(0, 4).forEach(function (s) { L = L.concat(egScoreLines(s)); });
+    if (!L.length) return t;
+    var add = ["", "[앱 종합 평가표 — 여러 기법을 점수로] 체력(회복력 · 기업 정보) 55% + 자리(MDD · 장기 평균선 · 기술 지표 · 닮은 과거 · 매크로) 45%. 괄호 안은 항목 점수(0~100). 자리 점수는 그 자산의 과거에 비해 쌀수록 높다."].concat(L);
+    add.push("→ edge 안에 \"review\" 키를 추가한다: { \"agree\": \"평가표에서 동의하는 점 2가지(숫자 인용)\", \"differ\": \"다르게 보는 점 — 점수가 놓친 것(사업 구조 변화 · 일회성 이익 · 규제 · 경쟁 등) 2가지\", \"era\": \"과거 큰 하락 2~3번이 각각 어떤 배경(정책 · 금리 · 국제 정세 · 당시 분위기)에서 왔고 무엇이 회복을 만들었는지, 지금과 같은 점 · 다른 점\", \"score\": 앱 점수를 그대로 쓰거나 고친 0~100 정수, \"why\": \"고쳤다면 이유 한 줄\" }. '오래 살아남아 위기마다 회복한 기록'은 강점으로 인정하되, 그 회복을 만든 조건이 지금도 있는지를 꼭 따진다.");
+    var mark = "\n=== 예측 · 대응 · 방향 (edge)", i = t.indexOf(mark); return i >= 0 ? t.slice(0, i) + "\n" + add.join("\n") + t.slice(i) : t + "\n" + add.join("\n");
+  };
+  var n0 = egNorm; egNorm = function (E) { var o = n0.apply(this, arguments), R = E && E.review; if (R && typeof R === "object" && (R.agree || R.differ || R.era)) { o = o || { history: [], policy: [], paths: [], roadmap: null, protect: [], grow: [], mine: "" }; var sc = parseFloat(R.score); o.review = { agree: R.agree || "", differ: R.differ || "", era: R.era || "", score: isFinite(sc) ? Math.max(0, Math.min(100, Math.round(sc))) : null, why: R.why || "" }; } return o; };
+  var x0 = egExtraHtml; egExtraHtml = function (E, opt) {
+    var h = x0.apply(this, arguments), N = egNorm(E), R = N && N.review; if (!R) return h;
+    var add = '<div class="anxH">평가표에 대한 Claude 의견</div><div class="egHi">' + (R.score != null ? '<div class="egPH"><b>Claude가 본 점수</b><em>' + R.score + '</em></div>' + (R.why ? '<div class="coreL"><small>이유</small>' + egEsc(R.why) + '</div>' : '') : '') + '<div class="egTwo"><div class="up"><small>동의하는 점</small>' + egEsc(R.agree || "-") + '</div><div class="dn"><small>다르게 보는 점</small>' + egEsc(R.differ || "-") + '</div></div>' + (R.era ? '<div class="coreL"><small>그때의 배경</small>' + egEsc(R.era) + '</div>' : '') + '</div>';
+    return h ? h.replace('<div class="egX">', '<div class="egX">' + add) : '<div class="egX">' + add + '</div>';
+  };
+  /* 분석 화면: ② 아래 첫머리에 평가표 */
+  if (typeof anxSections === "function") { var s0 = anxSections; anxSections = function (root) {
+    var r = s0.apply(this, arguments);
+    try { var sym = AN.sym, secs = root.querySelectorAll(".anSec"); if (sym && secs[1] && !secs[1].querySelector(".egSc")) {
+      var need = [sym, "^VIX"], ok = need.every(function (s) { return nbHist[s]; }), done = EG["sd:" + sym];
+      if (ok && done) { var hh = egScoreHtml(sym); if (hh) { var first = secs[1].querySelector(".egBox"); if (first) first.insertAdjacentHTML("beforebegin", hh); else secs[1].insertAdjacentHTML("beforeend", hh); } }
+      else if (!EG["sw:" + sym]) { EG["sw:" + sym] = 1; Promise.all([egEnsure(need), typeof coreFund === "function" ? coreFund(sym).catch(function () {}) : null, typeof macroEnsure === "function" ? macroEnsure().catch(function () {}) : null]).then(function () { EG["sd:" + sym] = 1; if (typeof CORE !== "undefined" && CORE.fund && CORE.fund[sym] === undefined) CORE.fund[sym] = null; if (currentTab === "analyst" && AN.sym === sym) renderAnalyst(); }); }
+    } } catch (e) { console.warn("eg", e); }
+    return r;
+  }; }
+  /* 분석 프롬프트를 만들기 전에 기업 정보 · 매크로도 받아 둔다 */
+  if (typeof anxBuildPrompt === "function") { var p0 = anxBuildPrompt; anxBuildPrompt = function () { var sym = typeof AN !== "undefined" ? AN.sym : null, self = this, a = arguments; return Promise.all([egEnsure([sym, "^VIX"]), sym && typeof coreFund === "function" ? coreFund(sym).catch(function () {}) : null, typeof macroEnsure === "function" ? macroEnsure().catch(function () {}) : null]).then(function () { return p0.apply(self, a); }); }; }
+  var st = document.createElement("style"); st.textContent = [
+    ".egScTop{display:grid;grid-template-columns:130px minmax(180px,240px) 1fr;gap:14px;align-items:center;margin:6px 0 12px}.egScTot{border:5px solid #3182f6;border-radius:50%;width:118px;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center}.egScTot b{font-size:40px;font-weight:900;line-height:1}.egScTot span{font-size:11.5px;color:#556;margin-top:3px}",
+    ".egScAx>div{display:grid;grid-template-columns:70px 34px 1fr;gap:8px;align-items:center;margin:6px 0}.egScAx small{font-weight:800;font-size:12.5px}.egScAx small i{font-style:normal;color:#8a93a3;font-weight:500;font-size:11px}.egScAx b{font-size:17px;font-weight:900;text-align:right}.egScAx .egBar{margin:0;height:8px}",
+    ".egScRead{background:#f6f8fb;border-radius:12px;padding:10px 14px}.egScRead b{font-size:15px}.egScRead p{margin:4px 0;font-size:13px;line-height:1.55}.egScRead small{color:#6b7686;font-size:11.5px}",
+    ".egScCat{border-top:1px solid #eef1f5;padding:8px 0}.egScCat summary{display:grid;grid-template-columns:44px 1fr 34px 120px;gap:10px;align-items:center;cursor:pointer;list-style:none;font-size:13.5px}.egScCat summary::-webkit-details-marker{display:none}.egScCat summary em{font-style:normal;font-weight:900;font-size:17px;text-align:right}.egScCat summary .egBar{margin:0;height:7px}",
+    ".egScAxTag{font-size:11px;font-weight:800;border-radius:6px;padding:2px 0;text-align:center;background:#e8f0fe;color:#1f5fbf}.egScAxTag.body{background:#e7f5ee;color:#1d7f55}.egScT{margin-top:8px;table-layout:fixed;width:100%}.egScT th:nth-child(1){width:27%}.egScT th:nth-child(2){width:25%}.egScT th:nth-child(4){width:auto}.egScT td,.egScT th{font-size:12.5px;padding:7px 8px;vertical-align:top;line-height:1.5}.egScT td:nth-child(3),.egScT th:nth-child(3){text-align:center;width:44px}",
+    "@media(max-width:720px){.egScTop{grid-template-columns:1fr}.egScTot{margin:0 auto}.egScCat summary{grid-template-columns:40px 1fr 30px}.egScCat summary .egBar{display:none}.egScT td:nth-child(2){white-space:normal}}",
+    "[data-theme=dark] .egScRead{background:#1e2533;color:#dde}[data-theme=dark] .egScCat{border-color:#263041}[data-theme=dark] .egScTot span{color:#aab}"
+  ].join(""); document.head.appendChild(st);
+})();
+
+/* ============================================================
+   v12.97 ① 이탈 사례 · MDD에 가격(단가)과 1년 상세  ② 깊이 읽기  ③ 전 종목 매일 스캔  ④ 신규 상장 점검표
+   ============================================================ */
+function egPx(sym, v) { if (v == null || !isFinite(v)) return "-"; var krw = /\.K[SQ]$|^\^K/.test(sym || ""); if (/^\^/.test(sym || "")) return v.toLocaleString(undefined, { maximumFractionDigits: v < 1000 ? 2 : 0 }); return krw ? Math.round(v).toLocaleString() + "원" : "$" + (v >= 1000 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(2) : v.toFixed(v >= 1 ? 2 : 4)); }
+function egSwingThr(sym) { return egLev(sym) || /-USD$/.test(sym) ? 0.25 : 0.15; }
+/* 이탈 뒤 1년: 최고(상승폭 · 가격 · 때) · 최저(하락폭 · 가격 · 때) · 큰 오르내림 횟수(직전 꺾인 곳에서 thr 이상 움직인 횟수) */
+function egMaY1(M) {
+  if (!M || M._y1) return M; var rows = nbHist[M.sym]; if (!rows) return M; var last = rows[rows.length - 1], thr = egSwingThr(M.sym);
+  M.eps.forEach(function (e) {
+    var lo = 0, hi = rows.length - 1; while (lo < hi) { var m = (lo + hi) >> 1; if (rows[m].t < e.t0) lo = m + 1; else hi = m; }
+    var tEnd = Math.min(last.t, e.t0 + 365 * EG_DAY), mx = rows[lo], mn = rows[lo], piv = rows[lo].c, dir = 0, ups = 0, dns = 0, ext = rows[lo].c;
+    for (var j = lo + 1; j < rows.length && rows[j].t <= tEnd; j++) {
+      var r = rows[j]; if (r.c > mx.c) mx = r; if (r.c < mn.c) mn = r;
+      if (dir >= 0 && r.c > ext) ext = r.c; if (dir <= 0 && r.c < ext) ext = r.c;
+      if (dir === 0) { if (r.c / piv - 1 >= thr) { dir = 1; ups++; ext = r.c; } else if (r.c / piv - 1 <= -thr) { dir = -1; dns++; ext = r.c; } }
+      else if (dir === 1 && r.c / ext - 1 <= -thr) { dir = -1; dns++; piv = ext; ext = r.c; }
+      else if (dir === -1 && r.c / ext - 1 >= thr) { dir = 1; ups++; piv = ext; ext = r.c; }
+    }
+    e.y1 = { full: last.t >= e.t0 + 365 * EG_DAY, hi: { v: mx.c / e.c0 - 1, c: mx.c, ym: egYm(mx.t) }, lo: { v: mn.c / e.c0 - 1, c: mn.c, ym: egYm(mn.t) }, ups: ups, dns: dns, thr: thr, loFirst: mn.t < mx.t };
+    e.nowV = last.c / e.c0 - 1;
+  });
+  M.lastC = last.c; M._y1 = 1; return M;
+}
+egMaHtml = function (syms, title) {
+  var Ms = []; (syms || []).forEach(function (s) { var w = egMaY1(egMaBreak(s, "w200")); if (w) Ms.push(w); });
+  if (!Ms.length) return "";
+  var cc = function (v) { return v == null ? '<span class="briefDim">아직</span>' : '<b class="' + (v >= 0 ? "up" : "dn") + '">' + egPct(v) + '</b>'; };
+  var h = '<div class="egBox"><div class="egH">' + egEsc(title || "장기 평균선(200주선) 이탈 사례") + ' <small>주봉 종가가 200주 평균(약 4년 평균 가격) 아래로 내려온 때와 그 뒤 — 선 위에 8주 이상 있다가 내려온 것만 세고, 다시 4주 연속 선 위면 끝난 것으로 봐요 · 모든 수익률은 "이탈한 그 주 종가(이탈가)에 샀다면" 기준 · 분할 반영 종가</small></div>';
+  Ms.forEach(function (M) {
+    var px = function (v) { return egPx(M.sym, v); };
+    var st = M.open ? (M.below ? '<em class="egThin">지금 선 아래 ' + egPct(M.gapNow) + ' · ' + M.open.ym + ' 이탈 · ' + egDur(M.open.days) + '째</em>' : '<em class="egThin">' + M.open.ym + ' 이탈 뒤 지금은 선 위 ' + egPct(M.gapNow) + ' — 4주 연속 선 위면 끝난 것으로 봐요</em>') : '<em>지금 선 ' + (M.below ? "아래" : "위") + ' ' + egPct(M.gapNow) + '</em>';
+    h += '<div class="egA"><div class="egAH"><b>' + egEsc(M.name) + '</b><span>' + M.from + '부터 ' + M.years + '년치 · 과거 이탈 ' + M.done.length + '번' + (M.open ? ' + 이번' : '') + ' · 지금 ' + px(M.lastC) + '</span>' + st + '</div>';
+    if (!M.eps.length) { h += '<div class="briefDim">이 기간에 200주선 아래로 내려온 적이 없어요.</div></div>'; return; }
+    h += '<div class="egEpL">' + M.eps.map(function (e) {
+      var y = e.y1 || {}, part = y.full ? "" : " (지금까지)";
+      return '<div class="egEp' + (e.open ? " now" : "") + '"><div class="egEpH"><b>' + e.ym + ' 이탈</b><span>이탈가 ' + px(e.c0) + '</span><span>선 아래 ' + egDur(e.days) + (e.open ? '째' : '') + '</span>' + (e.open ? '<i>이번 · ' + (M.below ? "진행 중" : "복귀 확인 중") + '</i>' : '') + '<em>지금 ' + px(M.lastC) + ' ' + cc(e.nowV) + '</em></div>' +
+        '<div class="egEpG"><div><small>1년 뒤</small>' + cc(e.r1) + '</div><div><small>2년 뒤</small>' + cc(e.r2) + '</div><div><small>3년 뒤</small>' + cc(e.r3) + '</div>' +
+        '<div class="w"><small>1년 안 최저' + part + '</small><b class="dn">' + egPct(y.lo ? y.lo.v : null) + '</b> <span>' + (y.lo ? px(y.lo.c) + ' · ' + y.lo.ym : '') + '</span></div>' +
+        '<div class="w"><small>1년 안 최고' + part + '</small><b class="up">' + egPct(y.hi ? y.hi.v : null) + '</b> <span>' + (y.hi ? px(y.hi.c) + ' · ' + y.hi.ym : '') + '</span></div>' +
+        '<div class="w"><small>큰 오르내림 (±' + Math.round((y.thr || 0.15) * 100) + '% 이상)</small><b>' + ((y.ups || 0) + (y.dns || 0)) + '번</b> <span>상승 ' + (y.ups || 0) + ' · 하락 ' + (y.dns || 0) + '</span></div>' +
+        '<div class="w"><small>3년 안 최저 · 최고</small><b class="dn">' + egPct(e.lo.v) + '</b> · <b class="up">' + egPct(e.hi.v) + '</b> <span>' + e.lo.ym + ' · ' + e.hi.ym + '</span></div>' +
+        '<div class="w"><small>하루 최대 상승 · 하락</small>' + (e.dUp ? '<b class="up">' + egPct(e.dUp.v, 1) + '</b> · <b class="dn">' + egPct(e.dDn.v, 1) + '</b> <span>' + e.dUp.d + ' · ' + e.dDn.d + '</span>' : '-') + '</div></div>' +
+        '<div class="egEpT">' + egEsc(egEpRead(M, e)) + '</div></div>';
+    }).join("") + '</div>';
+    var note = [], D = M.done;
+    if (D.length) {
+      var deep = D.filter(function (e) { return e.y1 && e.y1.lo.v <= -0.1; }).length, loFirst = D.filter(function (e) { return e.y1 && e.y1.loFirst && e.y1.lo.v <= -0.05; }).length, wl = Math.min.apply(null, D.map(function (e) { return e.y1 ? e.y1.lo.v : 0; })), ld = Math.max.apply(null, D.map(function (e) { return e.days; })), w1 = D.filter(function (e) { return e.r1 != null; }), p1 = w1.filter(function (e) { return e.r1 > 0; }).length, sw = Math.round(D.reduce(function (a, e) { return a + (e.y1 ? e.y1.ups + e.y1.dns : 0); }, 0) / D.length);
+      note.push('<b>깊이 읽기</b> — 과거 ' + D.length + '번 중 1년 뒤 플러스는 ' + p1 + '/' + w1.length + '번이었어요. 그런데 결과만 보면 놓치는 게 있어요. ① <b>이탈가가 바닥이 아니었어요</b>: ' + deep + '번은 1년 안에 이탈가보다 10% 넘게 더 내려갔고(가장 깊게 ' + egPct(wl) + '), ' + loFirst + '번은 최저점이 최고점보다 먼저 왔어요 — 사자마자 손실을 보고 버틴 뒤에야 올랐다는 뜻이에요. ② <b>가는 길이 험했어요</b>: 1년 동안 큰 오르내림이 평균 ' + sw + '번 있었어요. 중간에 팔고 싶어지는 순간이 그만큼 있었다는 거예요. ③ <b>기간은 예측이 안 돼요</b>: 선 아래 머문 기간이 가장 길 때 ' + egDur(ld) + '였어요. 그래서 이 신호는 "지금 한 번에"가 아니라 "여기서부터 ' + egPct(wl) + '까지 내려가도 계속 살 수 있게 몇 번에 나눌까"를 정하는 데 쓰는 게 맞아요.');
+      if (D.length < 5) note.push('<b>사례가 ' + D.length + '번뿐</b>이라 확률이 아니라 기록으로만 봐야 해요. 관찰 기간(' + M.from + '~, ' + M.years + '년)에 없던 종류의 긴 약세장은 이 표에 들어 있지 않아요.');
+    }
+    if (M.lev) note.push('<b>레버리지 상품 주의</b> — 하루 수익률의 2~3배를 따라가서, 지수가 오르내리며 제자리로 돌아와도 원금은 줄어요(변동성 손실). 위 "큰 오르내림" 횟수가 많을수록 이 손실이 커져요. 과거에 회복했다는 사실이 다음에도 회복한다는 뜻은 아니에요.');
+    if (note.length) h += '<div class="egNote">' + note.join('<br>') + '</div>';
+    h += '</div>';
+  });
+  return h + '</div>';
+};
+function egEpRead(M, e) {
+  var y = e.y1; if (!y) return ""; var t = [];
+  if (e.open && !y.full) { t.push("이번 이탈은 아직 " + egDur(e.days) + "째예요. 지금까지 이탈가 대비 최저 " + egPct(y.lo.v) + ", 최고 " + egPct(y.hi.v) + "."); return t.join(" "); }
+  if (y.lo.v <= -0.1) t.push((y.loFirst ? "먼저 " : "") + egPct(y.lo.v) + "(" + egPx(M.sym, y.lo.c) + ")까지 더 내려간 뒤"); else t.push("이탈가 근처가 거의 바닥이었고");
+  t.push(e.r1 == null ? "아직 1년이 안 됐어요." : e.r1 >= 0 ? "1년 뒤 " + egPct(e.r1) + "로 끝났어요." : "1년 뒤에도 " + egPct(e.r1) + "로 손실이었어요.");
+  if (e.r1 != null && e.r1 < 0 && e.r3 != null) t.push(e.r3 >= 0 ? "3년을 기다려야 플러스(" + egPct(e.r3) + ")가 됐어요." : "3년 뒤에도 " + egPct(e.r3) + " — 이탈이 긴 하락의 시작이었던 경우예요.");
+  if (y.ups + y.dns >= 6) t.push("그 1년 동안 ±" + Math.round(y.thr * 100) + "% 넘는 오르내림이 " + (y.ups + y.dns) + "번 — 버티기 쉽지 않은 길이었어요.");
+  return t.join(" ");
+}
+/* 프롬프트 줄에도 1년 상세(가격 포함)를 덧붙인다 */
+(function () {
+  var l0 = egMaLine; egMaLine = function (sym, mode) {
+    var t = l0.apply(this, arguments); if (!t || mode !== "w200") return t; var M = egMaY1(egMaBreak(sym, "w200")); if (!M || !M.eps.length) return t;
+    return t + "\n  · 1년 상세(이탈가 기준 · 분할 반영 종가): " + M.eps.slice(-6).map(function (e) { var y = e.y1; return e.ym + " 이탈가 " + egPx(sym, e.c0) + " → 1년 안 최저 " + egPct(y.lo.v) + "(" + egPx(sym, y.lo.c) + ", " + y.lo.ym + ") · 최고 " + egPct(y.hi.v) + "(" + egPx(sym, y.hi.c) + ", " + y.hi.ym + ") · ±" + Math.round(y.thr * 100) + "% 오르내림 " + (y.ups + y.dns) + "번" + (y.full ? "" : " (진행 중)") + " · 지금 " + egPx(sym, M.lastC) + "(" + egPct(e.nowV) + ")"; }).join(" / ");
+  };
+  /* 평가표 아래 '깊이 읽기' */
+  var h0 = egScoreHtml; egScoreHtml = function (sym) {
+    var h = h0.apply(this, arguments), S = egScore(sym); if (!h || !S || !S.raw) return h; var R = S.raw, px = function (v) { return egPx(sym, v); }, P = [];
+    P.push('<b>회복력</b> — ' + R.yrs.toFixed(1) + '년 동안 -20% 넘는 큰 하락이 ' + R.eps + '번 있었고 그중 ' + R.closed + '번을 전고점까지 되돌렸어요' + (R.openDd != null ? '(지금 ' + egPct(R.openDd) + ' 하락이 진행 중)' : '') + '.' + (R.recMed != null ? ' 고점에서 다시 고점까지 보통 ' + (R.recMed < 1 ? Math.round(R.recMed * 12) + '개월' : R.recMed.toFixed(1) + '년') + ', 가장 길 때 ' + (R.recMax < 1 ? Math.round(R.recMax * 12) + '개월' : R.recMax.toFixed(1) + '년') + '이 걸렸어요.' : '') + ' 여러 번 같은 방향으로 회복했다는 건 그 자산을 사는 사람과 돈을 버는 구조가 위기 때마다 살아 있었다는 뜻이에요. 다만 점수가 말해 주지 못하는 것이 하나 있어요 — <b>그때 회복을 만든 것</b>(금리 인하, 정부 지원, 새 수요)이 다음에도 있을지는 숫자에 없어요. 그래서 ③ 프롬프트에서 Claude에게 과거 하락마다의 배경을 따로 쓰게 했어요.');
+    P.push('<b>MDD</b> — 역대 최악은 ' + px(R.worstPk) + '(' + egYm(R.worstPkT) + ')에서 ' + px(R.worstC) + '(' + egYm(R.worstT) + ')까지 ' + egPct(S.worst) + '였어요. 지금은 고점 ' + px(R.pk) + ' 대비 ' + egPct(S.cur) + '(' + px(R.lastC) + ')예요.' + (S.cur < -0.03 ? ' 같은 최악이 지금 다시 온다면 ' + px(R.pk * (1 + S.worst)) + ' 근처까지, 즉 지금 가격에서 ' + egPct((1 + S.worst) / (1 + S.cur) - 1) + ' 더 내려갈 수 있었다는 계산이에요.' : ' 고점 근처라 같은 최악이 오면 지금 가격에서 ' + egPct(S.worst) + '(' + px(R.lastC * (1 + S.worst)) + ' 근처)까지 내려갈 수 있다는 뜻이에요.') + ' MDD는 "싸다"의 근거이면서 동시에 "얼마나 더 아플 수 있나"의 근거예요. 그래서 사기 전에 정할 것은 가격이 아니라 <b>이 폭을 견딜 수 있는 금액</b>이에요.' + (R.needUp != null && R.needUp >= 0.3 ? ' 그리고 빠진 폭과 회복에 필요한 폭은 달라요 — 지금은 ' + egPct(R.needUp) + ' 올라야 전고점이에요.' : ''));
+    if (R.wGap != null) P.push('<b>장기 평균선</b> — 200주선은 지난 4년 동안 이 자산을 산 사람들의 평균 가격쯤이에요. 지금은 그 선 ' + (R.wGap < 0 ? '아래 ' : '위 ') + egPct(R.wGap) + '예요. ' + (R.wGap < 0 ? '선 아래라는 건 4년 동안 산 사람 대부분이 손실 구간이라는 뜻이라, 공포가 크고 그래서 싸요. ' : R.wGap > 0.8 ? '선에서 이만큼 멀어진 건 최근에 급하게 올랐다는 뜻이에요. 좋은 자산도 이런 거리에서 사면 한동안 제자리일 수 있어요. ' : '') + (R.wN ? '과거 이탈 ' + R.wN + '번의 상세(이탈가 · 1년 안 최저/최고 가격 · 오르내림 횟수)는 아래 "장기 평균선 이탈 사례"에 있어요.' : '이 자산은 관찰 기간에 200주선을 깬 적이 없어요 — 깨진다면 처음 보는 일이라 과거 기록으로 판단할 수 없어요.'));
+    P.push('<b>기술 지표 · 매크로를 어떻게 쓸까</b> — 이 둘은 "무엇을 살까"가 아니라 "언제 · 얼마나 빨리"를 정하는 재료예요. 체력이 좋고 싼데 흐름이 역배열이면 아직 떨어지는 칼일 수 있으니 분할 간격을 넓히고, 정배열로 돌아서면 간격을 좁히는 식이에요. 매크로는 미리 맞히기 어려워 점수 비중을 가장 작게 뒀어요.');
+    var box = '<details class="egDeep" open><summary>깊이 읽기 — 숫자가 말하는 것과 말하지 못하는 것</summary>' + P.map(function (x) { return '<p>' + x + '</p>'; }).join("") + '</details>';
+    var k = h.lastIndexOf('<div class="egNote"><b>점수 읽는 법</b>'); return k >= 0 ? h.slice(0, k) + box + h.slice(k) : h + box;
+  };
+})();
+
+/* ---------- ③ 전 종목 매일 스캔 ---------- */
+var EGS = { run: false, done: 0, total: 0, res: null, flt: "good", mk: "all" };
+function egScanList() { var out = [], seen = {}; (typeof TICKER_DICT !== "undefined" ? TICKER_DICT : []).forEach(function (r) { var s = r[0]; if (seen[s] || /^\^|=X$|=F$|^DX-Y/.test(s)) return; seen[s] = 1; out.push(s); }); return out; }
+function egScanLoad() { if (EGS.res) return EGS.res; try { var v = JSON.parse(localStorage.getItem("sm.scan") || "null"); if (v && v.day && v.rows) EGS.res = v; } catch (e) {} return EGS.res; }
+function egScanRow(sym) {
+  var S = egScore(sym); if (!S) return null; var by = {}; S.cats.forEach(function (c) { by[c.id] = c.score; });
+  return { s: sym, n: S.name, t: S.total, b: S.body, sp: S.spot, ch: S.cheap, tech: by.tech != null ? by.tech : null, mdd: by.mdd, ma: by.ma, cur: S.cur, worst: S.worst, wGap: S.raw.wGap, wOpen: S.raw.wOpen, yrs: Math.round(S.raw.yrs * 10) / 10, cagr: S.raw.cagr, rec: S.raw.closed + "/" + S.raw.eps, lev: S.lev ? 1 : 0, px: S.raw.lastC, read: S.read[0], f: S.hasFund ? 1 : 0 };
+}
+function egScanRun(onTick) {
+  if (EGS.run) return Promise.resolve(EGS.res); var list = egScanList(), rows = [], had = {}, idx = 0; EGS.run = true; EGS.done = 0; EGS.total = list.length; Object.keys(nbHist).forEach(function (k) { had[k] = 1; });
+  var vix = egEnsure(["^VIX"]), mac = typeof macroEnsure === "function" ? macroEnsure().catch(function () {}) : null;
+  var one = function () {
+    if (idx >= list.length) return Promise.resolve(); var sym = list[idx++];
+    return egEnsure([sym]).then(function () { try { var r = egScanRow(sym); if (r) rows.push(r); } catch (e) {} if (!had[sym]) { delete nbHist[sym]; Object.keys(EG.memo).forEach(function (k) { if (k.indexOf(":" + sym + ":") > 0 || k.indexOf(sym + ":") === 0) delete EG.memo[k]; }); } EGS.done++; if (onTick) onTick(); }).then(one);
+  };
+  return Promise.all([vix, mac]).then(function () { var ws = []; for (var i = 0; i < 5; i++) ws.push(one()); return Promise.all(ws); }).then(function () {
+    /* 2단계: 체력 · 싼 정도가 좋은 주식 상위 40개만 기업 정보를 받아 다시 계산 (네이버 호출을 아끼려고) */
+    var cand = rows.filter(function (r) { return !r.lev && typeof coreIsStock === "function" && coreIsStock(r.s); }).sort(function (a, b) { return b.t - a.t; }).slice(0, 40), j = 0;
+    var two = function () { if (j >= cand.length) return Promise.resolve(); var r = cand[j++]; return Promise.all([egEnsure([r.s]), coreFund(r.s).catch(function () {})]).then(function () { try { var x = egScanRow(r.s); if (x) Object.assign(r, x); } catch (e) {} if (!had[r.s]) delete nbHist[r.s]; if (onTick) onTick(); }).then(two); };
+    return Promise.all([two(), two(), two()]);
+  }).then(function () {
+    rows.sort(function (a, b) { return b.t - a.t; }); EGS.res = { day: typeof smKstDay === "function" ? smKstDay() : new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), at: Date.now(), rows: rows }; EGS.run = false;
+    try { localStorage.setItem("sm.scan", JSON.stringify(EGS.res)); } catch (e) {} if (typeof smKvPut === "function") { try { smKvPut("cfg:scan", { day: EGS.res.day, at: EGS.res.at, rows: rows.slice(0, 120) }); } catch (e) {} }
+    return EGS.res;
+  }).catch(function (e) { EGS.run = false; throw e; });
+}
+function egScanFilter(rows) {
+  var mk = EGS.mk, f = EGS.flt; rows = rows.filter(function (r) { return mk === "all" || (mk === "kr" ? /\.K[SQ]$/.test(r.s) : mk === "coin" ? /-USD$/.test(r.s) : !/\.K[SQ]$|-USD$/.test(r.s)); });
+  if (f === "good") rows = rows.filter(function (r) { return r.b >= 65 && r.ch >= 62 && !r.lev; });
+  else if (f === "ma") rows = rows.filter(function (r) { return r.wGap != null && r.wGap <= 0.05 && r.b >= 55; }).sort(function (a, b) { return a.wGap - b.wGap; });
+  else if (f === "dd") rows = rows.filter(function (r) { return r.cur <= -0.2 && r.b >= 60; }).sort(function (a, b) { return a.cur - b.cur; });
+  else if (f === "strong") rows = rows.filter(function (r) { return r.b >= 75 && (r.tech || 0) >= 65; });
+  else if (f === "lev") rows = rows.filter(function (r) { return r.lev; });
+  return rows;
+}
+function egScanHtml() {
+  var R = egScanLoad(), today = typeof smKstDay === "function" ? smKstDay() : "", col = function (p) { return p == null ? "#8a93a3" : p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; };
+  var FL = [["good", "튼튼한데 싸진 것"], ["ma", "200주선 아래 · 근처"], ["dd", "-20% 넘게 빠진 튼튼한 것"], ["strong", "튼튼하고 오르는 중"], ["all", "전체 순위"], ["lev", "레버리지"]], MK = [["all", "전체"], ["kr", "국내"], ["us", "해외"], ["coin", "코인"]];
+  var h = '<div class="egBox egScan"><div class="egH">오늘의 후보 — 전 종목 스캔 <small>앱에 있는 종목 전체(지수 · 환율 제외)를 25년 일봉으로 계산해 회복력 · MDD · 장기 평균선 · 기술 지표 점수를 매겨요. 상위 40개 주식은 기업 정보까지 넣어 다시 계산해요. 매수 추천이 아니라 "먼저 들여다볼 순서"예요.</small></div>';
+  h += '<div class="anActs"><button class="primary" data-egscan' + (EGS.run ? " disabled" : "") + '>' + (EGS.run ? "스캔 중 " + EGS.done + " / " + EGS.total : R && R.day === today ? "🔄 다시 스캔" : "🔎 오늘 스캔 시작 (1~3분)") + '</button><span class="briefDim">' + (R ? "마지막 스캔 " + R.day + " · " + R.rows.length + "종목" + (R.day !== today ? " — 오늘 데이터로 다시 스캔하세요" : "") : "아직 스캔한 적이 없어요 · 아침 수집(07:00) 뒤 하루 한 번이면 충분해요") + '</span></div>';
+  if (EGS.run) h += '<div class="egBar" style="height:8px"><u style="width:' + (EGS.total ? Math.round(EGS.done / EGS.total * 100) : 0) + '%"></u></div>';
+  if (R && R.rows.length) {
+    var rows = egScanFilter(R.rows.slice());
+    h += '<div class="egChips">' + FL.map(function (f) { return '<button class="chip' + (EGS.flt === f[0] ? " on" : "") + '" data-egflt="' + f[0] + '">' + f[1] + '</button>'; }).join("") + '<div style="flex:1"></div>' + MK.map(function (m) { return '<button class="chip' + (EGS.mk === m[0] ? " on" : "") + '" data-egmk="' + m[0] + '">' + m[1] + '</button>'; }).join("") + '</div>';
+    h += rows.length ? '<div class="dxWrap egScanW"><table class="dgT egScanT"><thead><tr><th>#</th><th>종목</th><th>종합</th><th>체력</th><th>싼 정도</th><th>흐름</th><th>지금 낙폭<br><small>역대 최대</small></th><th>200주선 대비</th><th>큰 하락 회복</th><th>기록</th><th>한 줄 판정</th></tr></thead><tbody>' + rows.slice(0, 60).map(function (r, i) {
+      var sc = function (p) { return '<b style="color:' + col(p) + '">' + (p == null ? "-" : p) + '</b>'; };
+      return '<tr data-ansym2="' + egEsc(r.s) + '"><td>' + (i + 1) + '</td><td class="dgName"><b>' + egEsc(r.n) + '</b>' + (r.lev ? ' <small class="dgNo">레버리지</small>' : '') + (r.f ? '' : ' <small class="briefDim" title="기업 정보 없이 회복력만으로 체력을 봤어요">회복력만</small>') + '<br><small>' + egEsc(r.s) + ' · ' + egPx(r.s, r.px) + '</small></td><td>' + sc(r.t) + '</td><td>' + sc(r.b) + '</td><td>' + sc(r.ch) + '</td><td>' + sc(r.tech) + '</td><td><b class="dn">' + egPct(r.cur) + '</b><br><small>' + egPct(r.worst) + '</small></td><td>' + (r.wGap == null ? '-' : '<b class="' + (r.wGap < 0 ? "dn" : "") + '">' + egPct(r.wGap) + '</b>' + (r.wOpen ? '<br><small>이탈 중</small>' : '')) + '</td><td>' + r.rec + '번</td><td>' + r.yrs + '년' + (r.cagr != null ? '<br><small>연 ' + egPct(r.cagr, 1) + '</small>' : '') + '</td><td class="egScanR">' + egEsc(r.read) + '</td></tr>';
+    }).join("") + '</tbody></table></div><div class="briefDim" style="margin-top:6px">줄을 누르면 그 종목의 평가표 · 이탈 사례 · 프롬프트로 넘어가요. ' + (rows.length > 60 ? "상위 60개만 보여요. " : "") + '기록 3년 미만 종목은 점수 대신 아래 "신규 상장 점검표"로 봐요.</div>' : '<div class="briefDim" style="padding:10px 0">이 조건에 맞는 종목이 오늘은 없어요. 다른 조건을 눌러 보세요.</div>';
+    h += '<div class="egNote"><b>이 목록을 쓰는 법</b> — 「튼튼한데 싸진 것」은 체력 65점 이상이면서 MDD · 장기 평균선으로 본 "싼 정도"가 62점 이상인 종목이에요. 여기 올랐다고 사는 게 아니라, ① 줄을 눌러 왜 빠졌는지(평가표 · 이탈 사례) 보고 ② 프롬프트로 Claude에게 배경과 반론을 묻고 ③ 견딜 수 있는 금액과 분할 계획을 정하는 순서예요. 싸진 데에는 늘 이유가 있어요 — 그 이유가 "일시적"인지 "구조적"인지가 판단의 전부예요.</div>';
+  }
+  return h + '</div>';
+}
+
+/* ---------- ④ 신규 상장 점검표 (기록 3년 미만) ---------- */
+function egNew(sym) {
+  var rows = typeof nbHist !== "undefined" && nbHist[sym]; if (!rows || rows.length < 5) return null; var n = rows.length, first = rows[0], last = rows[n - 1], days = (last.t - first.t) / EG_DAY; if (days >= 3 * 365.25) return null;
+  var hi = first, lo = first, up = null, dn = null; for (var i = 1; i < n; i++) { var r = rows[i], d = r.c / rows[i - 1].c - 1; if (r.c > hi.c) hi = r; if (r.c < lo.c) lo = r; if (!up || d > up.v) up = { v: d, t: r.t }; if (!dn || d < dn.v) dn = { v: d, t: r.t }; }
+  var rs = []; for (i = 1; i < n; i++) rs.push(rows[i].c / rows[i - 1].c - 1); var mu = rs.reduce(function (a, b) { return a + b; }, 0) / (rs.length || 1), per = n / Math.max(0.05, days / 365.25), vol = rs.length >= 20 ? Math.sqrt(rs.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / rs.length) * Math.sqrt(Math.min(per, 365)) : null;
+  var vFirst = null, vLast = null; if (rows[0].v != null && n >= 40) { var a = 0, b = 0; for (i = 0; i < 20; i++) { a += rows[i].v || 0; b += rows[n - 1 - i].v || 0; } if (a > 0) { vFirst = a / 20; vLast = b / 20; } }
+  var d1 = function (k) { return new Date(first.t + k * EG_DAY).toISOString().slice(0, 10); }, passed = function (k) { return days >= k; };
+  var F = typeof CORE !== "undefined" && CORE.fund ? CORE.fund[sym] : null;
+  return { sym: sym, name: egName(sym), days: Math.round(days), first: first, last: last, hi: hi, lo: lo, fromFirst: last.c / first.c - 1, fromHi: last.c / hi.c - 1, fromLo: last.c / lo.c - 1, up: up, dn: dn, vol: vol, volRatio: vFirst ? vLast / vFirst : null, lock: [[90, d1(90), passed(90)], [180, d1(180), passed(180)], [365, d1(365), passed(365)]], F: F };
+}
+function egNewChecks(N) {
+  var C = [], px = function (v) { return egPx(N.sym, v); }, mo = Math.round(N.days / 30.4), lv = function (ok) { return ok === true ? "good" : ok === false ? "bad" : "mid"; };
+  C.push({ k: "기록 길이", v: mo + "개월 (" + new Date(N.first.t).toISOString().slice(0, 10) + " 첫 거래)", lv: N.days >= 365 ? "mid" : "bad", t: N.days < 180 ? "반년이 안 됐어요. 가격이 아직 '기대'로만 움직이는 시기라 실적 발표를 한두 번 지나야 제값이 잡혀요." : N.days < 365 ? "1년이 안 됐어요. 큰 하락을 한 번도 겪지 않았다면 회복력은 아직 모르는 거예요." : "1년은 넘었지만 긴 약세장을 겪은 기록은 없어요. 장기 점수(회복력 · 200주선)는 아직 쓸 수 없어요." });
+  C.push({ k: "첫 거래일 종가 대비", v: egPct(N.fromFirst) + " (" + px(N.first.c) + " → " + px(N.last.c) + ")", lv: lv(N.fromFirst >= 0), t: (N.fromFirst >= 0 ? "상장 첫날에 산 사람이 이익 구간이에요." : "상장 첫날에 산 사람이 손실 구간이에요 — 위에 팔고 싶은 물량이 쌓여 있어요.") + " 공모가는 앱이 알지 못해요 — 공모가 대비는 프롬프트로 Claude에게 확인하세요." });
+  C.push({ k: "상장 후 최고가 대비", v: egPct(N.fromHi) + " (최고 " + px(N.hi.c) + ", " + egYm(N.hi.t) + ")", lv: N.fromHi > -0.2 ? "mid" : N.fromHi > -0.5 ? "mid" : "bad", t: N.fromHi > -0.1 ? "최고가 근처예요. 신규 상장주는 초기 열기가 식으며 한 번 크게 빠지는 경우가 흔해서, 그 조정을 아직 안 거쳤다면 서두를 이유가 적어요." : N.fromHi > -0.5 ? "초기 열기에서 조정을 받는 중이에요. 락업 해제와 실적 발표 전후로 한 번 더 흔들릴 수 있어요." : "최고가에서 절반 넘게 빠졌어요. 열기는 빠졌지만, 사업이 기대에 못 미쳐서인지 물량 때문인지 구분해야 해요." });
+  C.push({ k: "상장 후 최저가 대비", v: egPct(N.fromLo) + " (최저 " + px(N.lo.c) + ", " + egYm(N.lo.t) + ")", lv: "mid", t: N.lo.t > N.hi.t ? "최저가가 최고가보다 나중이에요 — 고점 뒤 내려온 흐름이에요." : "최저가가 먼저였고 그 뒤 올라왔어요 — 바닥을 한 번 확인한 모양이에요." });
+  if (N.vol != null) C.push({ k: "변동성 (연) · 하루 최대", v: Math.round(N.vol * 100) + "% · " + egPct(N.up.v, 1) + " / " + egPct(N.dn.v, 1), lv: N.vol <= 0.45 ? "good" : N.vol <= 0.8 ? "mid" : "bad", t: N.vol > 0.8 ? "흔들림이 아주 커요. 비중을 작게, 한 번에 사지 않는 게 기본이에요." : N.vol > 0.45 ? "개별 성장주 수준의 흔들림이에요." : "신규 상장주치고는 차분한 편이에요." });
+  if (N.volRatio != null) C.push({ k: "거래량 (처음 20일 → 최근 20일)", v: "×" + N.volRatio.toFixed(2), lv: N.volRatio >= 0.5 ? "mid" : "mid", t: N.volRatio < 0.3 ? "초기보다 거래가 크게 줄었어요 — 관심이 빠진 상태라 작은 물량에도 가격이 크게 움직일 수 있어요." : N.volRatio > 1.2 ? "거래가 오히려 늘었어요 — 새로 들어오는 돈이 있다는 뜻이에요." : N.volRatio >= 0.7 ? "초기와 비슷한 거래가 이어지고 있어요." : "초기 열기가 식은 보통의 모습이에요." });
+  var nx = N.lock.filter(function (l) { return !l[2]; })[0];
+  C.push({ k: "보호예수(락업) 해제 — 통상 일정", v: N.lock.map(function (l) { return l[0] + "일 " + l[1].slice(2) + (l[2] ? " 지남" : ""); }).join(" · "), lv: nx && (Date.parse(nx[1]) - Date.now()) / EG_DAY <= 45 ? "bad" : "mid", t: (nx ? "다음 통상 해제 시점은 " + nx[1] + "(상장 " + nx[0] + "일)예요. " : "통상 해제 시점은 모두 지났어요. ") + "임직원 · 초기 투자자 물량이 풀리는 날 전후로 주가가 눌리는 일이 잦아요. 실제 날짜와 물량은 회사마다 달라서 증권신고서(S-1 · 투자설명서)에서 꼭 확인해야 해요 — 여기 날짜는 흔한 관행(90 · 180 · 365일)일 뿐이에요." });
+  var F = N.F;
+  if (F) {
+    if (F.opNeg != null) C.push({ k: "영업이익", v: F.opNeg ? "적자" : "흑자" + (F.margin != null ? " (이익률 " + (F.margin * 100).toFixed(1) + "%)" : ""), lv: lv(!F.opNeg), t: F.opNeg ? "아직 돈을 벌지 못해요. 이 경우 볼 것은 '현금이 몇 년 버티나'와 '매출이 얼마나 빨리 크나'예요." : "이미 돈을 버는 회사예요. 성장 기대가 꺾여도 버틸 바닥이 있어요." });
+    if (F.revG != null) C.push({ k: "매출 성장 (연)", v: egPct(F.revG, 1), lv: F.revG >= 0.2 ? "good" : F.revG >= 0.05 ? "mid" : "bad", t: F.revG >= 0.2 ? "매출이 빠르게 커요 — 신규 상장주의 높은 가격을 설명해 주는 유일한 근거예요." : "성장이 빠르지 않아요. 신규 상장 프리미엄을 줄 이유가 약해요." });
+    if (F.per != null) C.push({ k: "PER", v: F.per > 0 ? F.per.toFixed(0) + "배" : "적자", lv: F.per > 0 && F.per <= 40 ? "mid" : "bad", t: F.per > 60 ? "이익에 비해 가격이 매우 높아요. 성장이 조금만 느려져도 크게 빠질 수 있어요." : F.per > 0 ? "이익이 가격을 어느 정도 받치고 있어요." : "이익이 없어 PER을 쓸 수 없어요 — 매출 대비 가격(PSR)으로 비교해야 해요." });
+  } else C.push({ k: "기업 정보", v: "앱에 없음", lv: "mid", t: "상장한 지 얼마 안 돼 재무 자료가 아직 없거나 앱이 읽지 못했어요. 매출 · 이익 · 현금은 프롬프트로 Claude에게 증권신고서와 첫 실적을 찾게 하세요." });
+  return C;
+}
+function egNewHtml(sym) {
+  var N = egNew(sym); if (!N) return ""; var C = egNewChecks(N), g = C.filter(function (c) { return c.lv === "good"; }).length, b = C.filter(function (c) { return c.lv === "bad"; }).length;
+  var h = '<div class="egBox egNewB"><div class="egH">신규 상장 점검표 — ' + egEsc(N.name) + ' <small>거래 기록이 3년이 안 돼 회복력 · MDD · 200주선 같은 장기 기법을 쓸 수 없어요. 그래서 점수 대신 "지금 확인할 수 있는 것"과 "아직 알 수 없는 것"을 나눠 봐요</small></div>';
+  h += '<div class="dxSum ' + (b >= 3 ? "warn" : "ok") + '">확인된 항목 ' + C.length + '개 중 좋음 <b>' + g + '</b> · 주의 <b>' + b + '</b> — 종합 점수는 내지 않아요. 살아남은 기록이 없는 자산에 점수를 붙이면 근거 없는 확신이 되기 때문이에요.</div>';
+  h += '<div class="dxWrap"><table class="dgT egScT"><thead><tr><th>확인할 것</th><th>지금 값</th><th>상태</th><th>해석</th></tr></thead><tbody>' + C.map(function (c) { return '<tr><td><b>' + egEsc(c.k) + '</b></td><td>' + egEsc(c.v) + '</td><td><span class="dhBadge ' + (c.lv === "good" ? "ok" : c.lv === "bad" ? "warn" : "") + '">' + (c.lv === "good" ? "좋음" : c.lv === "bad" ? "주의" : "참고") + '</span></td><td>' + egEsc(c.t) + '</td></tr>'; }).join("") + '</tbody></table></div>';
+  h += '<div class="egNote"><b>오래된 기업과 다르게 봐야 하는 이유</b> — 오래 살아남은 자산은 "위기 때 어떻게 됐나"를 기록으로 볼 수 있지만, 신규 상장주는 그 기록이 없어요. 대신 볼 것은 네 가지예요. ① <b>가격이 무엇을 미리 반영했나</b>(공모가 · 매출 대비 가격을 비슷한 상장사와 비교) ② <b>팔 물량이 언제 얼마나 나오나</b>(락업 해제 · 추가 발행) ③ <b>돈을 벌고 있나, 아니면 현금이 몇 년 버티나</b> ④ <b>상장 뒤 실적 발표를 몇 번 통과했나</b>(약속한 숫자를 지켰는지). 그리고 가장 실용적인 규칙은 <b>시간을 내 편으로 두는 것</b>이에요 — 락업이 풀리고 실적을 서너 번 본 뒤에 사도 좋은 회사는 늦지 않고, 나쁜 회사는 그사이에 걸러져요. 비중은 "전부 잃어도 계획이 흔들리지 않는 만큼"만요.<br><b>아직 알 수 없는 것</b> — 큰 약세장에서의 낙폭과 회복 속도, 경기 침체 때의 매출, 경영진이 어려울 때 주주를 어떻게 대하는지. 이건 시간이 지나야만 알 수 있어요.</div>';
+  return h + '</div>';
+}
+function egNewLines(sym) {
+  var N = egNew(sym); if (!N) return []; var C = egNewChecks(N);
+  return ["", "[신규 상장 점검표 — 앱 계산] " + N.name + " 은(는) 거래 기록 " + Math.round(N.days / 30.4) + "개월이라 장기 기법(회복력 · MDD · 200주선)을 쓸 수 없음. 앱이 확인한 것:"].concat(C.map(function (c) { return "- " + c.k + ": " + c.v + " [" + (c.lv === "good" ? "좋음" : c.lv === "bad" ? "주의" : "참고") + "]"; })).concat([
+    "→ 신규 상장 종목이므로 아래를 웹에서 찾아 edge 안에 \"newco\" 키로 추가한다(출처 · 날짜 필수, 못 찾으면 '확인 못 함'):",
+    "  { \"ipo\": \"상장일 · 공모가 · 공모 규모 · 첫날 종가 · 지금 공모가 대비\", \"valuation\": \"시가총액 · 매출 대비 가격(PSR) · 비슷한 상장사 2~3곳과 비교\", \"lockup\": \"보호예수 해제 날짜와 물량(전체 주식의 몇 %) · 추가 발행 · 전환사채\", \"cash\": \"영업현금흐름 · 보유 현금 · 지금 속도로 몇 년 버티나\", \"earnings\": \"상장 뒤 실적 발표 횟수와 가이던스 대비 결과\", \"control\": \"지배구조 — 차등의결권 · 창업자 지분 · 대주주 매도 계획\", \"customers\": \"매출이 소수 고객 · 정부 계약에 쏠려 있는지\", \"analogs\": \"비슷한 과거 대형 상장 2~3건이 상장 뒤 1년 · 3년에 어떻게 됐는지(숫자)\", \"wait\": \"지금 사는 것과 락업 해제 · 실적 n번 뒤에 사는 것의 차이 — 기다릴 때 잃는 것과 얻는 것\", \"rule\": \"비중 상한과 분할 규칙(숫자)\" }",
+    "  상장 초기 주가는 기대와 수급으로 움직인다는 점, 살아남은 기록이 없다는 점을 전제로 쓴다. 점수를 매기지 않는다."]);
+}
+(function () {
+  /* 프롬프트 · 답 화면에 신규 상장 항목 */
+  var b0 = egBlock; egBlock = function (syms, withPort) { var t = b0.apply(this, arguments), L = []; (syms || []).slice(0, 3).forEach(function (s) { L = L.concat(egNewLines(s)); }); if (!L.length) return t; var mark = "\n=== 예측 · 대응 · 방향 (edge)", i = t.indexOf(mark); return i >= 0 ? t.slice(0, i) + "\n" + L.join("\n") + t.slice(i) : t + "\n" + L.join("\n"); };
+  var NK = [["ipo", "상장 · 공모가"], ["valuation", "가격 수준"], ["lockup", "풀릴 물량"], ["cash", "현금 · 버틸 기간"], ["earnings", "상장 뒤 실적"], ["control", "지배구조"], ["customers", "매출 쏠림"], ["analogs", "비슷한 과거 상장"], ["wait", "기다림의 득실"], ["rule", "비중 · 분할 규칙"]];
+  var n0 = egNorm; egNorm = function (E) { var o = n0.apply(this, arguments), R = E && E.newco; if (R && typeof R === "object" && NK.some(function (k) { return R[k[0]]; })) { o = o || { history: [], policy: [], paths: [], roadmap: null, protect: [], grow: [], mine: "" }; o.newco = R; } return o; };
+  var x0 = egExtraHtml; egExtraHtml = function (E, opt) { var h = x0.apply(this, arguments), N = egNorm(E), R = N && N.newco; if (!R) return h; var add = '<div class="anxH">신규 상장 — Claude가 찾은 것</div><div class="egRoad egNewR">' + NK.filter(function (k) { return R[k[0]]; }).map(function (k) { return '<div><small>' + k[1] + '</small>' + egEsc(typeof R[k[0]] === "string" ? R[k[0]] : JSON.stringify(R[k[0]])) + '</div>'; }).join("") + '</div>'; return h ? h.replace('<div class="egX">', '<div class="egX">' + add) : '<div class="egX">' + add + '</div>'; };
+  /* 분석 화면: ① 맨 위에 스캔 · ② 에 신규 상장 점검표 */
+  if (typeof anxSections === "function") { var s0 = anxSections; anxSections = function (root) {
+    var r = s0.apply(this, arguments);
+    try {
+      var secs = root.querySelectorAll(".anSec"), sym = AN.sym;
+      if (secs[0] && !secs[0].querySelector(".egScan")) { secs[0].insertAdjacentHTML("beforeend", egScanHtml()); egScanBind(root); }
+      if (sym && secs[1] && nbHist[sym] && EG["sd:" + sym] && !secs[1].querySelector(".egNewB")) { var hh = egNewHtml(sym); if (hh) { var first = secs[1].querySelector(".egBox"); if (first) first.insertAdjacentHTML("beforebegin", hh); else secs[1].insertAdjacentHTML("beforeend", hh); } }
+    } catch (e) { console.warn("eg", e); }
+    return r;
+  }; }
+  var st = document.createElement("style"); st.textContent = [
+    ".egEpL{display:grid;gap:8px}.egEp{border:1px solid #e6eaf0;border-radius:12px;padding:10px 12px;background:#fff}.egEp.now{background:#fff8ec;border-color:#f0d9b0}.egEpH{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:12.5px;color:#556}.egEpH>b{font-size:14.5px;color:#111}.egEpH i{font-style:normal;font-size:11px;font-weight:700;color:#b9600f;background:#fdebd0;border-radius:6px;padding:1px 6px}.egEpH em{font-style:normal;margin-left:auto}",
+    ".egEpG{display:grid;grid-template-columns:repeat(3,minmax(70px,90px)) repeat(5,minmax(120px,1fr));gap:6px;margin:8px 0 6px}.egEpG>div{background:#f6f8fb;border-radius:8px;padding:6px 8px;font-size:12.5px;line-height:1.4}.egEpG small{display:block;font-size:10.5px;color:#6b7686;font-weight:700}.egEpG span{display:block;font-size:11px;color:#6b7686}.egEpG b.up,.egEpH b.up{color:#c0392b}.egEpG b.dn,.egEpH b.dn{color:#1f5fbf}.egEpT{font-size:12.5px;line-height:1.55;color:#334}",
+    "@media(max-width:1100px){.egEpG{grid-template-columns:repeat(3,1fr)}.egEpG .w{grid-column:span 1}}@media(max-width:560px){.egEpG{grid-template-columns:repeat(2,1fr)}.egEpH em{margin-left:0}}",
+    ".egDeep{background:#f6f8fb;border-radius:12px;padding:10px 14px;margin:10px 0}.egDeep summary{font-weight:800;font-size:13.5px;cursor:pointer}.egDeep p{margin:8px 0 0;font-size:13px;line-height:1.65}",
+    ".egScanT td,.egScanT th{font-size:12.5px;padding:7px 8px;text-align:center;line-height:1.35}.egScanT td:nth-child(2),.egScanT th:nth-child(2),.egScanT td.egScanR{text-align:left}.egScanT tbody tr{cursor:pointer}.egScanT tbody tr:hover td{background:#f3f7ff}.egScanT small{color:#6b7686;font-size:11px}.egScanT b.dn{color:#1f5fbf}.egScanW{max-height:560px;overflow:auto}.egScanR{font-size:12px;color:#445;min-width:150px}.egScan .chip.on{background:#3182f6;color:#fff;border-color:#3182f6}.egNewR{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}",
+    "[data-theme=dark] .egEp{background:#161b24;border-color:#263041}[data-theme=dark] .egEp.now{background:#2a2114}[data-theme=dark] .egEpG>div,[data-theme=dark] .egDeep{background:#1e2533;color:#dde}[data-theme=dark] .egEpH>b{color:#eee}[data-theme=dark] .egEpT{color:#ccd}[data-theme=dark] .egScanT tbody tr:hover td{background:#1c2636}"
+  ].join(""); document.head.appendChild(st);
+})();
+function egScanBind(root) {
+  var redraw = function () { var b = root.querySelector(".egScan"); if (b) { b.outerHTML = egScanHtml(); egScanBind(root); } };
+  var go = root.querySelector("[data-egscan]"); if (go) go.onclick = function () { if (EGS.run) return; var lastDraw = 0; egScanRun(function () { if (Date.now() - lastDraw > 700) { lastDraw = Date.now(); redraw(); } }).then(function () { redraw(); if (typeof smToast === "function") smToast("스캔 완료 — " + EGS.res.rows.length + "종목"); }).catch(function (e) { redraw(); if (typeof smToast === "function") smToast("스캔 실패: " + (e && e.message || e), "bad"); }); redraw(); };
+  Array.prototype.forEach.call(root.querySelectorAll("[data-egflt]"), function (b) { b.onclick = function () { EGS.flt = b.getAttribute("data-egflt"); redraw(); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-egmk]"), function (b) { b.onclick = function () { EGS.mk = b.getAttribute("data-egmk"); redraw(); }; });
+  Array.prototype.forEach.call(root.querySelectorAll("[data-ansym2]"), function (tr) { tr.onclick = function () { AN.sym = tr.getAttribute("data-ansym2"); AN.ansId = null; if (typeof anRun === "function") anRun(); else renderAnalyst(); window.scrollTo(0, 0); }; });
+  if (!EGS.kv && !EGS.res && typeof smKvGet === "function") { EGS.kv = 1; smKvGet("cfg:scan").then(function (v) { if (v && v.rows && !EGS.res) { EGS.res = v; redraw(); } }); }
+}
+
+/* v12.97 분석 종목 검색 — 앱 사전에 없는 종목(막 상장한 회사 등)도 야후 검색으로 찾아 고를 수 있게 */
+(function () {
+  if (typeof anxSections !== "function") return; EG.names = EG.names || {};
+  var n0 = egName; egName = function (s) { var v = n0.apply(this, arguments); return (!v || v === s) && EG.names[s] ? EG.names[s] : v; };
+  var s0 = anxSections; anxSections = function (root) {
+    var r = s0.apply(this, arguments);
+    try {
+      var inp = document.getElementById("anSym"), res = document.getElementById("anSymRes"); if (!inp || !res || inp._egq) return r; inp._egq = 1; var tm = null, seq = 0;
+      inp.setAttribute("placeholder", (inp.getAttribute("placeholder") || "종목 검색") + " · 사전에 없으면 티커/영문명");
+      inp.addEventListener("input", function () {
+        clearTimeout(tm); var q = inp.value.trim(); if (q.length < 2) return; var my = ++seq;
+        tm = setTimeout(function () {
+          fetch("/api/search?q=" + encodeURIComponent(q)).then(function (x) { return x.json(); }).then(function (d) {
+            if (my !== seq || inp.value.trim() !== q) return; var have = {}; Array.prototype.forEach.call(res.querySelectorAll("[data-s]"), function (e) { have[e.getAttribute("data-s")] = 1; });
+            var ex = (d.quotes || []).filter(function (it) { return it.symbol && !have[it.symbol] && !/^\^|=X$|=F$/.test(it.symbol) && /EQUITY|ETF|CRYPTOCURRENCY/i.test(it.type || "EQUITY"); }).slice(0, 5); if (!ex.length) return;
+            res.insertAdjacentHTML("beforeend", '<div class="briefDim" style="padding:4px 10px;font-size:11px">사전에 없는 종목 (야후 검색) — 신규 상장은 점수 대신 점검표로 봐요</div>' + ex.map(function (it) { return '<div class="hRes" data-s="' + egEsc(it.symbol) + '" data-n="' + egEsc(it.name || it.symbol) + '"><b>' + egEsc(it.name || it.symbol) + '</b> <small>' + egEsc(it.symbol) + (it.exch ? ' · ' + egEsc(it.exch) : '') + '</small></div>'; }).join(""));
+            res.style.display = "block";
+            Array.prototype.forEach.call(res.querySelectorAll("[data-n]"), function (el) { el.onmousedown = function (e) { e.preventDefault(); var s = el.getAttribute("data-s"); EG.names[s] = el.getAttribute("data-n"); res.style.display = "none"; inp.value = ""; AN.sym = s; AN.ansId = null; if (typeof anRun === "function") anRun(); }; });
+          }).catch(function () {});
+        }, 350);
+      });
+    } catch (e) { console.warn("eg", e); }
+    return r;
+  };
+  var st = document.createElement("style"); st.textContent = ".egNewB .egScT th:nth-child(3){width:64px}.egNewB .dhBadge{white-space:nowrap}"; document.head.appendChild(st);
+})();
