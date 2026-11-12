@@ -921,3 +921,191 @@ function egSeamLoad(sym) {
     return (EG.seam[sym] = n ? { n: n, max: mx, maxD: mxD, big: big, histLast: ymd(snap.t[snap.t.length - 1]) } : { n: 0, why: "겹치는 날 없음" });
   }).catch(function () { return (EG.seam[sym] = { n: 0, why: "대조 실패" }); });
 }
+
+/* ============================================================
+   v13.00 ① 분석 프롬프트에 본질 · 변수 자료를 함께  ② 스캔 표 설명 · 200주선 이탈 중 · 조건 직접 넣기  ③ 분석 화면을 '요약 + 탭'으로 재구성
+   ============================================================ */
+/* ---------- ① 본질 · 변수 (본질/변수 화면과 같은 계산) ---------- */
+function egCoreEnsure(sym) {
+  var idx = egIndexOf(sym), ps = [egEnsure([sym, idx, "^VIX", "KRW=X"])];
+  if (typeof macroEnsure === "function") ps.push(macroEnsure().then(function () { return typeof macPxLoad === "function" ? macPxLoad() : null; }).catch(function () {}));
+  if (typeof coreFund === "function") ps.push(coreFund(sym).catch(function () {}));
+  try { if (typeof CORE !== "undefined" && !CORE.ans && typeof coreLoadAns === "function") coreLoadAns(); } catch (e) {}
+  return Promise.all(ps).catch(function () {});
+}
+function egCoreData(sym) {
+  if (typeof coreLong !== "function") return null; var idx = egIndexOf(sym), out = { sym: sym, rows: [], vars: [], fx: null, ev: [], iss: [], ans: null };
+  [sym, idx].filter(function (s, i, a) { return s && a.indexOf(s) === i; }).forEach(function (s) { var L = null, F = null, V = null; try { L = coreLong(s); F = (CORE.fund && CORE.fund[s]) || null; V = coreVerdict(L, F); } catch (e) {} if (L) out.rows.push({ sym: s, name: egName(s), L: L, F: F, V: V }); });
+  try { out.vars = coreVars() || []; } catch (e) {}
+  try { var FX = coreFx(); if (FX) out.fx = { F: FX, V: coreFxVerdict(FX) }; } catch (e) {}
+  try { out.ev = coreEvents() || []; } catch (e) {}
+  try { out.iss = coreIssues() || []; } catch (e) {}
+  try { if (CORE.ans && CORE.ans.j) out.ans = CORE.ans; } catch (e) {}
+  var me = out.rows[0], on = out.vars.filter(function (v) { return v.on; }).length; out.essOk = me && me.V ? me.V.st === "good" : null; out.varOn = on;
+  out.quad = out.essOk == null ? null : out.essOk && !on ? ["본질 좋음 · 변수 조용", "가장 편한 자리 — 정해 둔 적립을 그대로"] : out.essOk && on ? ["본질 좋음 · 변수 켜짐", "흔들리지만 본질은 그대로 — 변수 대응 규칙(분할 · 현금)을 꺼낼 때"] : !on ? ["본질 약함 · 변수 조용", "시장이 조용해도 이 자산 자체에 문제가 있을 수 있어요 — 이유부터 확인"] : ["본질 약함 · 변수 켜짐", "가장 조심할 자리 — 비중을 늘리기보다 지키는 쪽"];
+  return out;
+}
+function egCoreLines(sym) {
+  var D = egCoreData(sym); if (!D || (!D.rows.length && !D.vars.length)) return []; var P = function (v, d) { return typeof corePct === "function" ? corePct(v, d) : egPct(v, d); }, L = ["", "[본질 · 변수 — 앱의 본질/변수 화면과 같은 자료]"];
+  if (D.rows.length) { L.push("· 본질 (이 종목과 그 시장)  이름 | 연수익 3년/5년/10년 | 1년 | 아무 날 사서 1년 뒤 플러스 확률·중앙값·최악(최근 10년) | 고점 대비 | 역대 최대 낙폭 | -20% 낙폭 수(미회복)·회복 보통/최장 | 200일선 | 52주 위치 | 연변동성 | 규칙 판정(좋음/나쁨 수)과 근거");
+    D.rows.forEach(function (x) { var l = x.L, f = x.F; L.push("- " + x.name + "(" + x.sym + ") | " + P(l.c3, 1) + "/" + P(l.c5, 1) + "/" + P(l.c10, 1) + " | " + P(l.ret1, 1) + " | " + (l.f1 ? Math.round(l.f1.win * 100) + "% · " + P(l.f1.med, 0) + " · 최악 " + P(l.f1.worst, 0) : "-") + " | " + P(l.cur, 1) + " | " + P(l.worst, 0) + (l.worstY ? "(" + l.worstY + ")" : "") + " | " + l.dd20 + "(" + l.dd20open + ")" + (l.recMed ? " · " + Math.round(l.recMed / 30) + "개월/" + Math.round(l.recMax / 30) + "개월" : "") + " | " + (l.above200 == null ? "-" : (l.above200 ? "위 " : "아래 ") + P(l.vs200, 1)) + " | " + (l.pos52 == null ? "-" : Math.round(l.pos52 * 100)) + " | " + (l.vol == null ? "-" : Math.round(l.vol * 100) + "%") + (f ? " | 매출 " + P(f.revG, 0) + " · 영업이익 " + P(f.opG, 0) + (f.opNeg ? "(적자)" : "") + " · ROE " + (f.roe == null ? "-" : f.roe.toFixed(1)) + " · PER " + (f.per == null ? "-" : f.per) + " · 배당 " + (f.divY == null ? "-" : f.divY + "%") : "") + " | " + (x.V ? x.V.t + "(" + x.V.good + "/" + x.V.bad + ") — " + (x.V.why || []).join(" ; ") : "-")); }); }
+  if (D.quad) L.push("· 본질 × 변수 지금 자리: " + D.quad[0] + " → " + D.quad[1]);
+  if (D.vars.length) { L.push("· 변수 (매크로 조건)  조건 | 지금 | 값 | 과거 n번 → 코스피 1년 뒤 중앙값/승률 | 앱의 대응 규칙"); D.vars.forEach(function (v) { L.push("- " + v.name + " | " + (v.on ? "켜짐" : v.warn ? "주의" : "꺼짐") + " | " + (v.now || "") + (v.y1 ? " | " + v.n + "번 → " + P(v.y1.med, 0) + " / 승률 " + Math.round(v.y1.win * 100) + "%" : "") + (v.on || v.warn ? " | " + (v.resp || "") : "")); }); }
+  if (D.fx) { var FX = D.fx.F; L.push("· 환율 자리: 지금 " + Math.round(FX.now) + "원 · 1년 평균 " + Math.round(FX.y1.avg) + "원 · 3년 고점 " + Math.round(FX.max3) + "원 → " + D.fx.V.t); }
+  if (D.ev.length) { L.push("· 다가오는 일정(14일)"); D.ev.slice(0, 6).forEach(function (e) { L.push("- " + e.d + " " + e.t + (e.kb ? " — 볼 것: " + e.kb.watch : "")); }); }
+  if (D.iss.length) { L.push("· 오늘 켜진 이슈"); D.iss.slice(0, 4).forEach(function (i) { L.push("- " + i.t + (i.sub ? " · " + i.sub : "") + (i.why ? " — 왜: " + i.why : "")); }); }
+  if (D.ans) { var J = D.ans.j, E = J.essence || {}, mine = (E.assets || []).filter(function (a) { return a && a.name && (a.name === egName(sym) || String(a.name).indexOf(egName(sym)) >= 0); })[0];
+    L.push("· 본질/변수 화면에 저장된 Claude 답 (" + D.ans.day + "): 전체 본질 " + (E.verdict || "-") + (E.score != null ? " " + E.score + "점" : "") + (E.one ? " — " + E.one : ""));
+    if (mine) L.push("- 이 종목: " + (mine.st || "") + (mine.score != null ? " " + mine.score + "점" : "") + " · " + (mine.why || "") + (mine.risk ? " / 위험: " + mine.risk : "") + (mine.watch ? " / 볼 것: " + mine.watch : ""));
+    (J.variables || []).slice(0, 6).forEach(function (v) { if (v && v.name) L.push("- 변수 " + v.name + " [" + (v.state || "") + "] 대응 시작: " + (v.trigger || "-") + " → " + (v.response || "-")); }); }
+  L.push("→ 이 자료로 edge 안에 \"core\" 키를 쓴다: { \"essence\": \"이 종목의 본질 판정(유지|주의|훼손) + 이유 2문장 — 이익 · 성장 · 회복력 숫자 인용\", \"changed\": \"본질이 바뀌었는지 볼 숫자와 시점 한 줄\", \"vars\": [ { \"name\": \"변수(켜짐 · 주의 위주 3개 이내)\", \"path\": \"이 종목에 닿는 경로: 무엇 → 무엇 → 이 종목\", \"trigger\": \"대응을 시작할 조건(숫자)\", \"response\": \"그때 할 일(비중 · 분할 · 확인)\" } ], \"stance\": \"본질 × 변수 지금 자리에서의 행동 원칙 2문장 — 본질이 그대로면 변수는 대응의 대상이지 매도 이유가 아니라는 점을 기준으로\" }. 종합 평가표 · 이탈 사례 · 닮은 과거와 모순되지 않게, 서로 엇갈리면 어느 쪽을 더 믿는지와 이유를 쓴다.");
+  return L;
+}
+function egCoreHtml(sym) {
+  var D = egCoreData(sym); if (!D) return ""; var h = '<div class="egBox egCo"><div class="egH">본질 · 변수 — ' + egEsc(egName(sym)) + ' <small>본질/변수 화면과 같은 계산이에요 · 이 종목의 본질 판정과, 지금 켜진 변수 · 다가오는 일정이 프롬프트에 함께 들어가요</small></div>';
+  if (D.quad) h += '<div class="dxSum ' + (D.essOk && !D.varOn ? "ok" : "warn") + '"><b>' + egEsc(D.quad[0]) + '</b> — ' + egEsc(D.quad[1]) + '</div>';
+  D.rows.forEach(function (x) { var V = x.V || {}; h += '<div class="egA"><div class="egAH"><b>' + egEsc(x.name) + '</b><span>본질 규칙 판정</span><em class="' + (V.st === "good" ? "" : "egThin") + '">' + egEsc(V.t || "-") + ' · 좋음 ' + (V.good || 0) + ' / 나쁨 ' + (V.bad || 0) + '</em></div><div class="egWhy">' + (V.why || []).map(function (w) { return '<span class="' + (/^✓/.test(w) ? "g" : /^✗/.test(w) ? "b" : "") + '">' + egEsc(w) + '</span>'; }).join("") + '</div></div>'; });
+  if (D.vars.length) h += '<div class="egSubH">변수 — 지금 켜진 것 ' + D.varOn + '개</div><div class="dxWrap"><table class="dgT egScT"><thead><tr><th>변수</th><th>지금</th><th>상태</th><th>대응 규칙</th></tr></thead><tbody>' + D.vars.slice().sort(function (a, b) { return (b.on ? 2 : b.warn ? 1 : 0) - (a.on ? 2 : a.warn ? 1 : 0); }).map(function (v) { return '<tr class="' + (v.on ? "dxBad" : "") + '"><td><b>' + (v.icon || "") + ' ' + egEsc(v.name) + '</b></td><td>' + egEsc(v.now || "") + '</td><td><span class="dhBadge ' + (v.on ? "bad" : v.warn ? "warn" : "ok") + '">' + (v.on ? "켜짐" : v.warn ? "주의" : "꺼짐") + '</span></td><td>' + egEsc(v.on || v.warn ? v.resp || "" : (v.y1 ? "과거 " + v.n + "번 → 코스피 1년 뒤 보통 " + egPct(v.y1.med) : "")) + '</td></tr>'; }).join("") + '</tbody></table></div>';
+  if (D.fx) h += '<div class="egNote"><b>환율 자리</b> — 지금 ' + Math.round(D.fx.F.now).toLocaleString() + '원 · 1년 평균 ' + Math.round(D.fx.F.y1.avg).toLocaleString() + '원 → ' + egEsc(D.fx.V.t) + '</div>';
+  if (D.ev.length) h += '<div class="egSubH">다가오는 일정 (14일)</div><div class="egEvL">' + D.ev.slice(0, 6).map(function (e) { return '<div><b>' + egEsc(String(e.d).slice(5)) + '</b> ' + egEsc(e.t) + (e.kb ? '<small>볼 것: ' + egEsc(e.kb.watch) + '</small>' : '') + '</div>'; }).join("") + '</div>';
+  if (D.ans) h += '<div class="briefDim" style="margin-top:8px">본질/변수 화면에 저장된 Claude 답(' + egEsc(D.ans.day) + ')도 프롬프트에 요약해 넣어요. <button class="chip" onclick="navTo(\'core\')">본질 · 변수 화면 열기</button></div>'; else h += '<div class="briefDim" style="margin-top:8px">본질/변수 화면에서 Claude 답을 저장해 두면 그 결론(변수별 대응 조건)도 여기 프롬프트에 함께 들어가요. <button class="chip" onclick="navTo(\'core\')">본질 · 변수 화면 열기</button></div>';
+  return h + '</div>';
+}
+
+/* ---------- ② 스캔: 설명 · 200주선 이탈 중 · 조건 직접 넣기 ---------- */
+EGS.cond = EGS.cond || { b: 60, ch: 55, tech: 0, dd: 0, ma: 999, noLev: true, noBad: false };
+try { var _c = JSON.parse(localStorage.getItem("sm.scan.cond") || "null"); if (_c) EGS.cond = Object.assign(EGS.cond, _c); } catch (e) {}
+egScanFilter = function (rows) {
+  var mk = EGS.mk, f = EGS.flt, C = EGS.cond; rows = rows.filter(function (r) { return mk === "all" || (mk === "kr" ? /\.K[SQ]$/.test(r.s) : mk === "coin" ? /-USD$/.test(r.s) : !/\.K[SQ]$|-USD$/.test(r.s)); });
+  if (f === "good") rows = rows.filter(function (r) { return r.b >= 65 && r.ch >= 62 && !r.lev; });
+  else if (f === "brk") rows = rows.filter(function (r) { return r.wOpen && r.wGap != null && r.wGap < 0; }).sort(function (a, b) { return b.b - a.b; });
+  else if (f === "ma") rows = rows.filter(function (r) { return r.wGap != null && r.wGap >= 0 && r.wGap <= 0.1 && r.b >= 55; }).sort(function (a, b) { return a.wGap - b.wGap; });
+  else if (f === "dd") rows = rows.filter(function (r) { return r.cur <= -0.2 && r.b >= 60; }).sort(function (a, b) { return a.cur - b.cur; });
+  else if (f === "strong") rows = rows.filter(function (r) { return r.b >= 75 && (r.tech || 0) >= 68; });
+  else if (f === "lev") rows = rows.filter(function (r) { return r.lev; });
+  else if (f === "custom") rows = rows.filter(function (r) { return r.b >= C.b && r.ch >= C.ch && (r.tech == null ? C.tech <= 0 : r.tech >= C.tech) && (C.dd >= 0 ? true : r.cur <= C.dd / 100) && (C.ma >= 900 ? true : r.wGap != null && r.wGap <= C.ma / 100) && (!C.noLev || !r.lev) && (!C.noBad || r.q !== "bad"); });
+  return rows;
+};
+egScanHtml = function () {
+  var R = egScanLoad(), today = typeof smKstDay === "function" ? smKstDay() : "", col = function (p) { return p == null ? "#8a93a3" : p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; }, C = EGS.cond;
+  var all = R && R.rows ? R.rows : [], cntOf = function (f) { var k = EGS.flt, m = EGS.mk; EGS.flt = f; var n = egScanFilter(all.slice()).length; EGS.flt = k; EGS.mk = m; return n; };
+  var FL = [["good", "튼튼한데 싸진 것"], ["brk", "200주선 이탈 중"], ["ma", "200주선 바로 위 (10% 안)"], ["dd", "-20% 넘게 빠진 튼튼한 것"], ["strong", "튼튼하고 오르는 중"], ["custom", "내 조건"], ["all", "전체 순위"], ["lev", "레버리지"]], MK = [["all", "전체"], ["kr", "국내"], ["us", "해외"], ["coin", "코인"]];
+  var open = EGS.open != null ? EGS.open : !(typeof AN !== "undefined" && AN.sym), bad = all.filter(function (r) { return r.q === "bad"; }), wn = all.filter(function (r) { return r.q === "warn"; }).length;
+  var h = '<details class="egBox egScan"' + (open || EGS.run ? " open" : "") + '><summary class="egScanS"><b>오늘의 후보 — 전 종목 스캔</b><span>' + (EGS.run ? "스캔 중 " + EGS.done + " / " + EGS.total : R ? R.day + " · " + all.length + "종목 · 튼튼한데 싸진 것 <b>" + cntOf("good") + "</b> · 200주선 이탈 중 <b>" + cntOf("brk") + "</b>" + (R.day !== today ? " · 오늘 다시 스캔 필요" : "") : "아직 스캔 전 — 눌러서 열기") + '</span><i>펼치기 · 접기</i></summary>';
+  h += '<div class="egH"><small>앱에 있는 종목 전체(지수 · 환율 제외)를 25년 일봉으로 계산해 점수를 매겨요. 매수 추천이 아니라 "먼저 들여다볼 순서"예요.</small></div>';
+  h += '<div class="anActs"><button class="primary" data-egscan' + (EGS.run ? " disabled" : "") + '>' + (EGS.run ? "스캔 중 " + EGS.done + " / " + EGS.total : R && R.day === today ? "🔄 다시 스캔" : "🔎 오늘 스캔 시작 (1~3분)") + '</button><span class="briefDim">' + (R ? "마지막 스캔 " + R.day + (R.day !== today ? " — 오늘 데이터로 다시 스캔하세요" : "") : "아침 수집(07:00) 뒤 하루 한 번이면 충분해요") + '</span></div>';
+  if (EGS.run) h += '<div class="egBar" style="height:8px"><u style="width:' + (EGS.total ? Math.round(EGS.done / EGS.total * 100) : 0) + '%"></u></div>';
+  if (all.length) {
+    var rows = egScanFilter(all.slice());
+    h += '<div class="egChips">' + FL.map(function (f) { return '<button class="chip' + (EGS.flt === f[0] ? " on" : "") + '" data-egflt="' + f[0] + '">' + f[1] + (f[0] === "all" ? "" : ' <b>' + cntOf(f[0]) + '</b>') + '</button>'; }).join("") + '<div style="flex:1"></div>' + MK.map(function (m) { return '<button class="chip' + (EGS.mk === m[0] ? " on" : "") + '" data-egmk="' + m[0] + '">' + m[1] + '</button>'; }).join("") + '</div>';
+    if (EGS.flt === "custom") h += '<div class="egCond"><label>체력 ≥ <input type="number" data-egc="b" value="' + C.b + '" min="0" max="100"></label><label>싼 정도 ≥ <input type="number" data-egc="ch" value="' + C.ch + '" min="0" max="100"></label><label>흐름 ≥ <input type="number" data-egc="tech" value="' + C.tech + '" min="0" max="100"></label><label>지금 낙폭 ≤ <input type="number" data-egc="dd" value="' + C.dd + '" max="0" min="-99"> %</label><label>200주선 대비 ≤ <input type="number" data-egc="ma" value="' + (C.ma >= 900 ? "" : C.ma) + '" placeholder="제한 없음"> %</label><label><input type="checkbox" data-egc="noLev"' + (C.noLev ? " checked" : "") + '> 레버리지 빼기</label><label><input type="checkbox" data-egc="noBad"' + (C.noBad ? " checked" : "") + '> 검증 실패 빼기</label><span class="briefDim">예: 체력 70 · 낙폭 -25 · 200주선 0 → "튼튼한데 4년 평균보다 싸고 25% 넘게 빠진 것"</span></div>';
+    var FD = { good: "체력 65점 이상 + 싼 정도 62점 이상 (레버리지 제외)", brk: "주봉 종가가 200주선 아래로 내려와 아직 4주 연속 회복하지 못한 종목 — 체력 높은 순", ma: "200주선 위 0~10% — 선에 가까워 곧 닿을 수 있는 종목 (체력 55점 이상)", dd: "고점에서 20% 넘게 빠졌고 체력 60점 이상 — 많이 빠진 순", strong: "체력 75점 이상 + 흐름 68점 이상 — 싸지는 않지만 오르는 중", custom: "아래에 직접 넣은 조건", all: "종합 점수 순", lev: "레버리지 · 인버스 상품만 — 회복력 60점 상한" };
+    h += '<div class="briefDim" style="margin:2px 0 6px">조건: ' + FD[EGS.flt] + ' · <b>' + rows.length + '</b>종목 · 데이터 검증 통과 ' + (all.length - bad.length - wn) + ' / 주의 ' + wn + ' / 실패 ' + bad.length + '</div>';
+    h += rows.length ? '<div class="dxWrap egScanW"><table class="dgT egScanT"><thead><tr><th>#</th><th>종목</th><th title="체력 55% + 자리 45%">종합</th><th title="회복력 60% + 기업 정보 40%">체력</th><th title="MDD + 장기 평균선">싼 정도</th><th title="기술 지표 4개 평균">흐름</th><th>지금 낙폭<br><small>역대 최대</small></th><th>200주선 대비</th><th>큰 하락 회복</th><th>기록</th><th>한 줄 판정</th></tr></thead><tbody>' + rows.slice(0, 60).map(function (r, i) {
+      var sc = function (p) { return '<b style="color:' + col(p) + '">' + (p == null ? "-" : p) + '</b>'; }, tg = [];
+      if (r.lev) tg.push('<i class="egTg lev" title="레버리지 · 인버스 상품 — 지수가 제자리여도 원금이 줄 수 있어 회복력 점수를 60점으로 제한했어요">레버리지</i>');
+      if (!r.f) tg.push('<i class="egTg" title="기업 정보(ROE · 이익률 · 성장 · PER) 없이 회복력만으로 체력 점수를 냈어요 — ETF · 코인이거나, 상위 40개 밖이라 재무를 받지 않은 주식이에요. 종목을 누르면 재무까지 넣어 다시 계산해요">회복력만</i>');
+      if (r.q === "bad") tg.push('<i class="egTg bad" title="자료 검증 실패: ' + egEsc(r.qw || "") + ' — 숫자가 실제와 다를 수 있어요. 값은 그대로 보여 줘요">검증 실패</i>'); else if (r.q === "warn") tg.push('<i class="egTg warn" title="자료 검증에 주의 항목이 있어요 — 종목을 눌러 검증 탭에서 확인">검증 주의</i>');
+      return '<tr data-ansym2="' + egEsc(r.s) + '"><td>' + (i + 1) + '</td><td class="dgName"><b>' + egEsc(r.n) + '</b> ' + tg.join(" ") + '<br><small>' + egEsc(r.s) + ' · ' + egPx(r.s, r.px) + '</small></td><td>' + sc(r.t) + '</td><td>' + sc(r.b) + '</td><td>' + sc(r.ch) + '</td><td>' + sc(r.tech) + '<br><small>' + (r.tech == null ? "" : r.tech >= 68 ? "오름" : r.tech <= 48 ? "내림" : "횡보") + '</small></td><td><b class="dn">' + egPct(r.cur) + '</b><br><small>' + egPct(r.worst) + '</small></td><td>' + (r.wGap == null ? '<small>기록 부족</small>' : '<b class="' + (r.wGap < 0 ? "dn" : "") + '">' + egPct(r.wGap) + '</b>' + (r.wOpen && r.wGap < 0 ? '<br><i class="egTg bad">이탈 중</i>' : r.wOpen ? '<br><i class="egTg warn">복귀 확인 중</i>' : '')) + '</td><td>' + r.rec + '번</td><td>' + r.yrs + '년' + (r.cagr != null ? '<br><small>연 ' + egPct(r.cagr, 1) + '</small>' : '') + '</td><td class="egScanR">' + egEsc(r.read) + '</td></tr>';
+    }).join("") + '</tbody></table></div><div class="briefDim" style="margin-top:6px">줄을 누르면 그 종목 분석으로 넘어가요.' + (rows.length > 60 ? " 상위 60개만 보여요." : "") + '</div>' : '<div class="briefDim" style="padding:10px 0">이 조건에 맞는 종목이 오늘은 없어요.</div>';
+    h += '<details class="egLegend"><summary>표 읽는 법 — 점수 · 표시의 뜻</summary><div class="egLg">' +
+      '<div><b>종합</b>체력 55% + 자리 45%. 68점 이상 좋음 · 55~67 보통 · 42~54 주의 · 그 아래 나쁨 (색: 초록 · 파랑 · 주황 · 빨강).</div>' +
+      '<div><b>체력</b>오래 살아남고 회복해 왔는가. 회복력(관찰 기간 · -20% 하락 뒤 회복 횟수 · 회복까지 걸린 시간 · 전 기간 연수익 · 3년 보유 플러스 비율) 60% + 기업 정보(ROE · 이익률 · 매출/이익 성장 · PER) 40%.</div>' +
+      '<div><b>싼 정도</b>지금 가격이 이 종목의 과거에 비해 얼마나 싼가. MDD(지금 낙폭이 역사에서 어느 정도인지)와 장기 평균선(200주선 대비)으로만 계산해요. 많이 빠질수록 높아요 — 그래서 체력과 같이 봐야 해요.</div>' +
+      '<div><b>흐름</b>지금 오르는 중인지 내리는 중인지. 기술 지표 4개의 평균이에요: ① RSI(30 아래 침체는 높게, 70 위 과열은 낮게) ② 20 · 60 · 200일선 배열(정배열 78 · 혼조 55 · 역배열 38) ③ 최근 1년 수익 ④ 1년 변동성(차분할수록 높게). <b>68 이상 = 오름, 48 이하 = 내림, 그 사이 = 횡보.</b> 흐름이 내림이면 "싸졌지만 아직 떨어지는 중"일 수 있어요.</div>' +
+      '<div><b>지금 낙폭 / 역대 최대</b>위: 사상 최고 종가 대비 지금. 아래 작은 글씨: 역사상 가장 크게 빠졌던 폭.</div>' +
+      '<div><b>200주선 대비</b>주봉 200개(약 4년) 평균 가격 대비 지금. 마이너스면 4년 평균보다 싼 것. <i class="egTg bad">이탈 중</i> = 선 아래로 내려와 아직 못 올라옴 · <i class="egTg warn">복귀 확인 중</i> = 선 위로 올라왔지만 4주 연속은 아직. "기록 부족"은 200주(약 4년) 자료가 없는 종목.</div>' +
+      '<div><b>큰 하락 회복</b>고점에서 -20% 넘게 빠진 횟수 중 전고점을 되찾은 횟수. 5/5면 다섯 번 빠져 다섯 번 다 회복, 4/5면 한 번이 지금 진행 중이거나 못 돌아온 것.</div>' +
+      '<div><b>기록</b>자료가 있는 기간과 그 기간의 연평균 수익(배당 제외).</div>' +
+      '<div><b><i class="egTg">회복력만</i></b>기업 정보 없이 체력을 냈다는 뜻. ETF · 코인은 원래 재무가 없고, 주식은 네이버 호출을 아끼려고 상위 40개만 재무를 받아요. 줄을 눌러 들어가면 재무까지 넣어 다시 계산돼요(점수가 달라질 수 있어요).</div>' +
+      '<div><b><i class="egTg warn">검증 주의</i> · <i class="egTg bad">검증 실패</i></b>자료 점검 결과예요. 주의 = 빈 구간 · 급변 같은 의심 항목이 있음. 실패 = 날짜 중복 · 분할 미반영 의심 · 두 자료 불일치처럼 숫자가 틀릴 수 있는 문제. 값은 그대로 보여 드리고, 무엇이 문제인지는 종목의 「검증」 탭에 있어요.</div>' +
+      '<div><b><i class="egTg lev">레버리지</i></b>2~3배 · 인버스 상품. 회복력 점수를 60점으로 제한해요.</div></div></details>';
+  }
+  return h + '</details>';
+};
+(function () {
+  var b0 = egScanBind; egScanBind = function (root) {
+    b0.apply(this, arguments); var box = root.querySelector(".egScan"); if (!box) return;
+    var redraw = function () { var b = root.querySelector(".egScan"); if (b) { b.outerHTML = egScanHtml(); egScanBind(root); } };
+    box.addEventListener("toggle", function () { EGS.open = box.open; });
+    Array.prototype.forEach.call(box.querySelectorAll("[data-egc]"), function (el) { el.onchange = function () { var k = el.getAttribute("data-egc"); if (el.type === "checkbox") EGS.cond[k] = el.checked; else { var v = parseFloat(el.value); EGS.cond[k] = isFinite(v) ? v : k === "ma" ? 999 : 0; } try { localStorage.setItem("sm.scan.cond", JSON.stringify(EGS.cond)); } catch (e) {} EGS.open = true; redraw(); }; });
+    Array.prototype.forEach.call(box.querySelectorAll("[data-egflt],[data-egmk]"), function (b) { var f = b.onclick; b.onclick = function () { EGS.open = true; if (f) f.apply(this, arguments); }; });
+    Array.prototype.forEach.call(box.querySelectorAll("[data-ansym2]"), function (tr) { var f = tr.onclick; tr.onclick = function () { EGS.open = false; if (f) f.apply(this, arguments); }; });
+    var go = box.querySelector("[data-egscan]"); if (go) { var g = go.onclick; go.onclick = function () { EGS.open = true; if (g) g.apply(this, arguments); }; }
+  };
+})();
+
+/* ---------- ③ 분석 화면: 요약 + 탭 ---------- */
+function egSumHtml(sym) {
+  var S = egScore(sym), V = egVerify(sym), N = egNew(sym), D = egCoreData(sym), A = egAnalog(sym), M = egMaBreak(sym, "w200"), rows = nbHist[sym]; if (!rows || !rows.length) return "";
+  var last = rows[rows.length - 1], px = function (v) { return egPx(sym, v); }, col = function (p) { return p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; }, K = [], k = function (l, v, s, tone, tab) { K.push('<button class="egK ' + (tone || "") + '" data-egtab="' + tab + '"><small>' + l + '</small><b>' + v + '</b><span>' + (s || "") + '</span></button>'); };
+  var h = '<div class="egSum">';
+  if (S) {
+    var R = S.raw;
+    h += '<div class="egSumTop"><div class="egScTot" style="border-color:' + col(S.total) + '"><b style="color:' + col(S.total) + '">' + S.total + '</b><span>종합 · ' + S.grade + '</span></div><div class="egSumRead"><div class="egSumNm">' + egEsc(S.name) + ' <span>' + px(last.c) + ' · ' + (typeof cDate === "function" ? cDate(last.t) : "") + ' 종가</span></div><b>' + egEsc(S.read[0]) + '</b><p>' + egEsc(S.read[1]) + '</p><div class="egSumAx"><span>체력 <b style="color:' + col(S.body) + '">' + S.body + '</b></span><span>싼 정도 <b style="color:' + col(S.cheap) + '">' + S.cheap + '</b></span><span>자리 <b style="color:' + col(S.spot) + '">' + S.spot + '</b></span>' + S.cats.filter(function (c) { return c.id === "tech"; }).map(function (c) { return '<span>흐름 <b style="color:' + col(c.score) + '">' + c.score + '</b> ' + (c.score >= 68 ? "오름" : c.score <= 48 ? "내림" : "횡보") + '</span>'; }).join("") + '</div></div></div>';
+    k("지금 고점 대비", S.cur > -0.005 ? "최고가" : egPct(S.cur), "고점 " + px(R.pk) + " · " + egYm(R.pkT), S.cur <= -0.2 ? "dn" : "", "score");
+    k("역대 최대 낙폭", egPct(S.worst), px(R.worstPk) + " → " + px(R.worstC) + " · " + egYm(R.worstT), "", "score");
+    k("큰 하락 뒤 회복", R.closed + " / " + R.eps + "번", R.recMed != null ? "회복까지 보통 " + (R.recMed < 1 ? Math.round(R.recMed * 12) + "개월" : R.recMed.toFixed(1) + "년") : "-20% 하락 없음", R.eps && R.closed === R.eps ? "ok" : "", "score");
+    if (R.wGap != null) k("200주선 대비", egPct(R.wGap), M && M.open ? (M.below ? "이탈 중 · " + M.open.ym + "부터" : "복귀 확인 중") : "과거 이탈 " + R.wN + "번", R.wGap < 0 ? "dn" : "", "hist");
+  } else if (N) h += '<div class="egSumTop"><div class="egScTot" style="border-color:#8a93a3"><b style="color:#8a93a3;font-size:22px">신규</b><span>기록 ' + Math.round(N.days / 30.4) + '개월</span></div><div class="egSumRead"><div class="egSumNm">' + egEsc(N.name) + ' <span>' + px(last.c) + '</span></div><b>기록이 짧아 점수 대신 점검표로 봐요</b><p>회복력 · MDD · 200주선 같은 장기 기법을 쓸 수 없어요. 「평가표」 탭의 신규 상장 점검표와 프롬프트의 Claude 조사(공모가 · 락업 · 현금)를 보세요.</p></div></div>';
+  if (A && !A.thin) { var h1 = A.h.filter(function (x) { return x.l === "1년"; })[0] || A.h[A.h.length - 1]; k("닮은 과거 " + h1.l + " 뒤", Math.round(h1.win * 100) + "% 플러스", A.n + "번 · 보통 " + egPct(h1.med) + " · 최악 " + egPct(h1.worst), h1.win >= 0.6 ? "ok" : h1.win < 0.45 ? "dn" : "", "hist"); }
+  if (D && D.rows[0] && D.rows[0].V) k("본질 판정", egEsc(D.rows[0].V.t), "좋음 " + D.rows[0].V.good + " · 나쁨 " + D.rows[0].V.bad, D.rows[0].V.st === "good" ? "ok" : D.rows[0].V.st === "bad" ? "bad" : "", "core");
+  if (D && D.vars.length) k("켜진 변수", D.varOn + "개", D.varOn ? D.vars.filter(function (v) { return v.on; }).slice(0, 2).map(function (v) { return egEsc(v.name); }).join(" · ") : "지금은 조용해요", D.varOn ? "bad" : "ok", "core");
+  if (V) k("데이터 검증", V.level === "ok" ? "모두 통과" : V.level === "warn" ? "주의 " + V.warn : "실패 " + V.bad, V.level === "ok" ? V.ok + "개 항목" : V.checks.filter(function (c) { return c.lv === (V.level === "bad" ? "bad" : "warn"); }).slice(0, 2).map(function (c) { return egEsc(c.k.replace(/\s*\(.*$/, "")); }).join(" · "), V.level === "ok" ? "ok" : V.level === "bad" ? "bad" : "warn", "vf");
+  h += '<div class="egKs">' + K.join("") + '</div>';
+  if (S) h += '<div class="egSumLine"><span><i class="g"></i>강한 곳: ' + egEsc(S.strong.join(" · ")) + '</span><span><i class="b"></i>약한 곳: ' + egEsc(S.weak.join(" · ")) + '</span></div>';
+  h += '<div class="egSumNext"><b>다음 순서</b> ① 칸을 눌러 근거 확인 → ② 아래 「3 분석 실행」에서 프롬프트 복사(평가표 · 이탈 사례 · 본질/변수 · 검증이 모두 들어가요) → ③ Claude 답 붙여넣기 → ④ 카드</div>';
+  return h + '</div>';
+}
+(function () {
+  if (typeof anxSections !== "function") return;
+  /* 프롬프트에 본질 · 변수 */
+  var b0 = egBlock; egBlock = function (syms, withPort) { var t = b0.apply(this, arguments), L = []; try { if (syms && syms[0] && typeof AN !== "undefined" && currentTab === "analyst") L = egCoreLines(syms[0]); } catch (e) {} if (!L.length) return t; var mark = "\n=== 예측 · 대응 · 방향 (edge)", i = t.indexOf(mark); return i >= 0 ? t.slice(0, i) + "\n" + L.join("\n") + t.slice(i) : t + "\n" + L.join("\n"); };
+  var p0 = anxBuildPrompt; anxBuildPrompt = function () { var self = this, a = arguments, sym = typeof AN !== "undefined" ? AN.sym : null; return (sym ? egCoreEnsure(sym) : Promise.resolve()).then(function () { return p0.apply(self, a); }); };
+  var n0 = egNorm; egNorm = function (E) { var o = n0.apply(this, arguments), R = E && E.core; if (R && typeof R === "object" && (R.essence || R.stance || (R.vars && R.vars.length))) { o = o || { history: [], policy: [], paths: [], roadmap: null, protect: [], grow: [], mine: "" }; o.core = { essence: R.essence || "", changed: R.changed || "", stance: R.stance || "", vars: Array.isArray(R.vars) ? R.vars.filter(function (v) { return v && v.name; }).slice(0, 4) : [] }; } return o; };
+  var x0 = egExtraHtml; egExtraHtml = function (E, opt) {
+    var h = x0.apply(this, arguments), N = egNorm(E), R = N && N.core; if (!R) return h;
+    var add = '<div class="anxH">본질 · 변수로 본 이 종목</div><div class="egHi">' + (R.essence ? '<div class="coreL"><small>본질</small>' + egEsc(R.essence) + '</div>' : '') + (R.changed ? '<div class="coreL"><small>바뀌었는지 볼 것</small>' + egEsc(R.changed) + '</div>' : '') + (R.stance ? '<div class="coreL act"><small>행동 원칙</small>' + egEsc(R.stance) + '</div>' : '') + '</div>' + (R.vars.length ? '<div class="egHist" style="margin-top:8px">' + R.vars.map(function (v) { return '<div class="egHi"><b>' + egEsc(v.name) + '</b>' + (v.path ? '<div class="egPathLine">' + egEsc(v.path).replace(/\s*(→|->)\s*/g, ' <i>→</i> ') + '</div>' : '') + (v.trigger ? '<div class="coreL"><small>대응 시작</small>' + egEsc(v.trigger) + '</div>' : '') + (v.response ? '<div class="coreL act"><small>그때 할 일</small>' + egEsc(v.response) + '</div>' : '') + '</div>'; }).join("") + '</div>' : '');
+    return h ? h.replace('<div class="egX">', '<div class="egX">' + add) : '<div class="egX">' + add + '</div>';
+  };
+  /* 가장 바깥: ② 칸을 요약 + 탭으로 묶는다 (앞에서 넣은 상자들을 옮기기만 한다) */
+  var s0 = anxSections; anxSections = function (root) {
+    var r = s0.apply(this, arguments);
+    try {
+      var sym = AN.sym, secs = root.querySelectorAll(".anSec"), sec = secs[1]; if (!sym || !sec || sec.querySelector(".egTabs")) return r;
+      if (!EG["sd:" + sym] || !nbHist[sym] || !nbHist[sym].length) return r;
+      if (!EG["cd:" + sym]) { EG["cd:" + sym] = 1; egCoreEnsure(sym).then(function () { EG["cr:" + sym] = 1; if (currentTab === "analyst" && AN.sym === sym) renderAnalyst(); }); }
+      var boxes = Array.prototype.slice.call(sec.querySelectorAll(":scope > .egBox")), sc = boxes.filter(function (b) { return b.classList.contains("egSc"); }), vf = boxes.filter(function (b) { return b.classList.contains("egVf"); }), nw = boxes.filter(function (b) { return b.classList.contains("egNewB"); }), hist = boxes.filter(function (b) { return sc.indexOf(b) < 0 && vf.indexOf(b) < 0 && nw.indexOf(b) < 0; });
+      if (!boxes.length) return r;
+      var rest = Array.prototype.slice.call(sec.children).filter(function (el) { return !el.classList.contains("mkStep") && boxes.indexOf(el) < 0; });
+      var V = egVerify(sym), D = egCoreData(sym), tabs = [["sum", "요약", ""], ["score", "평가표", ""], ["hist", "과거 사례", ""], ["core", "본질 · 변수", D && D.varOn ? '<i class="bad">' + D.varOn + '</i>' : ""], ["vf", "검증", V && V.level !== "ok" ? '<i class="' + (V.level === "bad" ? "bad" : "warn") + '">' + (V.level === "bad" ? V.bad : V.warn) + '</i>' : '<i class="ok">✓</i>'], ["data", "앱 데이터", ""]];
+      var cur = EG.anTab && tabs.some(function (t) { return t[0] === EG.anTab; }) ? EG.anTab : "sum";
+      var wrap = document.createElement("div"); wrap.className = "egTabs";
+      wrap.innerHTML = '<div class="egTabBar">' + tabs.map(function (t) { return '<button data-egtab="' + t[0] + '" class="' + (t[0] === cur ? "on" : "") + '">' + t[1] + t[2] + '</button>'; }).join("") + '</div>' + tabs.map(function (t) { return '<div class="egPane" data-egpane="' + t[0] + '"' + (t[0] === cur ? "" : " hidden") + '></div>'; }).join("");
+      var pane = function (id) { return wrap.querySelector('[data-egpane="' + id + '"]'); };
+      pane("sum").innerHTML = egSumHtml(sym);
+      nw.concat(sc).forEach(function (b) { pane("score").appendChild(b); }); if (!nw.length && !sc.length) pane("score").innerHTML = '<div class="briefDim">평가표를 만들 만큼 자료가 없어요.</div>';
+      hist.forEach(function (b) { pane("hist").appendChild(b); }); if (!hist.length) pane("hist").innerHTML = '<div class="briefDim">과거 사례를 계산할 만큼 긴 자료가 없어요.</div>';
+      pane("core").innerHTML = EG["cr:" + sym] ? egCoreHtml(sym) : '<div class="briefDim">본질 · 변수 자료를 읽는 중이에요…</div>';
+      vf.forEach(function (b) { pane("vf").appendChild(b); });
+      rest.forEach(function (el) { pane("data").appendChild(el); }); if (!rest.length) pane("data").innerHTML = '<div class="briefDim">종목을 고르면 6틀 분석용 앱 데이터가 여기 나와요.</div>';
+      sec.appendChild(wrap);
+      try { var mkS = sec.querySelector(".mkStep"); Array.prototype.forEach.call(mkS.childNodes, function (nd) { if (nd.nodeType === 3 && /앱 데이터/.test(nd.nodeValue)) nd.nodeValue = nd.nodeValue.replace("앱 데이터", "종목 진단"); }); var tg = mkS.querySelector("[data-antg]"); if (tg) tg.style.display = "none"; } catch (e) {}
+      var go = function (id) { EG.anTab = id; Array.prototype.forEach.call(wrap.querySelectorAll(".egTabBar button"), function (b) { b.classList.toggle("on", b.getAttribute("data-egtab") === id); }); Array.prototype.forEach.call(wrap.querySelectorAll(".egPane"), function (p) { p.hidden = p.getAttribute("data-egpane") !== id; }); };
+      Array.prototype.forEach.call(wrap.querySelectorAll("[data-egtab]"), function (b) { b.onclick = function () { go(b.getAttribute("data-egtab")); if (b.classList.contains("egK")) wrap.scrollIntoView({ block: "start", behavior: "smooth" }); }; });
+    } catch (e) { console.warn("eg", e); }
+    return r;
+  };
+  var st = document.createElement("style"); st.textContent = [
+    ".egTabBar{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid #e6eaf0;margin:10px 0 12px;position:sticky;top:0;background:var(--admBg,#f4f5f7);z-index:3;padding-top:6px}.egTabBar button{font:inherit;font-size:13.5px;font-weight:700;border:0;background:none;padding:9px 14px;border-radius:10px 10px 0 0;color:#6b7686;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}.egTabBar button.on{color:#111;border-bottom-color:#3182f6;background:#fff}.egTabBar i{font-style:normal;font-size:11px;font-weight:800;border-radius:999px;padding:1px 6px;margin-left:5px;background:#eef8f2;color:#1d7f55}.egTabBar i.bad{background:#fcefef;color:#c03b3b}.egTabBar i.warn{background:#fff6e8;color:#b9600f}",
+    ".egPane>.egBox:first-child{margin-top:0}.egSum{background:#fff;border:1px solid #e3e7ee;border-radius:14px;padding:16px 18px}.egSumTop{display:grid;grid-template-columns:124px 1fr;gap:16px;align-items:center}.egSumNm{font-size:17px;font-weight:900}.egSumNm span{font-size:12.5px;font-weight:500;color:#6b7686;margin-left:6px}.egSumRead>b{display:block;font-size:15px;margin-top:4px;color:#1f3a68}.egSumRead p{margin:4px 0 6px;font-size:13px;line-height:1.55;color:#334}.egSumAx{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:#556}.egSumAx b{font-size:15px}",
+    ".egKs{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:14px 0 10px}.egK{font:inherit;text-align:left;border:1px solid #e6eaf0;background:#f8f9fb;border-radius:12px;padding:9px 11px;cursor:pointer;border-left:4px solid #b9c2d0}.egK:hover{background:#f0f5ff}.egK small{display:block;font-size:11px;font-weight:700;color:#6b7686}.egK b{display:block;font-size:18px;font-weight:900;line-height:1.25;color:#111}.egK span{display:block;font-size:11.5px;color:#6b7686;line-height:1.35;margin-top:1px}.egK.ok{border-left-color:#1d7f55}.egK.dn{border-left-color:#1f5fbf}.egK.dn b{color:#1f5fbf}.egK.bad{border-left-color:#c03b3b}.egK.bad b{color:#c03b3b}.egK.warn{border-left-color:#b9600f}.egK.warn b{color:#b9600f}",
+    ".egSumLine{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:#445}.egSumLine i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:#1d7f55}.egSumLine i.b{background:#c03b3b}.egSumNext{margin-top:10px;font-size:12.5px;line-height:1.5;color:#445;background:#f3f7ff;border-radius:10px;padding:8px 12px}",
+    ".egScanS{display:flex;gap:10px;align-items:baseline;cursor:pointer;list-style:none;flex-wrap:wrap}.egScanS::-webkit-details-marker{display:none}.egScanS>b{font-size:14.5px}.egScanS span{font-size:12.5px;color:#556}.egScanS i{font-style:normal;margin-left:auto;font-size:11.5px;color:#3182f6;font-weight:700}.egScan[open] .egScanS{margin-bottom:8px}.egScan .chip b{font-weight:800;opacity:.75;margin-left:2px}",
+    ".egTg{font-style:normal;font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 5px;background:#eef1f5;color:#556;white-space:nowrap;cursor:help}.egTg.bad{background:#fcefef;color:#c03b3b}.egTg.warn{background:#fff6e8;color:#b9600f}.egTg.lev{background:#f1e9fb;color:#6b3fa0}",
+    ".egCond{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#f6f8fb;border-radius:10px;padding:8px 10px;margin:4px 0 6px;font-size:12.5px}.egCond input[type=number]{width:78px;font:inherit;font-size:12.5px;padding:3px 5px;border:1px solid #cfd6e0;border-radius:6px}.egLegend{margin-top:8px;background:#f6f8fb;border-radius:10px;padding:8px 12px}.egLegend summary{cursor:pointer;font-weight:800;font-size:13px}.egLg{display:grid;gap:7px;margin-top:8px;font-size:12.5px;line-height:1.55}.egLg>div{padding-left:124px;text-indent:-124px}.egLg>div>*{text-indent:0}.egLg>div>b:first-child{display:inline-block;width:118px;margin-right:6px}",
+    ".egCo .egScT th:nth-child(3){width:66px}.egCo .dhBadge{white-space:nowrap}.egWhy{display:flex;gap:6px;flex-wrap:wrap}.egWhy span{font-size:12px;background:#f1f3f6;border-radius:8px;padding:3px 8px}.egWhy span.g{background:#eef8f2;color:#17603f}.egWhy span.b{background:#fcefef;color:#a02c2c}.egSubH{font-weight:800;font-size:13px;margin:12px 0 6px}.egEvL{display:grid;gap:5px;font-size:12.5px}.egEvL small{display:block;color:#6b7686;font-size:11.5px}",
+    "@media(max-width:640px){.egSumTop{grid-template-columns:1fr}.egSumTop .egScTot{margin:0 auto}.egTabBar button{padding:8px 9px;font-size:12.5px}.egKs{grid-template-columns:repeat(2,1fr)}}",
+    "[data-theme=dark] .egSum{background:#161b24;border-color:#263041}[data-theme=dark] .egK{background:#1e2533;border-color:#263041}[data-theme=dark] .egK b,[data-theme=dark] .egSumNm,[data-theme=dark] .egTabBar button.on{color:#eee}[data-theme=dark] .egTabBar{background:#0f131a;border-color:#263041}[data-theme=dark] .egTabBar button.on{background:#161b24}[data-theme=dark] .egSumRead p,[data-theme=dark] .egSumNext,[data-theme=dark] .egCond,[data-theme=dark] .egLegend{color:#ccd;background:#1e2533}[data-theme=dark] .egSumRead>b{color:#9db8ff}"
+  ].join(""); document.head.appendChild(st);
+})();

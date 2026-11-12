@@ -52,7 +52,7 @@ function smCacheClear(why) {
   try { if (typeof BRIEF_UNI_PENDING !== "undefined") { delete BRIEF_UNI_PENDING.us; delete BRIEF_UNI_PENDING.kr; } } catch (e) {}
   try { if (typeof briefState !== "undefined") { briefState.recent = null; briefState.result = null; briefState.issues = null; } } catch (e) {}
   try { if (typeof CORE !== "undefined") { CORE.ess = null; CORE.fund = {}; } } catch (e) {}
-  try { if (typeof EG !== "undefined") { EG.memo = {}; EG.seam = {}; EG.coreWarm = 0; EG.coreReady = 0; Object.keys(EG).forEach(function (k) { if (/^(sm|sd|sw|w|rw):/.test(k)) delete EG[k]; }); } } catch (e) {}
+  try { if (typeof EG !== "undefined") { EG.memo = {}; EG.seam = {}; EG.coreWarm = 0; EG.coreReady = 0; Object.keys(EG).forEach(function (k) { if (/^(sm|sd|sw|w|rw|cd|cr):/.test(k)) delete EG[k]; }); } } catch (e) {}
   try { if (typeof TPL_RC !== "undefined") wipe(TPL_RC); } catch (e) {}
   try { if (typeof MK !== "undefined" && MK._cap) wipe(MK._cap); } catch (e) {}
   try { if (typeof OPS !== "undefined") OPS.Ms = null; } catch (e) {}
