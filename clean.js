@@ -256,6 +256,7 @@ function clRun() {
   try { clOps(); } catch (e) { console.warn("cl ops", e); }
   try { clBrief(); } catch (e) { console.warn("cl brief", e); }
   try { clAnalyst(); } catch (e) { console.warn("cl analyst", e); }
+  try { clTables(); } catch (e) { console.warn("cl tables", e); }
   try { clCollapse(root); } catch (e) { console.warn("cl collapse", e); }
   try { clTerms(root); } catch (e) { console.warn("cl terms", e); }
   try { clFab(); } catch (e) {}
@@ -288,3 +289,70 @@ function clRun() {
 
 /* 작업실: 국내·미국 중 하나라도 '전체 시장 숫자 숨김' 상태면 요약 칸에도 시장 온도를 올리지 않는다 */
 function clOpsOff() { try { var Ms = typeof OPS !== "undefined" && OPS.Ms; if (!Ms) return false; var a = Array.isArray(Ms) ? Ms : Object.keys(Ms).map(function (k) { return Ms[k]; }); return a.some(function (M) { return M && M.mk !== "coin" && M.off; }); } catch (e) { return false; } }
+
+/* ============================================================
+   v13.21 좁은 화면(휴대폰)에서 표가 글자 단위로 꺾이던 문제
+   · 칸이 3개 이상인 표(.dgT)는 휴대폰에서 '한 줄 = 카드 한 장'으로 바꿔 보여 준다 (칸 이름은 왼쪽에 작게)
+   · 오늘의 후보(스캔) 표는 전용 카드: 이름 + 종합 → 점수 4칸 → 200주선 · 회복 · 기록 → 한 줄 판정
+   ============================================================ */
+function clTables() {
+  var ts = document.querySelectorAll("table.dgT");
+  for (var i = 0; i < ts.length; i++) {
+    var t = ts[i]; if (t.classList.contains("egScanT")) { clScanMore(t); continue; }
+    var hs = t.tHead && t.tHead.rows[0] ? t.tHead.rows[0].cells : null; if (!hs || hs.length < 3) continue;
+    var rows = t.tBodies[0] ? t.tBodies[0].rows : []; if (t._cln === rows.length && t.classList.contains("clRT") && (!rows.length || rows[rows.length - 1]._cl)) continue;
+    var lab = []; for (var k = 0; k < hs.length; k++) lab.push((hs[k].textContent || "").replace(/\s+/g, " ").trim());
+    for (var r = 0; r < rows.length; r++) {
+      var cs = rows[r].cells, col = 0; rows[r]._cl = 1;
+      for (var c = 0; c < cs.length; c++) { var sp = cs[c].colSpan || 1; if (sp === 1 && lab[col] && col > 0 && cs[c].getAttribute("data-l") !== lab[col]) cs[c].setAttribute("data-l", lab[col]); if (sp > 1) cs[c].classList.add("clSpan"); if (/^[-–—]?$/.test((cs[c].textContent || "").trim()) && c > 0 && !cs[c].querySelector("input,button,select,img,svg")) cs[c].classList.add("clNil"); else cs[c].classList.remove("clNil"); col += sp; }
+    }
+    t._cln = rows.length; if (!t.classList.contains("clRT")) t.classList.add("clRT");
+  }
+}
+/* 스캔 목록: 휴대폰에서는 15개만 먼저, 나머지는 '더 보기' */
+function clScanMore(t) {
+  var w = t.closest(".egScanW"); if (!w || w._clMore) return; w._clMore = 1;
+  var n = t.tBodies[0] ? t.tBodies[0].rows.length : 0; if (n <= 15) return;
+  var b = document.createElement("button"); b.type = "button"; b.className = "clScanMore"; b.textContent = "나머지 " + (n - 15) + "개 더 보기";
+  b.onclick = function () { w.classList.add("clAll"); b.remove(); };
+  w.insertAdjacentElement("afterend", b);
+}
+(function () {
+  if (typeof document === "undefined" || document.getElementById("clCss2")) return;
+  var st = document.createElement("style"); st.id = "clCss2"; st.textContent = [
+    ".clScanMore{display:none}",
+    "@media(max-width:720px){",
+    /* 일반 표 → 카드 */
+    ".dxWrap:has(>table.clRT),.tableWrap:has(>table.clRT){overflow:visible;max-height:none;border:0;background:transparent}",
+    "table.clRT{display:block;width:100%;min-width:0!important;table-layout:auto;border:0}table.clRT thead{display:none}table.clRT tbody{display:block}",
+    "table.clRT tr{display:block;padding:11px 12px;margin:0 0 8px;border:1px solid var(--admLine,#e3e7ee);border-radius:12px;background:var(--admCard,#fff)}",
+    "table.clRT td{display:block;position:relative;border:0!important;padding:3px 0 3px 92px!important;min-height:22px;width:auto!important;min-width:0!important;max-width:none!important;text-align:left!important;white-space:normal!important;word-break:keep-all;overflow-wrap:anywhere;font-size:13px;line-height:1.5;background:transparent!important}",
+    "table.clRT td[data-l]::before{content:attr(data-l);position:absolute;left:0;top:4px;width:84px;font-size:11.5px;font-weight:700;color:#7a8494;line-height:1.35;word-break:keep-all}",
+    "table.clRT td:not([data-l]){padding-left:0!important}table.clRT td:first-child{font-size:14.5px;font-weight:800;padding-bottom:6px!important}table.clRT td.clNil{display:none}",
+    "table.clRT tr.dxBad{border-color:#f0b8b8;background:#fff8f8}",
+    /* 스캔 표 → 전용 카드 */
+    ".egScanW{overflow:visible!important;max-height:none!important;border:0!important;background:transparent!important}",
+    "table.egScanT{display:block;width:100%;border:0;counter-reset:sc}table.egScanT thead{display:none}table.egScanT tbody{display:block}",
+    "table.egScanT tr{counter-increment:sc;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;padding:12px;margin:0 0 8px;border:1px solid var(--admLine,#e3e7ee);border-radius:12px;background:var(--admCard,#fff)}",
+    ".egScanW:not(.clAll) table.egScanT tr:nth-child(n+16){display:none}.clScanMore{display:block;width:100%;padding:11px;border:1px solid var(--admLine,#e3e7ee);border-radius:10px;background:var(--admCard,#fff);font-weight:700;font-size:13px;color:#3182f6;cursor:pointer}",
+    "table.egScanT td{display:block;border:0!important;padding:0!important;min-width:0!important;white-space:normal!important;word-break:keep-all;overflow-wrap:normal;background:transparent!important;text-align:center;line-height:1.3}",
+    "table.egScanT td:nth-child(1){display:none}",
+    "table.egScanT td:nth-child(2){grid-column:1/10;text-align:left;font-size:14.5px;overflow-wrap:anywhere}table.egScanT td:nth-child(2)>b::before{content:counter(sc) \". \";color:#8a93a3;font-weight:700}table.egScanT td:nth-child(2) small{font-size:11.5px}",
+    "table.egScanT td:nth-child(3){grid-column:10/13;text-align:right}table.egScanT td:nth-child(3) b{font-size:26px;font-weight:900;line-height:1}table.egScanT td:nth-child(3)::after{content:\"종합\";display:block;font-size:10.5px;color:#7a8494;font-weight:700;margin-top:2px}",
+    "table.egScanT td:nth-child(n+4):nth-child(-n+10){background:#f5f7fa!important;border-radius:8px;padding:6px 2px 7px!important;font-size:12px}table.egScanT td:nth-child(n+4):nth-child(-n+10)::before{display:block;font-size:10.5px;color:#7a8494;font-weight:700;margin-bottom:3px}",
+    "table.egScanT td:nth-child(n+4):nth-child(-n+7){grid-column:span 3}table.egScanT td:nth-child(n+4):nth-child(-n+7) b{font-size:16px}table.egScanT td:nth-child(n+4):nth-child(-n+7) br{display:none}table.egScanT td:nth-child(n+4):nth-child(-n+7) small{display:block;font-size:10.5px;margin-top:1px}",
+    "table.egScanT td:nth-child(n+8):nth-child(-n+10){grid-column:span 4}table.egScanT td:nth-child(n+8):nth-child(-n+10) b{font-size:13.5px}",
+    "table.egScanT td:nth-child(4)::before{content:\"체력\"}table.egScanT td:nth-child(5)::before{content:\"싼 정도\"}table.egScanT td:nth-child(6)::before{content:\"흐름\"}table.egScanT td:nth-child(7)::before{content:\"낙폭 / 최대\"}table.egScanT td:nth-child(8)::before{content:\"200주선 대비\"}table.egScanT td:nth-child(9)::before{content:\"큰 하락 회복\"}table.egScanT td:nth-child(10)::before{content:\"기록\"}",
+    "table.egScanT td:nth-child(11){grid-column:1/-1;text-align:left;font-size:12.5px;line-height:1.5;min-width:0!important;color:#445}",
+    "table.egScanT .egTg{white-space:nowrap}",
+    ".egFl button span{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3;word-break:keep-all}.egFl button{padding:8px 9px;font-size:12.5px}",
+    ".egLg>div{padding-left:0!important;text-indent:0!important}.egLg>div>b:first-child{display:block!important;width:auto!important;margin:0 0 2px!important}",
+    ".coreVars,.coreIss{grid-template-columns:minmax(0,1fr)!important}.coreVar,.coreIssC{min-width:0}.clRow,.clRow.v{grid-template-columns:minmax(0,1fr) auto!important}.clRow>*{min-width:0;overflow-wrap:anywhere}.clRow.v{grid-template-columns:minmax(0,1fr)!important}",
+    ".wbShapeRow{grid-template-columns:52px minmax(0,1fr)}.wbShapeRow>div{min-width:0;flex-wrap:wrap}.wbOpt{min-width:0;max-width:100%}.wbTodayH small{flex:1 1 140px;min-width:0}table.clRT td>*{max-width:100%}table.clRT .dgNo{white-space:normal}",
+    /* 홈 시작 카드가 화면 밖으로 밀리던 것 */
+    ".startCards{grid-template-columns:minmax(0,1fr)!important}.startCard{min-width:0;max-width:100%}",
+    "}",
+    "@media(max-width:720px){[data-theme=dark] table.clRT tr,[data-theme=dark] table.egScanT tr{background:#161b24;border-color:#263041}[data-theme=dark] table.egScanT td:nth-child(n+4):nth-child(-n+10){background:#1e2533!important}[data-theme=dark] table.clRT tr.dxBad{background:#2a1a1a;border-color:#5a2a2a}[data-theme=dark] table.egScanT td:nth-child(11){color:#aab}}"
+  ].join("");
+  document.head.appendChild(st);
+})();
