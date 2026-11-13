@@ -187,6 +187,54 @@ function clCore() {
   clTabify(box, "core", panes, "sum");
 }
 
+/* v13.20 작업실: 맨 위에 오늘 요약 한 줄(진행 · 데이터 · 만든 것 · 첫 이슈), 아래는 '할 일 4단계 / 모닝 노트' 탭 */
+function clOps() {
+  var box = document.getElementById("opsBody"); if (!box || box.querySelector(".clTabs")) return; var rail = box.querySelector(":scope > .opsRail"), board = box.querySelector(":scope > .opsBoard"); if (!rail || !board) return;
+  var kids = Array.prototype.slice.call(box.children), ri = kids.indexOf(rail), bh = box.querySelector(":scope > .opsBoardH"), bi = bh ? kids.indexOf(bh) : kids.indexOf(board);
+  var stepNodes = kids.slice(ri, bi), noteNodes = kids.slice(bi), steps = Array.prototype.slice.call(rail.querySelectorAll(".opsStep")), done = steps.filter(function (x) { return x.classList.contains("done"); }).length, now = steps.filter(function (x) { return x.classList.contains("now"); })[0];
+  var nowT = now ? ((now.querySelector("h3") || {}).textContent || "").trim() : "", h = '<div class="clKs clOpsK">';
+  h += clK("오늘 진행", done + " / " + steps.length + " 단계", nowT ? "다음: " + clEsc(nowT) : "오늘 할 일을 모두 끝냈어요", done === steps.length ? "ok" : "", "todo");
+  var Ms = (typeof OPS !== "undefined" && OPS.Ms) || [], NM = { kr: "국내", us: "미국", coin: "코인" }, badM = Ms.filter(function (m) { return m.level !== "ok"; });
+  if (Ms.length) h += clK("데이터", badM.length ? "확인 " + badM.length + "곳" : "모두 정상", Ms.map(function (m) { return NM[m.mk] + " " + (typeof dhMD === "function" && m.date ? dhMD(m.date) : "-") + (m.level === "ok" ? "" : " ⚠"); }).join(" · "), badM.length ? "warn" : "ok", "todo");
+  var iss = (typeof briefState !== "undefined" && briefState.issues) || [], R = typeof briefState !== "undefined" ? briefState.result : null;
+  if (R && R.temp && !R.temp.empty && R.temp.word && R.temp.total > 0 && !(R.marketWideOff) && !clOpsOff()) h += clK("시장 온도", clEsc(R.temp.word || "-"), "오른 종목 " + Math.round((R.temp.upPct || 0) * 100) + "%" + (R.temp.total ? " · " + R.temp.up + "/" + R.temp.total : ""), "", "note");
+  if (iss.length) h += clK("핵심 이슈 " + iss.length, clEsc(String(iss[0].title || "").slice(0, 22)), clEsc(iss[0].sub || ""), "", "note");
+  var made = Array.prototype.slice.call(board.querySelectorAll(".opsMade b, .opsPanel .opsTiles .opsTile")).slice(-3), mt = []; made.forEach(function (t) { var b = t.querySelector ? t.querySelector("b") : null, l = t.querySelector ? t.querySelector("span") : null; if (b && l && /카드|리포트|분석/.test(l.textContent)) mt.push(l.textContent.trim().replace(/ 저장$/, "") + " " + b.textContent.trim()); });
+  if (mt.length) h += clK("오늘 만든 것", mt.map(function (x) { return x.replace(/^\D+/, ""); }).join(" · "), mt.map(function (x) { return x.replace(/\s*\d+$/, ""); }).join(" · "), "", "note");
+  h += '</div>';
+  var sum = document.createElement("div"); sum.innerHTML = h; var strip = sum.firstChild; box.insertBefore(strip, rail);
+  var w = clTabify(box, "ops", [{ id: "todo", label: "오늘 할 일", badge: done < steps.length ? '<i class="warn">' + (steps.length - done) + '</i>' : '<i class="ok">✓</i>', nodes: stepNodes }, { id: "note", label: "모닝 노트", nodes: noteNodes }], "todo");
+  Array.prototype.forEach.call(strip.querySelectorAll("[data-cltab]"), function (b) { b.onclick = function () { w._go(b.getAttribute("data-cltab")); }; });
+}
+/* v13.20 오늘의 브리핑: 3초 요약은 그대로 맨 위, 아래는 주제별 탭 */
+function clBrief() {
+  var box = document.getElementById("briefBody"); if (!box || box.classList.contains("hidden") || box.querySelector(".clTabs")) return; var cols = box.querySelector(":scope > .bCols"), hero = document.getElementById("briefHero"); if (!cols || !hero || !cols.children.length) return;
+  var titleOf = function (el) { var h = el.querySelector("h3, .briefSecT, .slKick, .brAiHead b, .issH"); if (!h) return (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 14); var c = h.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll("small,button,span.briefDim,.clI"), function (x) { x.remove(); }); return c.textContent.replace(/\s+/g, " ").trim().slice(0, 24); };
+  var G = { iss: [], mkt: [], thm: [], money: [] }, lastKey = "mkt";
+  Array.prototype.slice.call(cols.children).forEach(function (el) {
+    if (el.classList.contains("snapRow") || !el.classList.contains("briefSec")) { G[lastKey].push(el); return; }
+    var t = titleOf(el), k = el.id === "briefTop5" || /핵심 이슈/.test(t) ? "iss" : /세일|돈이 몰린|인기/.test(t) ? "money" : /테마|업종|급등|급락/.test(t) ? "thm" : "mkt"; lastKey = k; G[k].push(el);
+  });
+  var top = Array.prototype.slice.call(box.children).filter(function (el) { return el !== cols; }), heroIdx = top.indexOf(hero), sel = document.getElementById("briefSelectSec"), selNodes = [];
+  if (sel) { selNodes.push(sel); var nx = sel.nextElementSibling; if (nx && nx.classList.contains("snapRow")) selNodes.push(nx); }
+  var wrapCols = function (nodes) { if (!nodes.length) return []; var d = document.createElement("div"); d.className = "bCols clBCols" + (nodes.filter(function (n) { return n.classList.contains("briefSec"); }).length <= 1 ? " one" : ""); nodes.forEach(function (n) { d.appendChild(n); }); return [d]; };
+  var nIss = (typeof briefState !== "undefined" && briefState.issues ? briefState.issues.length : 0);
+  var panes = [{ id: "iss", label: "핵심 이슈", badge: nIss ? '<i>' + nIss + '</i>' : '', nodes: wrapCols(G.iss) }, { id: "pick", label: "선별 종목", nodes: selNodes }, { id: "mkt", label: "시장 체력 · 지수", nodes: wrapCols(G.mkt) }, { id: "thm", label: "테마 · 급등락", nodes: wrapCols(G.thm) }, { id: "money", label: "돈이 몰린 곳 · 세일", nodes: wrapCols(G.money) }].filter(function (p) { return p.nodes.length; });
+  if (panes.length < 2) { panes.forEach(function (p) { p.nodes.forEach(function (n) { box.appendChild(n); }); }); return; }
+  cols.classList.add("clHid");
+  var w = clTabify(box, "brief", panes, "iss");
+  /* 3초 요약의 바로가기 버튼 → 해당 탭을 먼저 연다 */
+  Array.prototype.forEach.call(hero.querySelectorAll(".slNav button, .slNav a"), function (b) { if (b._cl) return; b._cl = 1; b.addEventListener("click", function () { var t = b.textContent; w._go(/업종|테마|급등/.test(t) ? "thm" : /돈/.test(t) ? "money" : /숫자|지수|체력/.test(t) ? "mkt" : "iss"); }, true); });
+}
+/* v13.20 분석: 5~8번(결과 요약 · 분석 자산 · 보정 · 회고)은 한 줄 탭으로 */
+function clAnalyst() {
+  var root = document.getElementById("anBody"); if (!root || root.querySelector(".clTabs[data-clk=anres]")) return; var secs = Array.prototype.slice.call(root.querySelectorAll(":scope > section.anSec, :scope > .anSec")); if (secs.length < 7) return;
+  var tail = secs.filter(function (x) { var m = x.querySelector(":scope > .mkStep > b"); return m && +m.textContent >= 5; }); if (tail.length < 3) return;
+  var host = document.createElement("section"); host.className = "anSec clAnRes"; tail[0].parentNode.insertBefore(host, tail[0]);
+  var hasAns = false; try { hasAns = typeof anAnsLoad === "function" && anAnsLoad().some(function (a) { return a.sym === AN.sym; }); } catch (e) {}
+  var panes = tail.map(function (x, i) { var m = x.querySelector(":scope > .mkStep"), c = m.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll("small,button,label,input,.clI"), function (y) { y.remove(); }); var no = (c.querySelector("b") || {}).textContent || "", t = c.textContent.replace(no, "").trim(); return { id: "s" + no, label: no + " " + t, badge: i === 0 && hasAns ? '<i class="ok">✓</i>' : '', nodes: [x] }; });
+  clTabify(host, "anres", panes, hasAns ? panes[0].id : panes[0].id);
+}
 /* 카드 작업대: '오늘 카드' 목록은 앞 두 묶음만 보이고 나머지는 접는다(고른 주제가 있는 묶음 · 검색 중에는 펼침) */
 function clMaker() {
   var grid = document.querySelector("#tab-onecard .wbGrid"); if (!grid || grid.getAttribute("data-clm")) return; var rows = Array.prototype.slice.call(grid.children), ci = -1;
@@ -205,6 +253,9 @@ function clRun() {
   try { clData(); } catch (e) { console.warn("cl data", e); }
   try { clCore(); } catch (e) { console.warn("cl core", e); }
   try { clMaker(); } catch (e) { console.warn("cl maker", e); }
+  try { clOps(); } catch (e) { console.warn("cl ops", e); }
+  try { clBrief(); } catch (e) { console.warn("cl brief", e); }
+  try { clAnalyst(); } catch (e) { console.warn("cl analyst", e); }
   try { clCollapse(root); } catch (e) { console.warn("cl collapse", e); }
   try { clTerms(root); } catch (e) { console.warn("cl terms", e); }
   try { clFab(); } catch (e) {}
@@ -215,6 +266,7 @@ function clRun() {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
   var st = document.createElement("style"); st.id = "clCss"; st.textContent = [
     ".clHid{display:none!important}",
+    ".clOpsK{margin:10px 0 14px}.clOpsK>*{min-width:0;overflow:hidden}.clOpsK>* b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.clOpsK>:last-child:nth-child(odd){grid-column:1/-1}.clOpsK .clK b{font-size:17px}.opsRail .opsStep{min-height:0}.clBCols{margin-top:0}.clBCols.one{display:block!important;columns:auto!important;column-count:1!important}.clBCols.one>.briefSec{width:auto!important;max-width:none!important}.clAnRes{border-top:0!important;padding-top:0!important}.clAnRes .clPane>.anSec{border-top:0;padding-top:0;margin-top:0}.clAnRes .clPane>.anSec>.mkStep>b{display:none}",
     ".clMore{font:inherit;font-size:12.5px;font-weight:700;display:block;width:100%;margin-top:8px;padding:9px;border:1px dashed #cfd6e0;border-radius:8px;background:#fafbfc;color:#1a56c4;cursor:pointer;box-shadow:none}.clMore:hover{border-color:#3182f6;background:#f0f5ff}",
     "html.adm .chip,html.adm .wbChip{border-radius:8px}",
     "#smGuide{display:none!important}.clPane[data-clpane=sum]>h3.dhH{display:none}.anChips span.chip.on{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:7px 12px;background:#1b2230;color:#fff;font-weight:700;font-size:13px}.anChips span.chip.on small{color:#c9d2e0;font-weight:500}",
@@ -233,3 +285,6 @@ function clRun() {
     "@media print{#clFab,#clDrawer,#clPop{display:none!important}.clHid{display:block!important}}"
   ].join(""); document.head.appendChild(st);
 })();
+
+/* 작업실: 국내·미국 중 하나라도 '전체 시장 숫자 숨김' 상태면 요약 칸에도 시장 온도를 올리지 않는다 */
+function clOpsOff() { try { var Ms = typeof OPS !== "undefined" && OPS.Ms; if (!Ms) return false; var a = Array.isArray(Ms) ? Ms : Object.keys(Ms).map(function (k) { return Ms[k]; }); return a.some(function (M) { return M && M.mk !== "coin" && M.off; }); } catch (e) { return false; } }
