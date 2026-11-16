@@ -1,0 +1,432 @@
+/* ============================================================
+   v13.30 낙폭 · 단계 분석 (dd.js)
+   HM의 'SOXL 25년 History' 자료의 방식을 모든 종목 · ETF · 레버리지에 적용한다.
+   ① 하락 사건: 52주 고점(최근 252거래일 종가 최고)에서 -10% 이상 빠지면 시작, 52주 신고가로 돌아오면 끝
+                사상최고가 기준 사건도 같이 센다
+   ② 도달 분포: 사건 가운데 -20% ~ -90%까지 간 비율, 백분위(중앙값 · 하위 25 · 10 · 5%)
+   ③ 진입 분석: -N%에 처음 닿은 날 종가에 샀다면 — 그 뒤 추가 하락, 1년(252거래일) 뒤
+   ④ 연초 대비: 해마다 전년 마지막 종가 대비 가장 낮았던 값, 그해 연말, 다음 해
+   ⑤ 단계 매수 구간: 이 종목 자신의 분포 백분위로 5단계 + 성향별 비율을 과거 사건에 그대로 넣어 본 결과
+   ⑥ 레버리지 역산: 상장 전 구간은 기초 ETF 일간수익률 × 배수 − 비용으로 만들고, 실제 구간과 맞춰 검산
+   ⑦ 사건의 배경: 앱의 주요 이벤트 목록(EVENTS) + 하락 모양(급락형 / 장기 하락형) + 200주선 이탈 여부
+   모든 계산은 종가 기준. 과거 통계이며 매수 권유가 아니다.
+   ============================================================ */
+var DD = { memo: {}, busy: {}, slide: 0 };
+var DD_LEV = { SOXL: ["SOXX", 3], TQQQ: ["QQQ", 3], UPRO: ["SPY", 3], SPXL: ["SPY", 3], TECL: ["XLK", 3], QLD: ["QQQ", 2], SSO: ["SPY", 2] };
+var DD_RATE_K = 1.155;            /* 빌린 돈 1배당 기준금리에 곱하는 값 (자료의 3배 상품 2.31 ÷ 2) */
+var DD_TH = [-0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9];
+var DD_PROF = [
+  { id: "safe", n: "안정", w: [5, 10, 15, 30, 40], d: "얕은 자리에서는 조금만, 깊은 자리에 대부분을 남겨 둬요" },
+  { id: "mid", n: "균형", w: [10, 15, 20, 25, 30], d: "단계가 깊어질수록 조금씩 더 (보내주신 자료의 비율)" },
+  { id: "agg", n: "공격", w: [30, 25, 20, 15, 10], d: "초반에 많이 — 얕게 끝나는 하락에서도 많이 사 둬요" }
+];
+function ddEsc(s) { return typeof escapeHtml === "function" ? escapeHtml(String(s == null ? "" : s)) : String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+function ddPct(v, d) { return v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : "") + (v * 100).toFixed(d == null ? 1 : d) + "%"; }
+function ddYmd(t) { var d = new Date(t + 9 * 3600e3); return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + d.getUTCDate()).slice(-2); }
+function ddYm(t) { return ddYmd(t).slice(0, 7); }
+function ddYear(t) { return new Date(t + 9 * 3600e3).getUTCFullYear(); }
+function ddMed(a) { a = a.filter(function (x) { return x != null && isFinite(x); }).sort(function (x, y) { return x - y; }); if (!a.length) return null; var m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; }
+/* 정렬된 배열의 q 분위(0~1), 선형 보간 */
+function ddQ(sorted, q) { var n = sorted.length; if (!n) return null; if (n === 1) return sorted[0]; var p = q * (n - 1), i = Math.floor(p), f = p - i; return i + 1 < n ? sorted[i] * (1 - f) + sorted[i + 1] * f : sorted[i]; }
+function ddName(s) { return typeof nbName === "function" ? nbName(s) : s; }
+function ddPx(sym, v) { return typeof egPx === "function" ? egPx(sym, v) : (v == null ? "-" : String(Math.round(v * 100) / 100)); }
+
+/* ---------- 기준금리(미국, %) : 바뀐 날만 들어 있는 계단 자료 ---------- */
+function ddRateFn() {
+  var s = typeof MAC !== "undefined" && MAC.doc && MAC.doc.series && MAC.doc.series.fed, a = (s && (s.d || s.rows)) || [], pts = [];
+  for (var i = 0; i < a.length; i++) { var k = String(a[i][0]).replace(/-/g, ""), v = +a[i][1]; if (k.length >= 8 && isFinite(v)) pts.push([Date.UTC(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)), v]); }
+  pts.sort(function (x, y) { return x[0] - y[0]; });
+  var fn = function (t) { if (!pts.length || t < pts[0][0]) return null; var lo = 0, hi = pts.length - 1; while (lo < hi) { var m = (lo + hi + 1) >> 1; if (pts[m][0] <= t) lo = m; else hi = m - 1; } return pts[lo][1]; };
+  fn.from = pts.length ? pts[0][0] : null; fn.n = pts.length; return fn;
+}
+
+/* ---------- 한 해 안에서의 최대 낙폭(연중 MDD) ---------- */
+function ddYearMdd(rows) {
+  var out = {}, y0 = null, pk = 0, md = 0;
+  for (var i = 0; i < rows.length; i++) { var y = ddYear(rows[i].t); if (y !== y0) { if (y0 != null) out[y0] = md; y0 = y; pk = rows[i].c; md = 0; } if (rows[i].c > pk) pk = rows[i].c; var d = rows[i].c / pk - 1; if (d < md) md = d; }
+  if (y0 != null) out[y0] = md; return out;
+}
+
+/* ---------- 분석에 쓰는 시세: 레버리지는 상장 전을 역산해 앞에 붙인다 ---------- */
+function ddSeries(sym, hist, rateFn) {
+  hist = hist || (typeof nbHist !== "undefined" ? nbHist : {});
+  var act = (hist[sym] || []).filter(function (r) { return r && r.c > 0 && r.t > 0; }).map(function (r) { return { t: r.t, c: r.c }; });
+  var out = { sym: sym, rows: act, synth: null }; if (act.length < 2) return out;
+  var L = DD_LEV[sym]; if (!L) return out;
+  var und = (hist[L[0]] || []).filter(function (r) { return r && r.c > 0 && r.t > 0; }); out.under = L[0]; out.lev = L[1];
+  if (und.length < 300) { out.synthWhy = "기초 ETF(" + L[0] + ") 시세를 못 받았어요"; return out; }
+  rateFn = rateFn || ddRateFn();
+  var key = function (t) { return ddYmd(t); }, uRet = {}, uIdx = {}, i;
+  for (i = 1; i < und.length; i++) { uRet[key(und[i].t)] = und[i].c / und[i - 1].c - 1; uIdx[key(und[i].t)] = i; }
+  /* 겹치는 구간에서 고정 비용(연)을 맞춘다: 평균( 배수×기초수익률 − 금리비용 − 실제수익률 ) × 252 */
+  var lev = L[1], borrow = (lev - 1) * DD_RATE_K, diff = [], xs = [], ys = [], noRate = 0;
+  for (i = 1; i < act.length; i++) {
+    var k = key(act[i].t), kp = key(act[i - 1].t), ui = uIdx[k]; if (ui == null || key(und[ui - 1].t) !== kp) continue;
+    var rt = rateFn(act[i].t); if (rt == null) { rt = 0; noRate++; }
+    var g = lev * uRet[k] - rt / 100 * borrow / 252, ra = act[i].c / act[i - 1].c - 1; if (Math.abs(ra) > 0.9) continue;
+    diff.push(g - ra); xs.push(g); ys.push(ra);
+  }
+  if (diff.length < 250) { out.synthWhy = "실제 구간과 겹치는 날이 너무 적어요 (" + diff.length + "일)"; return out; }
+  var fee = diff.reduce(function (a, b) { return a + b; }, 0) / diff.length * 252; fee = Math.max(-0.05, Math.min(0.1, fee));
+  var mx = xs.reduce(function (a, b) { return a + b; }, 0) / xs.length, my = ys.reduce(function (a, b) { return a + b; }, 0) / ys.length, sxy = 0, sxx = 0, syy = 0;
+  for (i = 0; i < xs.length; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) * (xs[i] - mx); syy += (ys[i] - my) * (ys[i] - my); }
+  var corr = sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : null;
+  var sRet = function (t, k) { var rt = rateFn(t); if (rt == null) rt = 0; return Math.max(-0.98, lev * uRet[k] - (fee + rt / 100 * borrow) / 252); };
+  /* 검산: 실제 구간 전체를 역산값으로 다시 만들어 연중 MDD를 비교 */
+  var chk = [{ t: act[0].t, c: act[0].c }];
+  for (i = 1; i < act.length; i++) { var k2 = key(act[i].t), r2 = uRet[k2] != null ? sRet(act[i].t, k2) : act[i].c / act[i - 1].c - 1; chk.push({ t: act[i].t, c: chk[i - 1].c * (1 + r2) }); }
+  var ya = ddYearMdd(act), ys2 = ddYearMdd(chk), yrs = Object.keys(ya).map(function (y) { return { y: +y, act: ya[y], syn: ys2[y], err: Math.abs(ya[y] - ys2[y]) }; }), maxErr = yrs.reduce(function (a, x) { return Math.max(a, x.err); }, 0);
+  yrs.sort(function (a, b) { return a.act - b.act; });
+  /* 상장 전 구간을 거꾸로 이어 붙인다 */
+  var first = act[0], fi = uIdx[key(first.t)], pre = [];
+  if (fi == null) { for (i = 1; i < und.length; i++) if (und[i].t >= first.t) { fi = i; break; } }
+  if (fi != null && fi > 250) {
+    var px = first.c;
+    for (i = fi; i >= 1; i--) { var kk = key(und[i].t); px = px / (1 + sRet(und[i].t, kk)); pre.push({ t: und[i - 1].t, c: px, s: 1 }); }
+    pre.reverse(); out.rows = pre.concat(act);
+    out.synth = { under: L[0], lev: lev, fee: fee, borrow: borrow, corr: corr, n: diff.length, maxErr: maxErr, years: yrs.slice(0, 4).sort(function (a, b) { return a.y - b.y; }), from: pre[0].t, to: first.t, days: pre.length, noRate: noRate > diff.length * 0.2 || !rateFn.n };
+  } else out.synthWhy = "기초 ETF 기록이 상장일보다 충분히 길지 않아요";
+  return out;
+}
+
+/* ---------- 하락 사건 뽑기 ---------- */
+function ddEvents(rows, basis) {
+  var n = rows.length, W = 252, dd = new Array(n), hiIdx = new Array(n), dq = [], i, ath = -1, athI = 0;
+  for (i = 0; i < n; i++) {
+    if (basis === "ath") { if (rows[i].c >= ath) { ath = rows[i].c; athI = i; } hiIdx[i] = athI; }
+    else { while (dq.length && rows[dq[dq.length - 1]].c <= rows[i].c) dq.pop(); dq.push(i); while (dq[0] <= i - W) dq.shift(); hiIdx[i] = dq[0]; }
+    dd[i] = rows[i].c / rows[hiIdx[i]].c - 1;
+  }
+  var evs = [], cur = null;
+  for (i = 0; i < n; i++) {
+    if (!cur) { if (dd[i] <= -0.10) cur = { i0: i, ip: hiIdx[i], it: i, depth: dd[i], lo: rows[i].c, il: i }; }
+    else {
+      if (dd[i] >= -1e-12) { cur.i1 = i; evs.push(cur); cur = null; continue; }
+      if (dd[i] < cur.depth) { cur.depth = dd[i]; cur.it = i; }
+      if (rows[i].c < cur.lo) { cur.lo = rows[i].c; cur.il = i; }
+    }
+  }
+  if (cur) { cur.open = 1; cur.i1 = null; evs.push(cur); }
+  return { dd: dd, hiIdx: hiIdx, evs: evs };
+}
+function ddReach(evs) {
+  var n = evs.length, dep = evs.map(function (e) { return e.depth; }).sort(function (a, b) { return a - b; });
+  return { n: n, th: DD_TH.map(function (th) { var c = evs.filter(function (e) { return e.depth <= th + 1e-9; }).length; return { th: th, c: c, p: n ? c / n : null }; }),
+    med: ddQ(dep, 0.5), p25: ddQ(dep, 0.25), p10: ddQ(dep, 0.10), p05: ddQ(dep, 0.05), worst: dep[0], sorted: dep };
+}
+/* -N%에 처음 닿은 날 종가에 샀다면 */
+function ddEntryOne(rows, E, e, th) {
+  if (e.depth > th + 1e-9) return null; var end = e.i1 != null ? e.i1 : rows.length - 1, j = -1, i;
+  for (i = e.i0; i <= end; i++) if (E.dd[i] <= th + 1e-9) { j = i; break; }
+  if (j < 0) return null; var lo = rows[j].c; for (i = j; i <= end; i++) if (rows[i].c < lo) lo = rows[i].c;
+  return { j: j, t: rows[j].t, c: rows[j].c, more: lo / rows[j].c - 1, r1: j + 252 < rows.length ? rows[j + 252].c / rows[j].c - 1 : null, open: !!e.open };
+}
+function ddEntry(rows, E, ths) {
+  return (ths || DD_TH).map(function (th) {
+    var hits = E.evs.map(function (e) { return ddEntryOne(rows, E, e, th); }).filter(Boolean), r1 = hits.map(function (h) { return h.r1; }).filter(function (v) { return v != null; });
+    return { th: th, n: hits.length, more: ddMed(hits.map(function (h) { return h.more; })), r1: ddMed(r1), n1: r1.length, pos: r1.length ? r1.filter(function (v) { return v > 0; }).length / r1.length : null, worst: r1.length ? Math.min.apply(null, r1) : null, best: r1.length ? Math.max.apply(null, r1) : null };
+  }).filter(function (x) { return x.n > 0; });
+}
+
+/* ---------- 연초 대비 ---------- */
+function ddYtd(rows) {
+  var by = {}, order = [], i;
+  for (i = 0; i < rows.length; i++) { var y = ddYear(rows[i].t); if (!by[y]) { by[y] = { y: y, a: i, b: i }; order.push(y); } by[y].b = i; }
+  var mdd = ddYearMdd(rows), lastY = order[order.length - 1], yrs = [];
+  order.forEach(function (y, k) {
+    if (k === 0) return; var p = by[order[k - 1]], Y = by[y], base = rows[p.b].c, lo = Infinity, li = Y.a;
+    for (var j = Y.a; j <= Y.b; j++) if (rows[j].c < lo) { lo = rows[j].c; li = j; }
+    yrs.push({ y: y, base: base, low: lo / base - 1, lowT: rows[li].t, end: rows[Y.b].c / base - 1, mdd: mdd[y], cur: y === lastY, firstPartial: k === 1 && (ddYmd(rows[p.a].t).slice(5) > "01-15") });
+  });
+  var done = yrs.filter(function (x) { return !x.cur; }), th = [-0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8];
+  var tab = th.map(function (t) { var hit = done.filter(function (x) { return x.low <= t + 1e-9; }); return { th: t, c: hit.length, p: done.length ? hit.length / done.length : null, pos: hit.filter(function (x) { return x.end > 0; }).length }; });
+  var avg = function (a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; };
+  /* 가장 깊이 빠졌던 해 3개와 그 다음 해 */
+  var deep = done.slice().sort(function (a, b) { return a.low - b.low; }).slice(0, 3).map(function (x) { var nx = yrs.filter(function (z) { return z.y === x.y + 1; })[0]; return { y: x.y, low: x.low, end: x.end, next: nx && !nx.cur ? nx.end : null, nextCur: nx && nx.cur ? nx.end : null }; });
+  return { yrs: yrs, done: done.length, tab: tab, avgLow: avg(done.map(function (x) { return x.low; })), avgMdd: avg(done.map(function (x) { return x.mdd; })), cur: yrs.filter(function (x) { return x.cur; })[0] || null, deep: deep, from: done.length ? done[0].y : null, to: done.length ? done[done.length - 1].y : null };
+}
+
+/* ---------- 200주선 (주봉 종가 200개 평균, 그 주가 끝난 뒤부터 적용) ---------- */
+function ddW200(rows) {
+  var wk = [], i, wkOf = function (t) { return Math.floor((t / 86400e3 + 3) / 7); }, map = new Array(rows.length);
+  for (i = 0; i < rows.length; i++) { var w = wkOf(rows[i].t); if (!wk.length || wk[wk.length - 1].w !== w) wk.push({ w: w, c: rows[i].c }); else wk[wk.length - 1].c = rows[i].c; map[i] = wk.length - 1; }
+  var ma = new Array(wk.length), s = 0; for (i = 0; i < wk.length; i++) { s += wk[i].c; if (i >= 200) s -= wk[i - 200].c; ma[i] = i >= 199 ? s / 200 : null; }
+  return rows.map(function (r, k) { var p = map[k] - 1; return p >= 0 ? ma[p] : null; });
+}
+
+/* ---------- 사건의 배경: 앱 이벤트 목록 + 모양 ---------- */
+function ddContext(rows, e) {
+  var t0 = rows[e.ip].t, t1 = rows[e.it].t, days = Math.round((t1 - t0) / 86400e3), names = [];
+  try { (typeof EVENTS !== "undefined" ? EVENTS : []).forEach(function (ev) { if (ev.ts >= t0 - 45 * 86400e3 && ev.ts <= t1 + 15 * 86400e3) names.push(ev); }); } catch (x) {}
+  var bad = names.filter(function (ev) { return ev.type !== "회복"; });
+  var shape = days <= 100 ? "급락형" : days >= 365 ? "장기 하락형" : "중간";
+  return { days: days, shape: shape, names: bad.map(function (ev) { return ev.name; }), types: bad.map(function (ev) { return ev.type; }), rec: e.i1 != null ? Math.round((rows[e.i1].t - t1) / 86400e3) : null };
+}
+
+/* ---------- 단계 매수 구간 ---------- */
+function ddStages(reach) {
+  var qs = [0.5, 0.25, 0.15, 0.10, 0.05], st = [], prev = 0;
+  qs.forEach(function (q, k) {
+    var d = ddQ(reach.sorted, q); if (d == null) return; d = Math.round(d * 100) / 100; if (d > -0.10) d = -0.10;
+    if (d > prev - 0.03) d = Math.round((prev - 0.03) * 100) / 100; if (d < -0.97) d = -0.97; prev = d;
+    var c = reach.sorted.filter(function (x) { return x <= d + 1e-9; }).length; st.push({ k: k + 1, d: d, q: q, c: c, p: reach.n ? c / reach.n : null });
+  });
+  return st;
+}
+/* 성향별 비율을 과거 사건에 그대로 넣어 본 결과 (예산 1 = 이 종목에 쓰기로 한 돈 전체) */
+function ddBacktest(rows, E, stages, weights) {
+  var res = [];
+  E.evs.forEach(function (e) {
+    var end = e.i1 != null ? e.i1 : rows.length - 1, buys = [], si = 0, i;
+    for (i = e.i0; i <= end && si < stages.length; i++) while (si < stages.length && E.dd[i] <= stages[si].d + 1e-9) { buys.push({ i: i, c: rows[i].c, w: weights[si] / 100 }); si++; }
+    if (!buys.length) return;
+    var inv = buys.reduce(function (a, b) { return a + b.w; }, 0), worst = 0, last = buys[buys.length - 1].i, val = function (idx) { var v = 0; buys.forEach(function (b) { if (b.i <= idx) v += b.w * (rows[idx].c / b.c - 1); }); return v; };
+    for (i = buys[0].i; i <= end; i++) { var v = val(i); if (v < worst) worst = v; }
+    var j1 = last + 252, r1 = j1 < rows.length ? val(j1) : null;
+    res.push({ e: e, inv: inv, n: buys.length, worst: worst, r1: r1, r1inv: r1 != null ? r1 / inv : null, open: !!e.open });
+  });
+  var r1 = res.map(function (x) { return x.r1; }).filter(function (v) { return v != null; });
+  return { n: res.length, inv: res.length ? res.reduce(function (a, x) { return a + x.inv; }, 0) / res.length : null, full: res.filter(function (x) { return x.n === stages.length; }).length,
+    worstMed: ddMed(res.map(function (x) { return x.worst; })), worst: res.length ? Math.min.apply(null, res.map(function (x) { return x.worst; })) : null,
+    r1Med: ddMed(r1), r1Worst: r1.length ? Math.min.apply(null, r1) : null, r1Best: r1.length ? Math.max.apply(null, r1) : null, pos: r1.length ? r1.filter(function (v) { return v > 0; }).length / r1.length : null, n1: r1.length, rows: res };
+}
+
+/* ---------- 전체 묶음 ---------- */
+function ddAnalyze(sym, hist, rateFn) {
+  var S = ddSeries(sym, hist, rateFn), rows = S.rows; if (!rows || rows.length < 300) return null;
+  var E = ddEvents(rows, "52w"), A = ddEvents(S.synth ? rows.filter(function (r) { return !r.s; }) : rows, "ath"), R = ddReach(E.evs), RA = ddReach(A.evs);
+  if (!E.evs.length) return { sym: sym, S: S, rows: rows, E: E, none: 1, last: rows[rows.length - 1] };
+  var stages = ddStages(R), last = rows[rows.length - 1], n = rows.length, cur = E.dd[n - 1], open = E.evs[E.evs.length - 1].open ? E.evs[E.evs.length - 1] : null;
+  var aRows = S.synth ? rows.filter(function (r) { return !r.s; }) : rows, curAth = A.dd[aRows.length - 1];
+  var ent = ddEntry(rows, E), Y = ddYtd(rows), w200 = ddW200(rows);
+  /* 꼬리 사건: 4단계(하위 10%) 근처까지 간 것 — 5%p 단위로 맞춘 기준 */
+  var tailTh = stages[3] ? Math.max(-0.9, Math.min(-0.2, Math.round(stages[3].d * 20) / 20)) : -0.3;
+  var tail = E.evs.filter(function (e) { return e.depth <= tailTh + 1e-9; }); if (tail.length < 3) { tail = E.evs.slice().sort(function (a, b) { return a.depth - b.depth; }).slice(0, Math.min(5, E.evs.length)).sort(function (a, b) { return a.i0 - b.i0; }); }
+  tail = tail.map(function (e) { var h = ddEntryOne(rows, E, e, Math.max(tailTh, e.depth)), c = ddContext(rows, e), brk = false; for (var i = e.i0; i <= (e.i1 != null ? e.i1 : n - 1); i++) if (w200[i] != null && rows[i].c < w200[i]) { brk = true; break; } return { e: e, pk: rows[e.ip].t, tr: rows[e.it].t, depth: e.depth, hit: h, ctx: c, brk: brk, open: !!e.open }; });
+  /* 200주선을 깬 사건과 안 깬 사건 */
+  var grp = { brk: [], ok: [] };
+  E.evs.forEach(function (e) { if (e.depth > -0.2) return; var end = e.i1 != null ? e.i1 : n - 1, b = false, known = false; for (var i = e.i0; i <= end; i++) if (w200[i] != null) { known = true; if (rows[i].c < w200[i]) { b = true; break; } } if (!known) return; (b ? grp.brk : grp.ok).push(e); });
+  var gs = function (a) { return { n: a.length, depth: ddMed(a.map(function (e) { return e.depth; })), worst: a.length ? Math.min.apply(null, a.map(function (e) { return e.depth; })) : null, days: ddMed(a.filter(function (e) { return e.i1 != null; }).map(function (e) { return Math.round((rows[e.i1].t - rows[e.ip].t) / 86400e3); })) }; };
+  var prof = DD_PROF.map(function (p) { var b = ddBacktest(rows, E, stages, p.w); b.id = p.id; b.name = p.n; b.w = p.w; b.desc = p.d; return b; });
+  /* 지금 깊이까지 간 사건 비율 · 지금 단계 */
+  var deepNow = open ? open.depth : cur, share = R.n ? R.sorted.filter(function (x) { return x <= deepNow + 1e-9; }).length / R.n : null;
+  var stNow = 0, stMax = 0; stages.forEach(function (s) { if (cur <= s.d + 1e-9) stNow = s.k; if (open && open.depth <= s.d + 1e-9) stMax = s.k; });
+  return { sym: sym, name: ddName(sym), S: S, rows: rows, E: E, A: A, R: R, RA: RA, stages: stages, ent: ent, Y: Y, tail: tail, tailTh: tailTh, grp: { brk: gs(grp.brk), ok: gs(grp.ok) }, prof: prof,
+    last: last, cur: cur, curAth: curAth, open: open, openPk: open ? rows[open.ip] : rows[E.hiIdx[n - 1]], deepNow: deepNow, share: share, stNow: stNow, stMax: stMax, w200: w200[n - 1], from: rows[0].t, yrs: (last.t - rows[0].t) / (365.25 * 86400e3), ctxNow: open ? ddContext(rows, open) : null };
+}
+function ddGet(sym) {
+  var rows = typeof nbHist !== "undefined" && nbHist[sym]; if (!rows || !rows.length) return null;
+  var L = DD_LEV[sym], u = L && nbHist[L[0]], key = sym + ":" + rows.length + ":" + rows[rows.length - 1].t + ":" + (u ? u.length : 0) + ":" + ((typeof MAC !== "undefined" && MAC.doc) ? 1 : 0);
+  if (DD.memo[key] === undefined) { try { DD.memo[key] = ddAnalyze(sym); } catch (e) { console.warn("dd", e); DD.memo[key] = null; } }
+  return DD.memo[key];
+}
+function ddEnsure(sym) {
+  var L = DD_LEV[sym], list = [sym].concat(L ? [L[0]] : []);
+  var p1 = typeof nbLoad === "function" ? nbLoad(list) : Promise.resolve(), p2 = L && typeof macroEnsure === "function" ? macroEnsure().catch(function () {}) : Promise.resolve();
+  return Promise.all([p1, p2]).then(function () { return ddGet(sym); });
+}
+
+/* ============================================================
+   화면 · 슬라이드
+   ============================================================ */
+function ddPrefs() { var o = {}; try { o = JSON.parse(localStorage.getItem("sm.dd") || "{}") || {}; } catch (e) {} return { prof: o.prof || "mid", loss: o.loss > 0 ? +o.loss : 10, brand: o.brand != null ? String(o.brand) : "겨울잠 리서치" }; }
+function ddSave(k, v) { var o = ddPrefs(); o[k] = v; try { localStorage.setItem("sm.dd", JSON.stringify(o)); } catch (e) {} }
+/* 낙폭 곡선 (52주 고점 대비) */
+function ddSvgDD(A, W, H, o) {
+  o = o || {}; var rows = A.rows, dd = A.E.dd, n = rows.length, L = 46, R = 8, T = o.top || 26, B = 22, w = W - L - R, h = H - T - B, B2 = Math.min(900, n), per = n / B2, pts = [], i;
+  var lo = Math.min(-0.2, Math.floor(Math.min.apply(null, A.R.sorted.concat([A.cur])) * 10 - 0.001) / 10), X = function (k) { return L + (k / (n - 1)) * w; }, Yv = function (v) { return T + (v / lo) * h; };
+  for (i = 0; i < B2; i++) { var a = Math.floor(i * per), b = Math.min(n, Math.floor((i + 1) * per) || a + 1), m = 0, mi = a; for (var j = a; j < b; j++) if (dd[j] <= m) { m = dd[j]; mi = j; } pts.push(X(mi).toFixed(1) + "," + Yv(m).toFixed(1)); }
+  var fg = o.fg || "#0f2240", sub = o.sub || "#6b7686", g = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="ddSvg" role="img" aria-label="52주 고점 대비 낙폭">';
+  for (var v = 0; v >= lo - 1e-9; v -= 0.2) g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Yv(v) + '" y2="' + Yv(v) + '" stroke="' + sub + '" stroke-opacity=".18"/><text x="' + (L - 6) + '" y="' + (Yv(v) + 4) + '" text-anchor="end" font-size="11" fill="' + sub + '">' + Math.round(v * 100) + '%</text>';
+  var y0 = ddYear(rows[0].t), y1 = ddYear(rows[n - 1].t), step = Math.max(1, Math.ceil((y1 - y0) / 8)), seen = {};
+  for (i = 0; i < n; i++) { var y = ddYear(rows[i].t); if (!seen[y]) { seen[y] = 1; if ((y - y0) % step === 0 && i > 0) g += '<text x="' + X(i) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="' + sub + '">' + y + '</text>'; } }
+  g += '<polygon points="' + L + ',' + Yv(0) + ' ' + pts.join(" ") + ' ' + (W - R) + ',' + Yv(0) + '" fill="' + fg + '" fill-opacity=".14"/><polyline points="' + pts.join(" ") + '" fill="none" stroke="' + fg + '" stroke-width="1.2"/>';
+  if (A.S.synth) { var sx = X(A.S.synth.days); g += '<line x1="' + sx + '" x2="' + sx + '" y1="' + T + '" y2="' + (T + h) + '" stroke="' + sub + '" stroke-dasharray="3 3"/><text x="' + (sx - 5) + '" y="' + (T + h - 5) + '" text-anchor="end" font-size="10.5" fill="' + sub + '">← 역산 | 실제 →</text>'; }
+  var line = o.line != null ? o.line : (A.stages[3] ? A.stages[3].d : null);
+  if (line != null && line >= lo) g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Yv(line) + '" y2="' + Yv(line) + '" stroke="#d6453d" stroke-width="1.6"/><text x="' + (L + 6) + '" y="' + (Yv(line) - 5) + '" font-size="11" font-weight="700" fill="#b9600f">' + Math.round(line * 100) + '% (4단계)</text>';
+  /* 깊은 사건에 이름표 */
+  var lab = A.tail.slice().sort(function (a, b) { return a.depth - b.depth; }).slice(0, 6).sort(function (a, b) { return a.tr - b.tr; }), lastX = -99;
+  lab.forEach(function (t) { var x = X(t.e.it); if (x - lastX < 62) return; lastX = x; var nm = t.open ? "현재" : (t.ctx.names[0] || ""); nm = nm.length > 9 ? nm.slice(0, 9) : nm; g += '<text x="' + Math.min(W - R - 26, Math.max(L + 26, x)) + '" y="11" text-anchor="middle" font-size="10.5" font-weight="700" fill="' + fg + '">’' + String(ddYear(t.tr)).slice(2) + (nm ? " " + ddEsc(nm) : "") + '</text><text x="' + Math.min(W - R - 26, Math.max(L + 26, x)) + '" y="23" text-anchor="middle" font-size="10.5" fill="#b9600f">' + Math.round(t.depth * 100) + '%</text>'; });
+  return g + '</svg>';
+}
+/* 도달 분포 막대 */
+function ddSvgReach(A, W, H, o) {
+  o = o || {}; var th = A.R.th, ra = A.RA.th, rowH = (H - 6) / th.length, L = 48, fg = o.fg || "#0f2240", sub = o.sub || "#6b7686", g = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="ddSvg" role="img" aria-label="도달 분포">';
+  th.forEach(function (t, k) { var y = 3 + k * rowH, bw = (W - L - 58), bh = Math.max(5, rowH * 0.3), p = t.p || 0, q = (ra[k] && ra[k].p) || 0;
+    g += '<text x="' + (L - 8) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="end" font-size="12.5" font-weight="700" fill="' + fg + '">' + Math.round(t.th * 100) + '%</text>' +
+      '<rect x="' + L + '" y="' + (y + rowH / 2 - bh - 1) + '" width="' + Math.max(1, bw * p) + '" height="' + bh + '" fill="' + fg + '"/><text x="' + (L + bw * p + 6) + '" y="' + (y + rowH / 2 - 2) + '" font-size="11" font-weight="700" fill="' + fg + '">' + (p * 100).toFixed(1) + '%</text>' +
+      (A.RA.n ? '<rect x="' + L + '" y="' + (y + rowH / 2 + 1) + '" width="' + Math.max(1, bw * q) + '" height="' + bh + '" fill="#a9bfe0"/><text x="' + (L + bw * q + 6) + '" y="' + (y + rowH / 2 + bh + 1) + '" font-size="10.5" fill="' + sub + '">' + (q * 100).toFixed(1) + '%</text>' : ''); });
+  return g + '</svg>';
+}
+/* 연도별 연초 대비 최저 */
+function ddSvgYtd(A, W, H, o) {
+  o = o || {}; var ys = A.Y.yrs, n = ys.length, L = 44, T = 8, B = 22, w = W - L - 6, h = H - T - B, lo = Math.min(-0.2, Math.floor(Math.min.apply(null, ys.map(function (y) { return y.low; })) * 10 - 0.001) / 10), fg = o.fg || "#0f2240", sub = o.sub || "#6b7686", bw = w / n, g = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="ddSvg" role="img" aria-label="연도별 연초 대비 최저">';
+  for (var v = 0; v >= lo - 1e-9; v -= 0.2) g += '<line x1="' + L + '" x2="' + (W - 6) + '" y1="' + (T + v / lo * h) + '" y2="' + (T + v / lo * h) + '" stroke="' + sub + '" stroke-opacity=".18"/><text x="' + (L - 6) + '" y="' + (T + v / lo * h + 4) + '" text-anchor="end" font-size="11" fill="' + sub + '">' + Math.round(v * 100) + '%</text>';
+  var step = Math.max(1, Math.ceil(n / 13));
+  ys.forEach(function (y, k) { var hh = Math.max(0, Math.min(0, y.low) / lo * h), x = L + k * bw; g += '<rect x="' + (x + bw * 0.14) + '" y="' + T + '" width="' + (bw * 0.72) + '" height="' + hh + '" fill="' + (y.cur ? "#d9822b" : y.low <= -0.5 ? fg : "#a9bfe0") + '"><title>' + y.y + '년 ' + ddPct(y.low) + '</title></rect>' + (k % step === 0 || y.cur ? '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10.5" fill="' + sub + '">’' + String(y.y).slice(2) + '</text>' : ''); });
+  return g + '</svg>';
+}
+function ddPeriod(pk, tr, open) { return ddYm(pk) + " → " + (open ? "진행 중" : ddYm(tr)); }
+function ddBg(t) { return t.open && !t.ctx.names.length ? "–" : (t.ctx.names.length ? t.ctx.names.slice(0, 2).join(" · ") : "목록에 해당 이벤트 없음"); }
+/* 한 줄 결론들 */
+function ddPoints(A) {
+  var R = A.R, e80 = A.ent[A.ent.length - 1], p = [], s4 = A.stages[3], s1 = A.stages[0];
+  p.push((A.S.synth ? A.S.synth.under + "×" + A.S.synth.lev + " 역산을 붙여 " : "") + ddYmd(A.from).slice(0, 4) + "년부터 " + R.n + "개 하락 사건 — 절반은 " + ddPct(R.med, 0) + "에서 멈췄고, 10건 중 1건은 " + ddPct(R.p10, 0) + "보다 더 갔어요");
+  var t5 = R.th.filter(function (x) { return x.th === -0.5; })[0], t6 = R.th.filter(function (x) { return x.th === -0.6; })[0];
+  if (t5 && t5.c >= 3 && t6 && t5.c === t6.c) p.push("-50%를 넘긴 하락 " + t5.c + "건은 예외 없이 -60% 이상까지 갔어요");
+  var deep = A.ent.filter(function (x) { return x.n1 >= 3; }).slice(-1)[0];
+  if (deep) p.push(Math.round(deep.th * 100) + "%에 처음 닿은 날 샀다면(" + deep.n + "건): 그 뒤 추가 하락 중앙값 " + ddPct(deep.more) + ", 1년 뒤 중앙값 " + ddPct(deep.r1) + " · 최악 " + ddPct(deep.worst));
+  if (A.grp.brk.n && A.grp.ok.n) p.push("200주선을 깬 사건(" + A.grp.brk.n + "건)의 최대 낙폭 중앙값 " + ddPct(A.grp.brk.depth, 0) + " vs 안 깬 사건(" + A.grp.ok.n + "건) " + ddPct(A.grp.ok.depth, 0));
+  return p;
+}
+function ddNm(A) { return /[가-힣]/.test(A.name) && !/\(/.test(A.name) && !DD_LEV[A.sym] ? A.name : A.sym.replace(/\.K[SQ]$/, ""); }
+function ddHead(A) {
+  var sh = A.share, nm = ddNm(A);
+  if (!A.open) return nm + " · 지금은 52주 고점 근처입니다 (하락 사건 아님)";
+  if (sh != null && sh <= 0.5) return nm + " · 이번 하락은 " + A.yrs.toFixed(0) + "년 역사에서 깊은 쪽 " + Math.max(1, Math.round(sh * 100)) + "% 구간입니다";
+  return nm + " · 이번 하락(" + ddPct(A.deepNow, 0) + ")은 흔한 깊이입니다 — 사건의 " + Math.round((sh || 0) * 100) + "%가 여기까지 왔습니다";
+}
+function ddKpis(A) {
+  var y = A.Y.cur, k = [];
+  k.push({ v: ddPct(A.cur), l: "52주 고점 대비", s: "고점 " + ddYmd(A.openPk.t) + " · " + ddPx(A.sym, A.openPk.c) + (A.open && A.open.depth < A.cur - 0.005 ? " · 이번 최저 " + ddPct(A.open.depth) : "") });
+  if (A.open) k.push({ v: A.share == null ? "–" : (A.share * 100).toFixed(1) + "%", l: "이번 깊이(" + ddPct(A.deepNow, 0) + ")까지 간 사건", s: A.R.n + "건 중 " + Math.round((A.share || 0) * A.R.n) + "건" });
+  else k.push({ v: A.R.n + "건", l: "지금까지의 하락 사건", s: "중앙값 " + ddPct(A.R.med, 0) + " · 가장 깊었던 것 " + ddPct(A.R.worst, 0) });
+  k.push({ v: y ? ddPct(y.end) : "–", l: "연초 대비", s: y ? "연중 최저 " + ddPct(y.low) + " · " + ddYmd(y.lowT).slice(5) : "" });
+  k.push({ v: A.stNow ? A.stNow + "단계" : "해당 없음", l: "지금 매수 단계", s: A.stMax > A.stNow ? "이번 하락에서 " + A.stMax + "단계까지 닿았음" : A.stages[A.stNow] ? "다음 " + (A.stNow + 1) + "단계 " + ddPct(A.stages[A.stNow].d, 0) : "가장 깊은 단계" });
+  return k;
+}
+function ddConflict(A) { var y = A.Y.cur; if (!y) return null; if (A.cur <= -0.2 && y.end > 0) return "전고점 대비로는 " + ddPct(A.cur, 0) + "인데 연초 대비로는 " + ddPct(y.end, 0) + "예요 — 올해 크게 오른 뒤 빠진 경우라 연초 기준만 보면 매수 단계가 열리지 않아요. 전고점 기준을 같이 봐야 해요."; if (A.cur > -0.1 && y.end <= -0.15) return "연초 대비로는 " + ddPct(y.end, 0) + "인데 52주 고점 대비로는 " + ddPct(A.cur, 0) + "예요 — 작년 말이 높았던 경우예요."; return null; }
+function ddCap(A, pr, loss) { var one = A.R.worst ? loss / 100 / Math.abs(A.R.worst) : null, st = pr && pr.worst ? loss / 100 / Math.abs(pr.worst) : null; return { one: one, st: st }; }
+
+function ddHtml(sym) {
+  var A = ddGet(sym); if (!A) return '<div class="briefDim">낙폭 분석을 할 만큼 시세가 길지 않아요 (300거래일 이상 필요).</div>';
+  if (A.none) return '<div class="briefDim">기록 기간 동안 52주 고점에서 -10% 넘게 빠진 적이 없어요.</div>';
+  var P = ddPrefs(), pr = A.prof.filter(function (x) { return x.id === P.prof; })[0] || A.prof[1], cap = ddCap(A, pr, P.loss), k = ddKpis(A), cf = ddConflict(A), h = '';
+  h += '<div class="egBox ddBox"><div class="ddTop"><div><div class="ddHd">' + ddEsc(ddHead(A)) + '</div><div class="briefDim">' + ddYmd(A.from) + ' ~ ' + ddYmd(A.last.t) + ' · ' + A.yrs.toFixed(1) + '년 · 종가 기준' + (A.S.synth ? ' · 앞 ' + (A.S.synth.days / 252).toFixed(1) + '년은 ' + A.S.synth.under + '×' + A.S.synth.lev + ' 역산' : '') + '</div></div><button class="primary" data-dddeck>슬라이드 자료 보기</button></div>';
+  h += '<div class="ddKs">' + k.map(function (x, i) { return '<div class="ddK' + (i === 0 && A.cur <= -0.2 ? " dn" : "") + '"><b>' + ddEsc(x.v) + '</b><span>' + ddEsc(x.l) + '</span><small>' + ddEsc(x.s) + '</small></div>'; }).join("") + '</div>';
+  if (cf) h += '<div class="ddWarn"><b>두 기준이 다르게 말해요</b> ' + ddEsc(cf) + '</div>';
+  if (A.R.n < 10) h += '<div class="ddWarn"><b>사건이 ' + A.R.n + '건뿐이에요</b> 백분위와 단계는 거친 값이에요. 참고만 하세요.</div>';
+  h += '<ol class="ddPts">' + ddPoints(A).map(function (p) { return '<li>' + ddEsc(p) + '</li>'; }).join("") + '</ol></div>';
+  if (A.S.synth) { var sy = A.S.synth;
+    h += '<div class="egBox ddBox"><div class="egH">상장 전 ' + (sy.days / 252).toFixed(1) + '년은 ' + sy.under + ' 일간수익률로 역산했어요 <small>' + sy.under + ' 일간수익률 × ' + sy.lev + ' − 하루 비용. 비용 = 연 ' + (sy.fee * 100).toFixed(2) + '%(실제 구간에 맞춰 추정 · 배당 효과 포함) + 미국 기준금리 × ' + sy.borrow.toFixed(2) + '. ' + ddYmd(sy.to) + '부터는 실제 시세예요.' + (sy.noRate ? ' 기준금리 자료가 없는 구간은 금리 0으로 계산했어요.' : '') + '</small></div>' +
+      '<div class="ddSyn"><div class="ddK"><b>' + (sy.corr == null ? "–" : sy.corr.toFixed(3)) + '</b><span>일간수익률 상관계수</span><small>겹치는 ' + sy.n + '일</small></div><div class="ddK"><b>' + (sy.maxErr * 100).toFixed(1) + '%p</b><span>연중 MDD 최대 오차</span><small>실제 구간을 역산으로 다시 만들어 비교</small></div>' +
+      '<div class="dxWrap"><table class="dgT"><thead><tr><th>연중 MDD</th><th>실제</th><th>역산</th><th>오차</th></tr></thead><tbody>' + sy.years.map(function (y) { return '<tr><td>' + y.y + '</td><td>' + ddPct(y.act) + '</td><td>' + ddPct(y.syn) + '</td><td>' + (y.err * 100).toFixed(1) + '%p</td></tr>'; }).join("") + '</tbody></table></div></div></div>'; }
+  else if (A.S.synthWhy) h += '<div class="ddWarn"><b>역산 없이 실제 시세만 썼어요</b> ' + ddEsc(A.S.synthWhy) + '</div>';
+  h += '<div class="egBox ddBox"><div class="egH">52주 고점 대비 낙폭 <small>최근 252거래일 종가 최고점에서 얼마나 내려와 있었는지. 빨간 선은 4단계(사건의 10%만 닿은 깊이).</small></div>' + ddSvgDD(A, 920, 300) + '</div>';
+  h += '<div class="egBox ddBox"><div class="egH">어디까지 빠졌나 — 도달 분포 <small>남색 = 52주 고점 기준 ' + A.R.n + '건' + (A.RA.n ? ' · 하늘색 = 사상최고가 기준 ' + A.RA.n + '건' + (A.S.synth ? '(실제 시세만)' : '') : '') + '</small></div><div class="ddTwo"><div>' + ddSvgReach(A, 560, 300) + '</div><div class="ddSide"><b>분포 백분위 (52주 기준)</b>' +
+    [["중앙값", A.R.med], ["하위 25%", A.R.p25], ["하위 10%", A.R.p10], ["하위 5%", A.R.p05], ["가장 깊었던 것", A.R.worst]].map(function (x) { return '<div><span>' + x[0] + '</span><em>' + ddPct(x[1], 0) + '</em></div>'; }).join("") + '</div></div></div>';
+  h += '<div class="egBox ddBox"><div class="egH">' + Math.round(A.tailTh * 100) + '%보다 깊었던 ' + A.tail.length + '번 — 배경과 그 뒤 <small>배경은 앱의 주요 이벤트 목록에서 그 기간에 있던 것. 모양: 고점→저점 100일 이하 = 급락형, 1년 이상 = 장기 하락형. 1년 후 = 그 깊이에 처음 닿은 날 종가에서 252거래일 뒤.</small></div><div class="dxWrap"><table class="dgT"><thead><tr><th>하락 구간</th><th>최대 낙폭</th><th>고점→저점</th><th>' + Math.round(A.tailTh * 100) + '% 닿은 날</th><th>그 뒤 추가 하락</th><th>1년 후</th><th>200주선</th><th>모양</th><th>배경 (앱 이벤트)</th></tr></thead><tbody>' +
+    A.tail.map(function (t) { return '<tr' + (t.open ? ' class="ddNow"' : '') + '><td>' + ddPeriod(t.pk, t.tr, t.open) + '</td><td><b>' + ddPct(t.depth) + '</b></td><td>' + t.ctx.days + '일</td><td>' + (t.hit ? ddYmd(t.hit.t) : "–") + '</td><td>' + (t.hit && !t.open ? ddPct(t.hit.more) : t.hit ? ddPct(t.hit.more) + " (진행 중)" : "–") + '</td><td>' + (t.hit && t.hit.r1 != null ? '<b class="' + (t.hit.r1 > 0 ? "ddUp" : "ddDn") + '">' + ddPct(t.hit.r1) + '</b>' : "–") + '</td><td>' + (t.brk ? "이탈" : "지킴") + '</td><td>' + (t.open ? "판단 대기" : t.ctx.shape) + '</td><td>' + ddEsc(ddBg(t)) + '</td></tr>'; }).join("") + '</tbody></table></div>' +
+    (A.grp.brk.n || A.grp.ok.n ? '<div class="ddMini"><b>200주선을 깼는가로 나누면</b> (-20% 넘게 빠진 사건) — 깬 사건 ' + A.grp.brk.n + '건: 최대 낙폭 중앙값 ' + ddPct(A.grp.brk.depth, 0) + ', 고점 회복까지 중앙값 ' + (A.grp.brk.days == null ? "–" : A.grp.brk.days + "일") + ' / 안 깬 사건 ' + A.grp.ok.n + '건: ' + ddPct(A.grp.ok.depth, 0) + ', ' + (A.grp.ok.days == null ? "–" : A.grp.ok.days + "일") + '</div>' : '') + '</div>';
+  h += '<div class="egBox ddBox"><div class="egH">그 자리에서 샀다면 — 진입 분석 <small>52주 고점 대비 -N%에 처음 닿은 날 종가에 샀을 때. 1년 = 252거래일.</small></div><div class="dxWrap"><table class="dgT"><thead><tr><th>첫 도달 시 매수</th><th>사건 수</th><th>추가 하락 중앙값</th><th>1년 후 중앙값</th><th>1년 후 플러스</th><th>1년 후 최악</th><th>1년 후 최고</th></tr></thead><tbody>' +
+    A.ent.map(function (x) { return '<tr><td><b>' + Math.round(x.th * 100) + '%</b></td><td>' + x.n + '</td><td>' + ddPct(x.more) + '</td><td><b class="' + (x.r1 > 0 ? "ddUp" : "ddDn") + '">' + ddPct(x.r1) + '</b></td><td>' + (x.pos == null ? "–" : Math.round(x.pos * 100) + "% (" + x.n1 + "건)") + '</td><td>' + ddPct(x.worst) + '</td><td>' + ddPct(x.best) + '</td></tr>'; }).join("") + '</tbody></table></div></div>';
+  var Y = A.Y;
+  h += '<div class="egBox ddBox"><div class="egH">연초 대비 — 해마다 어디까지 빠졌나 <small>막대 = 그해 가장 낮았던 종가 ÷ 전년 마지막 종가 − 1. 남색 = -50% 이하, 주황 = 올해(진행 중). 표본 ' + (Y.from || "") + '~' + (Y.to || "") + ' ' + Y.done + '개 해.</small></div>' + ddSvgYtd(A, 920, 220) +
+    '<div class="ddTwo"><div class="dxWrap"><table class="dgT"><thead><tr><th>연초 대비</th><th>도달한 해</th><th>확률</th><th>그해 연말 플러스</th></tr></thead><tbody>' + Y.tab.filter(function (x) { return x.c > 0; }).map(function (x) { return '<tr><td><b>' + Math.round(x.th * 100) + '%</b></td><td>' + x.c + '년</td><td>' + (x.p * 100).toFixed(1) + '%</td><td>' + x.pos + ' / ' + x.c + '</td></tr>'; }).join("") + '</tbody></table></div>' +
+    '<div class="ddSide"><b>가장 깊었던 해와 다음 해</b>' + Y.deep.map(function (d) { return '<div><span>' + d.y + ' (' + ddPct(d.low, 0) + ') → ' + (d.y + 1) + '</span><em class="' + ((d.next != null ? d.next : d.nextCur) > 0 ? "ddUp" : "") + '">' + (d.next != null ? ddPct(d.next) : d.nextCur != null ? ddPct(d.nextCur) + " (진행 중)" : "–") + '</em></div>'; }).join("") + '<b style="margin-top:10px">해마다 평균</b><div><span>연초 대비 최저</span><em>' + ddPct(Y.avgLow) + '</em></div><div><span>연중 MDD</span><em>' + ddPct(Y.avgMdd) + '</em></div></div></div></div>';
+  h += '<div class="egBox ddBox"><div class="egH">분포 백분위로 나눈 5단계 매수 구간 <small>이 종목 자신의 하락 사건 분포로 정한 깊이예요. 사건 도달 확률 = 과거 사건 중 그 깊이까지 간 비율. 비율은 고른 성향의 값이에요.</small></div>' +
+    '<div class="ddProfSel">' + A.prof.map(function (x) { return '<button data-ddprof="' + x.id + '" class="' + (x.id === pr.id ? "on" : "") + '"><b>' + x.name + '</b><span>' + x.w.join(" · ") + '</span></button>'; }).join("") + '</div><div class="briefDim" style="margin:4px 0 8px">' + ddEsc(pr.desc) + '</div>' +
+    '<div class="dxWrap"><table class="dgT"><thead><tr><th>단계</th><th>52주 고점 대비</th><th>그때 가격 (지금 고점 기준)</th><th>사건 도달 확률</th><th>비율 (' + pr.name + ')</th><th>상태</th></tr></thead><tbody>' + A.stages.map(function (s, i) { var passed = A.stMax >= s.k, now = A.stNow === s.k; return '<tr' + (now ? ' class="ddNow"' : '') + '><td><b>' + s.k + '단계</b></td><td>' + ddPct(s.d, 0) + '</td><td>' + ddPx(A.sym, A.openPk.c * (1 + s.d)) + '</td><td>' + Math.round(s.p * 100) + '% (' + s.c + '건)</td><td>' + pr.w[i] + '%</td><td>' + (now ? "지금 여기" : passed ? (A.cur <= s.d ? "통과" : "닿았다가 올라옴") : "대기") + '</td></tr>'; }).join("") + '</tbody></table></div>' +
+    '<div class="ddMini"><b>현재 위치</b> 52주 고점 대비 ' + ddPct(A.cur) + ' → ' + (A.stNow ? A.stNow + "단계 구간" + (A.stages[A.stNow] ? ", 다음 " + (A.stNow + 1) + "단계는 " + ddPct(A.stages[A.stNow].d, 0) + " (" + ddPx(A.sym, A.openPk.c * (1 + A.stages[A.stNow].d)) + ")" : "") : "아직 1단계(" + ddPct(A.stages[0].d, 0) + ")에 닿지 않았어요") + '</div></div>';
+  h += '<div class="egBox ddBox"><div class="egH">성향별 비율을 과거 사건에 넣어 보면 <small>이 종목에 쓰기로 한 돈을 100으로 두고, 각 단계에 처음 닿은 날 종가에 그 비율만큼 샀다고 가정. 손익은 모두 "쓰기로 한 돈 전체" 대비예요(안 쓴 돈은 현금). 과거 결과이며 앞으로를 보장하지 않아요.</small></div><div class="dxWrap"><table class="dgT"><thead><tr><th>성향</th><th>단계별 비율</th><th>참여한 사건</th><th>평균 투입</th><th>가장 아팠던 순간 (중앙값)</th><th>가장 아팠던 순간 (최악)</th><th>마지막 매수 1년 후 (중앙값)</th><th>1년 후 최악</th><th>1년 후 플러스</th></tr></thead><tbody>' +
+    A.prof.map(function (x) { return '<tr' + (x.id === pr.id ? ' class="ddNow"' : '') + '><td><b>' + x.name + '</b></td><td>' + x.w.join(" · ") + '</td><td>' + x.n + '건 (5단계까지 ' + x.full + '건)</td><td>' + (x.inv == null ? "–" : Math.round(x.inv * 100) + "%") + '</td><td>' + ddPct(x.worstMed) + '</td><td><b class="ddDn">' + ddPct(x.worst) + '</b></td><td><b class="' + (x.r1Med > 0 ? "ddUp" : "ddDn") + '">' + ddPct(x.r1Med) + '</b></td><td>' + ddPct(x.r1Worst) + '</td><td>' + (x.pos == null ? "–" : Math.round(x.pos * 100) + "% (" + x.n1 + "건)") + '</td></tr>'; }).join("") + '</tbody></table></div>' +
+    '<div class="ddCap"><label>계좌 전체에서 이 종목으로 잃어도 되는 한도 <input type="number" min="1" max="50" step="1" value="' + P.loss + '" data-ddloss> %</label><div><span>한 번에 다 샀다면 (과거 최대 낙폭 ' + ddPct(A.R.worst, 0) + ' 가정)</span><em>비중 ' + (cap.one == null ? "–" : Math.min(100, cap.one * 100).toFixed(0) + "% 이하") + '</em></div><div><span>' + pr.name + ' 비율로 나눠 샀다면 (과거 최악 ' + ddPct(pr.worst, 0) + ' 가정)</span><em>비중 ' + (cap.st == null ? "–" : Math.min(100, cap.st * 100).toFixed(0) + "% 이하") + '</em></div>' + ddMine(A) + '</div>' +
+    '<div class="briefDim" style="margin-top:8px">과거 최악보다 더 나쁜 일은 언제든 생길 수 있어요. 해외주식 양도차익은 연 250만 원 공제 후 22% 과세 — 위 수익률은 모두 세전이에요. 매수 권유가 아닌 참고 자료예요.</div></div>';
+  return h;
+}
+function ddMine(A) { try { var P = typeof egPortfolio === "function" ? egPortfolio() : null, m = P && P.pos && P.pos.filter(function (x) { return x.sym === A.sym; })[0]; return m ? '<div><span>지금 내 계좌에서 이 종목 비중</span><em>' + (m.w * 100).toFixed(1) + '%</em></div>' : ''; } catch (e) { return ''; } }
+
+/* ---------- 슬라이드 ---------- */
+function ddSlides(A) {
+  var P = ddPrefs(), pr = A.prof.filter(function (x) { return x.id === P.prof; })[0] || A.prof[1], cap = ddCap(A, pr, P.loss), Y = A.Y, S = [], foot = "출처: " + (A.S.synth ? A.S.synth.under + "·" + A.sym + " 일별 종가(~" + ddYmd(A.last.t) + "), " + ddYm(A.S.synth.to) + " 이전 " + A.S.synth.under + "×" + A.S.synth.lev + " 역산" : A.sym + " 일별 종가(~" + ddYmd(A.last.t) + ")") + (P.brand ? " · " + P.brand : "");
+  var T = function (kick, title, body, cls) { S.push('<section class="ddS ' + (cls || "") + '"><div class="ddSK">' + kick + '</div><h2>' + ddEsc(title) + '</h2><div class="ddSB">' + body + '</div><footer><span>' + ddEsc(foot) + '</span><i></i></footer></section>'); };
+  var tbl = function (hd, rows, hi) { return '<table class="ddST"><thead><tr>' + hd.map(function (x) { return '<th>' + x + '</th>'; }).join("") + '</tr></thead><tbody>' + rows.map(function (r, i) { return '<tr class="' + (hi && hi(i) ? "hi" : "") + '">' + r.map(function (c) { return '<td>' + c + '</td>'; }).join("") + '</tr>'; }).join("") + '</tbody></table>'; };
+  var side = function (ttl, kv, note) { return '<aside class="ddSA"><b>' + ttl + '</b>' + kv.map(function (x) { return x.length === 1 ? '<b style="margin-top:12px">' + x[0] + '</b>' : '<div><span>' + x[0] + '</span><em>' + x[1] + '</em></div>'; }).join("") + (note ? '<p>' + ddEsc(note) + '</p>' : '') + '</aside>'; };
+  var dk = { fg: "#0f2240", sub: "#5b6779" }, k = ddKpis(A), pts = ddPoints(A);
+  S.push('<section class="ddS dark cover"><div class="ddSK">' + ddEsc(P.brand || "StockMind") + ' · ' + (A.S.lev ? "레버리지 ETF " : "") + '낙폭 분석</div><h1>' + ddEsc(ddNm(A)) + ' ' + Math.round(A.yrs) + '년 History</h1><p>' + ddEsc(A.name) + ' — ' + (A.S.synth ? A.S.synth.under + " 역산으로 본 " : "") + '전고점·연초 대비 낙폭과 매수 단계</p><hr><small>기준일 ' + ddYmd(A.last.t) + '　분석 기간 ' + ddYmd(A.from) + ' ~ ' + ddYmd(A.last.t) + '　참고용 · 매수 권유 아님</small></section>');
+  T("EXECUTIVE SUMMARY", ddHead(A), '<div class="ddSKs">' + k.map(function (x) { return '<div><b>' + ddEsc(x.v) + '</b><span>' + ddEsc(x.l) + '</span><small>' + ddEsc(x.s) + '</small></div>'; }).join("") + '</div><ol class="ddSP">' + pts.slice(0, 3).map(function (p, i) { return '<li><i>0' + (i + 1) + '</i>' + ddEsc(p) + '</li>'; }).join("") + '</ol>');
+  if (A.S.synth) { var sy = A.S.synth;
+    T("METHODOLOGY", "상장 전 " + (sy.days / 252).toFixed(0) + "년은 " + sy.under + " 일간수익률로 역산했습니다", '<div class="ddSteps"><div><small>STEP 1</small><b>' + sy.under + ' 일간수익률</b><span>' + ddYmd(sy.from) + ' ~ ' + ddYmd(sy.to) + '<br>' + A.sym + ' 상장 전 구간</span></div><div><small>STEP 2</small><b>×' + sy.lev + ' − 일 비용</b><span>비용 = 연 ' + (sy.fee * 100).toFixed(2) + '% + 기준금리×' + sy.borrow.toFixed(2) + '<br>실제 구간 괴리로 추정</span></div><div class="on"><small>STEP 3</small><b>실제 ' + A.sym + ' 연결</b><span>' + ddYmd(sy.to) + '부터<br>실제 시세 사용</span></div></div><div class="ddSRow"><div class="ddSBig"><b>' + (sy.corr == null ? "–" : sy.corr.toFixed(3)) + '</b><span>일간수익률 상관계수</span><b>' + (sy.maxErr * 100).toFixed(1) + '%p</b><span>연도별 MDD 최대 오차</span></div>' + tbl(["연중 MDD", "실제", "역산", "오차"], sy.years.map(function (y) { return [y.y, ddPct(y.act), ddPct(y.syn), (y.err * 100).toFixed(1) + "%p"]; })) + '</div>'); }
+  var s4 = A.stages[3];
+  T(Math.round(A.yrs) + "-YEAR DRAWDOWN", "52주 고점 대비 " + ddPct(A.tailTh, 0) + "를 넘긴 하락은 " + Math.round(A.yrs) + "년간 " + A.R.sorted.filter(function (x) { return x <= A.tailTh + 1e-9; }).length + "번이었습니다", ddSvgDD(A, 1110, 410, dk));
+  T("PROBABILITY DISTRIBUTION", "절반은 " + ddPct(A.R.med, 0) + "에서 멈췄고, 10%만 " + ddPct(A.R.p10, 0) + "에 닿았습니다", '<div class="ddSRow"><div style="flex:1.7"><div class="ddLg"><i style="background:#0f2240"></i>52주 고점 기준 · ' + A.R.n + '건' + (A.RA.n ? '<i style="background:#a9bfe0"></i>사상최고가 기준 · ' + A.RA.n + '건' : '') + '</div>' + ddSvgReach(A, 690, 370, dk) + '</div>' + side("분포 백분위 (52주 기준)", [["중앙값", ddPct(A.R.med, 0)], ["하위 25%", ddPct(A.R.p25, 0)], ["하위 10%", ddPct(A.R.p10, 0)], ["하위 5%", ddPct(A.R.p05, 0)]], pts[1] && /예외 없이/.test(pts[1]) ? pts[1] : "가장 깊었던 사건은 " + ddPct(A.R.worst, 0) + "였습니다.") + '</div>');
+  T("TAIL EVENTS", ddPct(A.tailTh, 0) + "보다 깊었던 " + A.tail.length + "번: 배경과 모양이 결과를 갈랐습니다", tbl(["하락 구간 (고점 → 저점)", "최대 낙폭", ddPct(A.tailTh, 0) + " 도달일", "이후 추가하락", "1년 후", "모양 · 배경"], A.tail.slice(-8).map(function (t) { return [ddPeriod(t.pk, t.tr, t.open), ddPct(t.depth), t.hit ? ddYmd(t.hit.t) : "–", t.hit && !t.open ? ddPct(t.hit.more) : "—", t.hit && t.hit.r1 != null ? ddPct(t.hit.r1) : "—", (t.open ? "판단 대기" : t.ctx.shape) + (t.ctx.names.length ? " · " + ddEsc(t.ctx.names[0]) : "")]; }), function (i) { return A.tail.slice(-8)[i].open; }) + '<p class="ddSN">1년 후 수익률은 ' + ddPct(A.tailTh, 0) + ' 도달일 종가 기준 252거래일 후. 52주 고점 기준. 배경은 앱의 주요 이벤트 목록. 급락형 = 고점→저점 100일 이하, 장기 하락형 = 1년 이상.</p>');
+  var e0 = A.ent[0], eL = A.ent.filter(function (x) { return x.n1 >= 1; }).slice(-1)[0] || A.ent[A.ent.length - 1], allWorst = Math.min.apply(null, A.ent.filter(function (x) { return x.worst != null; }).map(function (x) { return x.worst; }));
+  T("ENTRY ANALYSIS", eL && e0 && eL.r1 != null && e0.r1 != null && eL.r1 > e0.r1 ? "깊게 살수록 1년 후 성과가 좋았습니다" : "깊이별 진입 후 1년 성과", '<div class="ddSRow"><div style="flex:1.9">' + tbl(["첫 도달 시 매수", "사건 수", "추가하락 중앙값", "1년 후 중앙값", "1년 후 플러스"], A.ent.map(function (x) { return [Math.round(x.th * 100) + "%", x.n, ddPct(x.more), ddPct(x.r1), x.pos == null ? "–" : Math.round(x.pos * 100) + "%"]; }), function (i) { return i === A.ent.length - 1; }) + '</div>' + side("1년 후 수익률 중앙값", [[Math.round(e0.th * 100) + "%에서 매수", ddPct(e0.r1)], [Math.round(eL.th * 100) + "%에서 매수", ddPct(eL.r1)]], isFinite(allWorst) ? "단, 깊이별 최악의 1년 후 수익률 중 가장 나빴던 값은 " + ddPct(allWorst) + "였습니다. 깊은 단계도 비중 상한이 필요합니다." : "") + '</div>');
+  T("YEAR-TO-DATE DRAWDOWN", ddNm(A) + " · 해마다 평균 연초 대비 " + ddPct(Y.avgLow) + "까지 빠졌습니다", '<p class="ddSN" style="margin:0 0 8px">막대 = 그해 연초 대비 최저 수익률(기준: 전년 마지막 거래일 종가). 남색 = -50% 이하, 하늘색 = -50% 초과, 주황 = 올해(진행 중).</p>' + ddSvgYtd(A, 1110, 380, dk));
+  var dp = Y.deep.filter(function (d) { return d.next != null; });
+  T("YEAR-TO-DATE DISTRIBUTION", dp.length ? "가장 깊이 빠진 해의 다음 해: " + dp.map(function (d) { return ddPct(d.next, 0); }).join(" · ") : "연초 대비 도달 확률", '<div class="ddSRow"><div style="flex:1.9">' + tbl(["연초 대비", "도달 연수", "확률", "그해 연말 플러스"], Y.tab.filter(function (x) { return x.c > 0; }).map(function (x) { return [Math.round(x.th * 100) + "%", x.c + "년", (x.p * 100).toFixed(1) + "%", x.pos + " / " + x.c]; })) + '<p class="ddSN">표본: ' + Y.from + '~' + Y.to + '년 ' + Y.done + '개 완결 연도. 올해는 진행 중이라 제외.</p></div>' + side("가장 깊었던 해 → 다음 해", Y.deep.map(function (d) { return [d.y + " → " + (d.y + 1), d.next != null ? ddPct(d.next) : d.nextCur != null ? ddPct(d.nextCur) + " (진행)" : "–"]; }).concat([["해마다 평균"], ["연초 대비 최저", ddPct(Y.avgLow)], ["연중 MDD", ddPct(Y.avgMdd)]])) + '</div>');
+  var cf = ddConflict(A);
+  if (Y.cur) S.push('<section class="ddS dark"><div class="ddSK">' + ddYear(A.last.t) + ' · ' + (cf ? "두 기준의 충돌" : "두 기준으로 본 지금") + '</div><div class="ddDuo"><div><b>' + ddPct(A.cur) + '</b><span>52주 고점 대비 · ' + (A.stNow ? A.stNow + "단계" : "단계 밖") + '</span></div><div class="ac"><b>' + ddPct(Y.cur.end) + '</b><span>연초 대비 · 연중 최저 ' + ddPct(Y.cur.low) + '</span></div></div><p class="ddBigP">연초 ' + ddPx(A.sym, Y.cur.base) + ' → 고점 ' + ddYmd(A.openPk.t).slice(5) + ' ' + ddPx(A.sym, A.openPk.c) + ' → 지금 ' + ddPx(A.sym, A.last.c) + '</p><p class="ddSmP">' + ddEsc(cf || "두 기준이 같은 방향을 가리키고 있습니다.") + '</p></section>');
+  T("BUY-STAGE FRAMEWORK", "분포 백분위로 나눈 5단계 매수 구간 (참고)", tbl(["단계", "52주 고점 대비", "가격 (현 고점 기준)", "사건 도달 확률", "비율 · " + pr.name], A.stages.map(function (s, i) { return [s.k + "단계", ddPct(s.d, 0), ddPx(A.sym, A.openPk.c * (1 + s.d)), Math.round(s.p * 100) + "%", pr.w[i] + "%"]; }), function (i) { return A.stNow === i + 1; }) + '<div class="ddBar"><i>현재 위치</i>52주 고점 대비 ' + ddPct(A.cur) + ' → ' + (A.stNow ? A.stNow + "단계 구간" + (A.stages[A.stNow] ? ", " + (A.stNow + 1) + "단계(" + ddPct(A.stages[A.stNow].d, 0) + ") 대기" : "") : "1단계(" + ddPct(A.stages[0].d, 0) + ") 전") + (Y.cur ? " · 연초 대비 " + ddPct(Y.cur.end) : "") + '</div><p class="ddSN">비율은 가정값입니다. 매수 권유가 아닌 참고 자료입니다.</p>');
+  T("PROFILE BACKTEST", "같은 단계, 다른 비율 — 과거 사건에 넣어 본 결과", tbl(["성향", "단계별 비율", "참여 사건", "평균 투입", "가장 아팠던 순간 (중앙값 / 최악)", "마지막 매수 1년 후 (중앙값 / 최악)", "플러스"], A.prof.map(function (x) { return [x.name, x.w.join("·"), x.n + "건", x.inv == null ? "–" : Math.round(x.inv * 100) + "%", ddPct(x.worstMed) + " / " + ddPct(x.worst), ddPct(x.r1Med) + " / " + ddPct(x.r1Worst), x.pos == null ? "–" : Math.round(x.pos * 100) + "%"]; }), function (i) { return A.prof[i].id === pr.id; }) + '<div class="ddNotes"><div><small>비중 상한</small><b>계좌 손실 한도 -' + P.loss + '%면 ' + ddEsc(ddNm(A)) + ' 비중 ' + (cap.one == null ? "–" : Math.min(100, cap.one * 100).toFixed(0)) + '% 이하 (한 번에 매수 · ' + ddPct(A.R.worst, 0) + ' 가정)' + (cap.st != null ? ' / ' + Math.min(100, cap.st * 100).toFixed(0) + '% 이하 (' + pr.name + ' 분할)' : '') + '</b></div><div><small>세금</small><b>해외주식 양도차익 연 250만 원 공제 후 22% · 위 수익률은 세전</b></div></div><p class="ddSN">손익은 "이 종목에 쓰기로 한 돈 전체" 대비(안 쓴 돈은 현금). 각 단계에 처음 닿은 날 종가에 매수했다고 가정.</p>');
+  S.push('<section class="ddS"><div class="ddSK">APPENDIX</div><h2>정의와 데이터</h2><div class="ddDef"><div><b>52주 고점 기준 사건</b><span>최근 252거래일 종가 최고에서 -10% 이상 하락 → 52주 신고가 복귀 시 종료. ' + A.R.n + '건</span></div><div><b>사상최고가 기준 사건</b><span>최고가에서 -10% 이상 하락 → 최고가 회복 시 종료. ' + A.RA.n + '건' + (A.S.synth ? " (실제 시세만)" : "") + '</span></div><div><b>연초 대비</b><span>그해 최저 종가 ÷ 전년 마지막 거래일 종가 − 1. ' + Y.done + '개 연도</span></div><div><b>연중 MDD</b><span>그해 안에서 고점 대비 최대 낙폭</span></div><div><b>진입 후 성과</b><span>52주 고점 대비 N%에 처음 닿은 날 종가에 매수, 1년 = 252거래일</span></div><div><b>단계</b><span>사건 최대 낙폭 분포의 50 · 25 · 15 · 10 · 5% 지점</span></div></div><p class="ddSN">과거 데이터 분석이며 미래 수익을 보장하지 않습니다.' + (A.S.lev ? " 레버리지 ETF는 원금 대부분을 잃을 수 있습니다." : "") + ' 배당은 포함하지 않은 종가 기준입니다.</p><footer><span>' + ddEsc(foot) + '</span><i></i></footer></section>');
+  return S;
+}
+function ddDeck(sym) {
+  var A = ddGet(sym); if (!A || A.none) return; var old = document.getElementById("ddDeck"); if (old) old.remove();
+  var S = ddSlides(A), P = ddPrefs(), el = document.createElement("div"); el.id = "ddDeck"; DD.slide = 0;
+  el.innerHTML = '<div class="ddBarTop"><b>' + ddEsc(A.name) + ' · 낙폭 분석 자료</b><span class="ddPg"></span><span style="flex:1"></span><label>표지 이름 <input type="text" value="' + ddEsc(P.brand) + '" maxlength="24" data-ddbrand></label><button data-ddprev>‹ 이전</button><button data-ddnext>다음 ›</button><button data-ddpng>이 장 이미지 저장</button><button data-ddpdf>PDF로 저장 (인쇄)</button><button data-ddclose>닫기</button></div><div class="ddStage"><div class="ddScale">' + S.map(function (s, i) { return s.replace("<i></i>", "<i>" + (i + 1) + "</i>"); }).join("") + '</div></div>';
+  document.body.appendChild(el); document.documentElement.classList.add("ddOpen");
+  var all = el.querySelectorAll(".ddS"), fit = function () { var st = el.querySelector(".ddStage"), sc = Math.min((st.clientWidth - 16) / 1280, (st.clientHeight - 16) / 720); el.querySelector(".ddScale").style.transform = "scale(" + sc + ")"; el.querySelector(".ddScale").style.marginLeft = Math.max(0, (st.clientWidth - 1280 * sc) / 2) + "px"; el.querySelector(".ddScale").style.marginTop = Math.max(0, (st.clientHeight - 720 * sc) / 2) + "px"; };
+  var go = function (i) { DD.slide = Math.max(0, Math.min(all.length - 1, i)); Array.prototype.forEach.call(all, function (s, k) { s.classList.toggle("cur", k === DD.slide); }); el.querySelector(".ddPg").textContent = (DD.slide + 1) + " / " + all.length; };
+  var close = function () { el.remove(); document.documentElement.classList.remove("ddOpen"); window.removeEventListener("resize", fit); document.removeEventListener("keydown", key); };
+  var key = function (e) { if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return; if (e.key === "ArrowRight" || e.key === " ") go(DD.slide + 1); else if (e.key === "ArrowLeft") go(DD.slide - 1); else if (e.key === "Escape") close(); };
+  el.querySelector("[data-ddprev]").onclick = function () { go(DD.slide - 1); }; el.querySelector("[data-ddnext]").onclick = function () { go(DD.slide + 1); }; el.querySelector("[data-ddclose]").onclick = close;
+  el.querySelector(".ddStage").onclick = function (e) { var r = this.getBoundingClientRect(); go(DD.slide + (e.clientX - r.left > r.width / 2 ? 1 : -1)); };
+  el.querySelector("[data-ddpdf]").onclick = function () { window.print(); };
+  el.querySelector("[data-ddbrand]").onchange = function () { ddSave("brand", this.value.trim()); var i = DD.slide; ddDeck(sym); var d = document.getElementById("ddDeck"); if (d) { DD.slide = i; var a2 = d.querySelectorAll(".ddS"); Array.prototype.forEach.call(a2, function (s, k) { s.classList.toggle("cur", k === i); }); d.querySelector(".ddPg").textContent = (i + 1) + " / " + a2.length; } };
+  el.querySelector("[data-ddpng]").onclick = function () { var btn = this, cur = all[DD.slide]; btn.disabled = true; btn.textContent = "만드는 중…";
+    ddH2c().then(function () { var box = document.createElement("div"); box.style.cssText = "position:fixed;left:-99999px;top:0;width:1280px;height:720px"; var cl = cur.cloneNode(true); cl.classList.add("cur"); cl.style.position = "static"; box.className = "ddScale"; box.appendChild(cl); document.body.appendChild(box);
+      return window.html2canvas(cl, { scale: 2, backgroundColor: null, width: 1280, height: 720, logging: false }).then(function (cv) { box.remove(); var a = document.createElement("a"); a.download = A.sym.replace(/[^A-Za-z0-9]/g, "") + "_낙폭분석_" + ("0" + (DD.slide + 1)).slice(-2) + ".png"; a.href = cv.toDataURL("image/png"); a.click(); }, function (e) { box.remove(); throw e; }); })
+      .catch(function (e) { console.warn("dd png", e); if (typeof toast === "function") toast("이미지를 만들지 못했어요 — PDF 저장을 써 주세요"); }).then(function () { btn.disabled = false; btn.textContent = "이 장 이미지 저장"; }); };
+  window.addEventListener("resize", fit); document.addEventListener("keydown", key); fit(); go(0);
+}
+function ddH2c() { if (window.html2canvas) return Promise.resolve(); if (DD.h2c) return DD.h2c; DD.h2c = new Promise(function (ok, no) { var s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"; s.onload = ok; s.onerror = function () { DD.h2c = null; no(new Error("h2c")); }; document.head.appendChild(s); }); return DD.h2c; }
+
+/* ---------- 분석 화면에 '낙폭 · 단계' 탭 붙이기 ---------- */
+function ddBind(pane, sym) {
+  var re = function () { pane.innerHTML = ddHtml(sym); ddBind(pane, sym); };
+  Array.prototype.forEach.call(pane.querySelectorAll("[data-ddprof]"), function (b) { b.onclick = function () { ddSave("prof", b.getAttribute("data-ddprof")); re(); }; });
+  var li = pane.querySelector("[data-ddloss]"); if (li) li.onchange = function () { var v = Math.max(1, Math.min(50, +li.value || 10)); ddSave("loss", v); re(); };
+  var dk = pane.querySelector("[data-dddeck]"); if (dk) dk.onclick = function () { ddDeck(sym); };
+}
+function ddMount(root) {
+  try {
+    if (typeof AN === "undefined" || !AN.sym) return; var sym = AN.sym, wrap = root && root.querySelector ? root.querySelector(".egTabs") : null; if (!wrap || wrap.querySelector('[data-egtab="dd"]')) return;
+    var bar = wrap.querySelector(".egTabBar"), after = bar.querySelector('[data-egtab="hist"]'), btn = document.createElement("button"); btn.setAttribute("data-egtab", "dd"); btn.textContent = "낙폭 · 단계";
+    if (after && after.nextSibling) bar.insertBefore(btn, after.nextSibling); else bar.appendChild(btn);
+    var pane = document.createElement("div"); pane.className = "egPane"; pane.setAttribute("data-egpane", "dd"); pane.hidden = true; pane.innerHTML = '<div class="briefDim">낙폭 분석을 계산하는 중…</div>'; wrap.appendChild(pane);
+    var show = function () { if (typeof EG !== "undefined") EG.anTab = "dd"; Array.prototype.forEach.call(wrap.querySelectorAll(".egTabBar button"), function (b) { b.classList.toggle("on", b === btn); }); Array.prototype.forEach.call(wrap.querySelectorAll(".egPane"), function (p) { p.hidden = p !== pane; }); };
+    var fill = function () { if (pane._f) return; pane._f = 1; ddEnsure(sym).then(function () { if (!pane.isConnected) return; pane.innerHTML = ddHtml(sym); ddBind(pane, sym); }).catch(function (e) { console.warn("dd", e); pane.innerHTML = '<div class="briefDim">낙폭 분석을 계산하지 못했어요.</div>'; }); };
+    btn.onclick = function () { show(); fill(); };
+    if (typeof EG !== "undefined" && EG.anTab === "dd") { show(); fill(); }
+  } catch (e) { console.warn("dd mount", e); }
+}
+(function () {
+  if (typeof document === "undefined") return;
+  if (typeof anxSections === "function") { var s0 = anxSections; anxSections = function (root) { var r = s0.apply(this, arguments); ddMount(root); return r; }; }
+  var st = document.createElement("style"); st.id = "ddCss"; st.textContent = [
+    ".ddBox{margin-bottom:12px}.ddTop{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.ddHd{font-size:18px;font-weight:900;line-height:1.35;color:#0f2240}.ddKs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.ddK{background:#f6f8fb;border-radius:12px;padding:11px 13px;border-top:3px solid #0f2240;min-width:0}.ddK b{display:block;font-size:24px;font-weight:900;line-height:1.15;color:#0f2240}.ddK.dn b{color:#1f5fbf}.ddK span{display:block;font-size:12.5px;font-weight:700;margin-top:3px}.ddK small{display:block;font-size:11.5px;color:#6b7686;line-height:1.4;margin-top:1px}",
+    ".ddWarn{background:#fff6e8;border-left:4px solid #b9600f;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.55;margin:8px 0}.ddWarn b{display:block;color:#8a4a0c}.ddPts{margin:10px 0 0;padding:0;list-style:none;counter-reset:dp}.ddPts li{counter-increment:dp;border-top:1px solid #e6eaf0;padding:9px 0 9px 34px;position:relative;font-size:13.5px;font-weight:600;line-height:1.5}.ddPts li::before{content:'0' counter(dp);position:absolute;left:0;top:9px;color:#b9600f;font-weight:900}",
+    ".ddSvg{display:block;width:100%;height:auto}.ddTwo{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px;align-items:start;margin-top:8px}.ddSide{background:#f6f8fb;border-top:3px solid #c97b2e;border-radius:0 0 10px 10px;padding:12px 14px}.ddSide>b{display:block;font-size:13px;margin-bottom:4px}.ddSide>div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #e3e7ee;padding:7px 0;font-size:13px}.ddSide em{font-style:normal;font-weight:800;font-size:15px}.ddUp{color:#1f5fbf!important}.ddDn{color:#c03b3b!important}",
+    ".ddSyn{display:grid;grid-template-columns:170px 170px minmax(0,1fr);gap:10px;align-items:start;margin-top:8px}.ddMini{font-size:12.5px;line-height:1.6;background:#f6f8fb;border-radius:8px;padding:8px 12px;margin-top:8px}tr.ddNow td{background:#fdebd8!important}.ddBox .dgT td,.ddBox .dgT th{white-space:nowrap}.ddBox .dgT td:last-child{white-space:normal}",
+    ".ddProfSel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:8px 0 2px}.ddProfSel button{font:inherit;border:1px solid #dfe4ec;background:#fff;border-radius:8px;padding:8px 10px;text-align:left;cursor:pointer}.ddProfSel button b{display:block;font-size:13.5px}.ddProfSel button span{font-size:11.5px;color:#6b7686}.ddProfSel button.on{border-color:#3182f6;background:#eaf2ff}.ddCap{margin-top:10px;background:#f6f8fb;border-radius:10px;padding:10px 14px}.ddCap label{display:block;font-size:13px;font-weight:700;margin-bottom:4px}.ddCap input{width:64px;font:inherit;padding:4px 6px;border:1px solid #cfd6e0;border-radius:6px;text-align:right}.ddCap>div{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #e3e7ee;padding:7px 0;font-size:13px}.ddCap em{font-style:normal;font-weight:800;white-space:nowrap}",
+    "@media(max-width:720px){.ddKs{grid-template-columns:repeat(2,minmax(0,1fr))}.ddK b{font-size:20px}.ddTwo,.ddSyn{grid-template-columns:minmax(0,1fr)}.ddBox .dgT td,.ddBox .dgT th{white-space:normal}.ddCap>div{flex-direction:column;gap:2px}.ddProfSel button span{display:block}}",
+    "[data-theme=dark] .ddHd,[data-theme=dark] .ddK b{color:#e8ecf3}[data-theme=dark] .ddK,[data-theme=dark] .ddSide,[data-theme=dark] .ddMini,[data-theme=dark] .ddCap{background:#1e2533}[data-theme=dark] .ddSvg{filter:invert(.92) hue-rotate(180deg)}[data-theme=dark] tr.ddNow td{background:#3a2a16!important}[data-theme=dark] .ddWarn{background:#2a2114}[data-theme=dark] .ddWarn b{color:#e6a35c}[data-theme=dark] .ddProfSel button{background:#161b24;border-color:#263041;color:#dde}[data-theme=dark] .ddProfSel button.on{background:#1c2b45}",
+    /* 슬라이드 */
+    "html.ddOpen{overflow:hidden}#ddDeck{position:fixed;inset:0;z-index:9000;background:#1a1d24;display:flex;flex-direction:column;font-family:Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}.ddBarTop{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:#0d1017;color:#dfe4ec;font-size:13px}.ddBarTop button{font:inherit;font-size:12.5px;font-weight:700;border:1px solid #39414f;background:#1c212b;color:#fff;border-radius:8px;padding:6px 11px;cursor:pointer}.ddBarTop input{font:inherit;font-size:12.5px;width:120px;padding:5px 7px;border-radius:6px;border:1px solid #39414f;background:#1c212b;color:#fff}.ddPg{color:#9aa4b5}.ddStage{flex:1;position:relative;overflow:hidden;cursor:pointer}.ddScale{width:1280px;height:720px;transform-origin:0 0;position:relative}",
+    ".ddS{position:absolute;inset:0;width:1280px;height:720px;box-sizing:border-box;background:#f7f5f1;color:#0f2240;padding:78px 85px 0;display:none;overflow:hidden;font-size:17px;line-height:1.45}.ddS.cur{display:block}.ddS.dark{background:#0f2240;color:#f7f5f1;border-left:16px solid #c97b2e;padding-left:70px}.ddS.cover{padding-top:215px}.ddS h1{font-size:74px;font-weight:800;margin:14px 0 14px;letter-spacing:-1px;line-height:1.05}.ddS.cover p{font-size:25px;font-weight:600;color:#c9d6ee;margin:0}.ddS.cover hr{width:145px;border:0;border-top:2px solid #c97b2e;margin:44px 0 26px 6px}.ddS.cover small{font-size:16px;color:#c9d6ee;font-weight:600}",
+    ".ddSK{font-size:15px;font-weight:700;letter-spacing:2px;color:#3d6aa8}.ddS.dark .ddSK{color:#e0a763;font-size:19px}.ddS h2{font-size:31px;font-weight:800;margin:6px 0 0;padding-bottom:16px;line-height:1.25;position:relative}.ddS h2::after{content:'';position:absolute;left:50px;right:52px;bottom:0;border-bottom:3px solid #0f2240}.ddSB{margin-top:24px}.ddS footer{position:absolute;left:85px;right:85px;bottom:38px;border-top:1px solid #cfd3da;padding-top:8px;display:flex;justify-content:space-between;font-size:14.5px;font-weight:600;color:#5b6779}.ddS footer i{font-style:normal}",
+    ".ddSKs{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.ddSKs>div{background:#fff;border-top:3px solid #0f2240;padding:14px 20px 18px;min-width:0}.ddSKs b{display:block;font-size:44px;font-weight:800;line-height:1.2;white-space:nowrap}.ddSKs span{display:block;font-size:17px;font-weight:800}.ddSKs small{display:block;font-size:14px;color:#5b6779;margin-top:2px}.ddSP{list-style:none;margin:30px 0 0;padding:0}.ddSP li{border-top:1px solid #cfd3da;padding:14px 0 14px 56px;position:relative;font-size:19px;font-weight:700}.ddSP li i{position:absolute;left:0;font-style:normal;color:#a55a12;font-weight:800}",
+    ".ddST{width:100%;border-collapse:collapse;font-size:17px}.ddST th{background:#e4e3e0;text-align:right;padding:8px 9px;font-weight:800;border:1px solid #cfcfcc;font-size:16px}.ddST td{text-align:right;padding:7px 9px;border:1px solid #d5d5d2;font-weight:700}.ddST th:first-child,.ddST td:first-child{text-align:left}.ddST tr.hi td{background:#fde9d6}.ddST td:last-child:not(:nth-child(-n+4)){white-space:normal}.ddSN{font-size:14px;color:#5b6779;font-weight:600;margin:12px 0 0}.ddSRow{display:flex;gap:36px;align-items:flex-start}.ddSRow>.ddST{flex:1}",
+    ".ddSA{flex:1;background:#fff;border-top:3px solid #c97b2e;padding:22px 22px 18px;min-width:0}.ddSA>b{display:block;font-size:16px;margin-bottom:4px}.ddSA>div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #dcdfe4;padding:10px 0;font-size:16px;font-weight:600;color:#3a4558}.ddSA em{font-style:normal;font-weight:800;font-size:20px;color:#0f2240;white-space:nowrap}.ddSA p{font-size:15px;color:#3a4558;font-weight:600;margin:14px 0 0}.ddLg{font-size:14.5px;font-weight:700;color:#3a4558;margin-bottom:6px}.ddLg i{display:inline-block;width:18px;height:10px;margin:0 7px 0 0;vertical-align:middle}.ddLg i+i,.ddLg i:nth-of-type(2){margin-left:18px}",
+    ".ddSteps{display:grid;grid-template-columns:repeat(3,1fr);gap:68px;margin-bottom:30px}.ddSteps>div{background:#fff;border-top:3px solid #3d6aa8;padding:16px 22px 18px}.ddSteps small{display:block;font-size:14px;letter-spacing:2px;font-weight:700;color:#3d6aa8}.ddSteps b{display:block;font-size:26px;font-weight:800;margin:4px 0 8px}.ddSteps span{font-size:16px;color:#3a4558;font-weight:600}.ddSteps .on{background:#0f2240;color:#fff;border-top-color:#c97b2e}.ddSteps .on small{color:#e0a763}.ddSteps .on span{color:#c9d6ee}.ddSBig{width:250px;flex:none}.ddSBig b{display:block;font-size:42px;font-weight:800;line-height:1.15}.ddSBig span{display:block;font-size:16px;font-weight:800;margin-bottom:12px}",
+    ".ddDuo{display:flex;gap:70px;margin-top:22px}.ddDuo b{display:block;font-size:104px;font-weight:800;line-height:1.1;letter-spacing:-2px}.ddDuo span{font-size:19px;font-weight:700;color:#c9d6ee}.ddDuo .ac b{color:#e0a763}.ddBigP{font-size:23px;font-weight:800;margin:44px 0 6px}.ddSmP{font-size:17px;color:#a9b8d4;font-weight:600;max-width:1000px;margin:0}.ddS.dark:not(.cover){padding-top:185px}",
+    ".ddBar{background:#0f2240;color:#fff;font-size:18.5px;font-weight:800;padding:14px 22px;margin-top:18px}.ddBar i{font-style:normal;color:#e0a763;font-size:15.5px;margin-right:20px}.ddNotes{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:22px}.ddNotes>div{border-left:3px solid #0f2240;padding:2px 0 2px 16px}.ddNotes small{display:block;font-size:14.5px;font-weight:800;color:#3d6aa8}.ddNotes b{font-size:17px}.ddDef{display:grid;grid-template-columns:1fr 1fr;gap:0 38px}.ddDef>div{border-top:1px solid #cfd3da;padding:11px 0}.ddDef b{display:block;font-size:17px}.ddDef span{font-size:16px;color:#3a4558;font-weight:600}",
+    "@media(max-width:720px){.ddBarTop label{display:none}.ddBarTop b{width:100%}}",
+    "@media print{@page{size:1280px 720px;margin:0}html.ddOpen body>*:not(#ddDeck){display:none!important}html.ddOpen,html.ddOpen body{overflow:visible!important;height:auto!important;background:#fff!important}#ddDeck{position:static!important;display:block!important;background:none!important}.ddBarTop{display:none!important}.ddStage{overflow:visible!important}.ddScale{transform:none!important;margin:0!important;height:auto!important}.ddS{display:block!important;position:relative!important;page-break-after:always;break-after:page;-webkit-print-color-adjust:exact;print-color-adjust:exact}}"
+  ].join("");
+  document.head.appendChild(st);
+})();
+if (typeof module !== "undefined") module.exports = { ddSeries: ddSeries, ddEvents: ddEvents, ddReach: ddReach, ddEntry: ddEntry, ddYtd: ddYtd, ddStages: ddStages, ddBacktest: ddBacktest, ddAnalyze: ddAnalyze, ddQ: ddQ, ddMed: ddMed, ddW200: ddW200, DD_PROF: DD_PROF };
