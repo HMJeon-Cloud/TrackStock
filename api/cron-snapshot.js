@@ -24,6 +24,7 @@ const TIME_BUDGET_MS = 52000;     // 기존 작업(최근 구간·과거·공시
 const UNIVERSE_BUDGET_MS = 270000; // v12.9 함수 제한 300초 — 유니버스(S&P 500 · 코스피 200)는 그 뒤 남는 시간에 (저장 여유 포함)
 const RECENT_BUDGET_MS = 38000;   // ① 최근 구간(가장 중요)에 먼저 쓰는 시간
 const FETCH_TIMEOUT_MS = 8000;    // 야후 한 건이 멈춰 있어도 8초면 포기
+const HIST_YEARS = 30;             // v13.31 과거 전체 파일에 담는 기간(년)
 const HISTORY_PER_RUN = 20;       // 남은 시간에 과거 전체를 받을 종목 수 (하루 2회 → 약 6일이면 전 종목 한 바퀴)
 const RECENT_DAYS = 400;      // recent.json이 담는 최근 일수 (v8.9: 90→400 — 200일선·52주 신고/신저가를 자체 데이터로 계산하고, 1년치로 오류를 검증)
 const RETRY_BAD = 1;              // 검증에 걸린 종목은 한 번 더 받아 본다
@@ -444,22 +445,26 @@ export default async function handler(req, res) {
   } else disc = { skipped: "시간 부족 (" + Math.round(left / 1000) + "초 남음)" };
 
   /* ② 과거 전체 — 남은 시간 안에서, 가장 오래 안 받은 종목부터 */
+  /* v13.31 과거 파일을 25년 → 30년으로 (SOXX 2001-07 상장일, QQQ 닷컴 고점까지 담기 위해).
+     아직 30년으로 다시 받지 않은 파일 중 레버리지 역산에 쓰는 기초 ETF · 레버리지 상품을 맨 먼저 받는다. */
+  const HIST_PRI = ["SOXX", "QQQ", "SPY", "XLK", "SOXL", "TQQQ", "UPRO", "SPXL", "SSO", "QLD", "TECL"];
+  const pri = (s) => (!(entries[s] && entries[s].span >= HIST_YEARS) && HIST_PRI.indexOf(s) >= 0 ? 0 : 1);
   const stale = symbols
-    .map((s) => ({ s, at: (entries[s] && entries[s].history) || "" }))
-    .sort((x, y) => (x.at < y.at ? -1 : x.at > y.at ? 1 : 0))
-    .filter((x) => force || x.at !== today)
+    .map((s) => ({ s, at: (entries[s] && entries[s].history) || "", p: pri(s) }))
+    .sort((x, y) => (x.p !== y.p ? x.p - y.p : x.at < y.at ? -1 : x.at > y.at ? 1 : 0))
+    .filter((x) => force || x.at !== today || x.p === 0)
     .slice(0, HISTORY_PER_RUN);
   for (let i = 0; i < stale.length; i += CONCURRENCY) {
     if (Date.now() - started > TIME_BUDGET_MS - 6000) break;   // 한 묶음(최대 8초) 여유
     await Promise.all(stale.slice(i, i + CONCURRENCY).map(async ({ s: sym }) => {
       try {
-        const r = await fetchYahoo(sym, 25 * 365.25);
+        const r = await fetchYahoo(sym, HIST_YEARS * 365.25);
         if (!r) throw new Error("no data");
-        const snap = toSnapshot(sym, r, 25);
+        const snap = toSnapshot(sym, r, HIST_YEARS);
         if (!snap.t.length) throw new Error("empty");
         await setJsonGz(redis, KEY.chart(sym), snap, 45 * 86400);   // 45일 안에 다시 안 받으면 만료
         writes++;
-        entries[sym] = { ...(entries[sym] || {}), history: today, rows: snap.t.length, updated: today };
+        entries[sym] = { ...(entries[sym] || {}), history: today, rows: snap.t.length, updated: today, span: HIST_YEARS };
         done.push(sym);
       } catch (e) {
         failed.push(sym + ": " + String(e.message).slice(0, 40));

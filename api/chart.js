@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   let rangeQs;
   if (range === "max") {
     const now = Math.floor(Date.now() / 1000);
-    rangeQs = "?period1=" + Math.floor(now - 25 * 365.25 * 86400) + "&period2=" + now;
+    rangeQs = "?period1=" + Math.floor(now - 30 * 365.25 * 86400) + "&period2=" + now;
   } else {
     rangeQs = "?range=" + encodeURIComponent(range);
   }
