@@ -257,6 +257,7 @@ function clRun() {
   try { clBrief(); } catch (e) { console.warn("cl brief", e); }
   try { clAnalyst(); } catch (e) { console.warn("cl analyst", e); }
   try { clTables(); } catch (e) { console.warn("cl tables", e); }
+  try { if (typeof cxButtons === "function") cxButtons(); } catch (e) { console.warn("cx buttons", e); }
   try { clShort(root); } catch (e) { console.warn("cl short", e); }
   try { clCollapse(root); } catch (e) { console.warn("cl collapse", e); }
   try { clTerms(root); } catch (e) { console.warn("cl terms", e); }
