@@ -55,8 +55,9 @@ function cleanDeep(o) {
   const tables = (Array.isArray(o.tables) ? o.tables : []).filter((t) => t && Array.isArray(t.cols) && Array.isArray(t.rows) && t.cols.length >= 2 && t.rows.length).slice(0, 6).map((t) => ({ t: str(t.t).slice(0, 80), unit: str(t.unit).slice(0, 40), cols: t.cols.slice(0, 10).map(str), rows: t.rows.filter(Array.isArray).slice(0, 14).map((r) => r.slice(0, 10).map(str)), note: str(t.note).slice(0, 300) }));
   const targets = (Array.isArray(o.targets) ? o.targets : []).filter((t) => t && t.n && isFinite(+t.px) && +t.px > 0).slice(0, 14).map((t) => ({ n: str(t.n).slice(0, 40), px: +t.px, note: str(t.note).slice(0, 60) }));
   const insight = (Array.isArray(o.insight) ? o.insight : []).filter((x) => x && x.h && x.p).slice(0, 6).map((x) => ({ h: str(x.h).slice(0, 120), p: str(x.p).slice(0, 1200), so: str(x.so).slice(0, 300) }));
+  const vw = o.view && typeof o.view === "object" && (o.view.think || o.view.conclusion) ? { title: str(o.view.title).slice(0, 80), think: str(o.view.think).slice(0, 900), path: (Array.isArray(o.view.path) ? o.view.path : []).map((x) => str(x).slice(0, 220)).filter(Boolean).slice(0, 4), conclusion: str(o.view.conclusion).slice(0, 500), flip: (Array.isArray(o.view.flip) ? o.view.flip : []).filter((x) => x && x.n).slice(0, 4).map((x) => ({ n: str(x.n).slice(0, 40), now: str(x.now).slice(0, 30), line: str(x.line).slice(0, 30), then: str(x.then).slice(0, 60) })) } : null;
   if (!story.length && !tables.length) return null;
-  return { insight, story, tables, targets, targetNote: str(o.targetNote).slice(0, 160), watch: o.watch && typeof o.watch === "object" ? { rule: str(o.watch.rule).slice(0, 300), now: str(o.watch.now).slice(0, 300) } : null };
+  return { view: vw, insight, story, tables, targets, targetNote: str(o.targetNote).slice(0, 160), watch: o.watch && typeof o.watch === "object" ? { rule: str(o.watch.rule).slice(0, 300), now: str(o.watch.now).slice(0, 300) } : null };
 }
 function clean(o, sym, prev, why) {
   if (!o || typeof o !== "object") return null;
@@ -78,7 +79,7 @@ function clean(o, sym, prev, why) {
   o.recheck = null; o.tries = 0;
   if (why === "earnings" && prev && prev.quarter === o.quarter) { o.tries = (prev.tries || 0) + 1; if (o.tries <= 3) o.recheck = kstDay(Date.now() + 2 * 86400e3); }
   /* 직접 붙여넣은 답에 본문 · 표가 같이 왔으면 다듬어 둔다 */
-  const dp = cleanDeep(o); ["story", "tables", "targets", "insight"].forEach((k) => { o[k] = dp ? dp[k] : []; }); if (dp) { o.targetNote = dp.targetNote; o.watch = dp.watch; }
+  const dp = cleanDeep(o); ["story", "tables", "targets", "insight"].forEach((k) => { o[k] = dp ? dp[k] : []; }); o.view = dp ? dp.view : null; if (dp) { o.targetNote = dp.targetNote; o.watch = dp.watch; }
   o.snap = (Array.isArray(o.snap) ? o.snap : []).filter((x) => x && x.k && x.v != null).slice(0, 8).map((x) => ({ k: String(x.k).slice(0, 30), v: String(x.v).slice(0, 30), s: String(x.s || "").slice(0, 60) }));
   o.savedAt = Date.now(); o.auto = why === "manual" ? 2 : 1; return o;
 }
@@ -205,7 +206,7 @@ export async function followStep(st, origin) {
     if (!data) return fail(out, "KPI 목록이 비어 저장하지 않았어요");
     data.links = note.links || []; data.model = out.model; data.read = note.fetched || 0; data.deep = 0;
     mergeFacts(data, F, note);
-    if (prev && prev.quarter === data.quarter && prev.story && prev.story.length) { ["story", "tables", "targets", "targetNote", "watch", "insight"].forEach((k) => { if (!(data[k] && data[k].length) && prev[k]) data[k] = prev[k]; }); }   // 깊이 단계가 실패해도 같은 분기의 지난 본문은 남긴다
+    if (prev && prev.quarter === data.quarter && prev.story && prev.story.length) { ["story", "tables", "targets", "targetNote", "watch", "insight", "view"].forEach((k) => { if (!(data[k] && (data[k].length || data[k].think)) && prev[k]) data[k] = prev[k]; }); }   // 깊이 단계가 실패해도 같은 분기의 지난 본문은 남긴다
     await kvPut(rc, "cfg:follow:" + sym, data); st.quarter = data.quarter; st.cut = out.truncated ? 1 : 0;
     return next("deep");
   }

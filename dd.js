@@ -496,6 +496,7 @@ function ddDeck(sym, custom) {
       return window.html2canvas(cl, { scale: 2, backgroundColor: null, width: 1280, height: 720, logging: false }).then(function (cv) { box.remove(); var a = document.createElement("a"); a.download = "uphill_" + A.sym.replace(/[^A-Za-z0-9]/g, "") + (custom ? "_" + custom.tag + "_" : "_낙폭리서치_") + ("0" + (DD.slide + 1)).slice(-2) + ".png"; a.href = cv.toDataURL("image/png"); a.click(); }, function (e) { box.remove(); throw e; }); })
       .catch(function (e) { console.warn("dd png", e); if (typeof toast === "function") toast("이미지를 만들지 못했어요 — PDF 저장을 써 주세요"); }).then(function () { btn.disabled = false; btn.textContent = "이 장 이미지 저장"; }); };
   window.addEventListener("resize", fit); document.addEventListener("keydown", key); fit(); go(0);
+  if (custom && typeof custom.after === "function") { try { custom.after(el); } catch (e) { console.warn("deck after", e); } }   // v13.99 넘치는 장을 줄여 맞추는 등 뒤처리
 }
 function ddH2c() { if (window.html2canvas) return Promise.resolve(); if (DD.h2c) return DD.h2c; DD.h2c = new Promise(function (ok, no) { var s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"; s.onload = ok; s.onerror = function () { DD.h2c = null; no(new Error("h2c")); }; document.head.appendChild(s); }); return DD.h2c; }
 
