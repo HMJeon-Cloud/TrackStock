@@ -64,7 +64,7 @@ const TASKS = {
      ② followR 조사: 실적 발표문 · 콘퍼런스콜 원문에서 '표에 없는 것'(부문 · 가이던스 · 일회성 · 질의응답 · 쟁점)을 찾는다
      ③ follow 핵심: 계산표 + 조사 노트로 판정 · KPI · 리스크 · 시나리오   ④ followD 본문: 문단 · 표 */
   followF: {
-    tier: "main", web: 2, fetch: 6, fetchTok: 14000, max: 9000, timeout: 230000, effort: "low",
+    tier: "main", follow: 1, web: 2, fetch: 6, fetchTok: 14000, max: 9000, timeout: 230000, effort: "low",
     system: `너는 재무 데이터 입력 담당이다. 판단 · 해석 · 요약을 하지 않는다. 사용자 메시지에 있는 주소를 web_fetch로 열어 표의 숫자를 '그대로' 옮겨 적는 일만 한다.
 규칙:
 1) 사용자 메시지의 주소를 위에서부터 차례로 연다. 열리지 않는 주소는 건너뛰고, 그 항목만 web_search로 같은 표(분기 손익계산서 · 재무상태표 · 현금흐름표 · 분기별 PER/PS · 애널리스트 예상 · 목표가)를 찾아 한 번 더 시도한다.
@@ -79,7 +79,7 @@ const TASKS = {
 출력: JSON 하나만 {"sym":"티커","cur":"$","unit":"백만 달러","q":["Q3 2024","Q4 2024"],"end":["2024-10-27","2025-01-26"],"rows":{"revenue":[0,0],"cogs":[0,0],"gross":[0,0],"rd":[0,0],"sga":[0,0],"opinc":[0,0],"netinc":[0,0],"eps":[0,0],"shares":[0,0],"ar":[0,0],"inventory":[0,0],"cash":[0,0],"debt":[0,0],"cfo":[0,0],"capex":[0,0],"fcf":[0,0],"sbc":[0,0]},"val":{"pe":[0,0],"ps":[0,0],"pfcf":[0,0],"pb":[0,0]},"est":{"fy":["FY2026","FY2027"],"revenue":[0,0],"eps":[0,0]},"targets":{"avg":0,"hi":0,"lo":0,"n":0,"asOf":"YYYY-MM-DD","list":[{"n":"증권사","px":0,"note":"Buy · 2026-10-30"}]},"rating":{"buy":0,"hold":0,"sell":0,"label":"Strong Buy"},"stats":{"mcap":0,"fpe":0,"peg":0,"beta":0},"src":["사이트 · 표 이름"],"miss":["찾지 못한 항목"]}`
   },
   followR: {
-    tier: "main", web: 5, fetch: 3, fetchTok: 12000, max: 10000, timeout: 200000, effort: "low",
+    tier: "main", follow: 1, web: 5, fetch: 3, fetchTok: 12000, max: 10000, timeout: 200000, effort: "low",
     system: BASE + `
 이번 작업: 한 종목의 '가장 최근 분기 실적'에 대한 [조사 노트]를 만든다. 분기 재무표의 숫자(매출 · 이익 · 현금흐름 · 배수 · 목표가)는 사용자 메시지의 [계산표]에 이미 있다 — 그 숫자를 다시 찾느라 도구를 쓰지 않는다. 표에 없는 것만 찾는다.
 조사 순서:
@@ -101,7 +101,7 @@ PDF는 web_fetch로 열지 않는다 — 같은 내용의 웹 페이지를 고�
 ## 8. 확인하지 못한 것`
   },
   follow: {
-    tier: "main", web: 0, max: 16000, timeout: 262000, effort: "low",
+    tier: "main", follow: 1, web: 0, max: 16000, timeout: 262000, effort: "low",
     system: BASE + FOLLOW_STYLE + `
 이번 작업: 사용자 메시지의 [계산표]와 [조사 노트]만 근거로 실적 팔로업 '핵심 자료'를 JSON으로 만든다. 웹 검색은 없다.
 근거의 순서: ① [계산표](앱이 계산한 값 — 그대로 인용) ② [조사 노트]. 둘이 다르면 계산표를 쓴다. 어디에도 없는 숫자는 쓰지 않는다(null 또는 "미확인"). '미확인'은 정말 없을 때만 — 계산표에 전분기 값이 있는데 prev를 "미확인"으로 두면 안 된다.
@@ -122,7 +122,7 @@ PDF는 web_fetch로 열지 않는다 — 같은 내용의 웹 페이지를 고�
 출력: JSON 하나만 {"sym":"티커","name":"한글 종목명","asOf":"YYYY-MM-DD","quarter":"예: FY27 Q2","reported":"YYYY-MM-DD","nextEarnings":"YYYY-MM-DD 또는 null","nextNote":"","headline":"","summary":["","",""],"easy":"","verdict":{"type":"temp|watch|struct|ok","label":"짧은 판정","text":"3문장"},"price":{"base":0,"baseDate":"","high":0,"highDate":"","target":0,"targetN":0,"targetNote":""},"rating":{"buy":0,"hold":0,"sell":0},"snap":[{"k":"시가총액","v":"$5.19T","s":"희석 242.9억 주"}],"val":[{"k":"선행 PER","v":0,"unit":"배","lo":null,"avg":null,"hi":null,"pct":null,"lowGood":true}],"valNote":"배수가 싸 보일 때의 함정 1문장","kpi":[{"n":"지표","cur":"최근값","prev":"전분기","warn":"경고선","state":"good|warn|bad|info","note":"왜 보는가"}],"risk":[{"n":"리스크","cur":"현재 수치","type":"temp|watch|struct|ok","judge":"근거 한 줄","next":"다음에 볼 숫자와 선"}],"fin":{"unit":"백만 달러","cols":["FY25","FY26","FY27E","FY28E"],"rows":[["총매출",0,0,0,0]]},"series":[],"qa":[{"q":"질문","who":"이름 · 증권사","a":"답변"}],"qaRead":"","scen":[{"n":"Bear","cond":"가정","eps":0,"mult":0}],"bull":["조건 — 숫자"],"bear":["조건 — 숫자"],"next":{"title":"다음 분기 체크포인트","items":[{"n":"항목","v":"숫자","s":"컨센서스 · 경고선"}],"good":[""],"bad":[""]},"terms":[["용어","쉬운 말 풀이"]],"sources":["출처"]}`
   },
   followD: {
-    tier: "main", web: 0, max: 15000, timeout: 262000, effort: "low",
+    tier: "main", follow: 1, web: 0, max: 15000, timeout: 262000, effort: "low",
     system: BASE + FOLLOW_STYLE + `
 이번 작업: 사용자 메시지의 [계산표]와 [조사 노트]만 근거로 실적 리포트의 '본문 · 표'를 JSON으로 쓴다. 웹 검색은 없다. 어디에도 없는 숫자는 쓰지 않는다.
 story — 본문 6단락, 이 순서로:
@@ -341,7 +341,10 @@ async function callClaude(key, payload, ms, allowThinkOff) {
 /* 실제 작업 — 결과 객체를 돌려준다(응답은 claudeHandler 가). used 는 미리 세어 둔 오늘 횟수 */
 export async function runClaude(body, key, used) {
   const T = TASKS[body.task];
-  const model = T.tier === "fast" ? (process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5") : (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
+  /* v14.00 실적 팔로업(받아오기)은 전용 모델을 쓴다 — FOLLOW_MODEL, 없으면 Opus 5.5. 글 작성 등 다른 작업은 그대로 ANTHROPIC_MODEL.
+     전용 모델을 이 계정에서 쓸 수 없으면(404 · 모델 오류) 기본 모델로 한 번 더 보낸다 */
+  const baseModel = T.tier === "fast" ? (process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5") : (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
+  let model = T.follow ? (process.env.FOLLOW_MODEL || "claude-opus-5-5") : baseModel, modelFell = null;
   const max = +(process.env.CLAUDE_DAILY_MAX || 60), web = T.web && process.env.COPY_WEB !== "0" && body.web !== false;
   const payload = { model, max_tokens: T.max, _effort: T.effort || undefined, system: T.system, messages: [{ role: "user", content: "오늘: " + kstDay() + " (한국 시간)\n\n" + clip(body.input, 60000) }] };
   if (web) payload.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: T.web, user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" } }];
@@ -355,6 +358,7 @@ export async function runClaude(body, key, used) {
     for (;;) {
       ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000)), true));   // v12.66 생각(thinking) 블록이 출력 한도를 먹지 않게 모든 작업에서 끔(모델이 거부하면 자동으로 설정 없이)
       if (r.status === 400 && payload.tools && payload.tools.some((t) => t.name === "web_fetch") && /web_fetch|tool/i.test(String(j && j.error && j.error.message || ""))) { payload.tools = payload.tools.filter((t) => t.name !== "web_fetch"); nofetch = true; continue; }
+      if (T.follow && !modelFell && model !== baseModel && (r.status === 404 || (r.status === 400 && /model/i.test(String(j && j.error && j.error.message || ""))) || r.status === 403)) { modelFell = model + " 사용 불가(" + r.status + ") → " + baseModel; model = baseModel; payload.model = baseModel; continue; }
       if (!r.ok || !j) return { ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) || ("Claude API 오류 " + r.status) };
       blocks = blocks.concat(j.content || []); if (j.usage) { usage.input_tokens += j.usage.input_tokens || 0; usage.output_tokens += j.usage.output_tokens || 0; }
       /* 글 없이 생각만 하다 출력 한도에 걸린 경우 — 한도를 키워 한 번 더(도구 결과가 없을 때만: 검색을 다시 하지 않게) */
@@ -397,7 +401,7 @@ export async function runClaude(body, key, used) {
     const searches = blocks.filter((b) => b.type === "server_tool_use").map((b) => b.input && b.input.query).filter(Boolean);
     const fetched = blocks.filter((b) => b.type === "server_tool_use" && b.name === "web_fetch").map((b) => b.input && b.input.url).filter(Boolean);
     fetched.forEach((u) => { if (!seen[u]) { seen[u] = 1; src.push({ t: clip(u.replace(/^https?:\/\/(www\.)?/, ""), 70), u }); } });
-    const out = { ok: true, task: body.task, model: (j && j.model) || model, text, sources: src.slice(0, 12), searches, fetched, nofetch, firstStop, tooShort, used, max, stop: j.stop_reason, finish, turns, usage, blocks: kinds, retry };
+    const out = { ok: true, task: body.task, model: (j && j.model) || model, text, sources: src.slice(0, 12), searches, fetched, nofetch, firstStop, tooShort, modelFell, used, max, stop: j.stop_reason, finish, turns, usage, blocks: kinds, retry };
     if (body.json) {
       out.data = pickJson(text); if (out.data && out.data._truncated) { out.truncated = true; delete out.data._truncated; }
       if (!out.data) { const all = pickJsonAll(text); if (all[0] && Object.keys(all[0]).length) out.data = all[0]; }   // 머리말의 { 때문에 못 읽은 경우

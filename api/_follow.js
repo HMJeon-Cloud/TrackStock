@@ -150,7 +150,7 @@ export async function followStep(st, origin) {
   const key = process.env.ANTHROPIC_API_KEY; if (!key) return { ok: false, reason: "NO_KEY" };
   const today = kstDay(), cmax = +(process.env.CLAUDE_DAILY_MAX || 60), sym = st.s; let log = await loadLog(rc);
   const finish = async (ok, msg, extra) => {   // 기록을 남기고 진행 표시를 지운다. 자동 대기열이면 다음 종목으로
-    log = await loadLog(rc); const rec = Object.assign({ at: Date.now(), s: sym, why: st.why, ok, msg, tok: st.tok || 0, web: st.web || 0, sec: Math.round((Date.now() - (st.t0 || Date.now())) / 1000) }, extra || {});
+    log = await loadLog(rc); const rec = Object.assign({ at: Date.now(), s: sym, why: st.why, ok, msg: msg + (st.model ? " · 모델 " + String(st.model).replace(/^claude-/, "") + (st.fell ? " (" + st.fell + ")" : "") : ""), model: st.model || null, tok: st.tok || 0, web: st.web || 0, sec: Math.round((Date.now() - (st.t0 || Date.now())) / 1000) }, extra || {});
     log.tried[sym] = today; Object.keys(log.tried).forEach((k) => { if (log.tried[k] !== today) delete log.tried[k]; });
     log.runs.unshift(rec); log.runs = log.runs.slice(0, 30); log.running = null; log.last = Date.now(); await kvPut(rc, "cfg:followlog", log);
     if (st.q === "due" && (st.depth || 0) < 6) await chain(origin, { depth: (st.depth || 0) + 1 });
@@ -176,7 +176,7 @@ export async function followStep(st, origin) {
     try { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000); const fr = await fetch(origin + "/api/fund?symbol=" + encodeURIComponent(sym), { signal: ac.signal }).catch(() => null); clearTimeout(tm); if (fr && fr.ok) naver = naverText(await fr.json().catch(() => null)); } catch (e) {}
     const inp = "[종목] " + sym + (prev && prev.name ? " (" + prev.name + ")" : "") + "\n\n" + (urls.length ? "[열어 볼 주소 — 위에서부터]\n" + urls.map((u) => "- " + u[0] + ": " + u[1]).join("\n") : "[주소 없음] 이 종목은 정해진 주소가 없다. web_search로 분기 손익계산서 · 재무상태표 · 현금흐름표 · 컨센서스 · 목표가 표를 찾아 web_fetch로 연다.");
     let out; try { out = await runClaude({ task: "followF", input: inp, json: true, need: ["q", "rows"], budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
-    st.tok = (st.tok || 0) + tokOf(out); st.web = (st.web || 0) + ((out && out.searches) || []).length;
+    st.tok = (st.tok || 0) + tokOf(out); if (out && out.model) st.model = out.model; if (out && out.modelFell) st.fell = out.modelFell; st.web = (st.web || 0) + ((out && out.searches) || []).length;
     const fin = out && out.ok ? cleanFin(out.data) : null;
     st.fin = fin ? fin.q.length : 0; st.finMsg = fin ? "" : String((out && (out.msg || out.reason)) || "분기 표를 읽지 못함").slice(0, 80);
     await kvPut(rc, "cfg:follownote:" + sym, { at: Date.now(), ctx: String(st.ctx || "").slice(0, 6000), fin: fin ? out.data : null, dataTried: 1, dataRead: ((out && out.fetched) || []).length, naver, text: "", used: 0 });
@@ -187,7 +187,7 @@ export async function followStep(st, origin) {
     const old = (await kvGet(rc, "cfg:follownote:" + sym)) || { at: Date.now(), used: 0 };
     const F = await factsOf(rc, sym, old);
     let out; try { out = await runClaude({ task: "followR", input: buildInput(sym, prev, null, st.why) + "\n\n[계산표 — 이미 확보한 숫자. 다시 찾지 않는다]\n" + (F.text || "(없음 — 이 경우 분기 숫자도 함께 찾아 노트 맨 앞에 표로 적는다)"), minText: 1500, finishAsk: "도구 사용은 여기까지. 지금까지 읽은 자료만으로, 처음에 정한 노트 형식(## 0. 기본 ~ ## 8. 확인하지 못한 것) 전체를 지금 바로 써 줘. 머리말 없이 '## 0. 기본'으로 시작한다. 못 찾은 항목은 '미확인'으로 둔다.", budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
-    st.tok = (st.tok || 0) + tokOf(out); st.web = (st.web || 0) + ((out && out.searches) || []).length;
+    st.tok = (st.tok || 0) + tokOf(out); if (out && out.model) st.model = out.model; if (out && out.modelFell) st.fell = out.modelFell; st.web = (st.web || 0) + ((out && out.searches) || []).length;
     const text = out && out.ok ? String(out.text || "").trim() : "";
     if (text.length < 1200) return fail(out && !out.ok ? out : null, "조사 노트가 너무 짧아요(" + text.length + "자)" + (out ? " [멈춘 이유: " + (out.firstStop || out.stop || "?") + (out.finish ? " → 다시 쓰기 " + out.finish : out.tooShort ? " → 다시 쓸 시간이 모자랐어요" : "") + " · 검색 " + ((out.searches || []).length) + " · 원문 " + ((out.fetched || []).length) + " · 이어 받기 " + (out.turns || 0) + "번" + (text ? " · 받은 글: " + text.slice(0, 80).replace(/\s+/g, " ") : "") + "]" : "") + " · 재무표: " + (old.fin ? "읽음" : "못 읽음") + " — 다시 누르면 재무표는 건너뛰고 조사부터 이어서 해요");
     await kvPut(rc, "cfg:follownote:" + sym, Object.assign({}, old, { at: Date.now(), text: text.slice(0, 40000), links: (out.sources || []).slice(0, 10), fetched: (out.fetched || []).length + (old.dataRead || 0), nofetch: !!out.nofetch, model: out.model, used: 0 }));
@@ -201,7 +201,7 @@ export async function followStep(st, origin) {
 
   if (st.step === "core") {
     let out; try { out = await runClaude({ task: "follow", input, json: true, need: ["quarter", "kpi|kpis|KPI|KPIs"], budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
-    st.tok = (st.tok || 0) + tokOf(out);
+    st.tok = (st.tok || 0) + tokOf(out); if (out && out.model) st.model = out.model; if (out && out.modelFell) st.fell = out.modelFell;
     const data = out && out.ok ? clean(out.data, sym, prev, st.why) : null;
     if (!data) return fail(out, "KPI 목록이 비어 저장하지 않았어요");
     data.links = note.links || []; data.model = out.model; data.read = note.fetched || 0; data.deep = 0;
@@ -213,7 +213,7 @@ export async function followStep(st, origin) {
   if (st.step === "deep") {
     const cur = await kvGet(rc, "cfg:follow:" + sym); if (!cur) return finish(false, "핵심 자료가 없어요 — 다시 받아와 주세요");
     let out; try { out = await runClaude({ task: "followD", input: input + "\n\n[이미 정한 판정] " + ((cur.verdict && cur.verdict.label) || "") + " · " + (cur.headline || ""), json: true, need: ["story|tables"], budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
-    st.tok = (st.tok || 0) + tokOf(out);
+    st.tok = (st.tok || 0) + tokOf(out); if (out && out.model) st.model = out.model; if (out && out.modelFell) st.fell = out.modelFell;
     const dp = out && out.ok ? cleanDeep(out.data) : null;
     /* 본문 단계만 실패했으면 노트를 남겨 둔다 — 하루 안에 다시 누르면 조사 · 판정을 건너뛰고 본문 단계만 다시 한다(토큰을 다시 쓰지 않게) */
     note.used = dp ? 1 : 0; note.coreDone = dp ? 0 : 1; await kvPut(rc, "cfg:follownote:" + sym, note);
@@ -255,7 +255,7 @@ export async function followHandler(req, res, viaCron) {
     /* 단계가 함수 시간 한도(300초)에 걸려 죽으면 기록 없이 멈춘다 — 여기서 알아채고 실패로 남긴다 */
     if (log.running && Date.now() - log.running.at >= 330000) { log.runs = log.runs || []; log.runs.unshift({ at: Date.now(), s: log.running.s, why: log.running.why, ok: false, msg: (log.running.label || "") + " 단계가 시간 한도(5분)를 넘겨 멈췄어요 — 다시 누르면 조사 노트부터 이어서 해요", tok: 0, web: 0 }); log.runs = log.runs.slice(0, 30); log.running = null; await kvPut(rc, "cfg:followlog", log); }
     const running = log.running || null;
-    return res.status(200).json({ ok: true, auto: cfg.auto !== false, used, max: +(process.env.FOLLOW_DAILY_MAX || 3), due, plan: plan.slice(0, 5), running, runs: (log.runs || []).slice(0, 12), last: log.last || null, key: !!process.env.ANTHROPIC_API_KEY, chain: !!process.env.CRON_SECRET });
+    return res.status(200).json({ ok: true, auto: cfg.auto !== false, used, max: +(process.env.FOLLOW_DAILY_MAX || 3), due, plan: plan.slice(0, 5), running, runs: (log.runs || []).slice(0, 12), last: log.last || null, key: !!process.env.ANTHROPIC_API_KEY, chain: !!process.env.CRON_SECRET, model: process.env.FOLLOW_MODEL || "claude-opus-5-5" });
   }
   const origin = (req.headers["x-forwarded-proto"] || "https") + "://" + req.headers.host;
   /* v13.97 직접 물어보기 ① 프롬프트 만들기: 앱이 계산한 숫자(가격 통계 · 네이버 재무표 · 지난 분기 계산표) + 화면이 보낸 앱 분석 자료를 넣어 돌려준다. Claude를 부르지 않는다 */
