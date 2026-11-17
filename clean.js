@@ -257,6 +257,7 @@ function clRun() {
   try { clBrief(); } catch (e) { console.warn("cl brief", e); }
   try { clAnalyst(); } catch (e) { console.warn("cl analyst", e); }
   try { clTables(); } catch (e) { console.warn("cl tables", e); }
+  try { clShort(root); } catch (e) { console.warn("cl short", e); }
   try { clCollapse(root); } catch (e) { console.warn("cl collapse", e); }
   try { clTerms(root); } catch (e) { console.warn("cl terms", e); }
   try { clFab(); } catch (e) {}
@@ -356,3 +357,13 @@ function clScanMore(t) {
   ].join("");
   document.head.appendChild(st);
 })();
+
+/* v13.50 표에서 짧은 글자(8자 이하)만 든 칸은 줄바꿈하지 않는다 — '사용' 같은 두 글자가 두 줄로 꺾이면 표가 엉성해 보인다.
+   휴대폰 카드 모양(.clRT · 스캔 카드)은 칸이 한 줄씩이라 영향이 없다. */
+function clShort(root) {
+  var ts = (root || document).querySelectorAll("table");
+  for (var i = 0; i < ts.length; i++) {
+    var t = ts[i], n = t.rows.length; if (t._sh === n) continue; t._sh = n;
+    for (var r = 0; r < n; r++) { var cs = t.rows[r].cells; for (var c = 0; c < cs.length; c++) { var el = cs[c]; if (el._sh) continue; el._sh = 1; var tx = (el.textContent || "").trim(); if (tx && tx.length <= 8 && !el.querySelector("br,div,p,ul,table,input,select,button")) el.style.whiteSpace = "nowrap"; } }
+  }
+}
