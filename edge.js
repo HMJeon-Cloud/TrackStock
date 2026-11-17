@@ -304,7 +304,7 @@ function egAnalogDeck() {
 ".egBox{border:1px solid var(--admLine,#e3e7ee);border-radius:14px;padding:14px 16px;margin:12px 0;background:var(--admCard,#fff)}.egH{font-weight:800;font-size:14.5px;margin-bottom:8px}.egH small{display:block;font-weight:500;font-size:12px;color:#6b7686;margin-top:2px}",
 ".egA{border-top:1px solid #eef1f5;padding:10px 0}.egA:first-of-type{border-top:0}.egAH{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}.egAH b{font-size:14px}.egAH span{font-size:12.5px;color:#556}.egAH em{font-style:normal;font-size:11.5px;color:#6b7686;margin-left:auto}.egAH em.egThin{color:#b9600f}",
 ".egGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.egCell{background:#f6f8fb;border-radius:10px;padding:9px 10px}.egCell small{font-size:11.5px;color:#6b7686;font-weight:700}.egCell>b{display:block;font-size:24px;font-weight:900;line-height:1.15;color:#1f3a68}.egCell>b.up{color:#c0392b}.egCell>b.dn{color:#1f5fbf}.egCell>i{font-style:normal;font-size:11px;color:#8a93a3}",
-".egBar{position:relative;height:6px;border-radius:3px;background:#e3e8f0;margin:6px 0}.egBar u{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#3182f6}.egBar s{position:absolute;top:-3px;bottom:-3px;width:2px;background:#111}.egR{font-size:12px;color:#445}.egE{font-size:11.5px;font-weight:700;color:#6b7686;margin-top:2px}.egE.up{color:#c0392b}.egE.dn{color:#1f5fbf}",
+".egBar{position:relative;height:10px;border-radius:6px;background:#eceff4;margin:6px 0;box-shadow:inset 0 1px 1px rgba(15,34,64,.06)}.egBar u{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:#1d4ed8;text-decoration:none}.egBar s{position:absolute;top:-3px;bottom:-3px;width:2px;background:#111}.egR{font-size:12px;color:#445}.egE{font-size:11.5px;font-weight:700;color:#6b7686;margin-top:2px}.egE.up{color:#c0392b}.egE.dn{color:#1f5fbf}",
 ".egNote{font-size:12.5px;line-height:1.55;color:#445;background:#fbf7ee;border-radius:10px;padding:8px 10px;margin-top:8px}.egEps{display:block;color:#6b7686;font-size:11.5px;margin-top:3px}",
 ".egW{display:grid;gap:5px;margin:4px 0 8px}.egWRow{display:grid;grid-template-columns:minmax(90px,150px) 1fr 44px;gap:8px;align-items:center;font-size:12.5px}.egWRow .egBar{margin:0}.egWRow b{text-align:right}.egChips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.egChips span{font-size:12px;background:#eef2f8;border-radius:999px;padding:3px 10px}",
 ".egFlags{display:grid;gap:5px;margin-bottom:8px}.egFlags>div{font-size:12.5px;border-radius:8px;padding:6px 10px;background:#eef8f2;border-left:4px solid #1d7f55}.egFlags>div.mid{background:#fff6e8;border-color:#b9600f}.egFlags>div.bad{background:#fcefef;border-color:#c03b3b}",
@@ -496,7 +496,7 @@ function egScoreLines(sym) {
 }
 function egScoreHtml(sym) {
   var S = egScore(sym); if (!S) return "";
-  var col = function (p) { return p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; }, bar = function (p) { return '<div class="egBar"><u style="width:' + p + '%;background:' + col(p) + '"></u></div>'; };
+  var col = function (p) { return smScCol(p); }, bar = function (p) { return '<div class="egBar"><u style="width:' + p + '%;background:' + col(p) + '"></u></div>'; };
   var h = '<div class="egBox egSc"><div class="egH">종합 평가표 — ' + egEsc(S.name) + ' <small>여러 기법의 결과를 한 표로 · 체력(오래 살아남고 회복했나, 돈을 버나) × 자리(지금 가격이 과거에 비해 싼가, 흐름은) · ' + (typeof cDate === "function" ? cDate(S.asOf) : "") + ' 종가 기준</small></div>';
   h += '<div class="egScTop"><div class="egScTot" style="border-color:' + col(S.total) + '"><b style="color:' + col(S.total) + '">' + S.total + '</b><span>종합 · ' + S.grade + '</span></div><div class="egScAx"><div><small>체력 <i>55%</i></small><b>' + S.body + '</b>' + bar(S.body) + '</div><div><small>자리 <i>45%</i></small><b>' + S.spot + '</b>' + bar(S.spot) + '</div></div><div class="egScRead"><b>' + egEsc(S.read[0]) + '</b><p>' + egEsc(S.read[1]) + '</p><small>강한 곳: ' + egEsc(S.strong.join(" · ")) + ' / 약한 곳: ' + egEsc(S.weak.join(" · ")) + '</small></div></div>';
   h += S.cats.map(function (c, i) { return '<details class="egScCat"' + (i < 1 ? " open" : "") + '><summary><span class="egScAxTag ' + c.axis + '">' + (c.axis === "body" ? "체력" : "자리") + '</span><b>' + egEsc(c.name) + '</b><em style="color:' + col(c.score) + '">' + c.score + '</em>' + bar(c.score) + '</summary><table class="dgT egScT"><thead><tr><th>기법 · 지표</th><th>지금 값</th><th>점수</th><th>해석</th></tr></thead><tbody>' + c.items.map(function (x) { return '<tr><td><b>' + egEsc(x.n) + '</b></td><td>' + egEsc(x.v) + '</td><td>' + (x.p != null ? '<b style="color:' + col(x.p) + '">' + x.p + '</b>' : '<span class="briefDim">참고</span>') + '</td><td>' + egEsc(x.t) + '</td></tr>'; }).join("") + '</tbody></table>' + (c.note ? '<div class="egNote">' + egEsc(c.note) + '</div>' : '') + '</details>'; }).join("");
@@ -532,9 +532,9 @@ function egScoreHtml(sym) {
   if (typeof anxBuildPrompt === "function") { var p0 = anxBuildPrompt; anxBuildPrompt = function () { var sym = typeof AN !== "undefined" ? AN.sym : null, self = this, a = arguments; return Promise.all([egEnsure([sym, "^VIX"]), sym && typeof coreFund === "function" ? coreFund(sym).catch(function () {}) : null, typeof macroEnsure === "function" ? macroEnsure().catch(function () {}) : null]).then(function () { return p0.apply(self, a); }); }; }
   var st = document.createElement("style"); st.textContent = [
     ".egScTop{display:grid;grid-template-columns:130px minmax(180px,240px) 1fr;gap:14px;align-items:center;margin:6px 0 12px}.egScTot{border:5px solid #3182f6;border-radius:50%;width:118px;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center}.egScTot b{font-size:40px;font-weight:900;line-height:1}.egScTot span{font-size:11.5px;color:#556;margin-top:3px}",
-    ".egScAx>div{display:grid;grid-template-columns:70px 34px 1fr;gap:8px;align-items:center;margin:6px 0}.egScAx small{font-weight:800;font-size:12.5px}.egScAx small i{font-style:normal;color:#8a93a3;font-weight:500;font-size:11px}.egScAx b{font-size:17px;font-weight:900;text-align:right}.egScAx .egBar{margin:0;height:8px}",
+    ".egScAx>div{display:grid;grid-template-columns:70px 34px 1fr;gap:8px;align-items:center;margin:6px 0}.egScAx small{font-weight:800;font-size:12.5px}.egScAx small i{font-style:normal;color:#8a93a3;font-weight:500;font-size:11px}.egScAx b{font-size:17px;font-weight:900;text-align:right}.egScAx .egBar{margin:0;height:10px}",
     ".egScRead{background:#f6f8fb;border-radius:12px;padding:10px 14px}.egScRead b{font-size:15px}.egScRead p{margin:4px 0;font-size:13px;line-height:1.55}.egScRead small{color:#6b7686;font-size:11.5px}",
-    ".egScCat{border-top:1px solid #eef1f5;padding:8px 0}.egScCat summary{display:grid;grid-template-columns:44px 1fr 34px 120px;gap:10px;align-items:center;cursor:pointer;list-style:none;font-size:13.5px}.egScCat summary::-webkit-details-marker{display:none}.egScCat summary em{font-style:normal;font-weight:900;font-size:17px;text-align:right}.egScCat summary .egBar{margin:0;height:7px}",
+    ".egScCat{border-top:1px solid #eef1f5;padding:8px 0}.egScCat summary{display:grid;grid-template-columns:44px 1fr 34px 120px;gap:10px;align-items:center;cursor:pointer;list-style:none;font-size:13.5px}.egScCat summary::-webkit-details-marker{display:none}.egScCat summary em{font-style:normal;font-weight:900;font-size:17px;text-align:right}.egScCat summary .egBar{margin:0;height:10px}",
     ".egScAxTag{font-size:11px;font-weight:800;border-radius:6px;padding:2px 0;text-align:center;background:#e8f0fe;color:#1f5fbf}.egScAxTag.body{background:#e7f5ee;color:#1d7f55}.egScT{margin-top:8px;table-layout:fixed;width:100%}.egScT th:nth-child(1){width:27%}.egScT th:nth-child(2){width:25%}.egScT th:nth-child(4){width:auto}.egScT td,.egScT th{font-size:12.5px;padding:7px 8px;vertical-align:top;line-height:1.5}.egScT td:nth-child(3),.egScT th:nth-child(3){text-align:center;width:44px}",
     "@media(max-width:720px){.egScTop{grid-template-columns:1fr}.egScTot{margin:0 auto}.egScCat summary{grid-template-columns:40px 1fr 30px}.egScCat summary .egBar{display:none}.egScT td:nth-child(2){white-space:normal}}",
     "[data-theme=dark] .egScRead{background:#1e2533;color:#dde}[data-theme=dark] .egScCat{border-color:#263041}[data-theme=dark] .egScTot span{color:#aab}"
@@ -660,7 +660,7 @@ function egScanFilter(rows) {
   return rows;
 }
 function egScanHtml() {
-  var R = egScanLoad(), today = typeof smKstDay === "function" ? smKstDay() : "", col = function (p) { return p == null ? "#8a93a3" : p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; };
+  var R = egScanLoad(), today = typeof smKstDay === "function" ? smKstDay() : "", col = function (p) { return smScCol(p); };
   var FL = [["good", "튼튼한데 싸진 것"], ["ma", "200주선 아래 · 근처"], ["dd", "-20% 넘게 빠진 튼튼한 것"], ["strong", "튼튼하고 오르는 중"], ["all", "전체 순위"], ["lev", "레버리지"]], MK = [["all", "전체"], ["kr", "국내"], ["us", "해외"], ["coin", "코인"]];
   var h = '<div class="egBox egScan"><div class="egH">오늘의 후보 — 전 종목 스캔 <small>앱에 있는 종목 전체(지수 · 환율 제외)를 25년 일봉으로 계산해 회복력 · MDD · 장기 평균선 · 기술 지표 점수를 매겨요. 상위 40개 주식은 기업 정보까지 넣어 다시 계산해요. 매수 추천이 아니라 "먼저 들여다볼 순서"예요.</small></div>';
   h += '<div class="anActs"><button class="primary" data-egscan' + (EGS.run ? " disabled" : "") + '>' + (EGS.run ? "스캔 중 " + EGS.done + " / " + EGS.total : R && R.day === today ? "🔄 다시 스캔" : "🔎 오늘 스캔 시작 (1~3분)") + '</button><span class="briefDim">' + (R ? "마지막 스캔 " + R.day + " · " + R.rows.length + "종목" + (R.day !== today ? " — 오늘 데이터로 다시 스캔하세요" : "") : "아직 스캔한 적이 없어요 · 아침 수집(07:00) 뒤 하루 한 번이면 충분해요") + '</span></div>';
@@ -987,7 +987,7 @@ egScanFilter = function (rows) {
   return rows;
 };
 egScanHtml = function () {
-  var R = egScanLoad(), today = typeof smKstDay === "function" ? smKstDay() : "", col = function (p) { return p == null ? "#8a93a3" : p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; }, C = EGS.cond;
+  var R = egScanLoad(), today = typeof smKstDay === "function" ? smKstDay() : "", col = function (p) { return smScCol(p); }, C = EGS.cond;
   var all = R && R.rows ? R.rows : [], cntOf = function (f) { var k = EGS.flt, m = EGS.mk; EGS.flt = f; var n = egScanFilter(all.slice()).length; EGS.flt = k; EGS.mk = m; return n; };
   var FL = [["good", "튼튼한데 싸진 것"], ["brk", "200주선 이탈 중"], ["ma", "200주선 바로 위"], ["dd", "-20% 넘게 빠진 것"], ["strong", "튼튼하고 오르는 중"], ["all", "전체 순위"], ["lev", "레버리지"], ["custom", "내 조건"]], MK = [["all", "전체"], ["kr", "국내"], ["us", "해외"], ["coin", "코인"]];
   var open = EGS.open != null ? EGS.open : !(typeof AN !== "undefined" && AN.sym), bad = all.filter(function (r) { return r.q === "bad"; }), wn = all.filter(function (r) { return r.q === "warn"; }).length;
@@ -1040,7 +1040,7 @@ egScanHtml = function () {
 /* ---------- ③ 분석 화면: 요약 + 탭 ---------- */
 function egSumHtml(sym) {
   var S = egScore(sym), V = egVerify(sym), N = egNew(sym), A = egAnalog(sym), M = egMaBreak(sym, "w200"), rows = nbHist[sym]; if (!rows || !rows.length) return "";
-  var last = rows[rows.length - 1], px = function (v) { return egPx(sym, v); }, col = function (p) { return p >= 68 ? "#1d7f55" : p >= 55 ? "#3182f6" : p >= 42 ? "#b9600f" : "#c03b3b"; }, K = [], k = function (l, v, s, tone, tab) { K.push('<button class="egK ' + (tone || "") + '" data-egtab="' + tab + '"><small>' + l + '</small><b>' + v + '</b><span>' + (s || "") + '</span></button>'); };
+  var last = rows[rows.length - 1], px = function (v) { return egPx(sym, v); }, col = function (p) { return smScCol(p); }, K = [], k = function (l, v, s, tone, tab) { K.push('<button class="egK ' + (tone || "") + '" data-egtab="' + tab + '"><small>' + l + '</small><b>' + v + '</b><span>' + (s || "") + '</span></button>'); };
   var h = '<div class="egSum">';
   if (S) {
     var R = S.raw;
@@ -1110,4 +1110,20 @@ function egSumHtml(sym) {
     "@media(max-width:640px){.egSumTop{grid-template-columns:1fr}.egSumTop .egScTot{margin:0 auto}.egTabBar button{padding:8px 9px;font-size:12.5px}.egKs{grid-template-columns:repeat(2,minmax(0,1fr))}.egK{min-width:0}}",
     "[data-theme=dark] .egSum{background:#161b24;border-color:#263041}[data-theme=dark] .egK{background:#1e2533;border-color:#263041}[data-theme=dark] .egK b,[data-theme=dark] .egSumNm,[data-theme=dark] .egTabBar button.on{color:#eee}[data-theme=dark] .egTabBar{background:#0f131a;border-color:#263041}[data-theme=dark] .egTabBar button.on{background:#161b24}[data-theme=dark] .egSumRead p,[data-theme=dark] .egSumNext,[data-theme=dark] .egCond,[data-theme=dark] .egLegend{color:#ccd;background:#1e2533}[data-theme=dark] .egSumRead>b{color:#9db8ff}"
   ].join(""); document.head.appendChild(st);
+})();
+
+/* ============================================================
+   v13.41 점수 표시 공용 — 얇은 초록 막대 대신 '점수 칩 + 굵은 막대'
+   한 가지 색(남색)의 짙고 옅음으로 높낮이를 나타낸다: 짙을수록 높은 점수. 가장 높은 구간만 검정 + 금색(브랜드 색).
+   ============================================================ */
+function smScLv(p) { return p == null || !isFinite(p) ? 0 : p >= 80 ? 5 : p >= 68 ? 4 : p >= 55 ? 3 : p >= 42 ? 2 : 1; }
+function smScCol(p) { return ["#b6bcc8", "#d64545", "#e8862e", "#d9a400", "#4caf50", "#1b8a4b"][smScLv(p)]; }
+function smScChip(p, size) { var lv = smScLv(p); return '<b class="smChip lv' + lv + (size ? " " + size : "") + '">' + (p == null || !isFinite(p) ? "–" : Math.round(p)) + '</b>'; }
+(function () {
+  if (typeof document === "undefined" || document.getElementById("smScCss")) return; var st = document.createElement("style"); st.id = "smScCss";
+  st.textContent = ".smChip{display:inline-block;min-width:38px;padding:4px 7px;border-radius:8px;font-size:13.5px;font-weight:800;line-height:1.25;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:-.2px}.smChip.lg{min-width:52px;font-size:20px;padding:5px 10px;border-radius:10px;font-weight:900}" +
+    ".smChip.lv0{background:#f1f3f6;color:#9aa3b2}.smChip.lv1{background:#e5484d;color:#fff}.smChip.lv2{background:#f08c2e;color:#fff}.smChip.lv3{background:#f6c62b;color:#3d2f00}.smChip.lv4{background:#57b85c;color:#fff}.smChip.lv5{background:#178a47;color:#fff}.smChip{box-shadow:inset 0 -1px 0 rgba(0,0,0,.08)}" +
+    ".smBar{display:inline-block;width:120px;height:10px;border-radius:6px;background:#eceff4;vertical-align:middle;margin-right:8px;overflow:hidden;box-shadow:inset 0 1px 1px rgba(15,34,64,.06)}.smBar i{display:block;height:10px;border-radius:6px}" +
+    "[data-theme=dark] .smChip.lv0{background:#232a36;color:#8f9aad}[data-theme=dark] .smBar,[data-theme=dark] .egBar{background:#263041}";
+  document.head.appendChild(st);
 })();
