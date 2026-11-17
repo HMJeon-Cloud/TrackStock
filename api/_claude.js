@@ -121,6 +121,14 @@ PDF는 web_fetch로 열지 않는다 — 같은 내용의 웹 페이지를 고�
 12) 답은 { 로 시작하는 JSON 하나만. quarter와 kpi는 반드시 채운다.
 출력: JSON 하나만 {"sym":"티커","name":"한글 종목명","asOf":"YYYY-MM-DD","quarter":"예: FY27 Q2","reported":"YYYY-MM-DD","nextEarnings":"YYYY-MM-DD 또는 null","nextNote":"","headline":"","summary":["","",""],"easy":"","verdict":{"type":"temp|watch|struct|ok","label":"짧은 판정","text":"3문장"},"price":{"base":0,"baseDate":"","high":0,"highDate":"","target":0,"targetN":0,"targetNote":""},"rating":{"buy":0,"hold":0,"sell":0},"snap":[{"k":"시가총액","v":"$5.19T","s":"희석 242.9억 주"}],"val":[{"k":"선행 PER","v":0,"unit":"배","lo":null,"avg":null,"hi":null,"pct":null,"lowGood":true}],"valNote":"배수가 싸 보일 때의 함정 1문장","kpi":[{"n":"지표","cur":"최근값","prev":"전분기","warn":"경고선","state":"good|warn|bad|info","note":"왜 보는가"}],"risk":[{"n":"리스크","cur":"현재 수치","type":"temp|watch|struct|ok","judge":"근거 한 줄","next":"다음에 볼 숫자와 선"}],"fin":{"unit":"백만 달러","cols":["FY25","FY26","FY27E","FY28E"],"rows":[["총매출",0,0,0,0]]},"series":[],"qa":[{"q":"질문","who":"이름 · 증권사","a":"답변"}],"qaRead":"","scen":[{"n":"Bear","cond":"가정","eps":0,"mult":0}],"bull":["조건 — 숫자"],"bear":["조건 — 숫자"],"next":{"title":"다음 분기 체크포인트","items":[{"n":"항목","v":"숫자","s":"컨센서스 · 경고선"}],"good":[""],"bad":[""]},"terms":[["용어","쉬운 말 풀이"]],"sources":["출처"]}`
   },
+  followG: {   // v14.12 빈칸 채우기 — 본문 · 표를 만든 뒤 남은 "미확인" 칸만 다시 찾는다(작게)
+    tier: "main", follow: 1, web: 6, fetch: 3, fetchTok: 8000, max: 3000, timeout: 200000, effort: "low",
+    system: BASE + `
+이번 작업: 이미 만든 실적 리포트의 표에 남은 빈칸만 채운다. 사용자 메시지의 [빈칸 목록]에 있는 '지표 × 분기' 값만 찾는다. 다른 것은 찾지 않는다.
+찾는 곳: 그 분기의 실적 발표문(보도자료 · 8-K EX-99.1 · 주주서한) · IR 발표 자료 · 당시 실적 기사. 이전 분기 값은 그 분기 발표문을 직접 열어 확인한다. 다음 분기 발표문의 "전년 동기 · 전분기" 비교 문장도 근거가 된다.
+규칙: 회사가 발표했거나 믿을 만한 매체가 그대로 옮긴 값만 쓴다. 같은 행의 다른 칸과 같은 형식(단위 · 소수 자리)으로 쓴다. 발표된 두 값으로 정확히 계산되는 값은 끝에 "(계산)"을 붙인다. 찾지 못했거나 확신이 없으면 그 빈칸은 답에서 뺀다 — 추정 · 보간 금지.
+출력: JSON 하나만 {"fills":[{"id":"빈칸 번호 그대로","v":"칸에 넣을 값","src":"출처 한 줄(문서 · 날짜)"}]}`,
+  },
   followD: {
     tier: "main", follow: 1, web: 0, max: 15000, timeout: 262000, effort: "low",
     system: BASE + FOLLOW_STYLE + `
