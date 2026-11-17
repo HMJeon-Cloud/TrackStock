@@ -25,6 +25,36 @@ const FOLLOW_STYLE = `
 [좋은 예] "매출은 $96.2B로 전년보다 106% 늘었고, 석 달 전 회사가 내놓은 예상(가이던스) $91.0B를 5.7% 웃돌았다 — 가이던스를 넘긴 것은 6분기 연속이다. 다만 넘긴 폭은 2년 전 +23%에서 5% 안팎으로 줄었다."
 `;
 
+/* v13.97 직접 물어보기용 프롬프트 — claude.ai 등에 붙여넣어 한 번에 전체 자료(JSON)를 받는다. 시간 제한이 없어 가장 깊게 조사할 수 있는 길 */
+export function followManualPrompt(sym, facts, ctx, urls, prevKpi, extra) {
+  const cut = (k) => String(TASKS[k].system).split("출력: JSON 하나만 ").pop().trim(), core = cut("follow"), deep = cut("followD"), fin = cut("followF");
+  const schema = core.replace(/\}$/, "") + "," + deep.replace(/^\{/, "").replace(/\}$/, "") + ',"finq":' + fin + "}";
+  return [
+    "너는 증권사 리서치센터에서 실적 리뷰를 쓰는 애널리스트다. 독자는 이 리포트에 돈을 낸 한국 개인투자자다. 아래 종목의 '가장 최근 분기 실적'을 웹 검색과 원문 열람으로 조사해, 맨 아래 형식의 JSON 하나로 답한다.",
+    "\n[종목] " + sym + "   [오늘] " + kstDay() + " (한국 시간)",
+    "\n[조사 순서 — 검색 요약만 보고 쓰지 않는다. 원문을 연다]",
+    "1) 분기 재무표: " + (urls && urls.length ? "아래 주소를 열어 최근 12분기의 손익 · 재무상태 · 현금흐름 · 분기별 배수 · 애널리스트 예상 · 목표가 표를 '그대로' finq 에 옮겨 적는다(계산 · 반올림 금지).\n" + urls.map((u) => "   - " + u[0] + ": " + u[1]).join("\n") : "분기 손익계산서 · 재무상태표 · 현금흐름표 · 컨센서스 · 목표가 표를 찾아 최근 12분기를 finq 에 '그대로' 옮겨 적는다."),
+    "2) 실적 발표문(press release / 8-K / CFO commentary) 원문: 부문 · 고객군 · 지역별 매출, 회사 기준(비GAAP) 이익, 일회성, 가이던스.",
+    "3) 콘퍼런스콜 전문: 경영진 핵심 발언, 질의응답(질문자 이름 · 소속 / 질문 / 답변의 숫자).",
+    "4) 가이던스 이력: 최근 6~8분기의 '회사 가이던스 vs 실제'.",
+    "5) 실적 발표 뒤의 사건(경영진 변화 · 규제 · 목표가 변경 등)과 이 회사 고유의 쟁점 2~3개.",
+    facts ? "\n[앱이 계산한 숫자 — 1순위 근거. 그대로 인용하고, 네가 찾은 값과 다르면 이쪽을 쓴다]\n" + facts : "",
+    ctx ? "\n[앱 분석 자료 — 가격의 자리 · 점수. insight 는 이것과 실적을 엮어서 쓴다]\n" + ctx : "",
+    prevKpi ? "\n[지난번 KPI와 경고선 — 같은 항목 · 같은 경고선을 유지하고 값만 새 분기로]\n" + prevKpi : "",
+    extra ? "\n[내가 추가로 알고 싶은 것 — 본문(story)이나 insight 에서 꼭 다룬다]\n" + extra : "",
+    FOLLOW_STYLE,
+    "[아래 규칙을 읽는 법] '계산표'는 위의 [앱이 계산한 숫자]와, 네가 finq 에 옮겨 적은 분기 재무표로 직접 계산한 값(전년 대비 · 전분기 대비 · 이익률 · FCF ÷ 매출 · 재고일수 = 재고 ÷ 분기 매출원가 × 91 · 회수일 = 매출채권 ÷ 분기 매출 × 91 · TTM EPS · PER)을 뜻한다. 본문에 이런 값을 쓸 때는 직접 계산하고 (계산)을 붙인다. '노트' · '조사 노트'는 네가 조사한 내용을 뜻한다. 표와 차트는 앱이 finq 로 다시 계산해 그리므로, finq 의 숫자는 반드시 원문 표 그대로여야 한다.",
+    "\n[내용 규칙]",
+    String(TASKS.follow.system).split("규칙:").pop().split("출력: JSON 하나만")[0].trim().replace(/\[계산표\]/g, "[앱이 계산한 숫자]").replace(/\[조사 노트\]/g, "네가 조사한 내용"),
+    "\n[본문 · 표 · 인사이트 규칙]",
+    String(TASKS.followD.system).split("웹 검색은 없다.").pop().split("답은 { 로 시작하는")[0].trim().replace(/\[계산표\]/g, "[앱이 계산한 숫자]").replace(/\[조사 노트\]/g, "네가 조사한 내용").replace(/계산표에 이미 있는 분기 손익 · 비용 · 현금흐름 표는 앱이 따로 그리므로 만들지 않는다\./, "분기 손익 · 비용 · 현금흐름 표는 앱이 finq 로 직접 그리므로 tables 에 넣지 않는다."),
+    "\n[finq 규칙 — 분기 재무표를 옮겨 적는 칸 (연간 표인 fin 과 다르다)]",
+    String(TASKS.followF.system).split("규칙:").pop().split("9) 답은")[0].trim(),
+    "\n[답 형식 — 설명 · 머리말 · 코드 울타리 없이, { 로 시작하는 JSON 하나만. 길어도 끊지 말고 끝까지 쓴다]",
+    schema
+  ].filter(Boolean).join("\n");
+}
+
 const TASKS = {
   /* v13.90 실적 팔로업 — 4단계 (api/_follow.js 가 차례로 부른다). 증권사 실적 리뷰가 만들어지는 순서를 그대로 따른다:
      ① followF 숫자: 재무 사이트의 분기 표(손익 · 재무상태 · 현금흐름 · 배수 · 예상 · 목표가)를 열어 '그대로 옮겨 적는다'(JSON). 판단하지 않는다
@@ -32,7 +62,7 @@ const TASKS = {
      ② followR 조사: 실적 발표문 · 콘퍼런스콜 원문에서 '표에 없는 것'(부문 · 가이던스 · 일회성 · 질의응답 · 쟁점)을 찾는다
      ③ follow 핵심: 계산표 + 조사 노트로 판정 · KPI · 리스크 · 시나리오   ④ followD 본문: 문단 · 표 */
   followF: {
-    tier: "main", web: 4, fetch: 8, max: 9000, timeout: 262000,
+    tier: "main", web: 2, fetch: 6, fetchTok: 14000, max: 9000, timeout: 230000,
     system: `너는 재무 데이터 입력 담당이다. 판단 · 해석 · 요약을 하지 않는다. 사용자 메시지에 있는 주소를 web_fetch로 열어 표의 숫자를 '그대로' 옮겨 적는 일만 한다.
 규칙:
 1) 사용자 메시지의 주소를 위에서부터 차례로 연다. 열리지 않는 주소는 건너뛰고, 그 항목만 web_search로 같은 표(분기 손익계산서 · 재무상태표 · 현금흐름표 · 분기별 PER/PS · 애널리스트 예상 · 목표가)를 찾아 한 번 더 시도한다.
@@ -47,7 +77,7 @@ const TASKS = {
 출력: JSON 하나만 {"sym":"티커","cur":"$","unit":"백만 달러","q":["Q3 2024","Q4 2024"],"end":["2024-10-27","2025-01-26"],"rows":{"revenue":[0,0],"cogs":[0,0],"gross":[0,0],"rd":[0,0],"sga":[0,0],"opinc":[0,0],"netinc":[0,0],"eps":[0,0],"shares":[0,0],"ar":[0,0],"inventory":[0,0],"cash":[0,0],"debt":[0,0],"cfo":[0,0],"capex":[0,0],"fcf":[0,0],"sbc":[0,0]},"val":{"pe":[0,0],"ps":[0,0],"pfcf":[0,0],"pb":[0,0]},"est":{"fy":["FY2026","FY2027"],"revenue":[0,0],"eps":[0,0]},"targets":{"avg":0,"hi":0,"lo":0,"n":0,"asOf":"YYYY-MM-DD","list":[{"n":"증권사","px":0,"note":"Buy · 2026-10-30"}]},"rating":{"buy":0,"hold":0,"sell":0,"label":"Strong Buy"},"stats":{"mcap":0,"fpe":0,"peg":0,"beta":0},"src":["사이트 · 표 이름"],"miss":["찾지 못한 항목"]}`
   },
   followR: {
-    tier: "main", web: 6, fetch: 4, max: 10000, timeout: 262000,
+    tier: "main", web: 5, fetch: 3, fetchTok: 12000, max: 10000, timeout: 200000,
     system: BASE + `
 이번 작업: 한 종목의 '가장 최근 분기 실적'에 대한 [조사 노트]를 만든다. 분기 재무표의 숫자(매출 · 이익 · 현금흐름 · 배수 · 목표가)는 사용자 메시지의 [계산표]에 이미 있다 — 그 숫자를 다시 찾느라 도구를 쓰지 않는다. 표에 없는 것만 찾는다.
 조사 순서:
@@ -56,6 +86,7 @@ const TASKS = {
 3) 가이던스 이력: 최근 6~8분기의 '회사 가이던스 vs 실제 매출'(검색 한두 번으로 찾을 수 있는 만큼).
 4) 이 회사 고유의 쟁점 2~3개(고객 집중, 재고 · 공급 약정, 규제, 주식 보상, 경쟁, 경영진 변화 등)와 실적 발표 이후의 주요 사건.
 PDF는 web_fetch로 열지 않는다 — 같은 내용의 웹 페이지를 고른다.
+중요: 도구 호출 사이에 "찾아보겠습니다" 같은 말을 쓰지 않는다. 도구는 모두 합쳐 8번 안에서 끝내고, 그 뒤에는 반드시 아래 형식의 노트 전체를 쓴다. 못 찾은 항목이 있어도 찾은 것만으로 노트를 완성한다(없는 것은 '미확인').
 노트 형식(한국어, 5,000~8,000자, 머리말 · 맺음말 없이 아래 제목 그대로. 숫자마다 (출처) · 직접 계산한 값은 (계산) · 못 찾은 값은 '미확인'):
 ## 0. 기본  회계 분기 이름과 기간 · 발표일 · 다음 실적일(공지 여부와 출처) · 회계연도 끝나는 달
 ## 1. 가이던스 · 예상 대비  이번 분기 매출 · EPS · 이익률이 회사 가이던스(중간값 · 상단)와 시장 예상을 얼마나 넘었나/못 미쳤나. 다음 분기 · 연간 가이던스 숫자와 그 시점의 시장 예상
@@ -109,8 +140,14 @@ tables — 계산표에 이미 있는 분기 손익 · 비용 · 현금흐름 �
  칸은 모두 문자열. note에 자료 이름 · (계산) 여부 · 경고선.
 targets — 계산표의 증권사 목표가가 있으면 비워 둔다(앱이 그린다). 계산표에 없고 노트에만 있으면 적는다.
 watch — rule: 이 종목에서 '구조적 훼손'으로 볼 기준을 숫자로. now: 지금 그 숫자.
+insight — 3~5개. 실적 숫자와 [앱 분석 자료](가격의 자리 · 낙폭 단계 · 종목 점수 · 타이밍 점수 · 과거 같은 깊이의 결과)를 '엮어서' 나오는 것만 쓴다. 실적만으로 알 수 있는 말을 되풀이하지 않는다. 꼭 다룰 것:
+ ⓐ 주가 변화 분해: 최근 1년 주가 변화율을 이익(TTM EPS) 변화와 배수(PER) 변화로 나눈다(계산표의 숫자로, (계산) 표시). 주가가 이익 때문에 움직였는지 몸값 때문에 움직였는지.
+ ⓑ 가격의 자리 × 실적: 지금 낙폭 깊이 · 매수 단계 · 기회 구간까지의 거리와, 실적이 멀쩡한지를 맞대어 본다(실적 멀쩡 + 깊은 낙폭 / 실적 꺾임 + 얕은 낙폭 등).
+ ⓒ 과거 같은 깊이에서 산 결과(앱 통계)와 이번 조건의 차이: 그때와 지금 무엇이 같고 다른가.
+ ⓓ 판정을 바꿀 숫자: 다음 분기까지 "이 숫자가 이 선을 넘으면 판정이 바뀐다"는 조건 2~3개.
+ 앱 분석 자료가 주어지지 않았으면 ⓐ · ⓓ만 쓴다. {h: 결론형 제목, p: 3~5문장, so: 한 문장}
 답은 { 로 시작하는 JSON 하나만.
-출력: JSON 하나만 {"story":[{"h":"주제: 결론","p":"5~7문장","so":"한 문장"}],"tables":[{"t":"표 제목","unit":"백만 달러","cols":["항목","전년 동기","이번 분기","증감률"],"rows":[["데이터센터","41,096","89,000","+117%"]],"note":""}],"targets":[],"targetNote":"","watch":{"rule":"","now":""}}`
+출력: JSON 하나만 {"story":[{"h":"주제: 결론","p":"5~7문장","so":"한 문장"}],"tables":[{"t":"표 제목","unit":"백만 달러","cols":["항목","전년 동기","이번 분기","증감률"],"rows":[["데이터센터","41,096","89,000","+117%"]],"note":""}],"targets":[],"targetNote":"","watch":{"rule":"","now":""},"insight":[{"h":"결론형 제목","p":"3~5문장","so":"한 문장"}]}`
   },
   analyst: {
     tier: "main", web: 4, max: 20000, timeout: 270000,
@@ -290,7 +327,7 @@ export async function runClaude(body, key, used) {
   const payload = { model, max_tokens: T.max, system: T.system, messages: [{ role: "user", content: "오늘: " + kstDay() + " (한국 시간)\n\n" + clip(body.input, 60000) }] };
   if (web) payload.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: T.web, user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" } }];
   /* v13.80 원문 읽기(web_fetch) — 검색에서 나온 주소의 본문을 읽는다. 추가 요금 없이 읽은 만큼 입력 토큰. 긴 글은 FOLLOW_FETCH_TOKENS(기본 25000)에서 자른다. API가 이 도구를 거절하면 빼고 다시 보낸다 */
-  if (web && T.fetch && process.env.COPY_FETCH !== "0") payload.tools.push({ type: "web_fetch_20250910", name: "web_fetch", max_uses: T.fetch, max_content_tokens: +(process.env.FOLLOW_FETCH_TOKENS || 25000) });
+  if (web && T.fetch && process.env.COPY_FETCH !== "0") payload.tools.push({ type: "web_fetch_20250910", name: "web_fetch", max_uses: T.fetch, max_content_tokens: +(process.env.FOLLOW_FETCH_TOKENS || T.fetchTok || 14000) });
   /* v12.45 안정화: ① 웹 검색이 길어져 API가 'pause_turn'으로 잠깐 멈추면 이어서 다시 요청(최대 3번) ② JSON이 깨지면 빠른 모델로 형식만 고치는 한 번 더(내용은 그대로) ③ 실패하면 이유(stop)를 같이 알려 준다
      Vercel 함수 한도 300초 안에서 남은 시간을 나눠 쓴다 */
   const t0 = Date.now(), left = () => Math.min(290000, +body.budgetMs || 290000) - (Date.now() - t0);   // v13.70 budgetMs: 한 실행에서 여러 번 부를 때 남은 시간만큼만
@@ -322,11 +359,14 @@ export async function runClaude(body, key, used) {
     }
     /* v12.48 글 없이 끝난 경우(검색만 하다 max_tokens 등) — 지금까지 모은 검색 결과를 그대로 이어 붙이고 "이제 결과만 써라"고 한 번 더(도구 없이). 그래도 안 되면 웹 없이 앱 숫자만으로 새로 */
     let finish = null, textNow = blocks.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
-    if (!textNow && left() > 45000) {
-      const ask = { role: "user", content: "검색은 여기까지. 지금까지 읽은 자료와 앱 숫자로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : body.task === "analyst" ? "'## 서술형'으로 시작해 '## 카드형' 블록까지, 처음 요청한 답변 형식 그대로." : "결과만.") };
+    const firstStop = j && j.stop_reason, tooShort = !!(+body.minText && textNow.length < +body.minText);
+    if (tooShort) blocks = blocks.filter((b) => b.type !== "text");   // 도구 사이의 머리말만 있는 경우 — 머리말은 버리고 읽은 자료만 남겨 다시 쓰게 한다
+    if ((!textNow || tooShort) && left() > 45000) {
+      const ask = { role: "user", content: body.finishAsk || "검색은 여기까지. 지금까지 읽은 자료와 앱 숫자로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : body.task === "analyst" ? "'## 서술형'으로 시작해 '## 카드형' 블록까지, 처음 요청한 답변 형식 그대로." : "결과만.") };
       let f1 = null;
       if (blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: payload.messages.concat([{ role: "assistant", content: blocks.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking") }, ask]) }, Math.min(T.timeout, left() - 30000), true); } catch (e) { f1 = null; } }
-      if (!(f1 && f1.r.ok && f1.j && (f1.j.content || []).some((b) => b.type === "text" && b.text.trim())) && left() > 45000) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "user", content: "(웹 검색 없이) 위 앱 숫자와 후보 기사만으로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") }] }, Math.min(T.timeout, left() - 5000), true); } catch (e) { f1 = null; } }
+      if (tooShort && !blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "assistant", content: "(자료를 충분히 찾지 못했다)" }, ask] }, Math.min(T.timeout, left() - 10000), true); } catch (e) { f1 = null; } }
+      if (!tooShort && !(f1 && f1.r.ok && f1.j && (f1.j.content || []).some((b) => b.type === "text" && b.text.trim())) && left() > 45000) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "user", content: "(웹 검색 없이) 위 앱 숫자와 후보 기사만으로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") }] }, Math.min(T.timeout, left() - 5000), true); } catch (e) { f1 = null; } }
       if (f1 && f1.r.ok && f1.j) { finish = f1.j.stop_reason || "finish"; blocks = blocks.concat(f1.j.content || []); if (f1.j.usage) { usage.input_tokens += f1.j.usage.input_tokens || 0; usage.output_tokens += f1.j.usage.output_tokens || 0; } }
     }
     const texts = blocks.filter((b) => b.type === "text").map((b) => b.text), text = texts.join("");
@@ -336,7 +376,7 @@ export async function runClaude(body, key, used) {
     const searches = blocks.filter((b) => b.type === "server_tool_use").map((b) => b.input && b.input.query).filter(Boolean);
     const fetched = blocks.filter((b) => b.type === "server_tool_use" && b.name === "web_fetch").map((b) => b.input && b.input.url).filter(Boolean);
     fetched.forEach((u) => { if (!seen[u]) { seen[u] = 1; src.push({ t: clip(u.replace(/^https?:\/\/(www\.)?/, ""), 70), u }); } });
-    const out = { ok: true, task: body.task, model: (j && j.model) || model, text, sources: src.slice(0, 12), searches, fetched, nofetch, used, max, stop: j.stop_reason, finish, turns, usage, blocks: kinds, retry };
+    const out = { ok: true, task: body.task, model: (j && j.model) || model, text, sources: src.slice(0, 12), searches, fetched, nofetch, firstStop, tooShort, used, max, stop: j.stop_reason, finish, turns, usage, blocks: kinds, retry };
     if (body.json) {
       out.data = pickJson(text); if (out.data && out.data._truncated) { out.truncated = true; delete out.data._truncated; }
       if (!out.data) { const all = pickJsonAll(text); if (all[0] && Object.keys(all[0]).length) out.data = all[0]; }   // 머리말의 { 때문에 못 읽은 경우
