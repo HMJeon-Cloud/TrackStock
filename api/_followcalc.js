@@ -18,6 +18,13 @@ export function cleanFin(fin) {
   const src = fin.rows && typeof fin.rows === "object" ? fin.rows : {};
   ROWS.forEach((k) => { const a = src[k]; if (Array.isArray(a) && a.length === q.length) { const v = a.map(num); if (v.filter((x) => x != null).length >= Math.min(4, q.length)) rows[k] = v; } });
   if (!rows.revenue) return null;
+  /* v14.11 빈칸 메우기 — 다른 행으로 정확히 계산되는 값만 채운다(매출 = 원가 + 총이익, EPS = 순이익 ÷ 희석 주식 수, FCF = 영업현금 − 설비투자). 채운 칸은 filled에 적어 표 아래에 밝힌다 */
+  const filled = [], blank = () => q.map(() => null), mU = /십억|B/i.test(String(fin.unit || "")) ? 1e9 : /천|K/i.test(String(fin.unit || "")) ? 1e3 : 1e6;
+  const fill = (k, f, nm) => { let n = 0; const a = rows[k] || blank(); q.forEach((_, i) => { if (a[i] == null) { const v = f(i); if (v != null && isFinite(v)) { a[i] = v; n++; filled.push(nm + " " + q[i]); } } }); if (n || rows[k]) rows[k] = a; };
+  const g = (k, i) => (rows[k] ? rows[k][i] : null);
+  if (rows.cogs || rows.gross) { fill("gross", (i) => (g("revenue", i) != null && g("cogs", i) != null ? +(g("revenue", i) - g("cogs", i)).toFixed(1) : null), "매출총이익"); fill("cogs", (i) => (g("revenue", i) != null && g("gross", i) != null ? +(g("revenue", i) - g("gross", i)).toFixed(1) : null), "매출원가"); }
+  if (rows.eps && rows.netinc && rows.shares) fill("eps", (i) => { if (g("netinc", i) == null || !(g("shares", i) > 0)) return null; const v = (g("netinc", i) * mU) / (g("shares", i) * 1e6); return Math.abs(v) < 1000 ? +v.toFixed(2) : null; }, "희석 EPS");
+  if (rows.fcf && rows.cfo && rows.capex) fill("fcf", (i) => (g("cfo", i) != null && g("capex", i) != null ? +(g("cfo", i) - Math.abs(g("capex", i))).toFixed(1) : null), "FCF");
   /* 최근 → 옛것 순서로 왔으면 뒤집는다: 분기 끝 날짜로, 없으면 매출이 대체로 커지는 방향으로 */
   let rev = false; if (end.length === q.length && end[0] && end[end.length - 1]) rev = end[0] > end[end.length - 1]; else if (fin.order === "desc") rev = true;
   if (rev) { q = q.reverse(); end = end.reverse(); Object.keys(rows).forEach((k) => rows[k].reverse()); }
@@ -29,6 +36,7 @@ export function cleanFin(fin) {
     targets: { avg: num(tg.avg), hi: num(tg.hi), lo: num(tg.lo), n: num(tg.n), asOf: String(tg.asOf || "").slice(0, 10), list: (Array.isArray(tg.list) ? tg.list : []).map((t) => ({ n: String((t && t.n) || "").slice(0, 40), px: num(t && t.px), note: String((t && t.note) || "").slice(0, 60) })).filter((t) => t.n && t.px > 0).slice(0, 14) },
     rating: fin.rating && typeof fin.rating === "object" ? { buy: num(fin.rating.buy), hold: num(fin.rating.hold), sell: num(fin.rating.sell), label: String(fin.rating.label || "").slice(0, 30) } : null,
     stats: fin.stats && typeof fin.stats === "object" ? { mcap: num(fin.stats.mcap), fpe: num(fin.stats.fpe), peg: num(fin.stats.peg), beta: num(fin.stats.beta) } : {},
+    filled,
     src: (Array.isArray(fin.src) ? fin.src : []).map((x) => String(x).slice(0, 80)).slice(0, 6), miss: (Array.isArray(fin.miss) ? fin.miss : []).map((x) => String(x).slice(0, 80)).slice(0, 8) };
 }
 
@@ -89,7 +97,23 @@ export function calcFacts(fin, px, naver) {
   addVal("pe", "TTM PER", K.pe, hist("pe", selfPe), true); addVal("ps", "P/S (매출 대비)", K.ps, hist("ps", selfPs), true);
   if (K.fcfy != null && fin.val.pfcf) addVal("fcfy", "FCF 수익률", K.fcfy, { a: fin.val.pfcf.map((x) => (x ? 100 / x : null)).slice(-12), how: "사이트 분기 표" }, false);
   const vPe = F.val.find((v) => v.k === "TTM PER"); if (vPe && vPe.avg && K.epsTtm > 0) K.peAvgPx = r1(vPe.avg * K.epsTtm, 2);
+  /* ---------- v14.10 실적 품질 점검 · 주가 변화 분해 (전부 코드 계산 — 숫자 뒤에 숨은 것을 본다) ---------- */
+  F.checks = []; const CK = (nn, v, t, state) => F.checks.push({ n: nn, v, t, state });
+  const fT = last(fcfT), nT = last(niT);
+  if (fT != null && nT != null && nT > 0) { const c = (fT / nT) * 100; CK("이익의 현금 전환", Math.round(c) + "%", "최근 4분기 FCF ÷ 순이익 — " + (c >= 90 ? "번 이익이 거의 다 현금으로 들어왔어요" : c >= 60 ? "이익의 일부가 아직 현금으로 안 들어왔어요" : "이익에 비해 들어온 현금이 적어요"), c >= 90 ? "good" : c >= 60 ? "warn" : "bad"); }
+  if (last(D.arY) != null && last(D.revY) != null) { const g = last(D.arY) - last(D.revY); CK("외상(매출채권) 증가", fmtP(last(D.arY)), "매출 " + fmtP(last(D.revY)) + "와 비교 — " + (g > 25 ? "외상이 매출보다 훨씬 빨리 늘었어요" : g > 10 ? "외상이 매출보다 빨리 늘었어요" : "매출과 비슷하거나 느리게 늘었어요"), g > 25 ? "bad" : g > 10 ? "warn" : "good"); }
+  if (last(D.invY) != null && last(D.cogsY) != null) { const g = last(D.invY) - last(D.cogsY); CK("재고 증가", fmtP(last(D.invY)), "매출원가 " + fmtP(last(D.cogsY)) + "와 비교 — " + (g > 25 ? "재고가 팔리는 속도보다 훨씬 빨리 쌓였어요" : g > 10 ? "재고가 조금 빨리 쌓였어요" : "팔리는 속도와 비슷해요"), g > 25 ? "bad" : g > 10 ? "warn" : "good"); }
+  if (K.lev != null) CK("영업 레버리지", fmtP(K.lev) + "p", "매출 증가율 − 영업비용 증가율 — " + (K.lev > 0 ? "매출이 비용보다 빨리 늘어 이익률이 넓어지는 구조예요" : K.lev > -5 ? "비용이 매출과 비슷하게 늘었어요" : "비용이 매출보다 빨리 늘었어요"), K.lev > 0 ? "good" : K.lev > -5 ? "warn" : "bad");
+  if (last(D.gm) != null && ya(D.gm) != null) { const g = last(D.gm) - ya(D.gm); CK("총이익률 방향", (g > 0 ? "+" : "") + g.toFixed(1) + "%p", "1년 전 " + ya(D.gm).toFixed(1) + "% → 지금 " + last(D.gm).toFixed(1) + "% — " + (g >= -0.5 ? "가격 결정력이 유지됐어요" : g >= -2 ? "조금 내려왔어요" : "뚜렷하게 내려왔어요"), g >= -0.5 ? "good" : g >= -2 ? "warn" : "bad"); }
+  if (K.sbcr != null) { const shY = R.shares && i0 >= 4 ? pct(R.shares[i0], R.shares[i0 - 4]) : null; CK("주식 보상 · 희석", K.sbcr + "%", "주식 보상 ÷ 매출" + (shY != null ? " · 주식 수 1년 " + fmtP(shY, 1) : "") + " — " + (K.sbcr < 5 && !(shY > 2) ? "주주 몫이 묽어지는 정도가 작아요" : K.sbcr < 15 ? "주주 몫이 조금씩 묽어지고 있어요" : "보상 비중이 커서 실제 이익은 더 작게 봐야 해요"), K.sbcr < 5 && !(shY > 2) ? "good" : K.sbcr < 15 ? "warn" : "bad"); }
+  if (K.netCash != null) { const yrs = K.netCash < 0 && fT > 0 ? -K.netCash / fT : null; CK("재무 체력", K.netCash >= 0 ? "순현금" : "순차입", (K.netCash >= 0 ? "현금이 빚보다 " + fmtN(K.netCash) + " " + U + " 많아요" : "빚이 현금보다 " + fmtN(-K.netCash) + " " + U + " 많아요" + (yrs != null ? " — 지금 FCF로 " + yrs.toFixed(1) + "년 치" : "")), K.netCash >= 0 ? "good" : yrs != null && yrs <= 3 ? "warn" : "bad"); }
+  F.decomp = null;
+  if (px && px.at && epsT && fin.end.length === n && i0 >= 7 && epsT[i0] > 0 && epsT[i0 - 4] > 0) { const p1 = px.at(fin.end[i0]), p0 = px.at(fin.end[i0 - 4]);
+    if (p1 && p0) { const pe1 = p1 / epsT[i0], pe0 = p0 / epsT[i0 - 4], dp = (p1 / p0 - 1) * 100, de = (epsT[i0] / epsT[i0 - 4] - 1) * 100, dm = (pe1 / pe0 - 1) * 100;
+      const read = de > 0 && dm < 0 ? "이익은 늘었는데 몸값(배수)은 내려왔어요. 주가보다 이익이 더 빨리 자란 구간이에요." : de > 0 && dm >= 0 ? (de >= dm ? "주가 변화의 더 큰 부분이 이익 증가에서 왔어요." : "이익도 늘었지만 몸값(배수)이 더 많이 올랐어요. 기대가 먼저 반영된 구간이에요.") : de <= 0 && dm > 0 ? "이익은 줄었는데 몸값(배수)이 올랐어요. 주가가 기대만으로 버틴 구간이에요." : "이익과 몸값(배수)이 함께 내려왔어요.";
+      F.decomp = { from: q[i0 - 4], to: q[i0], px: r1(dp), eps: r1(de), mult: r1(dm), pe0: r1(pe0), pe1: r1(pe1), read }; } }
   /* ---------- 표 ---------- */
+  if (fin.filled && fin.filled.length) F.fillNote = "빈칸 " + fin.filled.length + "곳은 다른 행으로 계산해 채웠어요: " + fin.filled.slice(0, 6).join(", ") + (fin.filled.length > 6 ? " 외" : "");
   const m8 = Math.min(8, n), idx = Array.from({ length: m8 }, (_, k) => n - m8 + k), cols8 = ["항목"].concat(idx.map((i) => q[i]));
   const row = (label, a, f) => [label].concat(idx.map((i) => (a ? f(a[i]) : "미확인")));
   const T1 = [row("매출", R.revenue, fmtN), row("  전년 대비", D.revY, fmtP), row("  전분기 대비", D.revQ, fmtP)];
@@ -97,7 +121,7 @@ export function calcFacts(fin, px, naver) {
   if (R.opinc) T1.push(row("영업이익", R.opinc, fmtN), row("  영업이익률", D.opm, (v) => (v == null ? "미확인" : v.toFixed(1) + "%")), row("  전년 대비", D.opY, fmtP));
   if (R.netinc) T1.push(row("순이익", R.netinc, fmtN));
   if (R.eps) T1.push(row("희석 EPS (" + fin.cur + ")", R.eps, (v) => fmtN(v, 2)), row("  전년 대비", D.epsY, fmtP));
-  F.tables.push({ t: "분기 손익 흐름 (최근 " + m8 + "분기)", unit: U, cols: cols8, rows: T1, note: "자료: " + (fin.src[0] || "분기 재무표") + " · 증감률 · 이익률은 앱 계산" + (F.warn.length ? " · " + F.warn[0] : ""), calc: 1 });
+  F.tables.push({ t: "분기 손익 흐름 (최근 " + m8 + "분기)", unit: U, cols: cols8, rows: T1, note: "자료: " + (fin.src[0] || "분기 재무표") + " · 증감률 · 이익률은 앱 계산" + (F.warn.length ? " · " + F.warn[0] : "") + (F.fillNote ? " · " + F.fillNote : ""), calc: 1 });
   if (R.cogs || R.rd || R.sga) { const T2 = []; const cr = (label, k) => { if (R[k]) T2.push(row(label, R[k], fmtN), row("  매출 대비", ratio(k, "revenue"), (v) => (v == null ? "미확인" : v.toFixed(1) + "%"))); }; cr("매출원가", "cogs"); cr("연구개발비", "rd"); cr("판매 · 관리비", "sga"); if (R.sbc) cr("주식 보상", "sbc");
     F.tables.push({ t: "비용 구조 — 매출 대비 비중", unit: U, cols: cols8, rows: T2, note: "매출이 늘 때 비용 비중이 내려가면 규모의 효과(영업 레버리지)가 나는 것" + (K.lev != null ? " · 최근 분기 매출 증가율 − 영업비용 증가율 = " + fmtP(K.lev) + "p" : ""), calc: 1 }); }
   if (R.fcf || R.ar || R.inventory || R.cash) { const T3 = []; if (R.cfo) T3.push(row("영업현금흐름", R.cfo, fmtN)); if (R.fcf) T3.push(row("남는 현금(FCF)", R.fcf, fmtN), row("  FCF ÷ 매출", D.fcfm, (v) => (v == null ? "미확인" : v.toFixed(0) + "%"))); if (R.ar) T3.push(row("매출채권", R.ar, fmtN), row("  회수일(DSO)", D.dso, (v) => (v == null ? "미확인" : Math.round(v) + "일"))); if (R.inventory) T3.push(row("재고", R.inventory, fmtN)); if (D.dio) T3.push(row("  재고일수", D.dio, (v) => (v == null ? "미확인" : Math.round(v) + "일"))); if (R.cash) T3.push(row("현금 · 단기투자", R.cash, fmtN)); if (R.debt) T3.push(row("차입금", R.debt, fmtN));
@@ -123,6 +147,8 @@ export function calcFacts(fin, px, naver) {
   if (px) L.push("", "■ 밸류에이션 (가격은 앱 종가 " + fmtN(px.px, 2) + ", 코드 계산)", (K.mcap ? "시가총액 약 " + fmtN(K.mcap / 1e9, 1) + "십억 " + (fin.cur === "$" ? "달러" : "") + " · " : "") + (K.pe != null ? "TTM PER " + K.pe + "배" : "TTM PER 미확인") + (K.ps != null ? " · P/S " + K.ps + "배" : "") + (K.fcfy != null ? " · FCF 수익률 " + K.fcfy + "%" : ""));
   F.val.forEach((v) => L.push(v.k + ": 지금 " + v.v + v.unit + (v.lo != null ? " · 최근 " + v.how.replace(/.*· /, "") + " 범위 " + v.lo + "~" + v.hi + ", 평균 " + v.avg + " · " + "낮은 쪽에서 " + v.pct + "% 자리" + (v.lowGood ? "(낮을수록 쌈)" : "(높을수록 쌈)") : " · 과거 범위 미확인") + " (" + v.how + ")"));
   if (K.peAvgPx) L.push("TTM PER이 평균 배수로 돌아가면 주가 " + fmtN(K.peAvgPx, 2) + " (지금 대비 " + fmtP((K.peAvgPx / px.px - 1) * 100) + ") — 단순 계산이며 목표가가 아님");
+  if (F.checks.length) L.push("", "■ 실적 품질 점검 (코드 계산 — 본문 · 리스크 · 인사이트의 근거로 쓸 것)", ...F.checks.map((c) => c.n + ": " + c.v + " — " + c.t + " [" + (c.state === "good" ? "양호" : c.state === "warn" ? "주의" : "경고") + "]"));
+  if (F.decomp) L.push("", "■ 주가 변화 분해 (" + F.decomp.from + " 분기 말 → " + F.decomp.to + " 분기 말, 코드 계산)", "주가 " + fmtP(F.decomp.px) + " = TTM EPS " + fmtP(F.decomp.eps) + " × TTM PER " + fmtP(F.decomp.mult) + " (" + F.decomp.pe0 + "배 → " + F.decomp.pe1 + "배) — " + F.decomp.read);
   if (fin.est) L.push("", "■ 시장 예상(컨센서스) — " + (fin.src[1] || fin.src[0] || "사이트"), "회계연도 | " + fin.est.fy.join(" | "), fin.est.revenue ? "매출 예상 | " + fin.est.revenue.map((v) => fmtN(v)).join(" | ") : "", fin.est.eps ? "EPS 예상 | " + fin.est.eps.map((v) => fmtN(v, 2)).join(" | ") + (px ? "  → 선행 PER " + fin.est.eps.map((v) => (v > 0 ? (px.px / v).toFixed(1) + "배" : "–")).join(" | ") + " (앱 종가 기준 계산)" : "") : "");
   if (fin.targets.avg || fin.targets.list.length) L.push("", "■ 증권사 목표가" + (fin.targets.asOf ? " (" + fin.targets.asOf + ")" : ""), (fin.targets.avg ? "평균 " + fmtN(fin.targets.avg, 2) + (px ? " (앱 종가 대비 " + fmtP((fin.targets.avg / px.px - 1) * 100) + ")" : "") : "") + (fin.targets.n ? " · " + fin.targets.n + "명" : "") + (fin.targets.hi ? " · 최고 " + fin.targets.hi + " / 최저 " + fin.targets.lo : "") + (fin.rating ? " · 의견 매수 " + (fin.rating.buy ?? "?") + " / 보유 " + (fin.rating.hold ?? "?") + " / 매도 " + (fin.rating.sell ?? "?") : ""), fin.targets.list.map((t) => t.n + " " + t.px + (t.note ? "(" + t.note + ")" : "")).join(" · "));
   if (fin.miss.length) L.push("", "■ 1단계에서 찾지 못한 것: " + fin.miss.join(" · "));

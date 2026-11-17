@@ -95,7 +95,7 @@ export function mergeFacts(d, F, note) {
   if (!F) return; const fin = note && note.fin ? cleanFin(note.fin) : null;
   if (F.px) { d.pxs = F.px; d.price = d.price || {}; d.price.base = F.px.px; d.price.baseDate = F.px.date; d.price.high = F.px.hi; d.price.highDate = F.px.hiDate; }
   if (F.ok) {
-    d.ctables = F.tables; d.kv = F.kv; d.calcWarn = F.warn;
+    d.ctables = F.tables; d.kv = F.kv; d.calcWarn = F.warn; d.fillNote = F.fillNote || ""; d.checks = F.checks || []; d.decomp = F.decomp || null;
     const mine = (d.series || []).filter((s) => !F.series.concat(F.extra).some((x) => x.n === s.n)).slice(0, 2);
     d.series = F.series.concat(mine).slice(0, 4); d.extra = F.extra.slice(0, 4);
     const keep = (d.val || []).filter((v) => v && /선행|forward/i.test(v.k || "") && v.v != null);
@@ -125,8 +125,12 @@ function dataUrls(sym) {
 }
 async function chartOf(rc, sym) {
   const fix = (j) => (j && Array.isArray(j.c) && Array.isArray(j.t) && j.c.length ? { t: j.t[0] > 1e11 ? j.t.map((x) => Math.floor(x / 1000)) : j.t, c: j.c, sym } : null);
-  try { const t = await getJsonGzText(rc, KEY.chart(sym)); const h = fix(t ? JSON.parse(t) : null); if (h) return h; } catch (e) {}
-  try { const t = await getJsonGzText(rc, KEY.recent); const S = (t && JSON.parse(t).symbols) || {}; return fix(S[sym]); } catch (e) { return null; }   // 과거 전체가 없으면 최근 400일로
+  /* v14.11 전체 기록(갱신이 느림) 뒤에 최근 400일 기록의 더 새 날짜를 이어 붙인다 — 계산표의 종가와 본문의 기준가가 같은 날이 되게 */
+  let full = null, rec = null;
+  try { const t = await getJsonGzText(rc, KEY.chart(sym)); full = fix(t ? JSON.parse(t) : null); } catch (e) {}
+  try { const t = await getJsonGzText(rc, KEY.recent); const S = (t && JSON.parse(t).symbols) || {}; rec = fix(S[sym]); } catch (e) {}
+  if (full && rec) { const lastT = full.t[full.t.length - 1]; rec.t.forEach((x, i) => { if (x > lastT + 43200 && rec.c[i] != null) { full.t.push(x); full.c.push(rec.c[i]); } }); }
+  return full || rec;   // 과거 전체가 없으면 최근 400일로
 }
 /* 가격 통계 + 계산표: note.fin(1단계가 옮겨 적은 표)과 앱 가격으로 매 단계 다시 계산한다(가벼운 계산) */
 async function factsOf(rc, sym, note) {
@@ -152,6 +156,7 @@ export async function followStep(st, origin) {
   const finish = async (ok, msg, extra) => {   // 기록을 남기고 진행 표시를 지운다. 자동 대기열이면 다음 종목으로
     log = await loadLog(rc); const rec = Object.assign({ at: Date.now(), s: sym, why: st.why, ok, msg: msg + (st.model ? " · 모델 " + String(st.model).replace(/^claude-/, "") + (st.fell ? " (" + st.fell + ")" : "") : ""), model: st.model || null, tok: st.tok || 0, web: st.web || 0, sec: Math.round((Date.now() - (st.t0 || Date.now())) / 1000) }, extra || {});
     log.tried[sym] = today; Object.keys(log.tried).forEach((k) => { if (log.tried[k] !== today) delete log.tried[k]; });
+    const ym = today.slice(0, 7); if (!log.month || log.month.ym !== ym) log.month = { ym, n: 0, ok: 0, tok: 0 }; log.month.n++; if (ok) log.month.ok++; log.month.tok += rec.tok || 0;   // v14.11 이번 달 사용량
     log.runs.unshift(rec); log.runs = log.runs.slice(0, 30); log.running = null; log.last = Date.now(); await kvPut(rc, "cfg:followlog", log);
     if (st.q === "due" && (st.depth || 0) < 6) await chain(origin, { depth: (st.depth || 0) + 1 });
     return { ok: true, done: [rec] };
@@ -255,7 +260,7 @@ export async function followHandler(req, res, viaCron) {
     /* 단계가 함수 시간 한도(300초)에 걸려 죽으면 기록 없이 멈춘다 — 여기서 알아채고 실패로 남긴다 */
     if (log.running && Date.now() - log.running.at >= 330000) { log.runs = log.runs || []; log.runs.unshift({ at: Date.now(), s: log.running.s, why: log.running.why, ok: false, msg: (log.running.label || "") + " 단계가 시간 한도(5분)를 넘겨 멈췄어요 — 다시 누르면 조사 노트부터 이어서 해요", tok: 0, web: 0 }); log.runs = log.runs.slice(0, 30); log.running = null; await kvPut(rc, "cfg:followlog", log); }
     const running = log.running || null;
-    return res.status(200).json({ ok: true, auto: cfg.auto !== false, used, max: +(process.env.FOLLOW_DAILY_MAX || 3), due, plan: plan.slice(0, 5), running, runs: (log.runs || []).slice(0, 12), last: log.last || null, key: !!process.env.ANTHROPIC_API_KEY, chain: !!process.env.CRON_SECRET, model: process.env.FOLLOW_MODEL || "claude-opus-5-5" });
+    return res.status(200).json({ ok: true, auto: cfg.auto !== false, used, max: +(process.env.FOLLOW_DAILY_MAX || 3), due, plan: plan.slice(0, 5), running, runs: (log.runs || []).slice(0, 12), month: log.month && log.month.ym === kstDay().slice(0, 7) ? log.month : null, cost: +(process.env.FOLLOW_COST_USD || 2.2), budget: +(process.env.FOLLOW_BUDGET_USD || 100), last: log.last || null, key: !!process.env.ANTHROPIC_API_KEY, chain: !!process.env.CRON_SECRET, model: process.env.FOLLOW_MODEL || "claude-opus-5-5" });
   }
   const origin = (req.headers["x-forwarded-proto"] || "https") + "://" + req.headers.host;
   /* v13.97 직접 물어보기 ① 프롬프트 만들기: 앱이 계산한 숫자(가격 통계 · 네이버 재무표 · 지난 분기 계산표) + 화면이 보낸 앱 분석 자료를 넣어 돌려준다. Claude를 부르지 않는다 */
