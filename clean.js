@@ -296,18 +296,26 @@ function clOpsOff() { try { var Ms = typeof OPS !== "undefined" && OPS.Ms; if (!
    · 칸이 3개 이상인 표(.dgT)는 휴대폰에서 '한 줄 = 카드 한 장'으로 바꿔 보여 준다 (칸 이름은 왼쪽에 작게)
    · 오늘의 후보(스캔) 표는 전용 카드: 이름 + 종합 → 점수 4칸 → 200주선 · 회복 · 기록 → 한 줄 판정
    ============================================================ */
+/* v14.01 휴대폰에서도 표는 표 그대로 — 카드로 바꾸지 않고, 표 안에서 옆으로 넘겨 본다.
+   · 첫 열(이름)은 왼쪽에 붙어 있어 넘겨도 어느 줄인지 보인다  · 칸은 한 줄로(긴 설명 칸만 줄바꿈)  · 넘길 수 있는 표 위에는 "옆으로 넘겨 보세요" 표시
+   스캔 목록(.egScanT)만 전용 카드를 그대로 쓴다 */
 function clTables() {
-  var ts = document.querySelectorAll("table.dgT");
+  var ts = document.querySelectorAll("table.dgT, table.coreT");
   for (var i = 0; i < ts.length; i++) {
     var t = ts[i]; if (t.classList.contains("egScanT")) { clScanMore(t); continue; }
+    if (t.closest("#ddDeck")) continue;
     var hs = t.tHead && t.tHead.rows[0] ? t.tHead.rows[0].cells : null; if (!hs || hs.length < 3) continue;
-    var rows = t.tBodies[0] ? t.tBodies[0].rows : []; if (t._cln === rows.length && t.classList.contains("clRT") && (!rows.length || rows[rows.length - 1]._cl)) continue;
-    var lab = []; for (var k = 0; k < hs.length; k++) lab.push((hs[k].textContent || "").replace(/\s+/g, " ").trim());
-    for (var r = 0; r < rows.length; r++) {
-      var cs = rows[r].cells, col = 0; rows[r]._cl = 1;
-      for (var c = 0; c < cs.length; c++) { var sp = cs[c].colSpan || 1; if (sp === 1 && lab[col] && col > 0 && cs[c].getAttribute("data-l") !== lab[col]) cs[c].setAttribute("data-l", lab[col]); if (sp > 1) cs[c].classList.add("clSpan"); if (/^[-–—]?$/.test((cs[c].textContent || "").trim()) && c > 0 && !cs[c].querySelector("input,button,select,img,svg")) cs[c].classList.add("clNil"); else cs[c].classList.remove("clNil"); col += sp; }
+    var rows = t.tBodies[0] ? t.tBodies[0].rows : [];
+    if (!(t._cln === rows.length && t.classList.contains("clSX") && (!rows.length || rows[rows.length - 1]._cl))) {
+      for (var r = 0; r < rows.length; r++) { var cs = rows[r].cells; rows[r]._cl = 1; for (var c = 1; c < cs.length; c++) { var len = (cs[c].textContent || "").replace(/\s+/g, " ").trim().length; cs[c].classList.toggle("clLong", len > 26 && !cs[c].querySelector("table,svg,canvas")); } }
+      t._cln = rows.length; t.classList.remove("clRT"); t.classList.add("clSX");
+      var w = t.parentNode; if (w && !/(^|\s)(dxWrap|tableWrap|rkWrap|coreTW|clSXw)(\s|$)/.test(w.className || "")) { var d = document.createElement("div"); d.className = "clSXw"; w.insertBefore(d, t); d.appendChild(t); w = d; }
+      if (w) w.classList.add("clSXb");
     }
-    t._cln = rows.length; if (!t.classList.contains("clRT")) t.classList.add("clRT");
+    var box = t.parentNode; if (!box || !box.classList.contains("clSXb")) continue;
+    var can = box.scrollWidth > box.clientWidth + 6, hint = box.previousElementSibling && box.previousElementSibling.classList.contains("clSXh") ? box.previousElementSibling : null;
+    if (can && !hint) { hint = document.createElement("div"); hint.className = "clSXh"; hint.textContent = "옆으로 넘겨 보세요 →"; box.parentNode.insertBefore(hint, box); }
+    else if (!can && hint) hint.remove();
   }
 }
 /* 스캔 목록: 휴대폰에서는 15개만 먼저, 나머지는 '더 보기' */
@@ -321,9 +329,18 @@ function clScanMore(t) {
 (function () {
   if (typeof document === "undefined" || document.getElementById("clCss2")) return;
   var st = document.createElement("style"); st.id = "clCss2"; st.textContent = [
-    ".clScanMore{display:none}",
+    ".clScanMore{display:none}.clSXh{display:none}",
     "@media(max-width:720px){",
-    /* 일반 표 → 카드 */
+    /* 일반 표: 표 그대로, 옆으로 넘겨 보기 */
+    ".clSXb{display:block;width:100%;min-width:0;box-sizing:border-box;contain:inline-size;overflow-x:auto!important;overflow-y:hidden;-webkit-overflow-scrolling:touch;max-width:100%;max-height:none!important;scrollbar-width:thin;scrollbar-color:#aeb6c4 #eef1f5;overscroll-behavior-x:contain}.clSXb::-webkit-scrollbar{height:8px}.clSXb::-webkit-scrollbar-thumb{background:#aeb6c4;border-radius:4px}.clSXb::-webkit-scrollbar-track{background:#eef1f5;border-radius:4px}",
+    ".clSXw{border:1px solid var(--admLine,#e3e7ee);border-radius:12px;background:var(--admCard,#fff)}",
+    "table.clSX{display:table!important;width:max-content!important;min-width:100%!important;table-layout:auto!important;border-collapse:separate!important;border-spacing:0}table.clSX thead{display:table-header-group!important}table.clSX tbody{display:table-row-group!important}table.clSX tr{display:table-row!important;background:var(--admCard,#fff)}",
+    "table.clSX th,table.clSX td{display:table-cell!important;white-space:nowrap!important;padding:9px 11px!important;font-size:12.8px!important;line-height:1.45;vertical-align:middle!important;width:auto!important;min-width:0!important;max-width:none!important;overflow-wrap:normal!important;word-break:keep-all!important}",
+    "table.clSX td.clLong{white-space:normal!important;min-width:220px!important;max-width:290px!important;line-height:1.55}table.clSX td small{white-space:nowrap}table.clSX td.clLong small{white-space:normal}",
+    "table.clSX th:first-child,table.clSX td:first-child{position:sticky;left:0;z-index:2;background:inherit;box-shadow:1px 0 0 var(--admLine,#e3e7ee);white-space:normal!important;min-width:104px!important;max-width:150px!important}table.clSX thead th{background:#f3f5f8;position:static}table.clSX thead th:first-child{z-index:3;background:#f3f5f8}",
+    "[data-theme=dark] table.clSX thead th,[data-theme=dark] table.clSX thead th:first-child{background:#1e2533}",
+    ".fuTbs>div,.rbTwo>div,.rkTwo>div,.rkGD,.egBox,.card{min-width:0}",
+    ".clSXh{display:block;text-align:right;font-size:11.5px;font-weight:700;color:#7a8494;margin:2px 4px 4px}",
     ".dxWrap:has(>table.clRT),.tableWrap:has(>table.clRT){overflow:visible;max-height:none;border:0;background:transparent}",
     "table.clRT{display:block;width:100%;min-width:0!important;table-layout:auto;border:0}table.clRT thead{display:none}table.clRT tbody{display:block}",
     "table.clRT tr{display:block;padding:11px 12px;margin:0 0 8px;border:1px solid var(--admLine,#e3e7ee);border-radius:12px;background:var(--admCard,#fff)}",
