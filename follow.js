@@ -155,6 +155,8 @@ function fuChart(s, W, H, col) {
 /* v13.80 본문 · 표 · 증권사 목표가 */
 function fuArr(d, k) { return d && Array.isArray(d[k]) ? d[k] : []; }
 function fuCell(c) { var t = fuE(c == null || c === "" ? "–" : c); return /^[+＋]\d/.test(t) ? '<span class="fuUp">' + t + '</span>' : /^[-−]\d/.test(t) ? '<span class="fuDn">' + t + '</span>' : t === "미확인" ? '<span class="briefDim">미확인</span>' : t; }
+function fuGaps(d) { var n = 0, M = /^\s*미확인\s*$/; fuArr(d, "tables").forEach(function (t) { if (t && !t.calc && t.rows) t.rows.forEach(function (r) { for (var i = 1; i < r.length; i++) if (r[i] == null || M.test(String(r[i]))) n++; }); }); fuArr(d, "kpi").forEach(function (k) { if (k && M.test(String(k.prev)) && !M.test(String(k.cur))) n++; }); return n; }
+function fuFill(sym) { FU.st = FU.st || {}; FU.st.running = { s: sym, at: Date.now(), t0: Date.now(), why: "manual", label: "마무리 · 빈칸 채우기" }; fuPaint(); return fuApi({ fill: sym }).then(function (j) { if (!j || !j.ok) { FU.st.running = null; if (typeof smToast === "function") smToast((j && (j.msg || j.reason)) || "시작하지 못했어요", "bad"); fuPaint(); return; } if (j.done) { fuStatus().then(function () { fuSync().then(function () { renderFollow(); }); }); return; } fuWatch(); }); }
 function fuTblNorm(t) {
   var cols = t.cols || [], nv = cols.length - 1, keep = [], part = [], none = [], isM = function (c) { return c == null || c === "" || /^미확인$|^–$|^-$/.test(String(c).trim()); }, numOf = function (c) { var m = String(c).replace(/,/g, "").match(/^[^\d\-−+]*([+\-−]?\d+(?:\.\d+)?)/); return m ? +m[1].replace("−", "-") : null; };
   (t.rows || []).forEach(function (r0) { var r = r0.slice();
@@ -231,6 +233,7 @@ function fuHubHtml(sym) {
   var base = (p && p.c) || (d.price && d.price.base), v0 = d.val[0], tg = d.price && d.price.target, dd = fuDday(d.nextEarnings), sig = fuSig(d);
   h += '<div class="egBox fuLead"><div class="fuV">' + fuTag(d.verdict.type, FU_VT) + '<b>' + fuE(d.verdict.label || "") + '</b></div><h4>' + fuE(d.headline || "") + '</h4><ul>' + d.summary.map(function (s) { return '<li>' + fuE(s) + '</li>'; }).join("") + '</ul>' + (d.easy ? '<div class="fuEasy"><b>쉽게 말하면</b> ' + fuE(d.easy) + '</div>' : '') + (d.verdict.text ? '<p class="fuVT">' + fuE(d.verdict.text) + '</p>' : '') + '</div>';
   var ST = fuArr(d, "story"), TB = fuArr(d, "ctables").concat(fuArr(d, "tables")), TG = fuArr(d, "targets"), SN = fuSnap(d, sym);
+  (function () { var g = fuGaps(d), f = d.fills; if (g || (f && f.n)) h += '<div class="fuGap">' + (f && f.n ? '<span>빈칸 <b>' + f.n + '곳</b>은 이전 분기 발표문을 다시 찾아 채웠어요' + (f.src && f.src.length ? ' <small>(' + f.src.slice(0, 3).map(fuE).join(' · ') + ')</small>' : '') + '</span>' : '') + (g ? '<span>아직 찾지 못한 칸 <b>' + g + '곳</b> — 표에 "미확인"으로 남아 있어요</span><button type="button" data-fufill>빈칸만 다시 찾기</button>' : '') + '</div>'; })();
   if (SN.length) h += '<div class="egBox fuSec"><div class="egH">핵심 데이터 <small>가격 · 배수는 앱이 계산한 값' + (d.rating ? " · 투자의견 매수 " + (d.rating.buy != null ? d.rating.buy : "?") + " / 보유 " + (d.rating.hold != null ? d.rating.hold : "?") + " / 매도 " + (d.rating.sell != null ? d.rating.sell : "?") : "") + '</small></div><div class="fuSnap">' + SN.map(function (x) { return '<div><small>' + fuE(x.k) + '</small><b>' + fuE(x.v) + '</b><span>' + fuE(x.s || "") + '</span></div>'; }).join("") + '</div></div>';
   var VW = fuView(d);
   if (VW) h += '<div class="egBox fuSec fuVwH"><div class="egH">그래서, 우리의 결론 <small>어떻게 보는가 · 앞으로의 방향 · 결론' + (VW.old ? " — 예전 자료라 판정 · 체크포인트로 엮었어요. 다시 받으면 새로 써 줘요" : "") + '</small></div><div class="g"><div><small>01 · 어떻게 보는가</small><p>' + fuNum(VW.think) + '</p></div><div><small>02 · 앞으로의 방향</small>' + VW.path.slice(0, 4).map(function (x) { return '<p class="li">' + fuNum(x) + '</p>'; }).join("") + '</div><div class="cc"><small>03 · 결론</small><p>' + fuNum(VW.conclusion) + '</p></div></div></div>';
@@ -348,6 +351,7 @@ function renderFollow() {
   var box = q(".fuPaste"), ta = q("[data-futa]"), prb = q("[data-fupr]"), exb = q("[data-fuextra]"), msg = q("[data-fumsg]"), cp = q("[data-fucopy]");
   q("[data-fumore]").onclick = function () { box.hidden = !box.hidden; FU.askOpen = box.hidden ? null : sym; if (!box.hidden) box.scrollIntoView({ behavior: "smooth", block: "nearest" }); }; q("[data-fucancel]").onclick = function () { box.hidden = true; FU.askOpen = null; };
   q("[data-fufetch]").onclick = function () { fuFetch(sym); };
+  (function () { var fb = q("[data-fufill]"); if (fb) fb.onclick = function () { if (FU.st && FU.st.running) return; fb.disabled = true; fb.textContent = "찾는 중…"; fuFill(sym); }; })();
   if (FU.prDraft && FU.prDraft.s === sym) { prb.value = FU.prDraft.t; cp.disabled = !prb.value.trim(); }
   prb.oninput = function () { FU.prDraft = { s: sym, t: prb.value }; cp.disabled = !prb.value.trim(); };
   exb.onchange = function () { fuExtraSave(sym, exb.value); };
