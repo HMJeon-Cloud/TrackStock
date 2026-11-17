@@ -91,8 +91,8 @@ function rkMoods(rows) {
 function rkMoodsNow() { var R = rkLoad(); if (!R) return null; if (RK._moods && RK._moodsAt === R.at) return RK._moods; RK._moods = rkMoods(R.rows); RK._moodsAt = R.at; return RK._moods; }
 /* 200일선 위인가 (시세가 220일 이상 있을 때) */
 function rkAbove200(sym) { var a = typeof nbHist !== "undefined" ? nbHist[sym] : null; if (!a || a.length < 220) return null; var n = a.length, sum = 0; for (var i = n - 200; i < n; i++) sum += a[i].c; return a[n - 1].c >= sum / 200 ? 1 : 0; }
-function rkGsOf(map, lev, mood) {
-  var off = rkOff(), fo = mood && RK_FIT[mood] ? RK_FIT[mood] : null; if (fo && fo.length) { off = Object.assign({}, off); fo.forEach(function (k) { off[k] = 1; }); }
+function rkGsOf(map, lev, mood, offX) {
+  var off = offX || rkOff(), fo = mood && RK_FIT[mood] ? RK_FIT[mood] : null; if (fo && fo.length) { off = Object.assign({}, off); fo.forEach(function (k) { off[k] = 1; }); }
   var sum = [0, 0, 0, 0, 0], cnt = [0, 0, 0, 0, 0], want = 0, have = 0;
   RK_I.forEach(function (I) { if (off[I[0]]) return; want++; var v = map ? map[I[0]] : null; if (v == null) return; have++; sum[I[1]] += v; cnt[I[1]]++; });
   var gs = sum.map(function (v, i) { if (!cnt[i]) return null; var x = Math.round(v / cnt[i]); return lev && (i === 1 || i === 3) ? Math.min(60, x) : x; });
