@@ -13,7 +13,7 @@ const BASE = `너는 한국 투자 데이터 계정 '우상향연구소(@uphill.
 const TASKS = {
   /* v13.70 실적 팔로업 — 분기 실적을 검색해 정해진 JSON으로 (api/_follow.js 가 부른다. 자동 수집) */
   follow: {
-    tier: "main", web: 8, max: 14000, timeout: 270000,
+    tier: "main", web: 6, max: 16000, timeout: 270000,
     system: BASE + `
 이번 작업: 한 종목의 '가장 최근 분기 실적'을 웹 검색으로 확인해 팔로업 자료를 만든다. 사용자 메시지에 종목과 (있으면) 지난번 KPI · 경고선이 온다.
 규칙:
@@ -25,7 +25,9 @@ const TASKS = {
 6) series: 분기별 추이 2~4개(매출, 핵심 사업부, 마진, 핵심 선행지표). x와 y의 길이를 맞춘다. 최근 8~12분기.
 7) nextEarnings: 다음 실적 발표일(현지 날짜 YYYY-MM-DD). 회사가 공지하지 않았으면 null로 두고 nextNote에 예상 시기를 쓴다.
 8) 글은 한국어 쉬운 말. 전문 용어는 terms에 풀이를 넣는다. 매수 · 매도 권유 문장과 목표가 제시는 하지 않는다(증권사 평균 목표가는 사실로만 적는다).
-9) 검색은 아껴 쓴다: 실적 발표문 → 콘퍼런스콜 → 밸류 · 컨센서스 순서. 답은 설명 없이 JSON 하나만.
+9) 검색은 아껴 쓴다: 실적 발표문 → 콘퍼런스콜 → 밸류 · 컨센서스 순서. 검색 사이에 설명 글을 쓰지 않는다.
+10) 답이 길어 끊기지 않게 짧게 쓴다: summary 3줄, kpi 8~12개(note 30자 안), risk 5개 안, qa 4개 안(답변 요지 90자 안), series 3개 안 · 8분기, fin 행 6개 안, scen 3개, bull · bear 각 3개, terms 6개 안, sources 6개 안. 전체 6,000자 안팎.
+11) 답은 설명 · 머리말 · 코드 울타리 없이 { 로 시작하는 JSON 하나만. quarter와 kpi는 반드시 채운다.
 출력: JSON 하나만 {"sym":"티커","name":"한글 종목명","asOf":"YYYY-MM-DD","quarter":"예: 2026 Q3","reported":"실적 발표일 YYYY-MM-DD","nextEarnings":"YYYY-MM-DD 또는 null","nextNote":"","headline":"이번 분기를 한 문장으로(40자 안팎)","summary":["핵심 3줄 — 숫자 포함","",""],"easy":"쉽게 말하면 …(2문장)","verdict":{"type":"temp|watch|struct|ok","label":"짧은 판정","text":"이유 2~3문장"},"price":{"base":0,"baseDate":"","high":0,"highDate":"","target":0,"targetN":0,"targetNote":""},"val":[{"k":"선행 PER","v":0,"unit":"배","lo":0,"avg":0,"hi":0,"pct":0,"lowGood":true}],"valNote":"","kpi":[{"n":"지표","cur":"최근값","prev":"전분기","warn":"경고선","state":"good|warn|bad|info","note":"짧은 설명"}],"risk":[{"n":"리스크","cur":"현재 수치","type":"temp|watch|struct|ok","judge":"판정 한마디","next":"다음에 확인할 것"}],"fin":{"unit":"백만 달러","cols":["FY24","FY25","FY26E","FY27E"],"rows":[["총매출",0,0,0,0]]},"series":[{"n":"분기 매출","unit":"백만 달러","x":["1Q25"],"y":[0]}],"qa":[{"q":"질문 요지","who":"증권사 · 애널리스트","a":"답변 요지"}],"qaRead":"질문이 어디로 쏠렸는지와 그 뜻","scen":[{"n":"Bear|Base|Bull","cond":"가정","px":0,"gap":0}],"bull":[""],"bear":[""],"next":{"title":"다음 분기 체크포인트","items":[{"n":"항목","v":"숫자","s":"보조 설명"}],"good":[""],"bad":[""]},"terms":[["용어","쉬운 말 풀이"]],"sources":["출처"]}`
   },
   analyst: {
@@ -170,6 +172,17 @@ function pickJson(text) {
   let t = body; for (let k = 0; k < 12 && t.length > 50; k++) { const cutAt = Math.max(t.lastIndexOf(","), t.lastIndexOf("}"), t.lastIndexOf("]")); if (cutAt <= 0) break; t = t.slice(0, cutAt); o = tryParse(closeJson(t)); if (o && typeof o === "object" && Object.keys(o).length) { o._truncated = true; return o; } }
   return null;
 }
+/* v13.72 글 안의 '짝이 맞는 { … }' 덩어리를 모두 찾아 읽히는 것만 돌려준다(큰 것부터) */
+function pickJsonAll(text) {
+  text = String(text || "").replace(/```(?:json)?/gi, ""); const out = []; let i = 0;
+  while (i < text.length && out.length < 20) {
+    const a = text.indexOf("{", i); if (a < 0) break; let d = 0, q = false, e = false, b = -1;
+    for (let k = a; k < text.length; k++) { const c = text[k]; if (q) { if (e) e = false; else if (c === "\\") e = true; else if (c === '"') q = false; } else if (c === '"') q = true; else if (c === "{") d++; else if (c === "}") { d--; if (!d) { b = k; break; } } }
+    if (b < 0) { i = a + 1; continue; }
+    const o = tryParse(text.slice(a, b + 1)); if (o && typeof o === "object") { out.push({ o, n: b - a }); i = b + 1; } else i = a + 1;
+  }
+  return out.sort((x, y) => y.n - x.n).map((x) => x.o);
+}
 const API = "https://api.anthropic.com/v1/messages";
 /* v12.51 생각(thinking) 블록이 출력 토큰을 크게 먹는 것이 확인됨(한 번에 thinking×3 · 29k 토큰). JSON 작업은 생각 없이 바로 쓰게 한다.
    모델이 이 설정을 모르면(400) 설정 없이 다시 보내고, 그 뒤로는 붙이지 않는다 */
@@ -239,13 +252,21 @@ export async function runClaude(body, key, used) {
     const out = { ok: true, task: body.task, model: (j && j.model) || model, text, sources: src.slice(0, 12), searches, used, max, stop: j.stop_reason, finish, turns, usage, blocks: kinds, retry };
     if (body.json) {
       out.data = pickJson(text); if (out.data && out.data._truncated) { out.truncated = true; delete out.data._truncated; }
+      if (!out.data) { const all = pickJsonAll(text); if (all[0] && Object.keys(all[0]).length) out.data = all[0]; }   // 머리말의 { 때문에 못 읽은 경우
+      /* v13.72 꼭 있어야 하는 칸(body.need)이 없으면 읽지 못한 것으로 보고 아래 '형식만 고치기'로 넘긴다. 한 겹 싸여 온 답({"data":{…}})은 벗긴다 */
+      const need = Array.isArray(body.need) ? body.need : null, has = (o) => o && typeof o === "object" && need.every((k) => String(k).split("|").some((a) => o[a] != null && o[a] !== ""));
+      if (need && out.data && !has(out.data)) {
+        const inner = Object.keys(out.data).map((k) => out.data[k]).filter((v) => v && typeof v === "object" && !Array.isArray(v) && has(v))[0];
+        const other = inner ? null : pickJsonAll(text).map((o) => (has(o) ? o : Object.keys(o).map((k) => o[k]).filter((v) => v && typeof v === "object" && !Array.isArray(v) && has(v))[0])).filter(Boolean)[0];   // 머리말에 { 가 섞였거나 JSON이 여러 개일 때
+        if (inner || other) out.data = inner || other; else { out.gotKeys = Object.keys(out.data).slice(0, 14); out.data = null; }
+      }
       if (!out.data && left() > 25000) {   // 형식만 고치기 — 빠른 모델 · 웹 없음 · 횟수에 안 셈
         const schema = String(T.system).split("출력:").pop().trim();
         const fix = await callClaude(key, { model: process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5", max_tokens: Math.max(4000, T.max), system: "너는 JSON 정리기다. 아래 [원문]에 담긴 내용을 [형식]에 맞는 올바른 JSON 하나로만 출력한다. 내용·숫자·출처는 한 글자도 바꾸거나 더하지 않는다. 문자열 안의 큰따옴표는 ‘ ’로 바꾼다. 원문이 중간에 끊겼으면 있는 내용만 담고, 없는 칸은 빈 문자열·빈 배열로 둔다. JSON 외의 말 금지.", messages: [{ role: "user", content: "[형식]\n" + schema + "\n\n[원문]\n" + clip(text, 40000) }] }, left() - 3000).catch(() => null);
         const ft = fix && fix.j && (fix.j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-        out.data = ft ? pickJson(ft) : null; if (out.data) out.repaired = true;
+        out.data = ft ? pickJson(ft) : null; if (out.data && need && !has(out.data)) { out.gotKeys = Object.keys(out.data).slice(0, 14); out.data = null; } if (out.data) { out.repaired = true; delete out.data._truncated; }
       }
-      if (!out.data) { out.ok = false; out.reason = "PARSE"; out.msg = "AI 응답을 읽지 못했어요" + (j.stop_reason === "max_tokens" ? " — 답이 너무 길어 중간에 끊겼어요(다시 시도하면 대개 됩니다)" : j.stop_reason === "pause_turn" ? " — 웹 검색이 길어져 답을 끝내지 못했어요" : !text.trim() ? " — 답 본문이 비어 있어요(웹 검색만 하고 끝남 · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + ")" : " — 형식이 깨졌어요") + " [stop: " + j.stop_reason + (finish ? " → 마무리 " + finish : "") + " · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + " · 출력 토큰 " + usage.output_tokens + "]"; out.text = clip(text, 600); }
+      if (!out.data) { out.ok = false; out.reason = "PARSE"; out.msg = "AI 응답을 읽지 못했어요" + (j.stop_reason === "max_tokens" ? " — 답이 너무 길어 중간에 끊겼어요(다시 시도하면 대개 됩니다)" : j.stop_reason === "pause_turn" ? " — 웹 검색이 길어져 답을 끝내지 못했어요" : !text.trim() ? " — 답 본문이 비어 있어요(웹 검색만 하고 끝남 · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + ")" : " — 형식이 깨졌어요") + " [stop: " + j.stop_reason + (finish ? " → 마무리 " + finish : "") + " · 블록: " + Object.keys(kinds).map((k) => k + "×" + kinds[k]).join(", ") + " · 출력 토큰 " + usage.output_tokens + (out.gotKeys ? " · 받은 칸: " + (out.gotKeys.join(",") || "없음") : "") + "]"; out.text = clip(text, 600); }
     }
     return out;
   } catch (e) {

@@ -48,7 +48,10 @@ function buildInput(sym, prev, px, why) {
   return L.join("\n");
 }
 function clean(o, sym, prev, why) {
-  if (!o || typeof o !== "object" || !o.quarter || !Array.isArray(o.kpi) || !o.kpi.length) return null;
+  if (!o || typeof o !== "object") return null;
+  if (!Array.isArray(o.kpi)) { const alt = o.kpis || o.KPI || o.KPIs; o.kpi = Array.isArray(alt) ? alt : o.kpi && typeof o.kpi === "object" ? Object.keys(o.kpi).map((k) => (typeof o.kpi[k] === "object" ? Object.assign({ n: k }, o.kpi[k]) : { n: k, cur: String(o.kpi[k]) })) : []; }
+  o.kpi.forEach((k) => { if (k && !k.n) k.n = k.name || k.k || k.label || ""; });
+  if (!o.quarter || !o.kpi.length) return null;
   o.sym = sym; ["summary", "val", "kpi", "risk", "series", "qa", "scen", "bull", "bear", "terms", "sources"].forEach((k) => { if (!Array.isArray(o[k])) o[k] = []; });
   const ST = { good: 1, warn: 1, bad: 1, info: 1 }, VT = { temp: 1, watch: 1, struct: 1, ok: 1 };
   o.kpi = o.kpi.slice(0, 16).filter((k) => k && k.n); o.kpi.forEach((k) => { if (!ST[k.state]) k.state = "info"; });
@@ -97,8 +100,8 @@ export async function followRun(opt) {
     let cu = 0; try { cu = +(await redisCmd(rc, ["INCR", "sm:claude:" + today])) || 0; } catch (e) {}
     if (cu > cmax) { done.push({ at: Date.now(), s: it.s, why: it.why, ok: false, msg: "오늘 Claude 작업 횟수(" + cmax + "회)를 다 썼어요", skip: opt.only ? 0 : 1 }); if (opt.only) { log.runs.unshift(done[done.length - 1]); log.runs = log.runs.slice(0, 30); } continue; }
     if (!opt.only) { try { used = +(await redisCmd(rc, ["INCR", dayKey])) || used + 1; if (used === 1) await redisCmd(rc, ["EXPIRE", dayKey, String(3 * 86400)]); } catch (e) {} }
-    let out; try { out = await runClaude({ task: "follow", input: buildInput(it.s, it.prev, px[it.s], it.why), json: true, budgetMs: Math.max(60000, 285000 - (Date.now() - t0)) }, key, used); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
-    const data = out && out.ok ? clean(out.data, it.s, it.prev, it.why) : null, rec = { at: Date.now(), s: it.s, why: it.why, ok: !!data, msg: data ? data.quarter + " 저장" : (out && (out.msg || out.reason)) || "형식이 맞지 않아 저장하지 않았어요", tok: out && out.usage ? (out.usage.input_tokens || 0) + (out.usage.output_tokens || 0) : 0, web: out && out.searches ? out.searches.length : 0, model: out && out.model };
+    let out; try { out = await runClaude({ task: "follow", input: buildInput(it.s, it.prev, px[it.s], it.why), json: true, need: ["quarter", "kpi|kpis|KPI|KPIs"], budgetMs: Math.max(60000, 285000 - (Date.now() - t0)) }, key, used); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
+    const data = out && out.ok ? clean(out.data, it.s, it.prev, it.why) : null, rec = { at: Date.now(), s: it.s, why: it.why, ok: !!data, msg: data ? data.quarter + " 저장" + (out.truncated ? " (답이 끊겨 뒷부분 일부 없음)" : out.repaired ? " (형식 고침)" : "") : (out && (out.msg || out.reason)) || "KPI 목록이 비어 저장하지 않았어요" + (out && out.data ? " [받은 칸: " + Object.keys(out.data).slice(0, 12).join(",") + " · stop: " + out.stop + "]" : ""), tok: out && out.usage ? (out.usage.input_tokens || 0) + (out.usage.output_tokens || 0) : 0, web: out && out.searches ? out.searches.length : 0, model: out && out.model };
     if (data) { if (out.sources && out.sources.length) data.links = out.sources.slice(0, 8); data.model = out.model; await kvPut(rc, "cfg:follow:" + it.s, data); }
     log.tried[it.s] = today; log.runs.unshift(rec); log.runs = log.runs.slice(0, 30); done.push(rec);
   }
