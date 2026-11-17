@@ -62,7 +62,7 @@ const TASKS = {
      ② followR 조사: 실적 발표문 · 콘퍼런스콜 원문에서 '표에 없는 것'(부문 · 가이던스 · 일회성 · 질의응답 · 쟁점)을 찾는다
      ③ follow 핵심: 계산표 + 조사 노트로 판정 · KPI · 리스크 · 시나리오   ④ followD 본문: 문단 · 표 */
   followF: {
-    tier: "main", web: 2, fetch: 6, fetchTok: 14000, max: 9000, timeout: 230000,
+    tier: "main", web: 2, fetch: 6, fetchTok: 14000, max: 9000, timeout: 230000, effort: "low",
     system: `너는 재무 데이터 입력 담당이다. 판단 · 해석 · 요약을 하지 않는다. 사용자 메시지에 있는 주소를 web_fetch로 열어 표의 숫자를 '그대로' 옮겨 적는 일만 한다.
 규칙:
 1) 사용자 메시지의 주소를 위에서부터 차례로 연다. 열리지 않는 주소는 건너뛰고, 그 항목만 web_search로 같은 표(분기 손익계산서 · 재무상태표 · 현금흐름표 · 분기별 PER/PS · 애널리스트 예상 · 목표가)를 찾아 한 번 더 시도한다.
@@ -77,7 +77,7 @@ const TASKS = {
 출력: JSON 하나만 {"sym":"티커","cur":"$","unit":"백만 달러","q":["Q3 2024","Q4 2024"],"end":["2024-10-27","2025-01-26"],"rows":{"revenue":[0,0],"cogs":[0,0],"gross":[0,0],"rd":[0,0],"sga":[0,0],"opinc":[0,0],"netinc":[0,0],"eps":[0,0],"shares":[0,0],"ar":[0,0],"inventory":[0,0],"cash":[0,0],"debt":[0,0],"cfo":[0,0],"capex":[0,0],"fcf":[0,0],"sbc":[0,0]},"val":{"pe":[0,0],"ps":[0,0],"pfcf":[0,0],"pb":[0,0]},"est":{"fy":["FY2026","FY2027"],"revenue":[0,0],"eps":[0,0]},"targets":{"avg":0,"hi":0,"lo":0,"n":0,"asOf":"YYYY-MM-DD","list":[{"n":"증권사","px":0,"note":"Buy · 2026-10-30"}]},"rating":{"buy":0,"hold":0,"sell":0,"label":"Strong Buy"},"stats":{"mcap":0,"fpe":0,"peg":0,"beta":0},"src":["사이트 · 표 이름"],"miss":["찾지 못한 항목"]}`
   },
   followR: {
-    tier: "main", web: 5, fetch: 3, fetchTok: 12000, max: 10000, timeout: 200000,
+    tier: "main", web: 5, fetch: 3, fetchTok: 12000, max: 10000, timeout: 200000, effort: "low",
     system: BASE + `
 이번 작업: 한 종목의 '가장 최근 분기 실적'에 대한 [조사 노트]를 만든다. 분기 재무표의 숫자(매출 · 이익 · 현금흐름 · 배수 · 목표가)는 사용자 메시지의 [계산표]에 이미 있다 — 그 숫자를 다시 찾느라 도구를 쓰지 않는다. 표에 없는 것만 찾는다.
 조사 순서:
@@ -99,7 +99,7 @@ PDF는 web_fetch로 열지 않는다 — 같은 내용의 웹 페이지를 고�
 ## 8. 확인하지 못한 것`
   },
   follow: {
-    tier: "main", web: 0, max: 16000, timeout: 262000,
+    tier: "main", web: 0, max: 16000, timeout: 262000, effort: "low",
     system: BASE + FOLLOW_STYLE + `
 이번 작업: 사용자 메시지의 [계산표]와 [조사 노트]만 근거로 실적 팔로업 '핵심 자료'를 JSON으로 만든다. 웹 검색은 없다.
 근거의 순서: ① [계산표](앱이 계산한 값 — 그대로 인용) ② [조사 노트]. 둘이 다르면 계산표를 쓴다. 어디에도 없는 숫자는 쓰지 않는다(null 또는 "미확인"). '미확인'은 정말 없을 때만 — 계산표에 전분기 값이 있는데 prev를 "미확인"으로 두면 안 된다.
@@ -120,7 +120,7 @@ PDF는 web_fetch로 열지 않는다 — 같은 내용의 웹 페이지를 고�
 출력: JSON 하나만 {"sym":"티커","name":"한글 종목명","asOf":"YYYY-MM-DD","quarter":"예: FY27 Q2","reported":"YYYY-MM-DD","nextEarnings":"YYYY-MM-DD 또는 null","nextNote":"","headline":"","summary":["","",""],"easy":"","verdict":{"type":"temp|watch|struct|ok","label":"짧은 판정","text":"3문장"},"price":{"base":0,"baseDate":"","high":0,"highDate":"","target":0,"targetN":0,"targetNote":""},"rating":{"buy":0,"hold":0,"sell":0},"snap":[{"k":"시가총액","v":"$5.19T","s":"희석 242.9억 주"}],"val":[{"k":"선행 PER","v":0,"unit":"배","lo":null,"avg":null,"hi":null,"pct":null,"lowGood":true}],"valNote":"배수가 싸 보일 때의 함정 1문장","kpi":[{"n":"지표","cur":"최근값","prev":"전분기","warn":"경고선","state":"good|warn|bad|info","note":"왜 보는가"}],"risk":[{"n":"리스크","cur":"현재 수치","type":"temp|watch|struct|ok","judge":"근거 한 줄","next":"다음에 볼 숫자와 선"}],"fin":{"unit":"백만 달러","cols":["FY25","FY26","FY27E","FY28E"],"rows":[["총매출",0,0,0,0]]},"series":[],"qa":[{"q":"질문","who":"이름 · 증권사","a":"답변"}],"qaRead":"","scen":[{"n":"Bear","cond":"가정","eps":0,"mult":0}],"bull":["조건 — 숫자"],"bear":["조건 — 숫자"],"next":{"title":"다음 분기 체크포인트","items":[{"n":"항목","v":"숫자","s":"컨센서스 · 경고선"}],"good":[""],"bad":[""]},"terms":[["용어","쉬운 말 풀이"]],"sources":["출처"]}`
   },
   followD: {
-    tier: "main", web: 0, max: 14000, timeout: 262000,
+    tier: "main", web: 0, max: 14000, timeout: 262000, effort: "low",
     system: BASE + FOLLOW_STYLE + `
 이번 작업: 사용자 메시지의 [계산표]와 [조사 노트]만 근거로 실적 리포트의 '본문 · 표'를 JSON으로 쓴다. 웹 검색은 없다. 어디에도 없는 숫자는 쓰지 않는다.
 story — 본문 6단락, 이 순서로:
@@ -306,16 +306,27 @@ const API = "https://api.anthropic.com/v1/messages";
 /* v12.51 생각(thinking) 블록이 출력 토큰을 크게 먹는 것이 확인됨(한 번에 thinking×3 · 29k 토큰). JSON 작업은 생각 없이 바로 쓰게 한다.
    모델이 이 설정을 모르면(400) 설정 없이 다시 보내고, 그 뒤로는 붙이지 않는다 */
 let THINK_OFF_OK = process.env.CLAUDE_THINK_OFF !== "0";
+/* v13.98 생각을 끌 수 없는 모델(thinking: disabled 를 400으로 거절 — 문서상 Opus 5.5 등)에서는 생각이 출력 한도(max_tokens)를 먼저 써 버려
+   글이 한 글자도 안 나오고 stop: max_tokens 로 끝났다(실적 팔로업 2/4 · 4/4 실패의 원인). 그런 모델에는
+   ① 출력 한도에 생각 몫(CLAUDE_THINK_ROOM, 기본 8000)을 더 얹고 ② 생각을 줄이라는 신호(output_config.effort)를 같이 보낸다.
+   effort 는 작업이 _effort 로 정한 값(없으면 보내지 않음). 모델이 effort 를 모르면(400) 빼고 다시 보낸다. 모델별로 기억한다 */
+const NO_OFF = {}, NO_EFFORT = {};
 async function callClaude(key, payload, ms, allowThinkOff) {
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), Math.max(5000, ms));
+  const eff = payload._effort, base = Object.assign({}, payload); delete base._effort; const m = base.model;
   const send = async (p) => { const r = await fetch(API, { method: "POST", signal: ac.signal, headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(p) }); const j = await r.json().catch(() => null); return { r, j }; };
+  const emsg = (o) => String((o.j && o.j.error && o.j.error.message) || "");
+  const roomy = () => { const q = Object.assign({}, base, { max_tokens: Math.min(+(process.env.CLAUDE_MAX_OUT || 32000), (base.max_tokens || 4000) + +(process.env.CLAUDE_THINK_ROOM || 8000)) }); if (eff && !NO_EFFORT[m]) q.output_config = Object.assign({}, base.output_config, { effort: eff }); return q; };
   try {
-    if (allowThinkOff && THINK_OFF_OK) {
-      const out = await send(Object.assign({ thinking: { type: "disabled" } }, payload));
-      if (out.r.status === 400 && /thinking/i.test(String(out.j && out.j.error && out.j.error.message || ""))) { THINK_OFF_OK = false; return await send(payload); }
-      return out;
+    if (allowThinkOff && THINK_OFF_OK && !NO_OFF[m]) {
+      const out = await send(Object.assign({ thinking: { type: "disabled" } }, base));
+      if (!(out.r.status === 400 && /thinking/i.test(emsg(out)))) return out;
+      NO_OFF[m] = 1;
     }
-    return await send(payload);
+    if (!allowThinkOff || (!NO_OFF[m] && !THINK_OFF_OK && !eff)) return await send(base);
+    let out = await send(roomy());
+    if (out.r.status === 400 && /effort|output_config/i.test(emsg(out))) { NO_EFFORT[m] = 1; out = await send(roomy()); }
+    return out;
   } finally { clearTimeout(tm); }
 }
 
@@ -324,7 +335,7 @@ export async function runClaude(body, key, used) {
   const T = TASKS[body.task];
   const model = T.tier === "fast" ? (process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5") : (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
   const max = +(process.env.CLAUDE_DAILY_MAX || 60), web = T.web && process.env.COPY_WEB !== "0" && body.web !== false;
-  const payload = { model, max_tokens: T.max, system: T.system, messages: [{ role: "user", content: "오늘: " + kstDay() + " (한국 시간)\n\n" + clip(body.input, 60000) }] };
+  const payload = { model, max_tokens: T.max, _effort: T.effort || undefined, system: T.system, messages: [{ role: "user", content: "오늘: " + kstDay() + " (한국 시간)\n\n" + clip(body.input, 60000) }] };
   if (web) payload.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: T.web, user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" } }];
   /* v13.80 원문 읽기(web_fetch) — 검색에서 나온 주소의 본문을 읽는다. 추가 요금 없이 읽은 만큼 입력 토큰. 긴 글은 FOLLOW_FETCH_TOKENS(기본 25000)에서 자른다. API가 이 도구를 거절하면 빼고 다시 보낸다 */
   if (web && T.fetch && process.env.COPY_FETCH !== "0") payload.tools.push({ type: "web_fetch_20250910", name: "web_fetch", max_uses: T.fetch, max_content_tokens: +(process.env.FOLLOW_FETCH_TOKENS || T.fetchTok || 14000) });
@@ -332,12 +343,14 @@ export async function runClaude(body, key, used) {
      Vercel 함수 한도 300초 안에서 남은 시간을 나눠 쓴다 */
   const t0 = Date.now(), left = () => Math.min(290000, +body.budgetMs || 290000) - (Date.now() - t0);   // v13.70 budgetMs: 한 실행에서 여러 번 부를 때 남은 시간만큼만
   try {
-    let blocks = [], j = null, r = null, turns = 0, nofetch = false, usage = { input_tokens: 0, output_tokens: 0 };
+    let blocks = [], j = null, r = null, turns = 0, nofetch = false, bumped = false, usage = { input_tokens: 0, output_tokens: 0 };
     for (;;) {
       ({ r, j } = await callClaude(key, payload, Math.min(T.timeout, left() - (body.json ? 40000 : 5000)), true));   // v12.66 생각(thinking) 블록이 출력 한도를 먹지 않게 모든 작업에서 끔(모델이 거부하면 자동으로 설정 없이)
       if (r.status === 400 && payload.tools && payload.tools.some((t) => t.name === "web_fetch") && /web_fetch|tool/i.test(String(j && j.error && j.error.message || ""))) { payload.tools = payload.tools.filter((t) => t.name !== "web_fetch"); nofetch = true; continue; }
       if (!r.ok || !j) return { ok: false, reason: "API_" + r.status, msg: clip(j && j.error && j.error.message, 240) || ("Claude API 오류 " + r.status) };
       blocks = blocks.concat(j.content || []); if (j.usage) { usage.input_tokens += j.usage.input_tokens || 0; usage.output_tokens += j.usage.output_tokens || 0; }
+      /* 글 없이 생각만 하다 출력 한도에 걸린 경우 — 한도를 키워 한 번 더(도구 결과가 없을 때만: 검색을 다시 하지 않게) */
+      if (j.stop_reason === "max_tokens" && !bumped && left() > 80000 && !blocks.some((b) => b.type === "text" && b.text.trim()) && !blocks.some((b) => /tool/.test(b.type))) { bumped = true; blocks = []; payload.max_tokens = Math.min(+(process.env.CLAUDE_MAX_OUT || 32000), payload.max_tokens * 2); continue; }
       if (j.stop_reason === "pause_turn" && turns < 3 && left() > 60000) { turns++; payload.messages = payload.messages.concat([{ role: "assistant", content: j.content }]); continue; }
       break;
     }
@@ -364,9 +377,9 @@ export async function runClaude(body, key, used) {
     if ((!textNow || tooShort) && left() > 45000) {
       const ask = { role: "user", content: body.finishAsk || "검색은 여기까지. 지금까지 읽은 자료와 앱 숫자로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : body.task === "analyst" ? "'## 서술형'으로 시작해 '## 카드형' 블록까지, 처음 요청한 답변 형식 그대로." : "결과만.") };
       let f1 = null;
-      if (blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: payload.messages.concat([{ role: "assistant", content: blocks.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking") }, ask]) }, Math.min(T.timeout, left() - 30000), true); } catch (e) { f1 = null; } }
-      if (tooShort && !blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "assistant", content: "(자료를 충분히 찾지 못했다)" }, ask] }, Math.min(T.timeout, left() - 10000), true); } catch (e) { f1 = null; } }
-      if (!tooShort && !(f1 && f1.r.ok && f1.j && (f1.j.content || []).some((b) => b.type === "text" && b.text.trim())) && left() > 45000) { try { f1 = await callClaude(key, { model, max_tokens: T.max, system: T.system, messages: [payload.messages[0], { role: "user", content: "(웹 검색 없이) 위 앱 숫자와 후보 기사만으로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") }] }, Math.min(T.timeout, left() - 5000), true); } catch (e) { f1 = null; } }
+      if (blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, _effort: T.effort || undefined, system: T.system, messages: payload.messages.concat([{ role: "assistant", content: blocks.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking") }, ask]) }, Math.min(T.timeout, left() - 30000), true); } catch (e) { f1 = null; } }
+      if (tooShort && !blocks.length) { try { f1 = await callClaude(key, { model, max_tokens: T.max, _effort: T.effort || undefined, system: T.system, messages: [payload.messages[0], { role: "assistant", content: "(자료를 충분히 찾지 못했다)" }, ask] }, Math.min(T.timeout, left() - 10000), true); } catch (e) { f1 = null; } }
+      if (!tooShort && !(f1 && f1.r.ok && f1.j && (f1.j.content || []).some((b) => b.type === "text" && b.text.trim())) && left() > 45000) { try { f1 = await callClaude(key, { model, max_tokens: T.max, _effort: T.effort || undefined, system: T.system, messages: [payload.messages[0], { role: "user", content: "(웹 검색 없이) 위 앱 숫자와 후보 기사만으로 바로 결과를 써 줘. 다른 말 없이 " + (body.json ? "JSON 하나만." : "결과만.") }] }, Math.min(T.timeout, left() - 5000), true); } catch (e) { f1 = null; } }
       if (f1 && f1.r.ok && f1.j) { finish = f1.j.stop_reason || "finish"; blocks = blocks.concat(f1.j.content || []); if (f1.j.usage) { usage.input_tokens += f1.j.usage.input_tokens || 0; usage.output_tokens += f1.j.usage.output_tokens || 0; } }
     }
     const texts = blocks.filter((b) => b.type === "text").map((b) => b.text), text = texts.join("");

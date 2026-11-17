@@ -170,7 +170,7 @@ export async function followStep(st, origin) {
   if (st.step === "data") {
     /* 1단계: 재무 사이트의 분기 표를 옮겨 적는다(판단 없음). 하루 안에 받아 둔 것이 있고 뒤 단계가 실패했던 거라면 건너뛴다 */
     const old = await kvGet(rc, "cfg:follownote:" + sym);
-    if (old && !old.used && Date.now() - old.at < 24 * 3600e3 && !st.fresh && (old.fin || old.dataTried)) { st.reused = 1; if (st.ctx) { old.ctx = String(st.ctx).slice(0, 6000); await kvPut(rc, "cfg:follownote:" + sym, old); } delete st.ctx; return next(old.text ? "core" : "research"); }
+    if (old && !old.used && Date.now() - old.at < 24 * 3600e3 && !st.fresh && (old.fin || old.dataTried)) { st.reused = 1; if (st.ctx) { old.ctx = String(st.ctx).slice(0, 6000); await kvPut(rc, "cfg:follownote:" + sym, old); } delete st.ctx; return next(old.text ? (old.coreDone && prev && prev.quarter ? "deep" : "core") : "research"); }
     const urls = dataUrls(sym); let naver = "";
     try { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000); const fr = await fetch(origin + "/api/fund?symbol=" + encodeURIComponent(sym), { signal: ac.signal }).catch(() => null); clearTimeout(tm); if (fr && fr.ok) naver = naverText(await fr.json().catch(() => null)); } catch (e) {}
     const inp = "[종목] " + sym + (prev && prev.name ? " (" + prev.name + ")" : "") + "\n\n" + (urls.length ? "[열어 볼 주소 — 위에서부터]\n" + urls.map((u) => "- " + u[0] + ": " + u[1]).join("\n") : "[주소 없음] 이 종목은 정해진 주소가 없다. web_search로 분기 손익계산서 · 재무상태표 · 현금흐름표 · 컨센서스 · 목표가 표를 찾아 web_fetch로 연다.");
@@ -214,8 +214,9 @@ export async function followStep(st, origin) {
     let out; try { out = await runClaude({ task: "followD", input: input + "\n\n[이미 정한 판정] " + ((cur.verdict && cur.verdict.label) || "") + " · " + (cur.headline || ""), json: true, need: ["story|tables"], budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
     st.tok = (st.tok || 0) + tokOf(out);
     const dp = out && out.ok ? cleanDeep(out.data) : null;
-    note.used = 1; await kvPut(rc, "cfg:follownote:" + sym, note);
-    if (!dp) return finish(true, cur.quarter + " 저장 — 핵심만(본문 · 표는 실패: " + String((out && (out.msg || out.reason)) || "형식").slice(0, 90) + ")", { part: 1 });
+    /* 본문 단계만 실패했으면 노트를 남겨 둔다 — 하루 안에 다시 누르면 조사 · 판정을 건너뛰고 본문 단계만 다시 한다(토큰을 다시 쓰지 않게) */
+    note.used = dp ? 1 : 0; note.coreDone = dp ? 0 : 1; await kvPut(rc, "cfg:follownote:" + sym, note);
+    if (!dp) return finish(true, cur.quarter + " 저장 — 핵심만(본문 · 표는 실패: " + String((out && (out.msg || out.reason)) || "형식").slice(0, 140) + ") — 다시 누르면 본문 · 표 단계만 다시 해요", { part: 1 });
     if (cur.targets && cur.targets.length && !(dp.targets && dp.targets.length)) { dp.targets = cur.targets; dp.targetNote = cur.targetNote || dp.targetNote; }   // 1단계 표에서 온 목표가는 지우지 않는다
     Object.assign(cur, dp); cur.deep = 1; cur.savedAt = Date.now(); await kvPut(rc, "cfg:follow:" + sym, cur);
     return finish(true, cur.quarter + " 저장 · " + (F.ok ? "재무표 " + F.q.length + "분기 계산" : "재무표 못 읽음(" + (st.finMsg || "검색으로 대신") + ")") + " · 본문 " + dp.story.length + "단락 · 표 " + (dp.tables.length + ((cur.ctables || []).length)) + "개" + (note.fetched ? " · 원문 " + note.fetched + "건 읽음" : note.nofetch ? " · 원문 읽기 불가(검색 요약만)" : "") + (st.cut ? " · 핵심 답이 끊겨 일부 없음" : ""));
