@@ -538,9 +538,20 @@ export default async function handler(req, res) {
     await redisCmd(redis, ["LPUSH", "sm:cronlog:hist", JSON.stringify(run)]); await redisCmd(redis, ["LTRIM", "sm:cronlog:hist", "0", "29"]); await redisCmd(redis, ["EXPIRE", "sm:cronlog:hist", String(40 * 86400)]);
   } catch (e) {}
 
+  /* v13.70 실적 팔로업 자동 수집을 깨운다 — 한국 09시 실행(UTC 0시)에서만, 별도 함수 실행으로 넘기고 기다리지 않는다(이 함수의 시간을 쓰지 않게).
+     받은 쪽이 바로 '시작함'으로 답하고 뒤에서 계속 돈다. 실패해도 수집 결과에는 영향 없음 */
+  let follow = null;
+  try {
+    if (process.env.CRON_SECRET && process.env.ANTHROPIC_API_KEY && !ownerRun && new Date().getUTCHours() < 3) {
+      const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 8000);
+      const fr = await fetch(origin + "/api/channel?op=follow", { method: "POST", signal: ac.signal, headers: { "content-type": "application/json", authorization: "Bearer " + process.env.CRON_SECRET }, body: "{}" }).catch(() => null);
+      clearTimeout(tm); follow = fr ? (fr.ok ? "started" : "http " + fr.status) : "no answer";
+    }
+  } catch (e) { follow = "error"; }
+
   res.status(200).json({
     ok: true,
-    store: "redis",
+    store: "redis", follow,
     at: kst(new Date().toISOString()),
     symbols: symbols.length, symbolsFrom: symSource,
     redisWrites: writes,

@@ -8,7 +8,8 @@ import { krHandler } from "./_kr.js";
 import { collectAll, saveGurusFromUpload } from "./_disc.js";
 import { copyHandler } from "./_copy.js";
 import { claudeHandler } from "./_claude.js";
-import { kvHandler } from "./_kv.js";   // v12.62 작은 공용 저장소
+import { kvHandler } from "./_kv.js";
+import { followHandler } from "./_follow.js";   // v13.70 실적 팔로업 자동 수집   // v12.62 작은 공용 저장소
 import { verifyHandler } from "./_verify.js";
 
 export async function loadNames(origin) {
@@ -35,12 +36,15 @@ export async function buildDaily(origin) {
 export default async function handler(req, res) {
   // v11.2.7 GitHub Actions가 받은 13F 올리기 — CRON_SECRET(Bearer)으로 확인 (운영자 토큰과 별개)
   if (req.query.op === "guruput") return guruPut(req, res);
+  // v13.70 아침 수집기가 부르는 실적 팔로업 자동 수집 — CRON_SECRET(Bearer)으로 확인
+  if (req.query.op === "follow" && process.env.CRON_SECRET && String(req.headers.authorization || "") === "Bearer " + process.env.CRON_SECRET) return followHandler(req, res, true);
   // 운영자 전용: 토큰이 없으면 내용 없이 거절 (CDN에도 남기지 않음)
   if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
   if (req.query.op === "ai") return aiHandler(req, res);
   if (req.query.op === "copy") return copyHandler(req, res);
   if (req.query.op === "claude") return claudeHandler(req, res);
   if (req.query.op === "kv") return kvHandler(req, res);
+  if (req.query.op === "follow") return followHandler(req, res, false);
   if (req.query.op === "verify") return verifyHandler(req, res);
   if (req.query.op === "kr") return krHandler(req, res);   // v12.71 국내 마감 자료(급등락 순위·업종, 외국인·기관 순매수, 지수 수급)
   if (req.query.op === "disc") return discHandler(req, res);   // v11.2 공시·구루 수동 수집 (운영자) — 크론과 같은 수집기를 시간 넉넉히

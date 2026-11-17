@@ -11,6 +11,23 @@ const BASE = `너는 한국 투자 데이터 계정 '우상향연구소(@uphill.
 글 품질 기준(v12.43): (5) 문장마다 '무엇이(사건·발표·수치) → 얼마나(앱 숫자) → 그래서(의미)' 중 최소 둘이 들어가야 한다. (6) 근거 없는 상투어 금지 — '투자심리 개선/위축', '불확실성 확대', '관망세', '차익실현 매물', '기대감 유입', '수급 개선'은 그 말을 뒷받침하는 구체 사건·숫자를 같은 문장에 쓸 때만 허용. (7) 숫자는 앱이 준 표기 그대로(소수점·부호·단위·% 와 %p 구분). 웹에서 가져온 숫자는 같은 문장에 출처 이름을 붙인다. (8) 확신 표시 conf: 상 = 공식 발표·공시 또는 서로 다른 출처 2곳 이상 / 중 = 믿을 만한 언론 1곳 / 하 = 정황상 추정. '하'는 되도록 빈칸으로 둔다. (10) JSON으로 답하라는 작업이면: 검색이 끝난 뒤 마지막에 JSON 하나만 쓰고 앞뒤에 설명·코드 블록을 붙이지 않는다. 문자열 안에서는 큰따옴표 대신 ‘ ’를 쓰고 줄바꿈을 넣지 않는다. 각 문장은 짧게 — 길이 제한을 지켜 답이 끊기지 않게 한다. (9) 출력 전에 스스로 점검: 숫자가 입력과 같은가, 날짜가 오늘 기준 맞는가(어제·지난주 일을 오늘 일로 쓰지 않았는가), 권유로 읽히는 문장이 없는가 — 틀린 게 있으면 고친 뒤 출력한다.`;
 
 const TASKS = {
+  /* v13.70 실적 팔로업 — 분기 실적을 검색해 정해진 JSON으로 (api/_follow.js 가 부른다. 자동 수집) */
+  follow: {
+    tier: "main", web: 8, max: 14000, timeout: 270000,
+    system: BASE + `
+이번 작업: 한 종목의 '가장 최근 분기 실적'을 웹 검색으로 확인해 팔로업 자료를 만든다. 사용자 메시지에 종목과 (있으면) 지난번 KPI · 경고선이 온다.
+규칙:
+1) 숫자는 회사 발표 자료(실적 발표문 · 8-K · 10-Q · 콘퍼런스콜)와 믿을 만한 집계 사이트에서 확인한 것만 쓴다. 확인 못 한 숫자는 null, 문자열 칸은 "미확인". 지어내지 않는다.
+2) state: 경고선을 안 넘었으면 good, 처음 넘었으면 warn, 두 분기 연속 넘었거나 크게 넘었으면 bad, 판단 대상이 아니면 info.
+3) verdict.type: 실적 자체가 꺾였으면 struct(구조적 훼손), 실적은 멀쩡한데 가격 · 심리 때문이면 temp(일시적), 선행지표가 처음 꺾여 지켜봐야 하면 watch, 문제없으면 ok. risk 항목의 type도 같은 뜻.
+4) val: 선행 PER을 맨 앞에, 그다음 TTM PER · PBR · P/S · FCF 수익률 · PEG 중 구할 수 있는 것. lo · avg · hi는 최근 3년 범위, pct는 3년 중 낮은 쪽에서 몇 %인지(0=가장 낮음). 값이 높을수록 싼 지표(FCF 수익률)는 lowGood을 false로. 3년 범위를 확인 못 하면 lo · avg · hi · pct를 null로.
+5) qa: 콘퍼런스콜 질의응답에서 중요한 것 3~6개 — 질문자와 소속을 적는다. 콜 내용을 찾지 못하면 빈 배열로 둔다(지어내지 않는다).
+6) series: 분기별 추이 2~4개(매출, 핵심 사업부, 마진, 핵심 선행지표). x와 y의 길이를 맞춘다. 최근 8~12분기.
+7) nextEarnings: 다음 실적 발표일(현지 날짜 YYYY-MM-DD). 회사가 공지하지 않았으면 null로 두고 nextNote에 예상 시기를 쓴다.
+8) 글은 한국어 쉬운 말. 전문 용어는 terms에 풀이를 넣는다. 매수 · 매도 권유 문장과 목표가 제시는 하지 않는다(증권사 평균 목표가는 사실로만 적는다).
+9) 검색은 아껴 쓴다: 실적 발표문 → 콘퍼런스콜 → 밸류 · 컨센서스 순서. 답은 설명 없이 JSON 하나만.
+출력: JSON 하나만 {"sym":"티커","name":"한글 종목명","asOf":"YYYY-MM-DD","quarter":"예: 2026 Q3","reported":"실적 발표일 YYYY-MM-DD","nextEarnings":"YYYY-MM-DD 또는 null","nextNote":"","headline":"이번 분기를 한 문장으로(40자 안팎)","summary":["핵심 3줄 — 숫자 포함","",""],"easy":"쉽게 말하면 …(2문장)","verdict":{"type":"temp|watch|struct|ok","label":"짧은 판정","text":"이유 2~3문장"},"price":{"base":0,"baseDate":"","high":0,"highDate":"","target":0,"targetN":0,"targetNote":""},"val":[{"k":"선행 PER","v":0,"unit":"배","lo":0,"avg":0,"hi":0,"pct":0,"lowGood":true}],"valNote":"","kpi":[{"n":"지표","cur":"최근값","prev":"전분기","warn":"경고선","state":"good|warn|bad|info","note":"짧은 설명"}],"risk":[{"n":"리스크","cur":"현재 수치","type":"temp|watch|struct|ok","judge":"판정 한마디","next":"다음에 확인할 것"}],"fin":{"unit":"백만 달러","cols":["FY24","FY25","FY26E","FY27E"],"rows":[["총매출",0,0,0,0]]},"series":[{"n":"분기 매출","unit":"백만 달러","x":["1Q25"],"y":[0]}],"qa":[{"q":"질문 요지","who":"증권사 · 애널리스트","a":"답변 요지"}],"qaRead":"질문이 어디로 쏠렸는지와 그 뜻","scen":[{"n":"Bear|Base|Bull","cond":"가정","px":0,"gap":0}],"bull":[""],"bear":[""],"next":{"title":"다음 분기 체크포인트","items":[{"n":"항목","v":"숫자","s":"보조 설명"}],"good":[""],"bad":[""]},"terms":[["용어","쉬운 말 풀이"]],"sources":["출처"]}`
+  },
   analyst: {
     tier: "main", web: 4, max: 20000, timeout: 270000,
     system: BASE + `
@@ -171,7 +188,7 @@ async function callClaude(key, payload, ms, allowThinkOff) {
 }
 
 /* 실제 작업 — 결과 객체를 돌려준다(응답은 claudeHandler 가). used 는 미리 세어 둔 오늘 횟수 */
-async function runClaude(body, key, used) {
+export async function runClaude(body, key, used) {
   const T = TASKS[body.task];
   const model = T.tier === "fast" ? (process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5") : (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
   const max = +(process.env.CLAUDE_DAILY_MAX || 60), web = T.web && process.env.COPY_WEB !== "0" && body.web !== false;
@@ -179,7 +196,7 @@ async function runClaude(body, key, used) {
   if (web) payload.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: T.web, user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" } }];
   /* v12.45 안정화: ① 웹 검색이 길어져 API가 'pause_turn'으로 잠깐 멈추면 이어서 다시 요청(최대 3번) ② JSON이 깨지면 빠른 모델로 형식만 고치는 한 번 더(내용은 그대로) ③ 실패하면 이유(stop)를 같이 알려 준다
      Vercel 함수 한도 300초 안에서 남은 시간을 나눠 쓴다 */
-  const t0 = Date.now(), left = () => 290000 - (Date.now() - t0);
+  const t0 = Date.now(), left = () => Math.min(290000, +body.budgetMs || 290000) - (Date.now() - t0);   // v13.70 budgetMs: 한 실행에서 여러 번 부를 때 남은 시간만큼만
   try {
     let blocks = [], j = null, r = null, turns = 0, usage = { input_tokens: 0, output_tokens: 0 };
     for (;;) {
