@@ -8,8 +8,8 @@ const pct = (a, b) => (a == null || b == null || b === 0 ? null : (a / Math.abs(
 const r1 = (v, d) => (v == null || !isFinite(v) ? null : +v.toFixed(d == null ? 1 : d));
 const fmtN = (v, d) => (v == null ? "미확인" : Math.abs(v) >= 1000 ? Math.round(v).toLocaleString("en-US") : (+v.toFixed(d == null ? (Math.abs(v) < 10 ? 2 : 1) : d)).toString());
 const fmtP = (v, d) => (v == null ? "미확인" : (v > 0 ? "+" : "") + v.toFixed(d == null ? (Math.abs(v) < 10 ? 1 : 0) : d) + "%");
-const ROWS = ["revenue", "cogs", "gross", "rd", "sga", "opex", "opinc", "netinc", "eps", "shares", "ar", "inventory", "cash", "debt", "cfo", "capex", "fcf", "sbc"];
-const NAME = { revenue: "매출", cogs: "매출원가", gross: "매출총이익", rd: "연구개발비", sga: "판매 · 관리비", opex: "영업비용", opinc: "영업이익", netinc: "순이익", eps: "희석 EPS", shares: "희석 주식 수", ar: "매출채권", inventory: "재고", cash: "현금 · 단기투자", debt: "차입금", cfo: "영업현금흐름", capex: "설비투자", fcf: "남는 현금(FCF)", sbc: "주식 보상" };
+const ROWS = ["revenue", "cogs", "gross", "rd", "sga", "opex", "opinc", "netinc", "eps", "shares", "ar", "inventory", "cash", "debt", "equity", "cfo", "capex", "fcf", "sbc"];
+const NAME = { revenue: "매출", cogs: "매출원가", gross: "매출총이익", rd: "연구개발비", sga: "판매 · 관리비", opex: "영업비용", opinc: "영업이익", netinc: "순이익", eps: "희석 EPS", shares: "희석 주식 수", ar: "매출채권", inventory: "재고", cash: "현금 · 단기투자", debt: "차입금", equity: "자본총계", cfo: "영업현금흐름", capex: "설비투자", fcf: "남는 현금(FCF)", sbc: "주식 보상" };
 
 /* fin 다듬기 — 분기는 옛것 → 최근 순서로 맞추고 숫자로 바꾼다 */
 export function cleanFin(fin) {
@@ -31,12 +31,14 @@ export function cleanFin(fin) {
   const val = {}; const vs = fin.val && typeof fin.val === "object" ? fin.val : {};
   ["pe", "ps", "pfcf", "pb", "evs"].forEach((k) => { const a = vs[k]; if (Array.isArray(a) && a.length === q.length) { const v = a.map(num); if (rev) v.reverse(); if (v.filter((x) => x != null && x > 0).length >= 4) val[k] = v.map((x) => (x != null && x > 0 ? x : null)); } });
   const e = fin.est && typeof fin.est === "object" ? fin.est : {}, est = {}; ["fy", "revenue", "eps"].forEach((k) => { if (Array.isArray(e[k])) est[k] = k === "fy" ? e[k].map(String) : e[k].map(num); });
+  /* v14.30 부문별 매출(분기) — 이름: 배열. 길이가 q와 같은 것만 */
+  const seg = {}; if (fin.seg && typeof fin.seg === "object" && !Array.isArray(fin.seg)) Object.keys(fin.seg).slice(0, 8).forEach((k) => { const a = fin.seg[k]; if (Array.isArray(a) && a.length === q.length) { const v = a.map(num); if (rev) v.reverse(); if (v.filter((x) => x != null).length >= 4) seg[String(k).slice(0, 30)] = v; } });
   const tg = fin.targets && typeof fin.targets === "object" ? fin.targets : {};
   return { unit: String(fin.unit || "백만 달러").slice(0, 20), cur: String(fin.cur || "$").slice(0, 4), q, end: end.length === q.length ? end : [], rows, val, est: est.fy && est.fy.length ? est : null,
     targets: { avg: num(tg.avg), hi: num(tg.hi), lo: num(tg.lo), n: num(tg.n), asOf: String(tg.asOf || "").slice(0, 10), list: (Array.isArray(tg.list) ? tg.list : []).map((t) => ({ n: String((t && t.n) || "").slice(0, 40), px: num(t && t.px), note: String((t && t.note) || "").slice(0, 60) })).filter((t) => t.n && t.px > 0).slice(0, 14) },
     rating: fin.rating && typeof fin.rating === "object" ? { buy: num(fin.rating.buy), hold: num(fin.rating.hold), sell: num(fin.rating.sell), label: String(fin.rating.label || "").slice(0, 30) } : null,
     stats: fin.stats && typeof fin.stats === "object" ? { mcap: num(fin.stats.mcap), fpe: num(fin.stats.fpe), peg: num(fin.stats.peg), beta: num(fin.stats.beta) } : {},
-    filled,
+    filled, seg: Object.keys(seg).length >= 2 ? seg : null,
     src: (Array.isArray(fin.src) ? fin.src : []).map((x) => String(x).slice(0, 80)).slice(0, 6), miss: (Array.isArray(fin.miss) ? fin.miss : []).map((x) => String(x).slice(0, 80)).slice(0, 8) };
 }
 
