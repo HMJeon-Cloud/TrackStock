@@ -26,7 +26,7 @@ async function main() {
   let up = 0, fail = 0;
   for (const s of syms) {
     try {
-      const c = cik[s] || cik[s.replace(".", "-")]; if (!c) { line("  " + s + ": SEC 등록 번호(CIK)를 찾지 못했어요"); fail++; continue; }
+      const c = cik[s] || cik[s.replace(".", "-")]; if (!c) { line("  " + s + ": SEC 등록 번호(CIK)가 없어요 — ETF · 해외 상장 종목은 8-K를 내지 않아 건너뛰어요"); continue; }
       await sleep(250);
       const sub = await secJson("https://data.sec.gov/submissions/CIK" + String(c).padStart(10, "0") + ".json", 30000), f = prPickFiling(sub);
       if (!f) { line("  " + s + ": 최근 제출 목록에 실적 8-K(항목 2.02)가 없어요"); continue; }
