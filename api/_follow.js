@@ -237,7 +237,10 @@ export async function followStep(st, origin) {
     const urls = dataUrls(sym); let naver = "";
     try { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000); const fr = await fetch(origin + "/api/fund?symbol=" + encodeURIComponent(sym), { signal: ac.signal }).catch(() => null); clearTimeout(tm); if (fr && fr.ok) naver = naverText(await fr.json().catch(() => null)); } catch (e) {}
     const inp = "[종목] " + sym + (prev && prev.name ? " (" + prev.name + ")" : "") + "\n\n" + (urls.length ? "[열어 볼 주소 — 위에서부터]\n" + urls.map((u) => "- " + u[0] + ": " + u[1]).join("\n") : "[주소 없음] 이 종목은 정해진 주소가 없다. web_search로 분기 손익계산서 · 재무상태표 · 현금흐름표 · 컨센서스 · 목표가 표를 찾아 web_fetch로 연다.");
-    let out; try { out = await runClaude({ task: "followF", input: inp, json: true, need: ["q", "rows"], budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
+    /* v14.31 발표문 원문이 있으면 함께 준다 — 재무 사이트 표에 최신 분기가 비어 있을 때 원문의 재무제표(손익 · 재무상태 · 현금흐름)로 채우게 */
+    const prD = await kvGet(rc, "cfg:followpr:" + sym), prDok = prD && prD.text && Date.now() - Date.parse(prD.date + "T00:00:00Z") < 100 * 86400e3;
+    const inpPr = prDok ? "\n\n[발표문 원문 — 회사가 " + prD.date + "에 낸 실적 발표문. 재무 사이트의 표에 가장 최근 분기 칸이 비어 있거나 반올림돼 있으면, 이 원문의 재무제표 숫자를 그대로 옮겨 그 분기 칸을 채운다(단위를 맞춘다). 지난 분기들은 사이트 표를 쓴다. 이 원문보다 새 분기가 사이트에 있으면 원문은 쓰지 않는다]\n" + String(prD.text).slice(0, 36000) : "";
+    let out; try { out = await runClaude({ task: "followF", input: inp + inpPr, json: true, need: ["q", "rows"], budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
     st.tok = (st.tok || 0) + tokOf(out); if (out && out.model) st.model = out.model; if (out && out.modelFell) st.fell = out.modelFell; st.web = (st.web || 0) + ((out && out.searches) || []).length;
     const fin = out && out.ok ? cleanFin(out.data) : null;
     st.fin = fin ? fin.q.length : 0; st.finMsg = fin ? "" : String((out && (out.msg || out.reason)) || "분기 표를 읽지 못함").slice(0, 80);

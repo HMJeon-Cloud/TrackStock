@@ -110,10 +110,11 @@ export function calcFacts(fin, px, naver) {
   if (K.sbcr != null) { const shY = R.shares && i0 >= 4 ? pct(R.shares[i0], R.shares[i0 - 4]) : null; CK("주식 보상 · 희석", K.sbcr + "%", "주식 보상 ÷ 매출" + (shY != null ? " · 주식 수 1년 " + fmtP(shY, 1) : "") + " — " + (K.sbcr < 5 && !(shY > 2) ? "주주 몫이 묽어지는 정도가 작아요" : K.sbcr < 15 ? "주주 몫이 조금씩 묽어지고 있어요" : "보상 비중이 커서 실제 이익은 더 작게 봐야 해요"), K.sbcr < 5 && !(shY > 2) ? "good" : K.sbcr < 15 ? "warn" : "bad"); }
   if (K.netCash != null) { const yrs = K.netCash < 0 && fT > 0 ? -K.netCash / fT : null; CK("재무 체력", K.netCash >= 0 ? "순현금" : "순차입", (K.netCash >= 0 ? "현금이 빚보다 " + fmtN(K.netCash) + " " + U + " 많아요" : "빚이 현금보다 " + fmtN(-K.netCash) + " " + U + " 많아요" + (yrs != null ? " — 지금 FCF로 " + yrs.toFixed(1) + "년 치" : "")), K.netCash >= 0 ? "good" : yrs != null && yrs <= 3 ? "warn" : "bad"); }
   F.decomp = null;
-  if (px && px.at && epsT && fin.end.length === n && i0 >= 7 && epsT[i0] > 0 && epsT[i0 - 4] > 0) { const p1 = px.at(fin.end[i0]), p0 = px.at(fin.end[i0 - 4]);
+  if (px && px.at && epsT && fin.end.length === n && i0 >= 7 && epsT[i0] > 0 && epsT[i0 - 4] > 0) { /* v14.31 끝점은 '지금 종가'와 '1년 전 종가' — 본문 · 핵심 데이터가 쓰는 1년 수익률 · TTM PER과 같은 숫자가 되게 (전에는 분기 말끼리 비교해 서로 달랐다) */
+    const p1 = px.px, p0 = px.r1y != null ? px.px / (1 + px.r1y / 100) : px.at(fin.end[i0 - 4]);
     if (p1 && p0) { const pe1 = p1 / epsT[i0], pe0 = p0 / epsT[i0 - 4], dp = (p1 / p0 - 1) * 100, de = (epsT[i0] / epsT[i0 - 4] - 1) * 100, dm = (pe1 / pe0 - 1) * 100;
       const read = de > 0 && dm < 0 ? "이익은 늘었는데 몸값(배수)은 내려왔어요. 주가보다 이익이 더 빨리 자란 구간이에요." : de > 0 && dm >= 0 ? (de >= dm ? "주가 변화의 더 큰 부분이 이익 증가에서 왔어요." : "이익도 늘었지만 몸값(배수)이 더 많이 올랐어요. 기대가 먼저 반영된 구간이에요.") : de <= 0 && dm > 0 ? "이익은 줄었는데 몸값(배수)이 올랐어요. 주가가 기대만으로 버틴 구간이에요." : "이익과 몸값(배수)이 함께 내려왔어요.";
-      F.decomp = { from: q[i0 - 4], to: q[i0], px: r1(dp), eps: r1(de), mult: r1(dm), pe0: r1(pe0), pe1: r1(pe1), read }; } }
+      F.decomp = { from: "1년 전", to: "지금", basis: "주가는 1년 전 종가 → " + (px.date || "최근") + " 종가 · 이익은 " + q[i0 - 4] + " → " + q[i0] + " 기준 최근 4분기 EPS", px: r1(dp), eps: r1(de), mult: r1(dm), pe0: r1(pe0), pe1: r1(pe1), read }; } }
   /* ---------- 표 ---------- */
   if (fin.filled && fin.filled.length) F.fillNote = "빈칸 " + fin.filled.length + "곳은 다른 행으로 계산해 채웠어요: " + fin.filled.slice(0, 6).join(", ") + (fin.filled.length > 6 ? " 외" : "");
   const m8 = Math.min(8, n), idx = Array.from({ length: m8 }, (_, k) => n - m8 + k), cols8 = ["항목"].concat(idx.map((i) => q[i]));
