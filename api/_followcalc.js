@@ -11,6 +11,73 @@ const fmtP = (v, d) => (v == null ? "미확인" : (v > 0 ? "+" : "") + v.toFixed
 const ROWS = ["revenue", "cogs", "gross", "rd", "sga", "opex", "opinc", "netinc", "eps", "shares", "ar", "inventory", "cash", "debt", "equity", "cfo", "capex", "fcf", "sbc"];
 const NAME = { revenue: "매출", cogs: "매출원가", gross: "매출총이익", rd: "연구개발비", sga: "판매 · 관리비", opex: "영업비용", opinc: "영업이익", netinc: "순이익", eps: "희석 EPS", shares: "희석 주식 수", ar: "매출채권", inventory: "재고", cash: "현금 · 단기투자", debt: "차입금", equity: "자본총계", cfo: "영업현금흐름", capex: "설비투자", fcf: "남는 현금(FCF)", sbc: "주식 보상" };
 
+/* v14.40 누락 재점검 — 1차로 옮겨 적은 표(raw)에서 '있어야 하는데 빈 칸'을 코드로 정확히 센다(AI의 자기 신고 miss에 기대지 않는다) */
+const FIN_PAGE = { inc: "분기 손익계산서", bal: "분기 재무상태표", cf: "분기 현금흐름표" };
+const FIN_ROW = {
+  revenue: ["inc", "Revenue"], cogs: ["inc", "Cost of Revenue"], gross: ["inc", "Gross Profit"], rd: ["inc", "Research & Development"], sga: ["inc", "Selling, General & Admin"], opinc: ["inc", "Operating Income"], netinc: ["inc", "Net Income"], eps: ["inc", "EPS (Diluted)"], shares: ["inc", "Shares Outstanding (Diluted)"],
+  ar: ["bal", "Receivables / Accounts Receivable"], inventory: ["bal", "Inventory"], cash: ["bal", "Cash & Short-Term Investments (없으면 Cash & Equivalents + Short-Term Investments)"], debt: ["bal", "Total Debt (없으면 Short-Term Debt + Long-Term Debt)"], equity: ["bal", "Shareholders' Equity / Total Stockholders' Equity"],
+  cfo: ["cf", "Operating Cash Flow"], capex: ["cf", "Capital Expenditures (양수로)"], fcf: ["cf", "Free Cash Flow"], sbc: ["cf", "Stock-Based Compensation"] };
+const DERIV = { gross: ["revenue", "cogs"], cogs: ["revenue", "gross"], fcf: ["cfo", "capex"], eps: ["netinc", "shares"] };
+export function finGaps(raw, opt) {
+  const G = { cells: [], rows: [], extra: [], newQ: null, n: 0, text: "" }; if (!raw || !Array.isArray(raw.q) || raw.q.length < 4) return G;
+  const q = raw.q.map(String), n = q.length, R = raw.rows && typeof raw.rows === "object" ? raw.rows : {}, i0 = Math.max(0, n - 8);
+  const okRow = (k) => Array.isArray(R[k]) && R[k].length === n && R[k].some((v) => num(v) != null), at = (k, i) => (okRow(k) ? num(R[k][i]) : null);
+  Object.keys(FIN_ROW).forEach((k) => {
+    if (!okRow(k)) { const dv = DERIV[k]; if (dv && okRow(dv[0]) && okRow(dv[1])) return; G.rows.push(k); return; }
+    for (let i = i0; i < n; i++) if (num(R[k][i]) == null) { const dv = DERIV[k]; if (dv && at(dv[0], i) != null && at(dv[1], i) != null) continue; G.cells.push({ row: k, q: q[i], i }); } });
+  const hasArr = (o) => o && typeof o === "object" && Object.keys(o).some((k) => Array.isArray(o[k]) && o[k].some((v) => num(v) != null));
+  if (!hasArr(raw.seg)) G.extra.push("seg");
+  ["pe", "ps", "pfcf", "pb"].forEach((k) => { if (!(raw.val && Array.isArray(raw.val[k]) && raw.val[k].some((v) => num(v) != null))) G.extra.push("val." + k); });
+  if (!(raw.est && Array.isArray(raw.est.fy) && raw.est.fy.length && Array.isArray(raw.est.eps) && raw.est.eps.some((v) => num(v) != null))) G.extra.push("est");
+  if (!(raw.targets && num(raw.targets.avg) != null)) G.extra.push("targets");
+  if (!(raw.rating && (num(raw.rating.buy) != null || num(raw.rating.hold) != null))) G.extra.push("rating");
+  ["mcap", "fpe", "peg", "beta"].forEach((k) => { if (!(raw.stats && num(raw.stats[k]) != null)) G.extra.push("stats." + k); });
+  /* 발표문 원문이 표의 마지막 분기보다 뚜렷이 새것이면 — 사이트가 아직 최신 분기를 올리지 않은 것 */
+  const lastEnd = Array.isArray(raw.end) && raw.end.length === n ? Date.parse(String(raw.end[n - 1]) + "T00:00:00Z") : NaN, prT = opt && opt.prDate ? Date.parse(opt.prDate + "T00:00:00Z") : NaN;
+  if (isFinite(lastEnd) && isFinite(prT) && prT - lastEnd > 100 * 86400e3) G.newQ = { after: q[n - 1], end: String(raw.end[n - 1]) };
+  G.n = G.cells.length + G.rows.length + G.extra.length + (G.newQ ? 1 : 0); if (!G.n) return G;
+  /* 다시 찾을 만한 누락인가 — 통계 한두 칸이나 업종상 없는 행(rd · sga · inventory · sbc)만 빠진 것은 재점검을 돌리지 않는다 */
+  G.must = !!(G.newQ || G.cells.length || G.rows.some((k) => !/^(rd|sga|inventory|sbc)$/.test(k)) || G.extra.some((k) => /^(seg|est|targets|val\.)/.test(k)));
+  const L = [], byRow = {}; G.cells.slice(0, 70).forEach((c) => { (byRow[c.row] = byRow[c.row] || []).push(c.q); });
+  if (G.newQ) L.push("[새 분기] 표의 마지막 분기는 " + G.newQ.after + "(분기 끝 " + G.newQ.end + ")인데 [발표문 원문]이 그보다 새 분기다 → 그 분기의 열 전체를 addQ로 만든다. 채울 키: " + Object.keys(FIN_ROW).map((k) => k + "(" + FIN_ROW[k][1].replace(/ \(.*$/, "") + ")").join(", "));
+  if (Object.keys(byRow).length) { L.push("[빈칸 — 행은 있는데 일부 분기가 비어 있음]"); Object.keys(byRow).forEach((k) => L.push("- " + k + " | " + FIN_PAGE[FIN_ROW[k][0]] + " | 표의 행 이름: " + FIN_ROW[k][1] + " | 빈 분기: " + byRow[k].join(", "))); }
+  if (G.rows.length) { L.push("[빠진 행 — 행 전체가 없음. 최근 8분기(" + q.slice(i0).join(", ") + ")를 찾는다]"); G.rows.forEach((k) => L.push("- " + k + " | " + FIN_PAGE[FIN_ROW[k][0]] + " | 표의 행 이름: " + FIN_ROW[k][1])); }
+  if (G.extra.length) { const X = { seg: "seg — 부문별 매출(Revenue by Segment). 사이트 표가 없으면 [발표문 원문]의 부문 표로 최신 분기와 전년 동기만이라도", "val.pe": "val.pe — 분기별 PE Ratio(Ratios 표)", "val.ps": "val.ps — 분기별 PS Ratio", "val.pfcf": "val.pfcf — 분기별 P/FCF Ratio", "val.pb": "val.pb — 분기별 PB Ratio", est: "est — 회계연도별 매출 · EPS 예상(Forecast)", targets: "targets — 목표가 평균 · 최고 · 최저 · 애널리스트 수 · 증권사별 목록", rating: "rating — 매수 / 보유 / 매도 수", "stats.mcap": "stats.mcap — 시가총액(백만)", "stats.fpe": "stats.fpe — Forward PE", "stats.peg": "stats.peg — PEG Ratio", "stats.beta": "stats.beta — Beta" }; L.push("[빠진 묶음]"); G.extra.forEach((k) => L.push("- " + (X[k] || k))); }
+  /* 누적 값에서 분기 값을 뺄 수 있게, 빈칸이 있는 행의 지금 값을 같이 준다 */
+  const ctx = Object.keys(byRow).filter(okRow).map((k) => k + ": " + q.slice(i0).map((x, j) => x + "=" + (num(R[k][i0 + j]) == null ? "빈칸" : num(R[k][i0 + j]))).join(" · "));
+  G.text = L.join("\n") + "\n\n[지금 표 — 분기 순서(옛 → 최근)] " + q.join(", ") + (Array.isArray(raw.end) && raw.end.length === n ? "\n[분기 끝 날짜] " + raw.end.join(", ") : "") + "\n[단위] " + (raw.unit || "백만") + (ctx.length ? "\n[빈칸이 있는 행의 지금 값]\n" + ctx.join("\n") : "");
+  return G;
+}
+/* 재점검 결과를 raw 표에 합친다 — 빈칸만 채우고(있는 값은 절대 덮어쓰지 않는다), 같은 행의 이웃 값과 자릿수가 크게 다르면(단위 착오) 버린다 */
+export function applyFinPatch(raw, P) {
+  const out = { filled: 0, rej: [], added: [], newQ: "" }; if (!raw || !P || typeof P !== "object") return out;
+  const R = (raw.rows = raw.rows && typeof raw.rows === "object" ? raw.rows : {}), n0 = raw.q.length;
+  const near = (k, i) => { const a = R[k]; if (!Array.isArray(a)) return null; for (let d = 1; d < a.length; d++) { for (const j of [i - d, i + d]) if (j >= 0 && j < a.length && num(a[j]) != null && num(a[j]) !== 0) return Math.abs(num(a[j])); } return null; };
+  const sane = (k, i, v) => { const b = near(k, i); if (b == null || v === 0) return true; const r = Math.abs(v) / b, lim = /^(netinc|cfo|fcf|capex|debt|opinc|eps|sbc)$/.test(k) ? 60 : 25; return r < lim && r > 1 / lim; };
+  /* 새 분기 열 */
+  const A = P.addQ; if (A && A.q && A.rows && typeof A.rows === "object" && !raw.q.map(String).includes(String(A.q)) && num(A.rows.revenue) != null) {
+    const lastEnd = Array.isArray(raw.end) && raw.end.length === n0 ? String(raw.end[n0 - 1]) : "";
+    if (!A.end || !lastEnd || String(A.end) > lastEnd) { const i = n0; if (sane("revenue", i, num(A.rows.revenue))) {
+      raw.q.push(String(A.q).slice(0, 12)); if (Array.isArray(raw.end) && raw.end.length === n0) raw.end.push(String(A.end || "").slice(0, 10));
+      Object.keys(R).forEach((k) => { if (Array.isArray(R[k]) && R[k].length === n0) { const v = num(A.rows[k]); if (v != null && !sane(k, i, v)) { out.rej.push(k + " " + A.q + "=" + v + "(자릿수 다름)"); R[k].push(null); } else { R[k].push(v); if (v != null) out.filled++; } } });
+      ["seg", "val"].forEach((g) => { if (raw[g] && typeof raw[g] === "object") Object.keys(raw[g]).forEach((k) => { if (Array.isArray(raw[g][k]) && raw[g][k].length === n0) raw[g][k].push(A[g] && num(A[g][k]) != null ? num(A[g][k]) : null); }); });
+      out.newQ = String(A.q); } else out.rej.push("새 분기 " + A.q + " 매출 자릿수 다름"); } }
+  const n = raw.q.length, qi = (name) => raw.q.map(String).indexOf(String(name));
+  (Array.isArray(P.cells) ? P.cells : []).slice(0, 200).forEach((c) => { if (!c || !FIN_ROW[c.row]) return; const i = qi(c.q), v = num(c.v); if (i < 0 || v == null) return;
+    if (!Array.isArray(R[c.row]) || R[c.row].length !== n) R[c.row] = raw.q.map(() => null);
+    if (num(R[c.row][i]) != null) return; if (!sane(c.row, i, v)) { out.rej.push(c.row + " " + c.q + "=" + v + "(자릿수 다름)"); return; }
+    R[c.row][i] = v; out.filled++; if (c.src) out.added.push(c.row + " " + c.q + " ← " + String(c.src).slice(0, 40)); });
+  const arrOk = (a) => Array.isArray(a) && a.length === n && a.some((v) => num(v) != null);
+  if (P.seg && typeof P.seg === "object" && !(raw.seg && Object.keys(raw.seg).some((k) => arrOk(raw.seg[k])))) { const S = {}; Object.keys(P.seg).slice(0, 10).forEach((k) => { if (arrOk(P.seg[k])) S[String(k).slice(0, 40)] = P.seg[k].map(num); }); if (Object.keys(S).length >= 2) { raw.seg = S; out.filled++; out.added.push("부문별 매출 " + Object.keys(S).length + "개"); } }
+  if (P.val && typeof P.val === "object") { raw.val = raw.val && typeof raw.val === "object" ? raw.val : {}; ["pe", "ps", "pfcf", "pb"].forEach((k) => { if (!arrOk(raw.val[k]) && arrOk(P.val[k])) { raw.val[k] = P.val[k].map(num); out.filled++; out.added.push("배수 " + k); } }); }
+  if (P.est && Array.isArray(P.est.fy) && P.est.fy.length && !(raw.est && Array.isArray(raw.est.fy) && raw.est.fy.length)) { raw.est = P.est; out.filled++; out.added.push("예상(est)"); }
+  if (P.targets && num(P.targets.avg) != null && !(raw.targets && num(raw.targets.avg) != null)) { raw.targets = P.targets; out.filled++; out.added.push("목표가"); }
+  if (P.rating && (num(P.rating.buy) != null || num(P.rating.hold) != null) && !(raw.rating && (num(raw.rating.buy) != null || num(raw.rating.hold) != null))) { raw.rating = P.rating; out.filled++; out.added.push("투자의견"); }
+  if (P.stats && typeof P.stats === "object") { raw.stats = raw.stats && typeof raw.stats === "object" ? raw.stats : {}; ["mcap", "fpe", "peg", "beta"].forEach((k) => { if (num(raw.stats[k]) == null && num(P.stats[k]) != null) { raw.stats[k] = num(P.stats[k]); out.filled++; } }); }
+  if (Array.isArray(P.src)) raw.src = (Array.isArray(raw.src) ? raw.src : []).concat(P.src.map((s) => String(s).slice(0, 80))).slice(0, 12);
+  return out;
+}
+
 /* fin 다듬기 — 분기는 옛것 → 최근 순서로 맞추고 숫자로 바꾼다 */
 export function cleanFin(fin) {
   if (!fin || typeof fin !== "object" || !Array.isArray(fin.q) || fin.q.length < 4) return null;
@@ -71,6 +138,8 @@ export function calcFacts(fin, px, naver) {
   if (!fin) { if (naver) L.push("", naver); F.text = L.join("\n"); return F; }
   const R = fin.rows, q = fin.q, n = q.length, i0 = n - 1, U = fin.unit, has = (k) => !!R[k];
   /* 옮겨 적은 숫자끼리 맞는지 확인 */
+  /* v14.32 같은 분기에 서로 다른 항목 값이 완전히 같으면 옮겨 적다 섞였을 수 있다 — 고치지 않고 알리기만 한다 */
+  F.sus = []; { const ks = ROWS.filter((k) => has(k) && !["eps", "shares"].includes(k)); for (let i = Math.max(0, n - 8); i < n; i++) for (let a = 0; a < ks.length; a++) for (let b = a + 1; b < ks.length; b++) { const x = R[ks[a]][i], y = R[ks[b]][i]; if (x != null && y != null && x === y && Math.abs(x) >= 100 && !(ks[a] === "opex" || ks[b] === "opex")) F.sus.push(q[i] + " " + NAME[ks[a]] + " = " + NAME[ks[b]] + " (" + fmtN(x, 0) + ")"); } }
   if (has("cogs") && has("gross")) { let bad = 0; for (let i = 0; i < n; i++) if (R.revenue[i] != null && R.cogs[i] != null && R.gross[i] != null && Math.abs(R.revenue[i] - R.cogs[i] - R.gross[i]) > Math.abs(R.revenue[i]) * 0.012) bad++; if (bad) { F.warn.push("매출 − 원가 ≠ 총이익인 분기 " + bad + "개 — 총이익률은 사이트 표의 총이익으로 계산"); } }
   else if (has("cogs") && !has("gross")) R.gross = R.revenue.map((v, i) => (v != null && R.cogs[i] != null ? v - R.cogs[i] : null));
   if (!has("fcf") && has("cfo") && has("capex")) R.fcf = R.cfo.map((v, i) => (v != null && R.capex[i] != null ? v - Math.abs(R.capex[i]) : null));
@@ -128,7 +197,7 @@ export function calcFacts(fin, px, naver) {
   if (R.cogs || R.rd || R.sga) { const T2 = []; const cr = (label, k) => { if (R[k]) T2.push(row(label, R[k], fmtN), row("  매출 대비", ratio(k, "revenue"), (v) => (v == null ? "미확인" : v.toFixed(1) + "%"))); }; cr("매출원가", "cogs"); cr("연구개발비", "rd"); cr("판매 · 관리비", "sga"); if (R.sbc) cr("주식 보상", "sbc");
     F.tables.push({ t: "비용 구조 — 매출 대비 비중", unit: U, cols: cols8, rows: T2, note: "매출이 늘 때 비용 비중이 내려가면 규모의 효과(영업 레버리지)가 나는 것" + (K.lev != null ? " · 최근 분기 매출 증가율 − 영업비용 증가율 = " + fmtP(K.lev) + "p" : ""), calc: 1 }); }
   if (R.fcf || R.ar || R.inventory || R.cash) { const T3 = []; if (R.cfo) T3.push(row("영업현금흐름", R.cfo, fmtN)); if (R.fcf) T3.push(row("남는 현금(FCF)", R.fcf, fmtN), row("  FCF ÷ 매출", D.fcfm, (v) => (v == null ? "미확인" : v.toFixed(0) + "%"))); if (R.ar) T3.push(row("매출채권", R.ar, fmtN), row("  회수일(DSO)", D.dso, (v) => (v == null ? "미확인" : Math.round(v) + "일"))); if (R.inventory) T3.push(row("재고", R.inventory, fmtN)); if (D.dio) T3.push(row("  재고일수", D.dio, (v) => (v == null ? "미확인" : Math.round(v) + "일"))); if (R.cash) T3.push(row("현금 · 단기투자", R.cash, fmtN)); if (R.debt) T3.push(row("차입금", R.debt, fmtN));
-    F.tables.push({ t: "현금과 재무 체력", unit: U, cols: cols8, rows: T3, note: "회수일(DSO) = 매출채권 ÷ 분기 매출 × 91 · 재고일수 = 재고 ÷ 분기 매출원가 × 91 (앱 계산) · 분기 현금흐름은 사이트의 분기 표 기준", calc: 1 }); }
+    F.tables.push({ t: "현금과 재무 체력", unit: U, cols: cols8, rows: T3, note: "회수일(DSO) = 매출채권 ÷ 분기 매출 × 91 · 재고일수 = 재고 ÷ 분기 매출원가 × 91 (앱 계산) · 분기 현금흐름은 사이트의 분기 표 기준" + (F.sus.length ? " · 원문 대조 필요: " + F.sus.slice(0, 2).join(", ") : ""), calc: 1 }); }
   /* ---------- 차트 ---------- */
   const m12 = Math.min(12, n), ix = Array.from({ length: m12 }, (_, k) => n - m12 + k), pick = (a) => { let k = 0; while (k < ix.length && a[ix[k]] == null) k++; return ix.slice(k); },   // 앞쪽의 빈 분기는 그리지 않는다(0으로 보이지 않게)
     mk = (nm, unit, a, d) => { const jx = pick(a); return { n: nm, unit, x: jx.map((i) => q[i]), y: jx.map((i) => (a[i] == null ? 0 : +a[i].toFixed(d == null ? 1 : d))), calc: 1 }; },
@@ -156,6 +225,7 @@ export function calcFacts(fin, px, naver) {
   if (fin.targets.avg || fin.targets.list.length) L.push("", "■ 증권사 목표가" + (fin.targets.asOf ? " (" + fin.targets.asOf + ")" : ""), (fin.targets.avg ? "평균 " + fmtN(fin.targets.avg, 2) + (px ? " (앱 종가 대비 " + fmtP((fin.targets.avg / px.px - 1) * 100) + ")" : "") : "") + (fin.targets.n ? " · " + fin.targets.n + "명" : "") + (fin.targets.hi ? " · 최고 " + fin.targets.hi + " / 최저 " + fin.targets.lo : "") + (fin.rating ? " · 의견 매수 " + (fin.rating.buy ?? "?") + " / 보유 " + (fin.rating.hold ?? "?") + " / 매도 " + (fin.rating.sell ?? "?") : ""), fin.targets.list.map((t) => t.n + " " + t.px + (t.note ? "(" + t.note + ")" : "")).join(" · "));
   if (fin.miss.length) L.push("", "■ 1단계에서 찾지 못한 것: " + fin.miss.join(" · "));
   if (F.warn.length) L.push("", "■ 주의: " + F.warn.join(" · "));
+  if (F.sus.length) L.push("", "■ 원문 대조 필요(같은 분기에 서로 다른 항목 값이 같음 — 옮겨 적다 섞였을 수 있음. 발표문 원문 값이 있으면 그 값을 쓰고, 확인 못 하면 본문에서 이 값을 근거로 쓰지 말 것): " + F.sus.join(" · "));
   if (naver) L.push("", naver);
   F.text = L.filter((x) => x !== "").join("\n").replace(/\n■/g, "\n\n■");
   return F;

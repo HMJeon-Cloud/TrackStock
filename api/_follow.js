@@ -7,7 +7,7 @@
 //   저장: sm:kv:cfg:follow(목록 · 자동 켬/끔 — 화면이 씀) · sm:kv:cfg:follow:<종목>(자료) · sm:kv:cfg:followlog(기록 · 진행 중 표시 — 서버가 씀)
 import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY } from "./_redis.js";
 import { runClaude, followManualPrompt } from "./_claude.js";
-import { cleanFin, priceStats, calcFacts, naverText } from "./_followcalc.js";
+import { cleanFin, priceStats, calcFacts, naverText, finGaps, applyFinPatch } from "./_followcalc.js";
 import { prTrim, prHtmlToText } from "./_followpr.js";
 import { vizFacts, guideFacts } from "./_followviz.js";
 
@@ -93,12 +93,13 @@ async function prices(rc, syms) {
 }
 
 /* 계산표의 결과를 자료에 합친다 — 코드가 계산한 것이 AI가 쓴 것보다 우선 */
+export const CALC_V = 1432;   // 앱 계산 기준 번호 — 계산식이 바뀌면 올린다(옛 자료에 '다시 계산' 안내)
 export function mergeFacts(d, F, note) {
   if (!F) return; const fin = note && note.fin ? cleanFin(note.fin) : null;
   if (F.px) { d.pxs = F.px; d.price = d.price || {}; d.price.base = F.px.px; d.price.baseDate = F.px.date; d.price.high = F.px.hi; d.price.highDate = F.px.hiDate; }
   if (F.ok) {
     d.viz = F.viz && F.viz.ok ? F.viz : null; if (d.x && d.x.guide && d.x.guide.length) d.guide = guideFacts(d.x.guide, fin);
-    d.ctables = F.tables; d.kv = F.kv; d.calcWarn = F.warn; d.fillNote = F.fillNote || ""; d.checks = F.checks || []; d.decomp = F.decomp || null;
+    d.ctables = F.tables; d.kv = F.kv; d.calcWarn = F.warn; d.fillNote = F.fillNote || ""; d.sus = F.sus || []; d.calcV = CALC_V; if (note && note.check) d.dataCheck = note.check; d.checks = F.checks || []; d.decomp = F.decomp || null;
     const mine = (d.series || []).filter((s) => !F.series.concat(F.extra).some((x) => x.n === s.n)).slice(0, 2);
     d.series = F.series.concat(mine).slice(0, 4); d.extra = F.extra.slice(0, 4);
     const keep = (d.val || []).filter((v) => v && /선행|forward/i.test(v.k || "") && v.v != null);
@@ -119,7 +120,7 @@ export function mergeFacts(d, F, note) {
 /* ---------- v13.80 3단계 수집: 조사 → 핵심 정리 → 깊이 ----------
    한 번의 함수 실행(300초)에 한 단계만 한다. 단계가 끝나면 같은 주소를 다시 불러(CRON_SECRET) 다음 단계로 넘긴다.
    조사 노트는 cfg:follownote:<종목>에 둔다 — 뒤 단계가 실패했을 때 하루 안에는 다시 검색하지 않고 노트부터 이어 간다(검색 비용을 두 번 쓰지 않게) */
-const STEPS = { data: "1/4 재무 숫자", research: "2/4 발표문 · 콜 조사", core: "3/4 판정 · KPI", deep: "4/4 본문 · 표", extra: "심화 자료 · 그림 재료", fill: "마무리 · 빈칸 채우기" };
+const STEPS = { check: "1/4 재무 숫자 · 누락 재점검", data: "1/4 재무 숫자", research: "2/4 발표문 · 콜 조사", core: "3/4 판정 · KPI", deep: "4/4 본문 · 표", extra: "심화 자료 · 그림 재료", fill: "마무리 · 빈칸 채우기" };
 /* v14.30 심화 자료 다듬기 — 모르는 키는 버리고 길이를 자른다. 숫자는 문자열로 온 것도 받아 준다 */
 const XG = ["성장", "수익성", "수요·고객", "재고·현금", "밸류", "시장·리스크"];
 export function cleanExtra(o) {
@@ -246,7 +247,37 @@ export async function followStep(st, origin) {
     st.fin = fin ? fin.q.length : 0; st.finMsg = fin ? "" : String((out && (out.msg || out.reason)) || "분기 표를 읽지 못함").slice(0, 80);
     await kvPut(rc, "cfg:follownote:" + sym, { at: Date.now(), ctx: String(st.ctx || "").slice(0, 6000), fin: fin ? out.data : null, dataTried: 1, dataRead: ((out && out.fetched) || []).length, naver, text: "", used: 0 });
     delete st.ctx;   // 노트에 넣었으니 다음 단계로 넘길 때는 들고 다니지 않는다
+    /* v14.40 누락 재점검 — 표를 아예 못 읽었거나 빈칸이 남았으면 그 칸만 다시 찾는 단계를 한 번 거친다(빈칸이 없으면 건너뛰어 비용 없음) */
+    if (process.env.FOLLOW_CHECK !== "0" && (!fin || finGaps(out.data, { prDate: prDok ? prD.date : "" }).must)) return next("check");
     return next("research");   // 표를 못 읽어도 멈추지 않는다 — 뒤 단계가 검색으로 채우고, 기록에 남긴다
+  }
+  if (st.step === "check") {
+    const note = (await kvGet(rc, "cfg:follownote:" + sym)) || { at: Date.now(), text: "", used: 0 }, urls = dataUrls(sym);
+    const prD = await kvGet(rc, "cfg:followpr:" + sym), prDok = prD && prD.text && Date.now() - Date.parse(prD.date + "T00:00:00Z") < 100 * 86400e3;
+    const prTxt = prDok ? "\n\n[발표문 원문 — 회사가 " + prD.date + "에 낸 실적 발표문]\n" + String(prD.text).slice(0, 40000) : "";
+    const urlTxt = urls.length ? "\n\n[다시 열 주소]\n" + urls.map((u) => "- " + u[0] + ": " + u[1]).join("\n") : "";
+    let out, ck = { asked: 0, filled: 0, na: [], rej: [], added: [] };
+    if (!note.fin) {   // 1차에 표를 통째로 못 읽음 → 같은 일을 한 번 더
+      try { out = await runClaude({ task: "followF", input: "[종목] " + sym + (prev && prev.name ? " (" + prev.name + ")" : "") + "\n\n[알림] 앞선 시도에서 분기 표를 읽지 못했다. 주소가 열리지 않으면 곧바로 web_search로 같은 표를 찾아 연다." + (urls.length ? "\n\n[열어 볼 주소 — 위에서부터]\n" + urls.map((u) => "- " + u[0] + ": " + u[1]).join("\n") : "") + prTxt, json: true, need: ["q", "rows"], budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
+      const fin = out && out.ok ? cleanFin(out.data) : null; if (fin) { note.fin = out.data; st.fin = fin.q.length; st.finMsg = ""; st.chk = "재무표 2차 시도로 읽음"; } else st.chk = "재무표 2차 시도도 실패";
+      ck.retry = 1;
+    } else {
+      const G = finGaps(note.fin, { prDate: prDok ? prD.date : "" }); ck.asked = G.n;
+      if (G.n) {
+        try { out = await runClaude({ task: "followC", input: "[종목] " + sym + (prev && prev.name ? " (" + prev.name + ")" : "") + "\n\n[다시 찾을 것 — " + G.n + "건]\n" + G.text + urlTxt + prTxt, json: true, budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
+        if (out && out.ok && out.data) { const before = JSON.stringify(note.fin), r = applyFinPatch(note.fin, out.data);
+          if (!cleanFin(note.fin)) note.fin = JSON.parse(before);   // 합친 뒤 표가 깨지면 되돌린다
+          else { ck.filled = r.filled; ck.rej = r.rej.slice(0, 8); ck.added = r.added.slice(0, 12); if (r.newQ) ck.newQ = r.newQ; }
+          ck.na = (Array.isArray(out.data.na) ? out.data.na : []).map((x) => String(x).slice(0, 90)).slice(0, 14); }
+        else ck.err = String((out && (out.msg || out.reason)) || "응답 없음").slice(0, 60);
+        const G2 = finGaps(note.fin, { prDate: "" }); ck.left = G2.cells.length + G2.rows.length + G2.extra.length;
+        st.chk = "누락 재점검 " + G.n + "건 중 " + (G.n - Math.min(G.n, ck.left + (G.newQ && !ck.newQ ? 1 : 0))) + "건 채움" + (ck.newQ ? "(새 분기 " + ck.newQ + " 추가)" : "") + (ck.left ? " · " + ck.left + "건은 못 채움(이유는 리포트의 '재무 숫자 누락 재점검'에)" : "") + (ck.err ? "(재점검 실패: " + ck.err + ")" : "");
+        const f2 = cleanFin(note.fin); if (f2) st.fin = f2.q.length;
+      }
+    }
+    st.tok = (st.tok || 0) + tokOf(out); st.web = (st.web || 0) + ((out && out.searches) || []).length; if (out && out.model) st.model = out.model;
+    note.check = ck; note.dataRead = (note.dataRead || 0) + ((out && out.fetched) || []).length; await kvPut(rc, "cfg:follownote:" + sym, note);
+    return next("research");
   }
   if (st.step === "research") {
     const old = (await kvGet(rc, "cfg:follownote:" + sym)) || { at: Date.now(), used: 0 };
@@ -288,7 +319,7 @@ export async function followStep(st, origin) {
     if (!dp) return finish(true, cur.quarter + " 저장 — 핵심만(본문 · 표는 실패: " + String((out && (out.msg || out.reason)) || "형식").slice(0, 140) + ") — 다시 누르면 본문 · 표 단계만 다시 해요", { part: 1 });
     if (cur.targets && cur.targets.length && !(dp.targets && dp.targets.length)) { dp.targets = cur.targets; dp.targetNote = cur.targetNote || dp.targetNote; }   // 1단계 표에서 온 목표가는 지우지 않는다
     Object.assign(cur, dp); cur.deep = 1; cur.savedAt = Date.now(); await kvPut(rc, "cfg:follow:" + sym, cur);
-    const doneMsg = cur.quarter + " 저장 · " + (F.ok ? "재무표 " + F.q.length + "분기 계산" : "재무표 못 읽음(" + (st.finMsg || "검색으로 대신") + ")") + " · 본문 " + dp.story.length + "단락 · 표 " + (dp.tables.length + ((cur.ctables || []).length)) + "개" + (st.pr ? " · 발표문 원문(" + st.pr + ") 사용" : "") + (note.fetched ? " · 원문 " + note.fetched + "건 읽음" : note.nofetch ? " · 원문 읽기 불가(검색 요약만)" : "") + (st.cut ? " · 핵심 답이 끊겨 일부 없음" : "");
+    const doneMsg = cur.quarter + " 저장 · " + (F.ok ? "재무표 " + F.q.length + "분기 계산" : "재무표 못 읽음(" + (st.finMsg || "검색으로 대신") + ")") + " · 본문 " + dp.story.length + "단락 · 표 " + (dp.tables.length + ((cur.ctables || []).length)) + "개" + (st.chk ? " · " + st.chk : "") + (st.pr ? " · 발표문 원문(" + st.pr + ") 사용" : "") + (note.fetched ? " · 원문 " + note.fetched + "건 읽음" : note.nofetch ? " · 원문 읽기 불가(검색 요약만)" : "") + (st.cut ? " · 핵심 답이 끊겨 일부 없음" : "");
     if (process.env.FOLLOW_EXTRA !== "0") { const stx = Object.assign({}, st, { step: "extra", msg: doneMsg }); log = await loadLog(rc); log.running = { s: sym, at: Date.now(), t0: st.t0, why: st.why, step: "extra", label: STEPS.extra }; await kvPut(rc, "cfg:followlog", log); if (await chain(origin, { step: stx })) return { ok: true, next: "extra" }; }
     const G = gapsOf(cur);
     if (G.length && process.env.FOLLOW_FILL !== "0") { const st2 = Object.assign({}, st, { step: "fill", msg: doneMsg }); log = await loadLog(rc); log.running = { s: sym, at: Date.now(), t0: st.t0, why: st.why, step: "fill", label: STEPS.fill }; await kvPut(rc, "cfg:followlog", log); if (await chain(origin, { step: st2 })) return { ok: true, next: "fill" }; }
@@ -378,6 +409,11 @@ export async function followHandler(req, res, viaCron) {
     if (!process.env.ANTHROPIC_API_KEY) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
     const lg = (await kvGet(rc, "cfg:followlog")) || {}; if (lg.running && Date.now() - lg.running.at < 330000) return res.status(200).json({ ok: true, busy: true, running: lg.running });
     return go(() => followStep({ s: fs, why: "manual", step: "fill", q: null, t0: Date.now(), t1: Date.now(), msg: "빈칸만 다시 찾기" }, origin)); }
+  /* v14.32 계산만 다시 — 저장해 둔 재무표 · 가격으로 앱 계산(점검 · 주가 분해 · 그림)만 새 기준으로 다시 한다. AI 호출 없음(무료) */
+  if (b.recalc) { const cs = String(b.recalc).toUpperCase(); if (!okSym(cs)) return res.status(200).json({ ok: false, reason: "BAD_SYM" });
+    const nt = await kvGet(rc, "cfg:follownote:" + cs), cur = await kvGet(rc, "cfg:follow:" + cs);
+    if (!cur || !nt || !nt.fin) return res.status(200).json({ ok: false, msg: "저장해 둔 재무표가 없어요 — '최신 자료로 갱신'으로 다시 받아 주세요" });
+    const F = await factsOf(rc, cs, nt); mergeFacts(cur, F, nt); await kvPut(rc, "cfg:follow:" + cs, cur); return res.status(200).json({ ok: true, done: true, calcV: CALC_V, viz: !!cur.viz }); }
   /* v14.30 그림 · 심화 자료만 다시 만들기 — 저장해 둔 조사 노트와 재무표로 그림 계산을 다시 하고(무료), 심화 자료 단계만 돌린다 */
   if (b.more) { const ms = String(b.more).toUpperCase(); if (!okSym(ms)) return res.status(200).json({ ok: false, reason: "BAD_SYM" });
     if (!process.env.ANTHROPIC_API_KEY) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
