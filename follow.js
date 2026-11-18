@@ -159,6 +159,23 @@ function fuChart(s, W, H, col) {
 /* v13.80 본문 · 표 · 증권사 목표가 */
 function fuArr(d, k) { return d && Array.isArray(d[k]) ? d[k] : []; }
 function fuCell(c) { var t = fuE(c == null || c === "" ? "–" : c); return /^[+＋]\d/.test(t) ? '<span class="fuUp">' + t + '</span>' : /^[-−]\d/.test(t) ? '<span class="fuDn">' + t + '</span>' : t === "미확인" ? '<span class="briefDim">미확인</span>' : t; }
+/* v14.20 발표문 원문 — 깃허브 수집(SEC 8-K 첨부) 또는 직접 붙여넣기로 넣어 두면 '받아오기'가 1순위 근거로 읽는다 */
+function fuPrHtml(sym) {
+  var P = FU.st && FU.st.pr ? FU.st.pr[sym] : null, us = !/\.(KS|KQ)$|^\d{6}$/.test(sym), h = '<div class="fuSrc"><div class="hd"><b>발표문 원문</b>';
+  if (P) h += '<span><i class="ok">있음</i> ' + fuE(P.date) + (P.via === "sec" ? " 제출 · SEC 8-K 첨부" : " 저장 · 직접 붙여넣음") + ' · ' + (+P.len || 0).toLocaleString() + '자' + (P.url ? ' · <a href="' + fuE(P.url) + '" target="_blank" rel="noopener">원문 열기</a>' : '') + ' — 다음 받아오기부터 1순위 근거로 읽어요</span><button type="button" data-fuprv>내용 보기</button><button type="button" data-fuprp>붙여넣기로 바꾸기</button><button type="button" data-fuprd>지우기</button>';
+  else h += '<span><i>없음</i> 넣어 두면 받아오기가 검색 요약 대신 회사가 낸 원문 숫자를 그대로 읽어요</span><button type="button" data-fuprp>원문 붙여넣기</button><button type="button" data-fuprg>가져오는 법</button>';
+  h += '</div><div class="pn" data-fuprpn hidden><textarea data-fuprt placeholder="회사 IR 페이지의 실적 발표문(Press Release · Shareholder Letter) 본문 전체를 복사해 붙여 주세요. 표가 깨져 보여도 괜찮아요."></textarea><div class="rw"><input data-fupru placeholder="원문 주소(선택) https://…"><button type="button" data-fuprs>저장</button></div></div>' +
+    '<div class="pn gd" data-fuprgd hidden><b>① 자동 수집(미국 종목)</b> GitHub 저장소 → Actions → "실적 발표문 수집" → Run workflow. 종목 칸을 비우면 이 목록의 미국 종목 전부, 적으면 그 종목만 받아요. SEC 전자공시의 8-K 첨부(EX-99.1 보도자료 · EX-99.2 CFO 설명)를 받아 여기에 올려요. 발표 직후 몇 분~몇십 분 뒤에 공시가 올라와요.<br><b>② 직접 붙여넣기</b> 회사 IR 페이지(예: investor.nvidia.com)의 실적 발표문을 열어 본문을 전부 복사 → "원문 붙여넣기".' + (us ? '' : '<br>한국 종목은 자동 수집 대상이 아니에요 — DART 공시나 회사 IR 자료를 붙여 주세요.') + '</div><pre class="pv" data-fuprpv hidden></pre></div>';
+  return h;
+}
+function fuPrBind(el, sym) {
+  var q = function (s) { return el.querySelector(s); }, tog = function (sel) { var x = q(sel); if (x) x.hidden = !x.hidden; }, say = function (t, bad) { if (typeof smToast === "function") smToast(t, bad ? "bad" : ""); };
+  var b; if ((b = q("[data-fuprp]"))) b.onclick = function () { tog("[data-fuprpn]"); };
+  if ((b = q("[data-fuprg]"))) b.onclick = function () { tog("[data-fuprgd]"); };
+  if ((b = q("[data-fuprv]"))) b.onclick = function () { var pv = q("[data-fuprpv]"); if (!pv.hidden) { pv.hidden = true; return; } pv.hidden = false; pv.textContent = "불러오는 중…"; fuApi({ prget: sym }).then(function (j) { pv.textContent = j && j.ok && j.pr ? String(j.pr.text).slice(0, 6000) + (j.pr.text.length > 6000 ? "\n…(앞 6,000자만 보여요 · 전체 " + j.pr.text.length.toLocaleString() + "자)" : "") : "불러오지 못했어요"; }); };
+  if ((b = q("[data-fuprd]"))) b.onclick = function () { fuApi({ prdel: sym }).then(function (j) { if (j && j.ok) { if (FU.st && FU.st.pr) delete FU.st.pr[sym]; say("발표문 원문을 지웠어요"); renderFollow(); } else say("지우지 못했어요", 1); }); };
+  if ((b = q("[data-fuprs]"))) b.onclick = function () { var t = q("[data-fuprt]").value, u = q("[data-fupru]").value.trim(); if (t.trim().length < 300) return say("원문이 너무 짧아요 — 발표문 본문 전체를 붙여 주세요", 1); b.disabled = true; b.textContent = "저장 중…"; fuApi({ prsave: sym, text: t.slice(0, 200000), url: u }).then(function (j) { if (j && j.ok) { FU.st = FU.st || {}; FU.st.pr = FU.st.pr || {}; FU.st.pr[sym] = j.pr; say("발표문 원문을 저장했어요 — 받아오기를 누르면 이 원문을 먼저 읽어요"); renderFollow(); } else { b.disabled = false; b.textContent = "저장"; say((j && (j.msg || j.reason)) || "저장하지 못했어요", 1); } }); };
+}
 function fuGaps(d) { var n = 0, M = /^\s*미확인\s*$/; fuArr(d, "tables").forEach(function (t) { if (t && !t.calc && t.rows) t.rows.forEach(function (r) { for (var i = 1; i < r.length; i++) if (r[i] == null || M.test(String(r[i]))) n++; }); }); fuArr(d, "kpi").forEach(function (k) { if (k && M.test(String(k.prev)) && !M.test(String(k.cur))) n++; }); return n; }
 function fuFill(sym) { FU.st = FU.st || {}; FU.st.running = { s: sym, at: Date.now(), t0: Date.now(), why: "manual", label: "마무리 · 빈칸 채우기" }; fuPaint(); return fuApi({ fill: sym }).then(function (j) { if (!j || !j.ok) { FU.st.running = null; if (typeof smToast === "function") smToast((j && (j.msg || j.reason)) || "시작하지 못했어요", "bad"); fuPaint(); return; } if (j.done) { fuStatus().then(function () { fuSync().then(function () { renderFollow(); }); }); return; } fuWatch(); }); }
 function fuTblNorm(t) {
@@ -233,6 +250,7 @@ function fuHubHtml(sym) {
     '<div class="fuStep"><i>1</i><div><b>추가로 알고 싶은 것</b> <small>선택 — 적어 두면 프롬프트에 들어가고, 이 기기에 기억돼요</small><textarea class="fuEx" data-fuextra placeholder="예: CEO 교체가 다음 분기 가이던스에 주는 영향 / 중국 매출이 0일 때와 재개될 때의 차이">' + fuE(fuExtra(sym)) + '</textarea></div></div>' +
     '<div class="fuStep"><i>2</i><div><b>프롬프트 만들기</b> <small>만든 뒤 아래 칸에서 자유롭게 고쳐 써도 돼요</small><div class="fuRow"><button class="primary" data-fumk>프롬프트 만들기</button><button data-fucopy disabled>복사</button><a class="fuLink" href="https://claude.ai/new" target="_blank" rel="noopener">claude.ai 새 대화 열기 ↗</a><span class="briefDim" data-fumsg></span></div><textarea class="fuPr" data-fupr placeholder="\"프롬프트 만들기\"를 누르면 여기에 나와요. 직접 써도 돼요."></textarea><small>claude.ai에서는 <b>웹 검색을 켜고</b>(가능하면 리서치 · 확장 사고도) 붙여넣어 보내세요. 답은 { 로 시작하는 JSON으로 와요.</small></div></div>' +
     '<div class="fuStep"><i>3</i><div><b>받은 답 저장</b> <small>{ 부터 } 까지 전체를 붙여넣어요. 분기 재무표(finq)가 들어 있으면 앱이 증감률 · 이익률 · PER 위치를 직접 계산해 합쳐요</small><textarea placeholder="AI가 준 JSON 답 전체를 붙여넣으세요" data-futa></textarea><div class="fuRow"><button class="primary" data-fusave>저장</button><button class="ghost" data-fucancel>닫기</button><span class="briefDim" data-fuerr></span></div></div></div></div>';
+  h += fuPrHtml(sym);
   if (!d) return h + '<div class="egBox"><div class="briefDim">아직 자료가 없어요. "받아오기"를 누르면 서버가 가장 최근 분기 자료를 만들어요(8~15분). 더 깊은 자료가 필요하면 "직접 물어보기"로 프롬프트를 만들어 claude.ai에 물어보세요.</div></div>' + fuAppBox(sym);
   var base = (p && p.c) || (d.price && d.price.base), v0 = d.val[0], tg = d.price && d.price.target, dd = fuDday(d.nextEarnings), sig = fuSig(d);
   h += '<div class="egBox fuLead"><div class="fuV">' + fuTag(d.verdict.type, FU_VT) + '<b>' + fuE(d.verdict.label || "") + '</b></div><h4>' + fuE(d.headline || "") + '</h4><ul>' + d.summary.map(function (s) { return '<li>' + fuE(s) + '</li>'; }).join("") + '</ul>' + (d.easy ? '<div class="fuEasy"><b>쉽게 말하면</b> ' + fuE(d.easy) + '</div>' : '') + (d.verdict.text ? '<p class="fuVT">' + fuE(d.verdict.text) + '</p>' : '') + '</div>';
@@ -355,6 +373,7 @@ function renderFollow() {
   var box = q(".fuPaste"), ta = q("[data-futa]"), prb = q("[data-fupr]"), exb = q("[data-fuextra]"), msg = q("[data-fumsg]"), cp = q("[data-fucopy]");
   q("[data-fumore]").onclick = function () { box.hidden = !box.hidden; FU.askOpen = box.hidden ? null : sym; if (!box.hidden) box.scrollIntoView({ behavior: "smooth", block: "nearest" }); }; q("[data-fucancel]").onclick = function () { box.hidden = true; FU.askOpen = null; };
   q("[data-fufetch]").onclick = function () { fuFetch(sym); };
+  try { fuPrBind(el, sym); } catch (e) { console.warn("fu pr", e); }
   (function () { var fb = q("[data-fufill]"); if (fb) fb.onclick = function () { if (FU.st && FU.st.running) return; fb.disabled = true; fb.textContent = "찾는 중…"; fuFill(sym); }; })();
   if (FU.prDraft && FU.prDraft.s === sym) { prb.value = FU.prDraft.t; cp.disabled = !prb.value.trim(); }
   prb.oninput = function () { FU.prDraft = { s: sym, t: prb.value }; cp.disabled = !prb.value.trim(); };

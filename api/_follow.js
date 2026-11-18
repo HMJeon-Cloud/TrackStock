@@ -8,6 +8,7 @@
 import { redisConf, redisCmd, setJsonGz, getJsonGzText, KEY } from "./_redis.js";
 import { runClaude, followManualPrompt } from "./_claude.js";
 import { cleanFin, priceStats, calcFacts, naverText } from "./_followcalc.js";
+import { prTrim, prHtmlToText } from "./_followpr.js";
 
 const YEAR = 365 * 86400;
 const kstNow = () => new Date(Date.now() + 9 * 3600e3);
@@ -216,7 +217,10 @@ export async function followStep(st, origin) {
   if (st.step === "research") {
     const old = (await kvGet(rc, "cfg:follownote:" + sym)) || { at: Date.now(), used: 0 };
     const F = await factsOf(rc, sym, old);
-    let out; try { out = await runClaude({ task: "followR", input: buildInput(sym, prev, null, st.why) + "\n\n[계산표 — 이미 확보한 숫자. 다시 찾지 않는다]\n" + (F.text || "(없음 — 이 경우 분기 숫자도 함께 찾아 노트 맨 앞에 표로 적는다)"), minText: 1500, finishAsk: "도구 사용은 여기까지. 지금까지 읽은 자료만으로, 처음에 정한 노트 형식(## 0. 기본 ~ ## 8. 확인하지 못한 것) 전체를 지금 바로 써 줘. 머리말 없이 '## 0. 기본'으로 시작한다. 못 찾은 항목은 '미확인'으로 둔다.", budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
+    /* v14.20 저장된 발표문 원문(8-K EX-99.1 등)이 있고 100일 안에 낸 것이면 1순위 근거로 함께 준다 */
+    const pr = await kvGet(rc, "cfg:followpr:" + sym), prOk = pr && pr.text && Date.now() - Date.parse(pr.date + "T00:00:00Z") < 100 * 86400e3; if (prOk) st.pr = pr.date;
+    const prIn = prOk ? "\n\n[발표문 원문 — 회사가 " + pr.date + "에 낸 실적 발표문(" + (pr.title || "8-K 첨부") + (pr.url ? " · " + pr.url : "") + "). 이미 받아 둔 것이니 다시 찾지 않는다. 숫자 · 가이던스 · 부문 표는 이 원문을 그대로 옮기고 출처를 (발표문)으로 적는다. 이 날짜보다 새 분기 실적이 이미 나왔다면 이 원문은 지난 분기 것이니 참고만 하고 새 발표문을 찾는다]\n" + String(pr.text).slice(0, 48000) : "";
+    let out; try { out = await runClaude({ task: "followR", input: buildInput(sym, prev, null, st.why) + "\n\n[계산표 — 이미 확보한 숫자. 다시 찾지 않는다]\n" + (F.text || "(없음 — 이 경우 분기 숫자도 함께 찾아 노트 맨 앞에 표로 적는다)") + prIn, minText: 1500, finishAsk: "도구 사용은 여기까지. 지금까지 읽은 자료만으로, 처음에 정한 노트 형식(## 0. 기본 ~ ## 8. 확인하지 못한 것) 전체를 지금 바로 써 줘. 머리말 없이 '## 0. 기본'으로 시작한다. 못 찾은 항목은 '미확인'으로 둔다.", budgetMs: left() }, key, cu); } catch (e) { out = { ok: false, msg: String(e.message).slice(0, 160) }; }
     st.tok = (st.tok || 0) + tokOf(out); if (out && out.model) st.model = out.model; if (out && out.modelFell) st.fell = out.modelFell; st.web = (st.web || 0) + ((out && out.searches) || []).length;
     const text = out && out.ok ? String(out.text || "").trim() : "";
     if (text.length < 1200) return fail(out && !out.ok ? out : null, "조사 노트가 너무 짧아요(" + text.length + "자)" + (out ? " [멈춘 이유: " + (out.firstStop || out.stop || "?") + (out.finish ? " → 다시 쓰기 " + out.finish : out.tooShort ? " → 다시 쓸 시간이 모자랐어요" : "") + " · 검색 " + ((out.searches || []).length) + " · 원문 " + ((out.fetched || []).length) + " · 이어 받기 " + (out.turns || 0) + "번" + (text ? " · 받은 글: " + text.slice(0, 80).replace(/\s+/g, " ") : "") + "]" : "") + " · 재무표: " + (old.fin ? "읽음" : "못 읽음") + " — 다시 누르면 재무표는 건너뛰고 조사부터 이어서 해요");
@@ -250,7 +254,7 @@ export async function followStep(st, origin) {
     if (!dp) return finish(true, cur.quarter + " 저장 — 핵심만(본문 · 표는 실패: " + String((out && (out.msg || out.reason)) || "형식").slice(0, 140) + ") — 다시 누르면 본문 · 표 단계만 다시 해요", { part: 1 });
     if (cur.targets && cur.targets.length && !(dp.targets && dp.targets.length)) { dp.targets = cur.targets; dp.targetNote = cur.targetNote || dp.targetNote; }   // 1단계 표에서 온 목표가는 지우지 않는다
     Object.assign(cur, dp); cur.deep = 1; cur.savedAt = Date.now(); await kvPut(rc, "cfg:follow:" + sym, cur);
-    const doneMsg = cur.quarter + " 저장 · " + (F.ok ? "재무표 " + F.q.length + "분기 계산" : "재무표 못 읽음(" + (st.finMsg || "검색으로 대신") + ")") + " · 본문 " + dp.story.length + "단락 · 표 " + (dp.tables.length + ((cur.ctables || []).length)) + "개" + (note.fetched ? " · 원문 " + note.fetched + "건 읽음" : note.nofetch ? " · 원문 읽기 불가(검색 요약만)" : "") + (st.cut ? " · 핵심 답이 끊겨 일부 없음" : "");
+    const doneMsg = cur.quarter + " 저장 · " + (F.ok ? "재무표 " + F.q.length + "분기 계산" : "재무표 못 읽음(" + (st.finMsg || "검색으로 대신") + ")") + " · 본문 " + dp.story.length + "단락 · 표 " + (dp.tables.length + ((cur.ctables || []).length)) + "개" + (st.pr ? " · 발표문 원문(" + st.pr + ") 사용" : "") + (note.fetched ? " · 원문 " + note.fetched + "건 읽음" : note.nofetch ? " · 원문 읽기 불가(검색 요약만)" : "") + (st.cut ? " · 핵심 답이 끊겨 일부 없음" : "");
     const G = gapsOf(cur);
     if (G.length && process.env.FOLLOW_FILL !== "0") { const st2 = Object.assign({}, st, { step: "fill", msg: doneMsg }); log = await loadLog(rc); log.running = { s: sym, at: Date.now(), t0: st.t0, why: st.why, step: "fill", label: STEPS.fill }; await kvPut(rc, "cfg:followlog", log); if (await chain(origin, { step: st2 })) return { ok: true, next: "fill" }; }
     return finish(true, doneMsg + (G.length ? " · 빈칸 " + G.length + "곳 남음" : ""));
@@ -280,6 +284,15 @@ export async function followHandler(req, res, viaCron) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, reason: "POST만" });
   const rc = redisConf(); if (!rc) return res.status(200).json({ ok: false, reason: "NO_REDIS" });
   let b = req.body; if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = null; } } b = b || {};
+  /* v14.20 실적 발표문 원문 — 저장(깃허브 수집 · 붙여넣기) · 조회 · 삭제. 원문은 cfg:followpr:<종목>, 목록은 cfg:followprx 한 키 */
+  const prSave = async (sym, o) => { let text = String(o.text || ""); if (/<(p|div|table|td)\b/i.test(text)) text = prHtmlToText(text); text = prTrim(text); if (text.length < 300) return { ok: false, msg: "원문이 너무 짧아요(" + text.length + "자) — 발표문 본문 전체를 붙여 주세요" };
+    const rec = { at: Date.now(), date: /^\d{4}-\d{2}-\d{2}$/.test(String(o.date || "")) ? o.date : kstDay(), acc: String(o.acc || "").slice(0, 30), url: /^https?:\/\//.test(String(o.url || "")) ? String(o.url).slice(0, 300) : "", title: String(o.title || "").slice(0, 160), via: o.via, text };
+    await kvPut(rc, "cfg:followpr:" + sym, rec); const x = (await kvGet(rc, "cfg:followprx")) || {}; x[sym] = { at: rec.at, date: rec.date, acc: rec.acc, url: rec.url, title: rec.title, via: rec.via, len: text.length }; await kvPut(rc, "cfg:followprx", x); return { ok: true, pr: x[sym] }; };
+  if (viaCron && b.prlist) { const cfg = (await kvGet(rc, "cfg:follow")) || {}; return res.status(200).json({ ok: true, list: (cfg.list || []).filter(okSym).filter((s) => !/\.(KS|KQ)$|^\d/.test(s)), have: (await kvGet(rc, "cfg:followprx")) || {} }); }
+  if (viaCron && b.prput) { const s = String(b.prput.sym || "").toUpperCase(); if (!okSym(s)) return res.status(200).json({ ok: false, reason: "BAD_SYM" }); return res.status(200).json(await prSave(s, Object.assign({}, b.prput, { via: "sec" }))); }
+  if (!viaCron && b.prsave) { const s = String(b.prsave).toUpperCase(); if (!okSym(s)) return res.status(200).json({ ok: false, reason: "BAD_SYM" }); return res.status(200).json(await prSave(s, { text: b.text, url: b.url, date: b.date, title: "직접 붙여넣은 발표문", via: "paste" })); }
+  if (!viaCron && b.prget) { const s = String(b.prget).toUpperCase(); const r = okSym(s) ? await kvGet(rc, "cfg:followpr:" + s) : null; return res.status(200).json({ ok: !!r, pr: r }); }
+  if (!viaCron && b.prdel) { const s = String(b.prdel).toUpperCase(); if (!okSym(s)) return res.status(200).json({ ok: false, reason: "BAD_SYM" }); await kvPut(rc, "cfg:followpr:" + s, null); const x = (await kvGet(rc, "cfg:followprx")) || {}; delete x[s]; await kvPut(rc, "cfg:followprx", x); return res.status(200).json({ ok: true }); }
   if (b.status) {   // 화면이 물어보는 상태: 기록 · 진행 중 · 오늘 쓴 횟수 · 오늘 반영할 종목 · 다음 예정
     const cfg = (await kvGet(rc, "cfg:follow")) || {}, log = (await kvGet(rc, "cfg:followlog")) || {}, today = kstDay(); let used = 0; try { used = +(await redisCmd(rc, ["GET", "sm:follow:" + today])) || 0; } catch (e) {}
     const due = [], plan = [];
@@ -288,7 +301,7 @@ export async function followHandler(req, res, viaCron) {
     /* 단계가 함수 시간 한도(300초)에 걸려 죽으면 기록 없이 멈춘다 — 여기서 알아채고 실패로 남긴다 */
     if (log.running && Date.now() - log.running.at >= 330000) { log.runs = log.runs || []; log.runs.unshift({ at: Date.now(), s: log.running.s, why: log.running.why, ok: false, msg: (log.running.label || "") + " 단계가 시간 한도(5분)를 넘겨 멈췄어요 — 다시 누르면 조사 노트부터 이어서 해요", tok: 0, web: 0 }); log.runs = log.runs.slice(0, 30); log.running = null; await kvPut(rc, "cfg:followlog", log); }
     const running = log.running || null;
-    return res.status(200).json({ ok: true, auto: cfg.auto !== false, used, max: +(process.env.FOLLOW_DAILY_MAX || 3), due, plan: plan.slice(0, 5), running, runs: (log.runs || []).slice(0, 12), month: log.month && log.month.ym === kstDay().slice(0, 7) ? log.month : null, cost: +(process.env.FOLLOW_COST_USD || 2.2), budget: +(process.env.FOLLOW_BUDGET_USD || 100), last: log.last || null, key: !!process.env.ANTHROPIC_API_KEY, chain: !!process.env.CRON_SECRET, model: process.env.FOLLOW_MODEL || "claude-opus-5-5" });
+    return res.status(200).json({ ok: true, auto: cfg.auto !== false, used, max: +(process.env.FOLLOW_DAILY_MAX || 3), due, plan: plan.slice(0, 5), running, runs: (log.runs || []).slice(0, 12), pr: (await kvGet(rc, "cfg:followprx")) || {}, month: log.month && log.month.ym === kstDay().slice(0, 7) ? log.month : null, cost: +(process.env.FOLLOW_COST_USD || 2.2), budget: +(process.env.FOLLOW_BUDGET_USD || 100), last: log.last || null, key: !!process.env.ANTHROPIC_API_KEY, chain: !!process.env.CRON_SECRET, model: process.env.FOLLOW_MODEL || "claude-opus-5-5" });
   }
   const origin = (req.headers["x-forwarded-proto"] || "https") + "://" + req.headers.host;
   /* v13.97 직접 물어보기 ① 프롬프트 만들기: 앱이 계산한 숫자(가격 통계 · 네이버 재무표 · 지난 분기 계산표) + 화면이 보낸 앱 분석 자료를 넣어 돌려준다. Claude를 부르지 않는다 */
@@ -297,7 +310,8 @@ export async function followHandler(req, res, viaCron) {
     if (!note.naver) { try { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000); const fr = await fetch(origin + "/api/fund?symbol=" + encodeURIComponent(sym), { signal: ac.signal }).catch(() => null); clearTimeout(tm); if (fr && fr.ok) note.naver = naverText(await fr.json().catch(() => null)); } catch (e) {} }
     const F = await factsOf(rc, sym, { naver: note.naver || "" });   // 지난 분기 재무표는 넣지 않는다 — 새 분기를 다시 옮겨 적게
     const kpi = prev && prev.kpi && prev.kpi.length ? "지난 분기 " + (prev.quarter || "") + " · 지난 판정 " + ((prev.verdict && prev.verdict.label) || "") + "\n" + prev.kpi.map((k) => "- " + k.n + " | 지난 최근값 " + k.cur + " | 경고선 " + k.warn).join("\n") : "";
-    return res.status(200).json({ ok: true, prompt: followManualPrompt(sym, F.text, String(b.ctx || "").slice(0, 6000), dataUrls(sym), kpi, String(b.extra || "").slice(0, 2000)), hasPx: !!F.px });
+    const prM = await kvGet(rc, "cfg:followpr:" + sym), prMok = prM && prM.text && Date.now() - Date.parse(prM.date + "T00:00:00Z") < 100 * 86400e3;
+    return res.status(200).json({ ok: true, prompt: followManualPrompt(sym, F.text, String(b.ctx || "").slice(0, 6000), dataUrls(sym), kpi, String(b.extra || "").slice(0, 2000)) + (prMok ? "\n\n[발표문 원문 — 회사가 " + prM.date + "에 낸 실적 발표문. 1순위 근거. 이보다 새 분기 실적이 나왔다면 참고만 한다]\n" + String(prM.text).slice(0, 30000) : ""), hasPx: !!F.px, pr: prMok ? prM.date : null });
   }
   /* ② 답 저장: 붙여넣은 JSON을 다듬고, 분기 재무표(finq)가 있으면 코드로 계산해 합친다 */
   if (b.save && okSym(String(b.save).toUpperCase())) {
@@ -318,6 +332,7 @@ export async function followHandler(req, res, viaCron) {
     if (!process.env.ANTHROPIC_API_KEY) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
     const lg = (await kvGet(rc, "cfg:followlog")) || {}; if (lg.running && Date.now() - lg.running.at < 330000) return res.status(200).json({ ok: true, busy: true, running: lg.running });
     return go(() => followStep({ s: fs, why: "manual", step: "fill", q: null, t0: Date.now(), t1: Date.now(), msg: "빈칸만 다시 찾기" }, origin)); }
+  const only = b.run && b.run !== "due" ? String(b.run).toUpperCase() : null;
   if (!b.run || b.run === "due") return res.status(200).json({ ok: true, skipped: "자동 수집은 쓰지 않아요" });
   if (!process.env.ANTHROPIC_API_KEY) return res.status(200).json({ ok: false, reason: "NO_KEY", msg: "Vercel 환경변수에 ANTHROPIC_API_KEY가 없어요" });
   if (!process.env.CRON_SECRET) return res.status(200).json({ ok: false, reason: "NO_CHAIN", msg: "Vercel 환경변수에 CRON_SECRET이 없어 단계를 이어 갈 수 없어요" });
