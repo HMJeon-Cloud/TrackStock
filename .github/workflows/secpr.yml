@@ -1,0 +1,41 @@
+# 실적 발표문 원문 수집 (v14.20) — SEC가 Vercel 서버를 막아서 GitHub 서버에서 받아 앱으로 올린다
+#   쓰는 법: Actions 탭 → "실적 발표문 수집" → Run workflow
+#     · 종목 칸을 비우면 실적 팔로업 목록의 미국 종목 전부, 적으면 그 종목만 (예: NVDA, PLTR)
+#     · 받은 원문은 실적 팔로업의 "받아오기"가 1순위 근거로 읽는다
+#   비밀값은 13F 수집과 같다(SEC_UA, CRON_SECRET) — 새로 만들 것 없음
+#   자동으로 돌리려면 아래 schedule 두 줄의 # 를 지운다(평일 아침 07:40 한국 시간 — 새 발표문이 있을 때만 올린다)
+name: 실적 발표문 수집
+on:
+  workflow_dispatch:
+    inputs:
+      syms:
+        description: "종목 (비우면 실적 팔로업 목록 전체) 예: NVDA, PLTR"
+        required: false
+        default: ""
+      force:
+        description: "이미 받은 발표문도 다시 받기"
+        type: boolean
+        required: false
+        default: false
+  # schedule:
+  #   - cron: "40 22 * * 1-5"   # 화~토 07:40 (한국)
+permissions:
+  contents: read
+jobs:
+  secpr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 발표문 받아서 올리기
+        run: node scripts/secpr.mjs
+        env:
+          SEC_CURL: "1"
+          SEC_UA: ${{ secrets.SEC_UA }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: https://track-stock-tau.vercel.app
+          SYMS: ${{ inputs.syms }}
+          FORCE: ${{ inputs.force }}
