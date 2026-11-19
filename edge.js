@@ -403,7 +403,7 @@ function egMaHtml(syms, title) {
 function egStep(v, steps, lowBest) { if (v == null || !isFinite(v)) return null; for (var i = 0; i < steps.length; i++) { if (lowBest ? v <= steps[i][0] : v >= steps[i][0]) return steps[i][1]; } return steps[steps.length - 1][1]; }
 function egScore(sym) {
   var rows = typeof nbHist !== "undefined" && nbHist[sym]; if (!rows || rows.length < 260) return null;
-  var n = rows.length, last = rows[n - 1], yrsAll = (last.t - rows[0].t) / (365.25 * EG_DAY), key = "sc:" + sym + ":" + last.t + ":" + n + ":" + (typeof CORE !== "undefined" && CORE.fund && CORE.fund[sym] ? 1 : 0) + ":" + (typeof MAC !== "undefined" && MAC.doc && !MAC.doc.none ? 1 : 0);
+  var n = rows.length, last = rows[n - 1], yrsAll = (last.t - rows[0].t) / (365.25 * EG_DAY), key = "sc:" + sym + ":" + last.t + ":" + n + ":" + (typeof CORE !== "undefined" && CORE.fund && CORE.fund[sym] ? 1 : 0) + ":" + (typeof MAC !== "undefined" && MAC.doc && !MAC.doc.none ? 1 : 0) + ":" + (typeof gxSig === "function" ? gxSig() : "");
   if (EG.memo[key] !== undefined) return EG.memo[key];
   var lev = egLev(sym), coin = /-USD$/.test(sym), cats = [], it = function (name, val, pts, txt) { return pts === "info" ? { n: name, v: val, p: null, t: txt } : pts == null ? null : { n: name, v: val, p: Math.round(pts), t: txt }; };   // "info" = 점수 없이 참고로만
   var cat = function (id, name, axis, w, items, note) { items = items.filter(Boolean); var sc = items.filter(function (x) { return x.p != null; }); if (!sc.length) return; var s = sc.reduce(function (a, x) { return a + x.p; }, 0) / sc.length; cats.push({ id: id, name: name, axis: axis, w: w, score: Math.round(s), items: items, note: note || "" }); };
@@ -474,7 +474,7 @@ function egScore(sym) {
   } catch (e) {}
   cat("mac", "매크로 — 지금 바깥 환경", "spot", 0.1, mi, "매크로는 미리 맞히기 어려운 변수라 비중을 가장 작게(자리 점수의 10%) 뒀어요.");
   /* --- 합산 --- */
-  var axis = function (a) { var cs = cats.filter(function (x) { return x.axis === a; }), w = cs.reduce(function (s, x) { return s + x.w; }, 0); return w ? Math.round(cs.reduce(function (s, x) { return s + x.score * x.w; }, 0) / w) : null; };
+  var axis = function (a) { var gk = function (x) { return x.w * (typeof gxCatK === "function" ? gxCatK(x.id) : 1); }, cs = cats.filter(function (x) { return x.axis === a; }), w = cs.reduce(function (s, x) { return s + gk(x); }, 0); return w ? Math.round(cs.reduce(function (s, x) { return s + x.score * gk(x); }, 0) / w) : null; };   // v14.70 거장 점수 반영을 켜면 '자리' 항목의 비율이 달라진다(gurux.js)
   var body = axis("body"), spot = axis("spot"); if (body == null || spot == null) return (EG.memo[key] = null);
   var total = Math.round(body * 0.55 + spot * 0.45), grade = total >= 80 ? "매우 좋음" : total >= 68 ? "좋음" : total >= 55 ? "보통" : total >= 42 ? "주의" : "나쁨";
   /* 한 줄 판정은 '체력'과 '싼 정도(MDD + 장기 평균선)'로 정하고, 흐름(기술 지표)은 덧붙인다 — 흐름이 좋아 자리 점수가 높은 것을 '싸다'고 읽지 않게 */
