@@ -9,7 +9,7 @@ import { runClaude, taskSystem } from "./_claude.js";
 import { GURUS, DISC_KEY } from "./_disc.js";
 
 const KEY_AI = "sm:guruai";
-const S = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+const S = (v, n) => { const t = String(v == null ? "" : v).replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };   // 잘릴 때는 … 를 붙여 잘린 것을 알 수 있게
 const arr = (a, n) => (Array.isArray(a) ? a.slice(0, n) : []);
 async function readDoc(rc, key) { try { const t = await getJsonGzText(rc, key); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
 const kstDay = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
@@ -35,17 +35,17 @@ export function guruFacts(g) {
 }
 function cleanNote(d) {
   const kinds = ["발언", "서한", "보도", "공시"];
-  const views = arr(d && d.views, 10).map((v) => ({ date: S(v && v.date, 10), kind: kinds.includes(v && v.kind) ? v.kind : "보도", say: S(v && v.say, 260), pos: S(v && v.pos, 120), src: S(v && v.src, 60), url: /^https?:\/\//.test(String((v && v.url) || "")) ? String(v.url).slice(0, 300) : "" })).filter((v) => v.say && v.src);
+  const views = arr(d && d.views, 10).map((v) => ({ date: S(v && v.date, 10), kind: kinds.includes(v && v.kind) ? v.kind : "보도", say: S(v && v.say, 500), pos: S(v && v.pos, 160), src: S(v && v.src, 120), url: /^https?:\/\//.test(String((v && v.url) || "")) ? String(v.url).slice(0, 300) : "" })).filter((v) => v.say && v.src);
   const st = d && d.stance && typeof d.stance === "object" ? d.stance : {};
-  return { views, stance: { risk: ["확대", "중립", "축소", "미확인"].includes(st.risk) ? st.risk : "미확인", why: S(st.why, 240) }, themes: arr(d && d.themes, 6).map((x) => S(x, 60)).filter(Boolean), miss: arr(d && d.miss, 6).map((x) => S(x, 120)).filter(Boolean) };
+  return { views, stance: { risk: ["확대", "중립", "축소", "미확인"].includes(st.risk) ? st.risk : "미확인", why: S(st.why, 400) }, themes: arr(d && d.themes, 6).map((x) => S(x, 60)).filter(Boolean), miss: arr(d && d.miss, 6).map((x) => S(x, 300)).filter(Boolean) };
 }
 function cleanAi(d) {
   const conf = ["높음", "보통", "낮음"];
-  return { head: S(d && d.head, 90), view: S(d && d.view, 800), shift: S(d && d.shift, 600), consist: S(d && d.consist, 400),
-    intent: arr(d && d.intent, 7).map((x) => ({ move: S(x && x.move, 120), why: S(x && x.why, 520), alt: S(x && x.alt, 260), basis: S(x && x.basis, 200), conf: conf.includes(x && x.conf) ? x.conf : "낮음" })).filter((x) => x.move && x.why),
-    apply: arr(d && d.apply, 5).map((x) => ({ do: S(x && x.do, 110), how: S(x && x.how, 400) })).filter((x) => x.do),
-    dont: arr(d && d.dont, 4).map((x) => S(x, 240)).filter(Boolean), watch: arr(d && d.watch, 5).map((x) => S(x, 260)).filter(Boolean),
-    risk: ["확대", "중립", "축소", "미확인"].includes(d && d.risk) ? d.risk : "미확인", caveat: S(d && d.caveat, 260) };
+  return { head: S(d && d.head, 120), view: S(d && d.view, 1200), shift: S(d && d.shift, 900), consist: S(d && d.consist, 700),
+    intent: arr(d && d.intent, 7).map((x) => ({ move: S(x && x.move, 320), why: S(x && x.why, 900), alt: S(x && x.alt, 500), basis: S(x && x.basis, 400), conf: conf.includes(x && x.conf) ? x.conf : "낮음" })).filter((x) => x.move && x.why),
+    apply: arr(d && d.apply, 5).map((x) => ({ do: S(x && x.do, 110), how: S(x && x.how, 600) })).filter((x) => x.do),
+    dont: arr(d && d.dont, 4).map((x) => S(x, 300)).filter(Boolean), watch: arr(d && d.watch, 6).map((x) => S(x, 400)).filter(Boolean),
+    risk: ["확대", "중립", "축소", "미확인"].includes(d && d.risk) ? d.risk : "미확인", caveat: S(d && d.caveat, 600) };
 }
 function cleanSum(d) {
   const rk = (v) => (["확대", "중립", "축소", "미확인"].includes(v) ? v : "미확인");

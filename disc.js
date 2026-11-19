@@ -28,7 +28,7 @@ function dsKo(sym) { if (typeof BRIEF_KO !== "undefined" && BRIEF_KO[sym]) retur
 /* 13F 종목명: 등록된 티커면 한글명, 아니면 영문을 보기 좋게 */
 function dsIss(x) {
   var ko = x.t ? dsKo(x.t) : null; if (ko) return ko;
-  return String(x.n || "").toLowerCase().replace(/\b(inc|corp|co|ltd|plc|hldgs|del|new|com|cl a|cl b|class a|class b)\b\.?/g, "").replace(/\s+/g, " ").trim().replace(/\b\w/g, function (c) { return c.toUpperCase(); }) || x.n;
+  return String(x.n || "").toLowerCase().replace(/\b(inc|corp|co|ltd|plc|hldgs|del|new|com|cl a|cl b|class a|class b)\b\.?/g, "").replace(/\s+/g, " ").trim().replace(/\b\w/g, function (c) { return c.toUpperCase(); }).replace(/\b(Etf|Msci|Spdr|S&p|Ftse|Eafe|Acwi|Qqq|Ai|Us)\b/g, function (w) { return w.toUpperCase(); }) || x.n;
 }
 function dsPrice(sym) { var r = typeof DATA !== "undefined" && DATA.recentData; var d = (r && r.symbols && r.symbols[sym]) || null; if (!d && typeof briefState !== "undefined" && briefState.recent) d = briefState.recent.symbols[sym]; if (!d || !d.c) return null; for (var i = d.c.length - 1; i >= 0; i--) if (d.c[i] > 0) return d.c[i]; return null; }
 function dsVal(it) { if (it.k !== "insider" && it.k !== "major") return it.amt || null; var p = dsPrice(it.sym); return p && it.chg ? it.chg * p : null; }

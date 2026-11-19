@@ -280,7 +280,7 @@ function gxRegime() {
   if (typeof dsGurus !== "function") return null; var G = dsGurus(), a = 0, b = 0, rows = [], per = "";
   G.forEach(function (g) { var P = GX_P[g.id]; if (!P) return; var f = gxFlow(g); if (f == null) return; var x = gxClamp(f / 0.1);
     if (P.ty === "macro" && g.optSum && g.total) x = gxClamp(x + gxClamp((g.optSum.call - g.optSum.put) / g.total / 0.2) * 0.5);
-    var sy = gxSay(g.id); if (sy != null) x = x * 0.7 + sy * 0.3;   // 발언 조사 · AI 해석에 위험 태도가 있으면 30% 섞는다
+    var sy = gxSayInfo(g.id); if (sy) x = x * (1 - sy.w) + sy.v * sy.w;   // 발언 조사 · AI 해석의 위험 태도를 섞는다(분기 말 뒤 발언이면 50%, 아니면 30%)
     var w = P.trust * (P.ty === "macro" || P.ty === "deep" ? 1.5 : 1); a += x * w; b += w; rows.push({ id: g.id, nm: g.nm, ty: P.ty, f: f, x: x, w: w }); if ((g.period || "") > per) per = g.period; });
   if (rows.length < 4 || !b) return null; var sc = Math.round(a / b * 100);
   var say = { up: 0, dn: 0 }, N = (GXA.doc && GXA.doc.notes) || {}; Object.keys(N).forEach(function (id) { var r = N[id] && N[id].stance && N[id].stance.risk; if (r === "확대") say.up++; else if (r === "축소") say.dn++; });
@@ -307,7 +307,12 @@ var GX_MIX_DEF = { macro: 30, value: 20, deep: 20, activist: 10, growth: 20 };
 function gxCfg() { if (GXA._cfg) return GXA._cfg; var c = null; try { c = JSON.parse(localStorage.getItem("sm.gx.cfg") || "null"); } catch (e) {} c = c || {}; if (c.on == null) { try { c.on = localStorage.getItem("sm.rank.gx") === "1"; } catch (e) { c.on = false; } }
   GXA._cfg = { on: !!c.on, basis: c.basis && (c.basis === "all" || c.basis === "mix" || GX_TYPES[c.basis]) ? c.basis : "all", mix: Object.assign({}, GX_MIX_DEF, c.mix || {}), blend: [0, 5, 10, 15].indexOf(+c.blend) >= 0 ? +c.blend : 0 }; return GXA._cfg; }
 function gxCfgSave(c) { GXA._cfg = c; GXA._bs = null; try { localStorage.setItem("sm.gx.cfg", JSON.stringify(c)); } catch (e) {} if (typeof EG !== "undefined" && EG.memo) { /* 평가표는 기준이 바뀌면 다시 계산 — 키에 gxSig가 들어 있다 */ } }
-function gxSay(id) { var D = GXA.doc || {}, n = D.notes && D.notes[id], a = D.ai && D.ai[id], r = (a && a.risk && a.risk !== "미확인" ? a.risk : n && n.stance ? n.stance.risk : null); return r === "확대" ? 1 : r === "축소" ? -1 : r === "중립" ? 0 : null; }
+/* 발언 · 해석의 위험 태도 — 더 최근에 만든 쪽을 쓴다. 13F 분기 말보다 뒤의 본인 발언이 있으면 '지금'에 더 가까워 무게를 50%로 올린다 */
+function gxSayInfo(id) { var D = GXA.doc || {}, n = D.notes && D.notes[id], a = D.ai && D.ai[id], nr = n && n.stance && n.stance.risk !== "미확인" ? n.stance.risk : null, ar = a && a.risk && a.risk !== "미확인" ? a.risk : null;
+  var r = nr && ar ? ((n.at || 0) > (a.at || 0) ? nr : ar) : nr || ar; if (!r) return null; var g = (typeof dsGurus === "function" ? dsGurus() : []).filter(function (x) { return x.id === id; })[0], per = g && g.period ? g.period : "";
+  var fresh = !!(n && (n.views || []).some(function (v) { return String(v.date || "") > per; }));
+  return { v: r === "확대" ? 1 : r === "축소" ? -1 : 0, w: fresh ? 0.5 : 0.3, fresh: fresh }; }
+function gxSay(id) { var s = gxSayInfo(id); return s ? s.v : null; }
 function gxTypeScores() {
   var R = gxRegime(), out = {}; if (!R) return null;
   GX_TY_ORDER.forEach(function (ty) { var rs = R.rows.filter(function (r) { return r.ty === ty; }), a = 0, b = 0, says = 0; rs.forEach(function (r) { var t = GX_P[r.id].trust; if (gxSay(r.id) != null) says++; a += r.x * t; b += t; });
@@ -401,7 +406,7 @@ function gxSumHtml() {
     if (hi.length >= 2 && TS[hi[0]].score - TS[hi[hi.length - 1]].score >= 40) lead += " 유형별로는 엇갈려요 — " + GX_TYPES[hi[0]].nm + "(" + (TS[hi[0]].score > 0 ? "+" : "") + TS[hi[0]].score + ")은 늘리고 " + GX_TYPES[hi[hi.length - 1]].nm + "(" + (TS[hi[hi.length - 1]].score > 0 ? "+" : "") + TS[hi[hi.length - 1]].score + ")은 줄였어요.";
     h += '<p class="gxLead">' + lead + '</p>';
     h += '<div class="gxGauge"><div class="gxGb"><i style="left:' + pos + '%"></i></div><div class="gxGl"><span>-100 위험 축소</span><span>0 중립</span><span>+100 위험 확대</span></div></div>';
-    h += '<details class="gxHow"><summary>이 숫자는 어떻게 만들었나 · 용어 풀이</summary><div><p><b>13F</b> — 미국에서 1억 달러 이상을 굴리는 기관이 분기마다 내는 보유 주식 보고서. 분기가 끝나고 45일 안에 공개돼요. 미국 주식의 매수 포지션만 담기고 공매도 · 채권 · 원자재 · 현금은 빠져요.</p><p><b>순매매</b> — 주식 수가 늘고 준 만큼만 계산한 금액(주식 수 변화 × 분기 말 가격)을 지난 분기 보유액으로 나눈 값. 주가가 올라서 평가액이 커진 것은 빼고 \'실제로 사고판 방향\'만 봐요.</p><p><b>거장 국면 점수</b> — 사람마다 순매매를 -100~+100으로 바꿔(±10%면 끝값) 평균한 것. 13F가 생각을 잘 보여 주는 사람(신뢰도 ★ 많은 사람)과, 위험 태도를 잘 드러내는 매크로 · 딥밸류 유형에 더 큰 무게를 줬어요. 매크로는 풋 · 콜 옵션의 기울기도 조금 더했어요. 발언 조사나 AI 해석에서 위험 태도가 확인된 사람은 그 태도를 30% 섞어요.</p><p><b>풋 · 콜</b> — 풋은 내릴 때, 콜은 오를 때 이익이 나는 옵션. 13F의 옵션 금액은 실제 낸 돈이 아니라 기초자산 값이라 크게 보이고, 보험(헤지)인지 베팅인지는 알 수 없어요.</p></div></details>';
+    h += '<details class="gxHow"><summary>이 숫자는 어떻게 만들었나 · 용어 풀이</summary><div><p><b>13F</b> — 미국에서 1억 달러 이상을 굴리는 기관이 분기마다 내는 보유 주식 보고서. 분기가 끝나고 45일 안에 공개돼요. 미국 주식의 매수 포지션만 담기고 공매도 · 채권 · 원자재 · 현금은 빠져요.</p><p><b>순매매</b> — 주식 수가 늘고 준 만큼만 계산한 금액(주식 수 변화 × 분기 말 가격)을 지난 분기 보유액으로 나눈 값. 주가가 올라서 평가액이 커진 것은 빼고 \'실제로 사고판 방향\'만 봐요.</p><p><b>거장 국면 점수</b> — 사람마다 순매매를 -100~+100으로 바꿔(±10%면 끝값) 평균한 것. 13F가 생각을 잘 보여 주는 사람(신뢰도 ★ 많은 사람)과, 위험 태도를 잘 드러내는 매크로 · 딥밸류 유형에 더 큰 무게를 줬어요. 매크로는 풋 · 콜 옵션의 기울기도 조금 더했어요. 발언 조사나 AI 해석에서 위험 태도가 확인된 사람은 그 태도를 30% 섞고, 13F 분기 말보다 뒤에 한 본인 발언이면 \'지금\'에 더 가까워 50%를 섞어요.</p><p><b>풋 · 콜</b> — 풋은 내릴 때, 콜은 오를 때 이익이 나는 옵션. 13F의 옵션 금액은 실제 낸 돈이 아니라 기초자산 값이라 크게 보이고, 보험(헤지)인지 베팅인지는 알 수 없어요.</p></div></details>';
     h += '<h5 class="gxH5">유형별로 보면</h5><div class="gxTyT"><div class="h"><span>유형</span><span>점수 · 순매수 / 순매도</span><span>옵션(풋 · 콜)</span><span>가장 크게 움직인 사람</span></div>' + GX_TY_ORDER.map(function (ty) { var rs = R.rows.filter(function (r) { return r.ty === ty; }); if (!rs.length) return ""; var t = TS[ty], put = 0, call = 0; G.forEach(function (g) { if (GX_P[g.id] && GX_P[g.id].ty === ty && g.optSum) { put += g.optSum.put || 0; call += g.optSum.call || 0; } });
       var top = rs.slice().sort(function (a, b) { return Math.abs(b.f) - Math.abs(a.f); })[0];
       return '<div style="--gx:' + GX_TYPES[ty].c + '"><span><i></i>' + GX_TYPES[ty].nm + '</span><span><b class="' + (t.score >= 25 ? "pos" : t.score <= -25 ? "neg" : "") + '">' + (t.score > 0 ? "+" : "") + t.score + '</b><small>순매수 ' + t.up + ' / 순매도 ' + t.dn + ' · ' + rs.length + '명</small></span><span>' + (put + call ? '풋 ' + dsUsd(put) + ' · 콜 ' + dsUsd(call) : '–') + '</span><span>' + (top ? gxE(top.nm) + ' ' + (top.f >= 0 ? "+" : "") + gxPc(top.f) + ' 순매' + (top.f >= 0 ? "수" : "도") : '') + '</span></div>'; }).join("") + '</div><p class="gxNote">유형이 다르면 같은 순매도도 뜻이 달라요. 가치 · 우량 장기 유형의 순매도는 "살 만한 값이 아니다", 매크로 유형의 순매도는 "위험을 덜겠다", 성장 유형의 순매도는 "테마를 갈아탄다"에 가까워요.</p>';
@@ -432,10 +437,10 @@ function gxSumBind(el) {
 /* 인물 화면: 13F 밖의 이야기 + AI 해석 */
 function gxAiHtml(id, g) {
   var D = GXA.doc || { notes: {}, ai: {} }, N = D.notes[id] || {}, A = D.ai[id], own = gxOwner(), T = GX_TYPES[GX_P[id].ty], h = '';
-  var stale = A && g && A.period !== g.period;
+  var stale = A && g && A.period !== g.period, behind = A && ((N.at && N.at > A.at && (N.views || []).length) || (N.memoAt && N.memoAt > A.at));
   h += '<div class="mkStep"><b>AI</b>왜 이렇게 움직였나 <small class="briefDim">인물 정보 + 13F 숫자 + 발언을 겹쳐 읽은 추정이에요</small></div>';
   if (A) {
-    h += '<div class="gxAi" style="--gx:' + T.c + '"><div class="gxAh"><b>' + gxE(A.head) + '</b><span class="gxReg ' + (A.risk === "확대" ? "up" : A.risk === "축소" ? "dn" : "") + '">위험 ' + gxE(A.risk) + '</span></div>' + (stale ? '<p class="gxStale">이 해석은 ' + dsQ(A.period) + ' 기준이에요 — 새 분기 보고서가 나왔어요.</p>' : '') + '<p class="gxAv">' + gxE(A.view) + '</p>' + (A.shift ? '<h5>포트폴리오는 어디에서 어디로 옮겨 갔나</h5><p class="gxAv">' + gxE(A.shift) + '</p>' : '') +
+    h += '<div class="gxAi" style="--gx:' + T.c + '"><div class="gxAh"><b>' + gxE(A.head) + '</b><span class="gxReg ' + (A.risk === "확대" ? "up" : A.risk === "축소" ? "dn" : "") + '">위험 ' + gxE(A.risk) + '</span></div>' + (stale ? '<p class="gxStale">이 해석은 ' + dsQ(A.period) + ' 기준이에요 — 새 분기 보고서가 나왔어요.</p>' : '') + (behind ? '<p class="gxStale">이 해석을 만든 뒤에 ' + (N.at && N.at > A.at && (N.views || []).length ? '발언 조사(' + N.views.length + '건' + (N.stance && N.stance.risk !== "미확인" ? ' · 위험 태도 ' + gxE(N.stance.risk) : '') + ')' : '') + (N.memoAt && N.memoAt > A.at ? (N.at && N.at > A.at ? '와 ' : '') + '메모' : '') + '가 추가됐어요 — 해석에는 아직 반영되지 않았어요. \'해석 다시 만들기\'나 프롬프트를 다시 복사해 반영해 주세요.</p>' : '') + '<p class="gxAv">' + gxE(A.view) + '</p>' + (A.shift ? '<h5>포트폴리오는 어디에서 어디로 옮겨 갔나</h5><p class="gxAv">' + gxE(A.shift) + '</p>' : '') +
       '<h5>움직임별 해석 <small>확신 = 이 해석이 맞을 가능성(본인 발언이 뒷받침하면 높음, 숫자만으로 한 짐작이면 낮음)</small></h5><div class="gxIn">' + (A.intent || []).map(function (x) { return '<div><div class="m"><b>' + gxE(x.move) + '</b><span class="gxCf c' + (x.conf === "높음" ? 3 : x.conf === "보통" ? 2 : 1) + '">확신 ' + gxE(x.conf) + '</span></div><p>' + gxE(x.why) + '</p>' + (x.alt ? '<p class="alt"><b>다른 설명</b> ' + gxE(x.alt) + '</p>' : '') + (x.basis ? '<small>근거: ' + gxE(x.basis) + '</small>' : '') + '</div>'; }).join("") + '</div>' + (A.consist ? '<h5>평소 철학 · 습관과 견주면</h5><p class="gxAv">' + gxE(A.consist) + '</p>' : '') +
       ((A.apply || []).length ? '<h5>우리는 이렇게 적용한다</h5><div class="gxAp">' + A.apply.map(function (x) { return '<div><b>' + gxE(x.do) + '</b><p>' + gxE(x.how) + '</p></div>'; }).join("") + '</div>' : '') +
       ((A.dont || []).length ? '<h5>이렇게 쓰면 안 된다</h5><ul>' + A.dont.map(function (x) { return '<li>' + gxE(x) + '</li>'; }).join("") + '</ul>' : '') +
@@ -469,6 +474,8 @@ function gxDecorate2() {
   var have = {}; dsGurus().forEach(function (x) { have[x.id] = x; });
   var id = GX.sel && !have[GX.sel] ? GX.sel : DS.g.id; if (!id || !GX_P[id]) return;
   var w = document.createElement("div"); w.className = "gxAiWrap"; w.innerHTML = gxAiHtml(id, have[id]);
+  /* 순서: 13F 밖의 이야기(재료) → AI 해석(결과) */
+  (function () { var mk = w.querySelectorAll(".mkStep"); if (mk.length < 2) return; var aiNodes = [], n = mk[0]; while (n && n !== mk[1]) { aiNodes.push(n); n = n.nextSibling; } aiNodes.forEach(function (x) { w.appendChild(x); }); })();
   var ap = box.querySelector(".gxApply"), anchor = ap ? ap.nextSibling : null;
   if (ap) ap.parentNode.insertBefore(w, anchor); else { var card = box.querySelector(".gxCard"); if (card) card.parentNode.insertBefore(w, card.nextSibling); else box.appendChild(w); }
   gxAiBind(w, id);

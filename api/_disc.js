@@ -286,14 +286,24 @@ export function matchTicker(map, issuer) {
   }
   return best;
 }
+/* v14.71 ETF 이름 — 13F의 발행자 이름이 'ISHARES INC'처럼 운용사 묶음 이름뿐이면 어떤 ETF인지 알 수 없다. 종목 구분(titleOfClass)을 붙여 보여 주고,
+   잘 알려진 ETF만 티커를 붙인다(모르면 비워 둔다 — 엉뚱한 티커보다 낫다) */
+const FUND_RE = /^(ISHARES( INC| TR| TRUST| U ?S ETF TR(UST)?)?|SELECT SECTOR SPDR TR(UST)?|SPDR (SER(IES)? TR(UST)?|INDEX SHS FDS|DOW JONES INDL AVRG ETF)|VANGUARD [A-Z ]*FDS?|VANGUARD [A-Z ]*FUNDS?|VANECK (ETF|VECTORS ETF) TR(UST)?|INVESCO EXCHANGE[A-Z\- ]*|INVESCO ACTIVELY MANAGED[A-Z\- ]*|GLOBAL X FDS|PROSHARES TR( II)?|DIREXION SHS ETF TR|WISDOMTREE TR(UST)?|FIRST TR [A-Z\- ]*|SCHWAB STRATEGIC TR|J ?P ?MORGAN EXCHANGE[A-Z\- ]*|ISHARES S&P GSCI[A-Z ]*)$/i;
+const ETF_TK = [[/ISHARES/, /MSCI BRAZIL/, "EWZ"], [/ISHARES/, /CORE MSCI EMERG/, "IEMG"], [/ISHARES/, /MSCI EMERG/, "EEM"], [/ISHARES/, /RUSSELL 2000/, "IWM"], [/ISHARES/, /MSCI JAPAN/, "EWJ"], [/ISHARES/, /MSCI MEXICO/, "EWW"], [/ISHARES/, /MSCI (SOUTH )?KOREA/, "EWY"], [/ISHARES/, /MSCI TAIWAN/, "EWT"], [/ISHARES/, /MSCI INDIA/, "INDA"], [/ISHARES/, /MSCI CHINA/, "MCHI"], [/ISHARES/, /(CHINA LARGE|FTSE CHINA)/, "FXI"], [/ISHARES/, /MSCI EAFE/, "EFA"], [/ISHARES/, /20\+ ?YR|20 ?YR TR BD/, "TLT"], [/ISHARES/, /IBOXX.*HIGH ?YI|HIGH YIELD CORP/, "HYG"], [/ISHARES/, /IBOXX.*INV/, "LQD"], [/ISHARES/, /CORE S&P 500/, "IVV"], [/ISHARES/, /SEMICONDUCTOR/, "SOXX"], [/ISHARES/, /RUSSELL 1000 GRO/, "IWF"], [/ISHARES/, /BITCOIN/, "IBIT"],
+  [/SELECT SECTOR/, /ENERGY/, "XLE"], [/SELECT SECTOR/, /FINANCIAL/, "XLF"], [/SELECT SECTOR/, /TECHNOLOGY/, "XLK"], [/SELECT SECTOR/, /HEALTH/, "XLV"], [/SELECT SECTOR/, /INDL|INDUSTRIAL/, "XLI"], [/SELECT SECTOR/, /UTIL/, "XLU"], [/SELECT SECTOR/, /STAPLES/, "XLP"], [/SELECT SECTOR/, /DISCRETIONARY/, "XLY"], [/SELECT SECTOR/, /MATERIALS/, "XLB"], [/SELECT SECTOR/, /REAL ESTATE/, "XLRE"],
+  [/VANECK/, /JR GOLD/, "GDXJ"], [/VANECK/, /GOLD MINERS/, "GDX"], [/VANECK/, /SEMICONDUCTOR/, "SMH"], [/SPDR SER/, /S&P BIOTECH/, "XBI"], [/SPDR SER/, /S&P REGIONAL BANK/, "KRE"], [/SPDR SER/, /S&P METALS/, "XME"], [/SPDR SER/, /OIL & GAS EXP/, "XOP"], [/SPDR SER/, /S&P HOMEBUILD/, "XHB"], [/VANGUARD/, /FTSE EMERG/, "VWO"], [/VANGUARD/, /TOTAL STK|TOTAL STOCK/, "VTI"], [/VANGUARD/, /S&P 500/, "VOO"], [/INVESCO/, /QQQ/, "QQQ"]];
+function fundName(issuer, cls) { const n = String(issuer || "").trim(), c = String(cls || "").trim(); if (!FUND_RE.test(n) || !c || /^(COM|SHS|ETF|UNIT|TR UNIT|SH BEN INT)$/i.test(c)) return null; const brand = n.replace(/\s+(INC|TR|TRUST|FDS?|FUNDS?|SER(IES)?|INDEX SHS.*|ETF.*|EXCHANGE.*|U ?S ETF.*|SHS.*|STRATEGIC.*|ACTIVELY.*|VECTORS.*|II)$/i, "").replace(/\s+(INC|TR|TRUST|FDS?)$/i, ""); return brand + " · " + c; }
+function etfTicker(n) { const s = String(n || ""); if (s.indexOf(" · ") < 0) return undefined; const i = s.indexOf(" · "), b = s.slice(0, i).toUpperCase(), c = s.slice(i + 3).toUpperCase(); for (const r of ETF_TK) if (r[0].test(b) && r[1].test(c)) return r[2]; return null; }
+const tickOf = (map, n) => { const e = etfTicker(n); return e !== undefined ? e : map ? matchTicker(map, n) : null; };
 export function parseInfoTable(xml) {
   const rows = [], parts = String(xml).split(/<(?:[\w-]+:)?infoTable>/i).slice(1);
   const tag = (s, n) => { const m = s.match(new RegExp("<(?:[\\w-]+:)?" + n + ">([^<]*)<", "i")); return m ? m[1].trim() : ""; };
   const opt = {};   // v14.50 옵션(풋·콜)은 주식 합계에서 빼되, 따로 모아 둔다 — 매크로 투자자의 방향성 베팅을 읽는 재료
   parts.forEach((p) => {
-    const pc = tag(p, "putCall"); if (pc) { const cu = tag(p, "cusip").toUpperCase(), nm = tag(p, "nameOfIssuer").replace(/&amp;/g, "&"), k = (cu || nm) + "|" + pc.toLowerCase(); const o = opt[k] || (opt[k] = { n: nm, cu, pc: /put/i.test(pc) ? "put" : "call", v: 0 }); o.v += num(tag(p, "value")) || 0; return; }
+    const pc = tag(p, "putCall"); if (pc) { const cu = tag(p, "cusip").toUpperCase(), nm0 = tag(p, "nameOfIssuer").replace(/&amp;/g, "&"), nm = fundName(nm0, tag(p, "titleOfClass").replace(/&amp;/g, "&")) || nm0, k = (cu || nm) + "|" + pc.toLowerCase(); const o = opt[k] || (opt[k] = { n: nm, cu, pc: /put/i.test(pc) ? "put" : "call", v: 0 }); o.v += num(tag(p, "value")) || 0; return; }
     const typ = tag(p, "sshPrnamtType"); if (typ && typ.toUpperCase() !== "SH") return;
-    rows.push({ n: tag(p, "nameOfIssuer").replace(/&amp;/g, "&"), cls: tag(p, "titleOfClass"), cu: tag(p, "cusip").toUpperCase(), v: num(tag(p, "value")) || 0, sh: num(tag(p, "sshPrnamt")) || 0 });
+    const n0 = tag(p, "nameOfIssuer").replace(/&amp;/g, "&");
+    rows.push({ n: fundName(n0, tag(p, "titleOfClass").replace(/&amp;/g, "&")) || n0, cls: tag(p, "titleOfClass"), cu: tag(p, "cusip").toUpperCase(), v: num(tag(p, "value")) || 0, sh: num(tag(p, "sshPrnamt")) || 0 });
   });
   const by = {};   // 같은 종목이 여러 줄(운용역별)로 나오면 합친다
   rows.forEach((r) => { const k = r.cu || r.n; const x = by[k] || (by[k] = { n: r.n, cls: r.cls, cu: r.cu, v: 0, sh: 0 }); x.v += r.v; x.sh += r.sh; });
@@ -311,7 +321,7 @@ async function filingTable(cik, acc, deadline) {
 export function diffHoldings(cur, prev, total, map) {
   const P = {}; prev.forEach((x) => { P[x.cu || x.n] = x; });
   const C = {}; cur.forEach((x) => { C[x.cu || x.n] = x; });
-  const tk = (n) => (map ? matchTicker(map, n) : null);
+  const tk = (n) => tickOf(map, n);
   const pTot = prev.reduce((a, x) => a + x.v, 0), pw = (p) => (p && pTot ? p.v / pTot : 0);
   const top = cur.slice().sort((a, b) => b.v - a.v).slice(0, 15).map((x) => { const p = P[x.cu || x.n]; return { n: x.n, t: tk(x.n), v: x.v, sh: x.sh, w: total ? x.v / total : null, pw: p ? +pw(p).toFixed(4) : 0, chg: p ? (p.sh ? x.sh / p.sh - 1 : null) : "new" }; });
   const moves = [];
@@ -333,7 +343,8 @@ export function diffHoldings(cur, prev, total, map) {
 
 /* 13F 계산 본체 — 저장소와 무관 (Vercel 수집기와 GitHub Actions 스크립트가 같이 쓴다)
    prev: 지난 문서 { gurus } · opt.getMap(ms): 티커 대조표를 돌려주는 함수 */
-function histLine(rows, tot, p, map) { const s = rows.slice().sort((a, b) => b.v - a.v); return { p, total: tot, n: rows.length, t5: tot ? +(s.slice(0, 5).reduce((a, x) => a + x.v, 0) / tot).toFixed(4) : null, top: s.slice(0, 5).map((x) => ({ n: x.n, t: map ? matchTicker(map, x.n) : null, w: tot ? +(x.v / tot).toFixed(4) : null })) }; }
+const FV = 1471;   // 구루 계산 기준 번호 — 바뀌면 다음 수집 때 다시 계산
+function histLine(rows, tot, p, map) { const s = rows.slice().sort((a, b) => b.v - a.v); return { p, total: tot, n: rows.length, t5: tot ? +(s.slice(0, 5).reduce((a, x) => a + x.v, 0) / tot).toFixed(4) : null, top: s.slice(0, 5).map((x) => ({ n: x.n, t: tickOf(map, x.n), w: tot ? +(x.v / tot).toFixed(4) : null })) }; }
 export async function buildGurus(prev, opt) {
   const t0 = Date.now(), budget = opt.budgetMs || 15000, maxUpd = opt.maxUpdates || 2, log = { checked: 0, updated: [], errors: [] };
   const U = secUA(); if (!U.hasMail) log.errors.push("SEC_UA에 이메일이 없어요 — SEC가 거절할 수 있어요 (예: StockMind hm@example.com)"); if (U.stripped) log.note = "SEC_UA의 한글·특수문자는 빼고 보냈어요";
@@ -357,7 +368,8 @@ export async function buildGurus(prev, opt) {
         for (const f of q.slice(0, 8)) { if (k >= opt.backfill || Date.now() - t0 > budget * 0.85) break; if (ent.hist.some((h) => h.p === f.period)) continue;
           try { if (!map) map = (await opt.getMap(12000)) || {}; const rows = await filingTable(G.cik, f.acc, t0 + budget); ent.hist.push(histLine(rows, rows.reduce((a, x) => a + x.v, 0), f.period, map)); k++; log.back = (log.back || 0) + 1; } catch (e) { log.errors.push(G.id + " " + f.period + " 과거 분기: " + String(e.message || e).slice(0, 80)); break; } }
         ent.hist.sort((a, b) => String(a.p).localeCompare(String(b.p))); ent.hist = ent.hist.slice(-12); };
-      if (old && old.acc === q[0].acc && old.conc && old.flow !== undefined) {   // conc · flow가 없으면 옛 형식 — 한 번 다시 계산해 새 요약(집중도 · 옵션 · 순매매 · 기록)을 채운다
+      if (old && old.fv !== FV) old.hist = [];   // v14.71 계산 기준(ETF 이름 등)이 바뀌면 지난 분기 기록도 새로 만든다
+      if (old && old.acc === q[0].acc && old.conc && old.flow !== undefined && old.fv === FV) {   // conc · flow가 없으면 옛 형식 — 한 번 다시 계산해 새 요약(집중도 · 옵션 · 순매매 · 기록)을 채운다
         await backfill(old); old.checked = new Date().toISOString(); continue; }
       if (upd >= maxUpd || Date.now() - t0 > budget * 0.6) { pend++; continue; }
       if (!map) map = (await opt.getMap(Math.max(1500, Math.min(12000, budget - (Date.now() - t0))))) || {};
@@ -367,7 +379,7 @@ export async function buildGurus(prev, opt) {
       const hist = ((old && old.hist) || []).filter((h) => h && h.p !== q[0].period), hl = (rows, tot, p) => histLine(rows, tot, p, map);
       if (q[1] && pv.length && !hist.some((h) => h.p === q[1].period)) hist.push(hl(pv, D.prevTotal, q[1].period));
       hist.push(Object.assign(hl(cur, total, q[0].period), { turn: D.turn, nNew: D.nNew, nExit: D.nExit })); hist.sort((a, b) => String(a.p).localeCompare(String(b.p)));
-      byId[G.id] = { id: G.id, nm: G.nm, org: G.org, cik: G.cik, acc: q[0].acc, filed: q[0].filed, period: q[0].period, prevPeriod: q[1] ? q[1].period : null, total, n: cur.length, ...D, hist: hist.slice(-12), checked: new Date().toISOString() };
+      byId[G.id] = { id: G.id, nm: G.nm, org: G.org, cik: G.cik, acc: q[0].acc, filed: q[0].filed, period: q[0].period, prevPeriod: q[1] ? q[1].period : null, total, n: cur.length, ...D, hist: hist.slice(-12), fv: FV, checked: new Date().toISOString() };
       upd++; log.updated.push(G.id); await backfill(byId[G.id]);
     } catch (e) {
       const m = String(e.message || e);
@@ -401,7 +413,7 @@ export async function saveGurusFromUpload(redis, body) {
     byId[g.id] = { id: g.id, nm: ids[g.id].nm, org: ids[g.id].org, cik: ids[g.id].cik, acc: String(g.acc || "").slice(0, 30), filed: String(g.filed || "").slice(0, 10), period: g.period, prevPeriod: g.prevPeriod || null,
       total: +g.total || 0, n: +g.n || 0, nNew: +g.nNew || 0, nExit: +g.nExit || 0, top: clip(g.top, 15), buys: clip(g.buys, 12), sells: clip(g.sells, 12),
       conc: g.conc && typeof g.conc === "object" ? { t1: +g.conc.t1 || 0, t5: +g.conc.t5 || 0, t10: +g.conc.t10 || 0 } : null, turn: g.turn == null ? null : +g.turn || 0, flow: g.flow == null ? null : +g.flow || 0, etfW: g.etfW == null ? null : +g.etfW || 0, prevTotal: +g.prevTotal || 0,
-      opts: clip(g.opts, 8), optSum: g.optSum && typeof g.optSum === "object" ? { put: +g.optSum.put || 0, call: +g.optSum.call || 0 } : null, hist: (Array.isArray(g.hist) ? g.hist.slice(-12) : []), checked: String(g.checked || new Date().toISOString()).slice(0, 30) };
+      opts: clip(g.opts, 8), optSum: g.optSum && typeof g.optSum === "object" ? { put: +g.optSum.put || 0, call: +g.optSum.call || 0 } : null, hist: (Array.isArray(g.hist) ? g.hist.slice(-12) : []), fv: +g.fv || 0, checked: String(g.checked || new Date().toISOString()).slice(0, 30) };
     n++;
   });
   const log = body && body.log ? { at: new Date().toISOString(), checked: +body.log.checked || 0, updated: clip(body.log.updated, 20), errors: clip(body.log.errors, 20).map((x) => String(x).slice(0, 300)), via: "github" } : { at: new Date().toISOString(), via: "github" };
