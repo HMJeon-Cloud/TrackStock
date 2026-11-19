@@ -531,7 +531,7 @@ function gxProfiles(ids) { var o = {}; ids.forEach(function (id) { if (GX_P[id])
 /* 사람마다 지금 상태 — 무엇을 해야 하나 */
 function gxTodo(id) {
   var have = {}; dsGurus().forEach(function (x) { have[x.id] = x; }); var g = have[id], D = GXA.doc || { notes: {}, ai: {} }, N = D.notes[id] || {}, A = D.ai[id], day = 86400e3;
-  if (!g) return { k: "no13f", t: "13F 없음", todo: !N.at || Date.now() - N.at > 30 * day };
+  if (!g) return { k: "no13f", t: "13F 없음", todo: false, noteOld: !N.at || Date.now() - N.at > 30 * day };   // 13F가 들어오면 그때 할 일로 — 13F 수집이 먼저
   if (!A) return { k: "none", t: "해석 없음", todo: true };
   if (A.period !== g.period) return { k: "stale", t: "새 분기", todo: true };
   if ((N.at && N.at > A.at && (N.views || []).length) || (N.memoAt && N.memoAt > A.at)) return { k: "behind", t: "발언 반영 안 됨", todo: true };
