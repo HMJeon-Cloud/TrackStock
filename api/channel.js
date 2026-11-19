@@ -6,6 +6,7 @@ import { loadTickerPairs } from "./_tickers.js";
 import { reqIsOwner } from "./_owner.js";
 import { krHandler } from "./_kr.js";
 import { collectAll, saveGurusFromUpload } from "./_disc.js";
+import { guruHandler } from "./_guru.js";
 import { copyHandler } from "./_copy.js";
 import { claudeHandler } from "./_claude.js";
 import { kvHandler } from "./_kv.js";
@@ -45,6 +46,7 @@ export default async function handler(req, res) {
   if (req.query.op === "claude") return claudeHandler(req, res);
   if (req.query.op === "kv") return kvHandler(req, res);
   if (req.query.op === "follow") return followHandler(req, res, false);
+  if (req.query.op === "guru") return guruHandler(req, res);   // v14.60 구루 발언 조사 · 메모 · AI 해석
   if (req.query.op === "verify") return verifyHandler(req, res);
   if (req.query.op === "kr") return krHandler(req, res);   // v12.71 국내 마감 자료(급등락 순위·업종, 외국인·기관 순매수, 지수 수급)
   if (req.query.op === "disc") return discHandler(req, res);   // v11.2 공시·구루 수동 수집 (운영자) — 크론과 같은 수집기를 시간 넉넉히

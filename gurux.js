@@ -255,3 +255,150 @@ var GX_ORG = { berkshire: "버크셔 해서웨이", pershing: "퍼싱 스퀘어"
     "@media(max-width:640px){.gxCols,.gxLens{grid-template-columns:1fr;gap:10px}.gxR{grid-template-columns:1fr}.gxRk{grid-row:auto}.gxHr{grid-template-columns:78px 1fr 62px}.gxHr small{display:none}.gxTrust{margin-left:0;width:100%}}";
   document.head.appendChild(st);
 })();
+
+/* ============================================================
+   v14.60 — 2~5단계
+   ② 13F 밖의 이야기(발언 조사 · 운영자 메모)  ③ AI 해석  ④ 거장 종합(국면 · 유형별 · 확신 종목)  ⑤ 종목 순위에 반영(묶음 비중 조정 · 종목별 거장 보유)
+   ============================================================ */
+var GXA = { doc: null, loading: null, busy: {} };
+function gxAiLoad(fresh) {
+  if (GXA.doc && !fresh) return Promise.resolve(GXA.doc); if (GXA.loading) return GXA.loading;
+  GXA.loading = fetch("/api/snap?guruai=1" + (fresh ? "&fresh=" + Date.now() : "")).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }).then(function (j) { GXA.doc = j && (j.notes || j.ai) ? j : { notes: {}, ai: {} }; GXA.loading = null; return GXA.doc; });
+  return GXA.loading;
+}
+function gxOwner() { return typeof isOwner === "function" && isOwner(); }
+function gxApi(body) { if (typeof proPost !== "function") return Promise.resolve({ ok: false, msg: "운영자 로그인이 필요해요" }); return proPost("guru", body).catch(function () { return { ok: false, msg: "서버에 닿지 못했어요" }; }); }
+function gxToast(m, k) { if (typeof smToast === "function") smToast(m, k); }
+/* 인물 정보를 글로 — AI에게 주는 재료 */
+function gxProfileText(id) { var P = GX_P[id]; if (!P) return ""; var T = GX_TYPES[P.ty];
+  return ["유형: " + T.nm + (P.style === "swing" ? " (집중 베팅형 — 확신이 있을 때 크게, 틀리면 바로 정리)" : "") + " · 특징: " + (P.tags || []).join(", "), "한 줄: " + P.one, "철학: " + P.phil.join(" / "), "매매 습관: " + P.how.join(" / "), "이력: " + P.hist.map(function (x) { return x[0] + " " + x[1]; }).join(" / "), "이 사람의 13F 읽는 법: " + P.read, "13F의 한계: " + P.tw, "유형에서 버릴 것: " + T.skip].join("\n"); }
+/* 순매매 방향 — 서버 값(flow)이 없으면 주요 매매 목록으로 어림 */
+function gxFlow(g) { if (g.flow != null) return g.flow; var b = (g.buys || []).reduce(function (a, m) { return a + (m.dv || 0); }, 0), s = (g.sells || []).reduce(function (a, m) { return a + (m.dv || 0); }, 0), base = g.prevTotal || g.total; return base ? (b + s) / base : null; }
+function gxClamp(x) { return Math.max(-1, Math.min(1, x)); }
+/* ④ 거장 국면 — 순매매 방향을 '13F 신뢰도 × 유형 가중'으로 평균. 매크로 · 딥밸류는 위험 태도를 더 잘 보여 줘 1.5배, 매크로는 옵션 기울기를 더한다 */
+function gxRegime() {
+  if (typeof dsGurus !== "function") return null; var G = dsGurus(), a = 0, b = 0, rows = [], per = "";
+  G.forEach(function (g) { var P = GX_P[g.id]; if (!P) return; var f = gxFlow(g); if (f == null) return; var x = gxClamp(f / 0.1);
+    if (P.ty === "macro" && g.optSum && g.total) x = gxClamp(x + gxClamp((g.optSum.call - g.optSum.put) / g.total / 0.2) * 0.5);
+    var w = P.trust * (P.ty === "macro" || P.ty === "deep" ? 1.5 : 1); a += x * w; b += w; rows.push({ id: g.id, nm: g.nm, ty: P.ty, f: f, x: x, w: w }); if ((g.period || "") > per) per = g.period; });
+  if (rows.length < 4 || !b) return null; var sc = Math.round(a / b * 100);
+  var say = { up: 0, dn: 0 }, N = (GXA.doc && GXA.doc.notes) || {}; Object.keys(N).forEach(function (id) { var r = N[id] && N[id].stance && N[id].stance.risk; if (r === "확대") say.up++; else if (r === "축소") say.dn++; });
+  return { score: sc, label: sc >= 25 ? "위험 확대" : sc <= -25 ? "위험 축소" : "중립", n: rows.length, rows: rows.sort(function (p, q) { return q.x - p.x; }), period: per, say: say };
+}
+/* 확신 종목 — 집중 투자자(13F 신뢰도 2 이상 · 상위 5종목 30% 이상)가 비중을 바꾼 폭(%p) × 신뢰도 */
+function gxConviction() {
+  var by = {}; (typeof dsGurus === "function" ? dsGurus() : []).forEach(function (g) { var P = GX_P[g.id], c = P && gxConc(g); if (!P || P.trust < 2 || !c || c.t5 < 0.3) return; var tot = g.total || 0;
+    (g.buys || []).concat(g.sells || []).forEach(function (m) { var d = m.pw != null && m.w != null ? m.w - m.pw : (tot ? m.dv / tot : 0); if (Math.abs(d) < 0.005) return; var k = m.t || m.n, x = by[k] || (by[k] = { k: k, t: m.t, n: m.n, s: 0, who: [] }); x.s += d * 100 * P.trust / 3; x.who.push({ nm: g.nm, d: d, kind: m.kind, ty: P.ty }); }); });
+  var L = Object.keys(by).map(function (k) { return by[k]; }); return { up: L.filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 6), dn: L.filter(function (x) { return x.s < 0; }).sort(function (a, b) { return a.s - b.s; }).slice(0, 6) };
+}
+/* 종목 하나를 누가 들고 있나 — 순위 상세 · 다른 화면에서 쓴다 */
+function gxHolders(sym) {
+  var out = []; if (!sym || typeof dsGurus !== "function" || !DS.guru) return out; var s = String(sym).toUpperCase();
+  dsGurus().forEach(function (g) { var P = GX_P[g.id], hit = null; (g.top || []).forEach(function (x, i) { if (x.t === s) hit = { rank: i + 1, w: x.w, chg: x.chg }; });
+    var mv = (g.buys || []).concat(g.sells || []).filter(function (m) { return m.t === s; })[0]; if (!hit && !mv) return;
+    out.push({ id: g.id, nm: g.nm, ty: P ? P.ty : null, trust: P ? P.trust : 0, w: hit ? hit.w : (mv ? mv.w : null), rank: hit ? hit.rank : null, kind: mv ? mv.kind : (hit && hit.chg === "new" ? "new" : "hold"), pw: mv ? mv.pw : null, period: g.period }); });
+  return out.sort(function (a, b) { return (b.w || 0) - (a.w || 0); });
+}
+function gxSumHtml() {
+  var R = gxRegime(), G = dsGurus(); if (!G.length) return "";
+  var open = true; try { open = localStorage.getItem("sm.gurux.sum") !== "0"; } catch (e) {}
+  var h = '<details class="gxSum"' + (open ? " open" : "") + '><summary><b>거장 종합</b>' + (R ? '<span class="gxReg ' + (R.score >= 25 ? "up" : R.score <= -25 ? "dn" : "") + '">' + R.label + ' ' + (R.score > 0 ? "+" : "") + R.score + '</span><small>' + R.n + '명 · ' + (typeof dsQ === "function" ? dsQ(R.period) : R.period) + ' 13F 기준</small>' : '<small>자료가 4명 이상 모이면 계산해요</small>') + '</summary>';
+  if (R) {
+    var pos = Math.round((R.score + 100) / 2);
+    h += '<div class="gxGauge"><div class="gxGb"><i style="left:' + pos + '%"></i></div><div class="gxGl"><span>위험 축소</span><span>중립</span><span>위험 확대</span></div></div>';
+    h += '<p class="gxNote">순매매(주식 수 변화 × 분기 말 가격 ÷ 지난 분기 합계)를 사람마다 -100~+100으로 바꿔 평균했어요. 주가 변동은 빠져 있고, 13F 신뢰도가 높은 사람 · 매크로와 딥밸류 유형에 더 큰 무게를 줬어요.' + (R.say.up + R.say.dn ? ' 발언 조사 기준으로는 위험 확대 ' + R.say.up + '명 · 축소 ' + R.say.dn + '명.' : '') + ' 분기 말 기준이라 45일 넘게 늦은 그림이에요.</p>';
+    h += '<div class="gxTyT"><div class="h"><span>유형</span><span>순매수한 사람 / 순매도한 사람</span><span>옵션</span><span>눈에 띄는 움직임</span></div>' + GX_TY_ORDER.map(function (ty) { var rs = R.rows.filter(function (r) { return r.ty === ty; }); if (!rs.length) return ""; var up = rs.filter(function (r) { return r.f > 0.01; }), dn = rs.filter(function (r) { return r.f < -0.01; }), put = 0, call = 0; G.forEach(function (g) { if (GX_P[g.id] && GX_P[g.id].ty === ty && g.optSum) { put += g.optSum.put || 0; call += g.optSum.call || 0; } });
+      var top = rs.slice().sort(function (a, b) { return Math.abs(b.f) - Math.abs(a.f); })[0];
+      return '<div style="--gx:' + GX_TYPES[ty].c + '"><span><i></i>' + GX_TYPES[ty].nm + '</span><span><b class="pos">' + up.length + '</b> / <b class="neg">' + dn.length + '</b><small>' + rs.length + '명</small></span><span>' + (put + call ? '풋 ' + dsUsd(put) + ' · 콜 ' + dsUsd(call) : '–') + '</span><span>' + (top ? gxE(top.nm) + ' ' + (top.f >= 0 ? "+" : "") + gxPc(top.f) + ' 순매' + (top.f >= 0 ? "수" : "도") : '') + '</span></div>'; }).join("") + '</div>';
+    var C = gxConviction(), row = function (x) { return '<div><span class="gxCn">' + gxE(x.t || x.n) + '</span><b class="' + (x.s > 0 ? "pos" : "neg") + '">' + (x.s > 0 ? "+" : "") + x.s.toFixed(1) + '</b><small>' + x.who.slice(0, 3).map(function (w) { return gxE(w.nm) + " " + (w.kind === "new" ? "신규" : w.kind === "exit" ? "전량 매도" : (w.d > 0 ? "+" : "") + (w.d * 100).toFixed(1) + "%p"); }).join(" · ") + '</small></div>'; };
+    if (C.up.length || C.dn.length) h += '<div class="gxCv"><div><h5>확신을 실은 종목</h5>' + (C.up.map(row).join("") || '<p class="briefDim">없음</p>') + '</div><div><h5>확신을 거둔 종목</h5>' + (C.dn.map(row).join("") || '<p class="briefDim">없음</p>') + '</div></div><p class="gxNote">집중 투자자(13F 신뢰도 ★★ 이상 · 상위 5종목 30% 이상)가 비중을 0.5%p 넘게 바꾼 종목만. 점수 = 비중 변화(%p) × 신뢰도. 수백 종목을 들고 있는 곳은 뺐어요.</p>';
+  }
+  return h + '</details>';
+}
+/* 인물 화면: 13F 밖의 이야기 + AI 해석 */
+function gxAiHtml(id, g) {
+  var D = GXA.doc || { notes: {}, ai: {} }, N = D.notes[id] || {}, A = D.ai[id], own = gxOwner(), T = GX_TYPES[GX_P[id].ty], h = '';
+  var stale = A && g && A.period !== g.period;
+  h += '<div class="mkStep"><b>AI</b>왜 이렇게 움직였나 <small class="briefDim">인물 정보 + 13F 숫자 + 발언을 겹쳐 읽은 추정이에요</small></div>';
+  if (A) {
+    h += '<div class="gxAi" style="--gx:' + T.c + '"><div class="gxAh"><b>' + gxE(A.head) + '</b><span class="gxReg ' + (A.risk === "확대" ? "up" : A.risk === "축소" ? "dn" : "") + '">위험 ' + gxE(A.risk) + '</span></div>' + (stale ? '<p class="gxStale">이 해석은 ' + dsQ(A.period) + ' 기준이에요 — 새 분기 보고서가 나왔어요.</p>' : '') + '<p class="gxAv">' + gxE(A.view) + '</p>' +
+      '<div class="gxIn">' + (A.intent || []).map(function (x) { return '<div><div class="m"><b>' + gxE(x.move) + '</b><span class="gxCf c' + (x.conf === "높음" ? 3 : x.conf === "보통" ? 2 : 1) + '">확신 ' + gxE(x.conf) + '</span></div><p>' + gxE(x.why) + '</p>' + (x.basis ? '<small>근거: ' + gxE(x.basis) + '</small>' : '') + '</div>'; }).join("") + '</div>' +
+      ((A.apply || []).length ? '<h5>우리는 이렇게 적용한다</h5><div class="gxAp">' + A.apply.map(function (x) { return '<div><b>' + gxE(x.do) + '</b><p>' + gxE(x.how) + '</p></div>'; }).join("") + '</div>' : '') +
+      ((A.dont || []).length ? '<h5>이렇게 쓰면 안 된다</h5><ul>' + A.dont.map(function (x) { return '<li>' + gxE(x) + '</li>'; }).join("") + '</ul>' : '') +
+      ((A.watch || []).length ? '<h5>다음 분기에 확인할 것</h5><ul>' + A.watch.map(function (x) { return '<li>' + gxE(x) + '</li>'; }).join("") + '</ul>' : '') +
+      '<p class="gxTw"><b>한계</b> ' + gxE(A.caveat) + ' <span>· ' + new Date(A.at).toISOString().slice(0, 10) + ' 작성' + (A.withNote ? " · 발언 조사 반영" : " · 발언 조사 없이 작성") + (A.withMemo ? " · 메모 반영" : "") + '</span></p></div>';
+  } else h += '<div class="dvNone">' + (own ? "아직 해석을 만들지 않았어요. 발언 조사를 먼저 하면 근거가 더 탄탄해져요." : "아직 해석이 준비되지 않았어요.") + '</div>';
+  if (own && g) h += '<div class="gxBtns"><button type="button" class="chip" data-gxrun="read"' + (GXA.busy[id] ? " disabled" : "") + '>' + (GXA.busy[id] === "read" ? "해석하는 중…" : A ? "해석 다시 만들기" : "해석 만들기") + '</button><small class="briefDim">Claude 1회 · 웹 검색 없음</small></div>';
+  h += '<div class="mkStep"><b>✎</b>13F 밖의 이야기 <small class="briefDim">공매도 · 선물 · 채권 · 현금과 "왜"는 13F에 없어요 — 인터뷰 · 서한에서 찾아요</small></div>';
+  if ((N.views || []).length) h += '<div class="gxNv">' + N.views.map(function (v) { return '<div><span class="d">' + gxE(v.date) + '</span><span class="k">' + gxE(v.kind) + '</span><p>' + gxE(v.say) + (v.pos ? ' <em>' + gxE(v.pos) + '</em>' : '') + '<small>' + (v.url ? '<a href="' + gxE(v.url) + '" target="_blank" rel="noopener">' + gxE(v.src) + '</a>' : gxE(v.src)) + '</small></p></div>'; }).join("") + '</div>' + (N.stance && N.stance.risk !== "미확인" ? '<p class="gxNote"><b>발언으로 본 위험 태도: ' + gxE(N.stance.risk) + '</b> — ' + gxE(N.stance.why) + '</p>' : '') + ((N.miss || []).length ? '<p class="gxNote">찾지 못한 것 · 주의: ' + N.miss.map(gxE).join(" / ") + '</p>' : '') + '<p class="gxNote">' + gxE(N.asOf || "") + ' 조사 · AI가 웹에서 찾은 내용이라 원문 링크로 확인해 주세요.</p>';
+  else if (N.at) h += '<div class="dvNone">최근 6개월 안에서 확인된 발언을 찾지 못했어요' + ((N.miss || []).length ? " — " + N.miss.map(gxE).join(" / ") : "") + '</div>';
+  else h += '<div class="dvNone">' + (own ? "아직 조사하지 않았어요." : "아직 조사된 발언이 없어요.") + '</div>';
+  if (N.memo && !own) h += '<p class="gxMemoV"><b>운영자 메모</b> ' + gxE(N.memo) + '</p>';
+  if (own) h += '<div class="gxBtns"><button type="button" class="chip" data-gxrun="note"' + (GXA.busy[id] ? " disabled" : "") + '>' + (GXA.busy[id] === "note" ? "찾는 중… (1~3분)" : N.at ? "발언 다시 조사" : "발언 조사") + '</button><small class="briefDim">Claude 1회 · 웹 검색 사용</small></div><div class="gxMemo"><textarea data-gxmemo rows="3" placeholder="직접 본 내용을 적어 두면 해석에 반영해요. 예: 11월 인터뷰에서 구리 숏을 언급 — 경기 둔화에 거는 포지션">' + gxE(N.memo || "") + '</textarea><button type="button" class="chip" data-gxrun="memo">메모 저장</button></div>';
+  return h;
+}
+function gxAiBind(box, id) {
+  Array.prototype.forEach.call(box.querySelectorAll("[data-gxrun]"), function (b) { b.onclick = function () { var k = b.getAttribute("data-gxrun"), P = GX_P[id], body;
+    if (k === "memo") { var ta = box.querySelector("[data-gxmemo]"); body = { memo: id, text: ta ? ta.value : "" }; }
+    else if (k === "note") body = { note: id, profile: gxProfileText(id) };
+    else body = { read: id, profile: gxProfileText(id), ty: GX_TYPES[P.ty].nm };
+    if (k !== "memo") { GXA.busy[id] = k; renderGuru(); }
+    gxApi(body).then(function (j) { delete GXA.busy[id]; if (!j || !j.ok) { gxToast((j && (j.msg || j.reason)) || "실패했어요", "bad"); renderGuru(); return; }
+      GXA.doc = GXA.doc || { notes: {}, ai: {} }; if (j.note) GXA.doc.notes[id] = j.note; if (j.ai) GXA.doc.ai[id] = j.ai; gxToast(k === "memo" ? "메모를 저장했어요" : k === "note" ? "발언 조사를 마쳤어요" : "해석을 만들었어요"); renderGuru(); }); }; });
+}
+/* 구루 화면에 2~4단계 얹기 */
+function gxDecorate2() {
+  var box = document.getElementById("guruBody"); if (!box || typeof dsGurus !== "function") return;
+  if (!GXA.doc) { gxAiLoad().then(function () { if (typeof watchPane === "undefined" || watchPane === "guru") renderGuru(); }); }
+  var ty = box.querySelector(".gxTyRow"); if (ty && !box.querySelector(".gxSum")) { var s = document.createElement("div"); s.innerHTML = gxSumHtml(); if (s.firstChild) { var el = s.firstChild; ty.parentNode.insertBefore(el, ty); el.addEventListener("toggle", function () { try { localStorage.setItem("sm.gurux.sum", el.open ? "1" : "0"); } catch (e) {} }); } }
+  var have = {}; dsGurus().forEach(function (x) { have[x.id] = x; });
+  var id = GX.sel && !have[GX.sel] ? GX.sel : DS.g.id; if (!id || !GX_P[id]) return;
+  var w = document.createElement("div"); w.className = "gxAiWrap"; w.innerHTML = gxAiHtml(id, have[id]);
+  var ap = box.querySelector(".gxApply"), anchor = ap ? ap.nextSibling : null;
+  if (ap) ap.parentNode.insertBefore(w, anchor); else { var card = box.querySelector(".gxCard"); if (card) card.parentNode.insertBefore(w, card.nextSibling); else box.appendChild(w); }
+  gxAiBind(w, id);
+}
+/* ⑤ 종목 순위에 반영 — 켰을 때만. 국면 점수가 ±25를 넘으면 묶음 비중을 옮긴다(최대 10점) */
+function gxRankOn() { try { return localStorage.getItem("sm.rank.gx") === "1"; } catch (e) { return false; } }
+function gxAdjPlan() { var R = gxRegime(); if (!R || Math.abs(R.score) < 25) return { R: R, s: 0 }; return { R: R, s: Math.min(10, Math.round(Math.abs(R.score) / 10)) }; }
+function gxAdjW(w) {
+  if (!gxRankOn() || typeof DS === "undefined" || !DS.guru) return w; var P = gxAdjPlan(); if (!P.s || w.length < 5) return w;
+  var o = w.slice(), s = P.s;
+  if (P.R.score < 0) { var d = Math.min(s, o[0]); o[0] -= d; o[2] += Math.ceil(d / 2); o[3] += Math.floor(d / 2); }   // 위험 축소: 가격 · 기술(추세) ↓ → 낙폭 · 단계, 기업 · 본질 ↑
+  else { var d2 = Math.min(s, o[2]); o[2] -= d2; o[0] += d2; }                                                          // 위험 확대: 낙폭 · 단계(깊은 곳 기다리기) ↓ → 가격 · 기술 ↑
+  return o;
+}
+function gxRankBoxHtml() {
+  var on = gxRankOn(), P = gxAdjPlan(), R = P.R, h = '<div class="egBox gxRk"><label class="gxSw"><input type="checkbox" data-gxrank' + (on ? " checked" : "") + '><b>거장 국면 반영</b></label>';
+  if (!R) return h + '<span>거장 13F 자료가 4명 이상 모이면 쓸 수 있어요.</span></div>';
+  h += '<span class="gxReg ' + (R.score >= 25 ? "up" : R.score <= -25 ? "dn" : "") + '">' + R.label + ' ' + (R.score > 0 ? "+" : "") + R.score + '</span><span>' + (!P.s ? "지금은 중립 구간(±25 안)이라 켜도 비중이 바뀌지 않아요." : R.score < 0 ? "거장들이 위험을 줄이는 중 → ① 가격 · 기술 비중 -" + P.s + ", ③ 낙폭 · 단계 +" + Math.ceil(P.s / 2) + ", ④ 기업 · 본질 +" + Math.floor(P.s / 2) + (on ? " (적용 중)" : " (켜면 적용)") : "거장들이 위험을 늘리는 중 → ③ 낙폭 · 단계 비중 -" + P.s + ", ① 가격 · 기술 +" + P.s + (on ? " (적용 중)" : " (켜면 적용)")) + '</span><small>분기 말 기준 13F로 만든 가설이에요. 과거 검증은 아직 못 했어요(쌓인 분기가 적어요) — 켜고 끈 순위를 비교해 참고만 하세요.</small></div>';
+  return h;
+}
+function gxRankMount(el) {
+  if (typeof DS === "undefined") return; if (!DS.guru) { if (typeof dsEnsure === "function" && !GXA._rk) { GXA._rk = 1; dsEnsure().then(function () { return gxAiLoad(); }).then(function () { if (typeof renderRank === "function" && document.getElementById("rankBody")) renderRank(); }); } return; }
+  var top = el.querySelector(".rkTop"); if (!top) return; var w = document.createElement("div"); w.innerHTML = gxRankBoxHtml(); var b = w.firstChild; top.parentNode.insertBefore(b, top.nextSibling);
+  var cb = b.querySelector("[data-gxrank]"); if (cb) cb.onchange = function () { try { localStorage.setItem("sm.rank.gx", cb.checked ? "1" : "0"); } catch (e) {} if (typeof RK !== "undefined") { RK._moods = null; } renderRank(); };
+}
+function gxHoldersHtml(sym) {
+  var H = gxHolders(sym); if (!H.length) return "";
+  var KN = { "new": "신규", add: "증액", trim: "축소", exit: "전량 매도", hold: "유지" };
+  return '<div class="gxHold"><h4>거장 보유 <small>' + (typeof dsQ === "function" ? dsQ(H[0].period) : "") + ' 13F · 순위 점수에는 넣지 않고 참고로 보여 줘요</small></h4>' + H.slice(0, 8).map(function (x) { var T = x.ty ? GX_TYPES[x.ty] : null; return '<div><span class="n">' + (T ? '<i style="background:' + T.c + '"></i>' : '') + gxE(x.nm) + (T ? '<small>' + T.nm + '</small>' : '') + '</span><span>' + (x.w ? gxPc(x.w, 1) + (x.rank ? ' · ' + x.rank + '위' : '') : '–') + '</span><b class="' + (x.kind === "new" || x.kind === "add" ? "pos" : x.kind === "trim" || x.kind === "exit" ? "neg" : "") + '">' + KN[x.kind] + '</b></div>'; }).join("") + '<p>유형에 따라 무게가 달라요 — 매크로 투자자의 작은 비중은 뜻이 약하고, 집중 투자자의 신규 · 전량 매도는 강한 의견이에요.</p></div>';
+}
+(function () {
+  if (typeof renderGuru === "function") { var r1 = renderGuru; renderGuru = function () { r1.apply(this, arguments); try { gxDecorate2(); } catch (e) { if (window.console) console.warn("gx2", e); } }; }
+  if (typeof rkDetailHtml === "function") { var d0 = rkDetailHtml; rkDetailHtml = function (R) { var h = d0.apply(this, arguments); try { h += gxHoldersHtml(R && R.sym); } catch (e) {} return h; }; }
+  var st = document.createElement("style"); st.textContent =
+    ".gxSum{border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px;background:var(--card)}.gxSum summary{cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:15px}.gxSum summary small{color:var(--sub);font-size:12.5px}.gxReg{font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px;background:var(--soft,var(--card2));color:var(--txt2,var(--txt));white-space:nowrap}.gxReg.up{background:#fde8ea;color:var(--up)}.gxReg.dn{background:#e3eefe;color:var(--down)}" +
+    ".gxGauge{margin:14px 0 6px}.gxGb{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,#3182f6 0%,#dfe5ee 45%,#dfe5ee 55%,#f04452 100%)}.gxGb i{position:absolute;top:-4px;width:4px;height:18px;margin-left:-2px;background:var(--txt);border-radius:2px}.gxGl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--sub);margin-top:5px}.gxNote{font-size:12.5px;line-height:1.6;color:var(--sub);margin:8px 0}" +
+    ".gxTyT{display:grid;gap:0;margin:10px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}.gxTyT>div{display:grid;grid-template-columns:150px 150px 170px 1fr;gap:10px;padding:8px 12px;font-size:13px;align-items:center;border-top:1px solid var(--line)}.gxTyT>div.h{border-top:0;background:var(--soft,var(--card2));font-size:12px;font-weight:700;color:var(--sub)}.gxTyT i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gx);margin-right:6px}.gxTyT small{color:var(--sub);margin-left:6px}" +
+    ".gxCv{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}.gxCv h5,.gxAi h5{margin:12px 0 6px;font-size:12px;font-weight:800;color:var(--txt2,var(--txt))}.gxCv h5{margin-top:0}.gxCv>div>div{display:grid;grid-template-columns:70px 50px 1fr;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line);align-items:baseline}.gxCn{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gxCv small{color:var(--sub);font-size:12px}.gxSum .pos,.gxHold .pos{color:var(--up)}.gxSum .neg,.gxHold .neg{color:var(--down)}" +
+    ".gxAiWrap{margin-bottom:16px}.gxAi{border:1px solid var(--line);border-left:3px solid var(--gx);border-radius:10px;padding:14px 16px;background:var(--card)}.gxAh{display:flex;justify-content:space-between;gap:10px;align-items:center}.gxAh b{font-size:16.5px;letter-spacing:-.2px;word-break:keep-all}.gxAv{margin:8px 0 12px;font-size:14px;line-height:1.7;word-break:keep-all}.gxStale{font-size:12.5px;color:#8a6414;background:#fbf1d9;border-radius:6px;padding:6px 10px;margin:8px 0}" +
+    ".gxIn{display:grid;gap:8px}.gxIn>div{padding:10px 12px;border-radius:8px;background:var(--soft,var(--card2))}.gxIn .m{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.gxIn .m b{font-size:14px;word-break:keep-all}.gxIn p{margin:4px 0 2px;font-size:13.5px;line-height:1.65;word-break:keep-all}.gxIn small{font-size:12px;color:var(--sub)}.gxCf{font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap;background:#eceff3;color:#5b6474}.gxCf.c3{background:#e2f4ea;color:#157347}.gxCf.c2{background:#fbf1d9;color:#8a6414}" +
+    ".gxAp{display:grid;grid-template-columns:1fr 1fr;gap:8px}.gxAp>div{border:1px solid var(--line);border-radius:8px;padding:10px 12px}.gxAp b{font-size:13.5px}.gxAp p{margin:4px 0 0;font-size:13px;line-height:1.6;word-break:keep-all}.gxAi ul{margin:0;padding-left:16px}.gxAi li{font-size:13px;line-height:1.65;word-break:keep-all}.gxAi .gxTw span{color:var(--sub)}" +
+    ".gxBtns{display:flex;gap:8px;align-items:center;margin:8px 0 14px}.gxNv{display:grid;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}.gxNv>div{display:grid;grid-template-columns:86px 44px 1fr;gap:8px;padding:9px 12px;border-top:1px solid var(--line);font-size:13px;align-items:baseline}.gxNv>div:first-child{border-top:0}.gxNv .d{color:var(--sub);font-variant-numeric:tabular-nums}.gxNv .k{font-size:11.5px;font-weight:800;color:var(--txt2,var(--sub))}.gxNv p{margin:0;line-height:1.6;word-break:keep-all}.gxNv em{font-style:normal;font-weight:700;background:#fbf1d9;color:#8a6414;border-radius:4px;padding:1px 6px;font-size:12px;white-space:nowrap}.gxNv small{display:block;color:var(--sub);font-size:12px}.gxNv a{color:var(--accent)}" +
+    ".gxMemo{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;margin-bottom:14px}.gxMemo textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;background:var(--card);color:var(--txt)}.gxMemoV{font-size:13px;line-height:1.6;padding:8px 12px;background:var(--soft,var(--card2));border-radius:8px}" +
+    ".gxRk{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px}.gxRk small{flex-basis:100%;color:#8a92a3;font-size:12px}.gxSw{display:inline-flex;gap:6px;align-items:center;cursor:pointer}.gxAdj{color:#c9772b;font-weight:700}" +
+    ".gxHold{margin-top:16px;border-top:1px solid #e6e9ef;padding-top:12px}.gxHold h4{margin:0 0 8px;font-size:14px}.gxHold h4 small{font-weight:500;color:#8a92a3;font-size:12px;margin-left:6px}.gxHold>div{display:grid;grid-template-columns:1fr 110px 80px;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid #eef0f4;align-items:center}.gxHold .n i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}.gxHold .n small{color:#8a92a3;margin-left:6px;font-size:11.5px}.gxHold b{text-align:right}.gxHold p{font-size:12px;color:#8a92a3;margin:8px 0 0}" +
+    "@media(max-width:640px){.gxTyT>div{grid-template-columns:1fr 1fr}.gxTyT>div.h{display:none}.gxCv,.gxAp{grid-template-columns:1fr}.gxNv>div{grid-template-columns:78px 1fr}.gxNv .k{display:none}.gxMemo{grid-template-columns:1fr}}";
+  document.head.appendChild(st);
+})();

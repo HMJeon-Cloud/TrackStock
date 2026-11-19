@@ -321,17 +321,19 @@ export function diffHoldings(cur, prev, total, map) {
   const sw = cur.map((x) => (total ? x.v / total : 0)).sort((a, b) => b - a), sumN = (k) => +sw.slice(0, k).reduce((a, x) => a + x, 0).toFixed(4);
   const isEtf = (x) => /\b(ETF|ISHARES|SPDR|VANGUARD|INVESCO QQQ|PROSHARES|SELECT SECTOR|INDEX FD|INDEX FUND|TR UNIT|GOLD TR|GOLD SHS)\b/i.test(x.n + " " + (x.cls || ""));
   const conc = { t1: sumN(1), t5: sumN(5), t10: sumN(10) }, turn = total ? +(moves.reduce((a, m) => a + Math.abs(m.dv), 0) / 2 / total).toFixed(4) : null;
+  const flow = pTot ? +(moves.reduce((a, m) => a + m.dv, 0) / pTot).toFixed(4) : null;   // v14.60 순매매 — 주가 변동을 뺀 실제 사고판 방향
   const etfW = total ? +(cur.filter(isEtf).reduce((a, x) => a + x.v, 0) / total).toFixed(4) : null;
   const PO = {}; (prev.opts || []).forEach((o) => { PO[(o.cu || o.n) + "|" + o.pc] = o; });
   const opts = (cur.opts || []).slice().sort((a, b) => b.v - a.v).slice(0, 8).map((o) => { const p = PO[(o.cu || o.n) + "|" + o.pc]; return { n: o.n, t: tk(o.n), pc: o.pc, v: o.v, isNew: !p, chg: p && p.v ? +(o.v / p.v - 1).toFixed(3) : null }; });
   const optSum = { put: (cur.opts || []).filter((o) => o.pc === "put").reduce((a, o) => a + o.v, 0), call: (cur.opts || []).filter((o) => o.pc === "call").reduce((a, o) => a + o.v, 0) };
   const buys = moves.filter((m) => m.dv > 0).sort((a, b) => b.dv - a.dv).slice(0, 12).map((m) => Object.assign(m, { t: tk(m.n) }));
   const sells = moves.filter((m) => m.dv < 0).sort((a, b) => a.dv - b.dv).slice(0, 12).map((m) => Object.assign(m, { t: tk(m.n) }));
-  return { top, buys, sells, nNew: moves.filter((m) => m.kind === "new").length, nExit: moves.filter((m) => m.kind === "exit").length, conc, turn, etfW, opts, optSum, prevTotal: pTot };
+  return { top, buys, sells, nNew: moves.filter((m) => m.kind === "new").length, nExit: moves.filter((m) => m.kind === "exit").length, conc, turn, flow, etfW, opts, optSum, prevTotal: pTot };
 }
 
 /* 13F 계산 본체 — 저장소와 무관 (Vercel 수집기와 GitHub Actions 스크립트가 같이 쓴다)
    prev: 지난 문서 { gurus } · opt.getMap(ms): 티커 대조표를 돌려주는 함수 */
+function histLine(rows, tot, p, map) { const s = rows.slice().sort((a, b) => b.v - a.v); return { p, total: tot, n: rows.length, t5: tot ? +(s.slice(0, 5).reduce((a, x) => a + x.v, 0) / tot).toFixed(4) : null, top: s.slice(0, 5).map((x) => ({ n: x.n, t: map ? matchTicker(map, x.n) : null, w: tot ? +(x.v / tot).toFixed(4) : null })) }; }
 export async function buildGurus(prev, opt) {
   const t0 = Date.now(), budget = opt.budgetMs || 15000, maxUpd = opt.maxUpdates || 2, log = { checked: 0, updated: [], errors: [] };
   const U = secUA(); if (!U.hasMail) log.errors.push("SEC_UA에 이메일이 없어요 — SEC가 거절할 수 있어요 (예: StockMind hm@example.com)"); if (U.stripped) log.note = "SEC_UA의 한글·특수문자는 빼고 보냈어요";
@@ -350,18 +352,23 @@ export async function buildGurus(prev, opt) {
       const seenP = {}, q = list.filter((x) => (seenP[x.period] ? false : (seenP[x.period] = 1)));   // 분기별 최신 1건
       const old = byId[G.id];
       if (!q.length) { byId[G.id] = Object.assign(old || { id: G.id }, { checked: new Date().toISOString() }); continue; }
-      if (old && old.acc === q[0].acc && old.conc) {   // conc가 없으면 옛 형식 — 한 번 다시 계산해 새 요약(집중도 · 옵션 · 기록)을 채운다
-        old.checked = new Date().toISOString(); continue; }
+      /* v14.60 과거 분기 채우기 — 기록(hist)에 없는 지난 분기를 최대 8분기까지 받아 한 줄씩 넣는다(opt.backfill: 한 사람당 이번 실행에 받을 분기 수) */
+      const backfill = async (ent) => { if (!opt.backfill || !ent) return; ent.hist = ent.hist || []; let k = 0;
+        for (const f of q.slice(0, 8)) { if (k >= opt.backfill || Date.now() - t0 > budget * 0.85) break; if (ent.hist.some((h) => h.p === f.period)) continue;
+          try { if (!map) map = (await opt.getMap(12000)) || {}; const rows = await filingTable(G.cik, f.acc, t0 + budget); ent.hist.push(histLine(rows, rows.reduce((a, x) => a + x.v, 0), f.period, map)); k++; log.back = (log.back || 0) + 1; } catch (e) { log.errors.push(G.id + " " + f.period + " 과거 분기: " + String(e.message || e).slice(0, 80)); break; } }
+        ent.hist.sort((a, b) => String(a.p).localeCompare(String(b.p))); ent.hist = ent.hist.slice(-12); };
+      if (old && old.acc === q[0].acc && old.conc && old.flow !== undefined) {   // conc · flow가 없으면 옛 형식 — 한 번 다시 계산해 새 요약(집중도 · 옵션 · 순매매 · 기록)을 채운다
+        await backfill(old); old.checked = new Date().toISOString(); continue; }
       if (upd >= maxUpd || Date.now() - t0 > budget * 0.6) { pend++; continue; }
       if (!map) map = (await opt.getMap(Math.max(1500, Math.min(12000, budget - (Date.now() - t0))))) || {};
       const dl = t0 + budget, cur = await filingTable(G.cik, q[0].acc, dl), pv = q[1] ? await filingTable(G.cik, q[1].acc, dl) : [];
       const total = cur.reduce((a, x) => a + x.v, 0), D = diffHoldings(cur, pv, total, map);
       /* 분기 기록 — 새 보고서가 올 때마다 한 줄씩 쌓는다(최근 12분기). 처음에는 지난 분기 한 줄도 같이 넣는다 */
-      const hist = ((old && old.hist) || []).filter((h) => h && h.p !== q[0].period), hl = (rows, tot, p) => { const s = rows.slice().sort((a, b) => b.v - a.v); return { p, total: tot, n: rows.length, t5: tot ? +(s.slice(0, 5).reduce((a, x) => a + x.v, 0) / tot).toFixed(4) : null, top: s.slice(0, 5).map((x) => ({ n: x.n, t: matchTicker(map, x.n), w: tot ? +(x.v / tot).toFixed(4) : null })) }; };
+      const hist = ((old && old.hist) || []).filter((h) => h && h.p !== q[0].period), hl = (rows, tot, p) => histLine(rows, tot, p, map);
       if (q[1] && pv.length && !hist.some((h) => h.p === q[1].period)) hist.push(hl(pv, D.prevTotal, q[1].period));
       hist.push(Object.assign(hl(cur, total, q[0].period), { turn: D.turn, nNew: D.nNew, nExit: D.nExit })); hist.sort((a, b) => String(a.p).localeCompare(String(b.p)));
       byId[G.id] = { id: G.id, nm: G.nm, org: G.org, cik: G.cik, acc: q[0].acc, filed: q[0].filed, period: q[0].period, prevPeriod: q[1] ? q[1].period : null, total, n: cur.length, ...D, hist: hist.slice(-12), checked: new Date().toISOString() };
-      upd++; log.updated.push(G.id);
+      upd++; log.updated.push(G.id); await backfill(byId[G.id]);
     } catch (e) {
       const m = String(e.message || e);
       log.errors.push(G.id + ": " + (/ByteString/i.test(m) ? "SEC_UA에 한글이 있어요 — 영문 이름과 이메일만 넣어 주세요" : /403/.test(m) ? "SEC 거절(403) · 보낸 이름: " + secUA().ua.replace(/([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@/, "$1***@") + " · 응답: " + m.slice(0, 260) : /abort/i.test(m) ? "시간 초과" : m.slice(0, 160)));
@@ -393,7 +400,7 @@ export async function saveGurusFromUpload(redis, body) {
     if (!g || !ids[g.id] || !/^\d{4}-\d{2}-\d{2}$/.test(String(g.period || ""))) return;
     byId[g.id] = { id: g.id, nm: ids[g.id].nm, org: ids[g.id].org, cik: ids[g.id].cik, acc: String(g.acc || "").slice(0, 30), filed: String(g.filed || "").slice(0, 10), period: g.period, prevPeriod: g.prevPeriod || null,
       total: +g.total || 0, n: +g.n || 0, nNew: +g.nNew || 0, nExit: +g.nExit || 0, top: clip(g.top, 15), buys: clip(g.buys, 12), sells: clip(g.sells, 12),
-      conc: g.conc && typeof g.conc === "object" ? { t1: +g.conc.t1 || 0, t5: +g.conc.t5 || 0, t10: +g.conc.t10 || 0 } : null, turn: g.turn == null ? null : +g.turn || 0, etfW: g.etfW == null ? null : +g.etfW || 0, prevTotal: +g.prevTotal || 0,
+      conc: g.conc && typeof g.conc === "object" ? { t1: +g.conc.t1 || 0, t5: +g.conc.t5 || 0, t10: +g.conc.t10 || 0 } : null, turn: g.turn == null ? null : +g.turn || 0, flow: g.flow == null ? null : +g.flow || 0, etfW: g.etfW == null ? null : +g.etfW || 0, prevTotal: +g.prevTotal || 0,
       opts: clip(g.opts, 8), optSum: g.optSum && typeof g.optSum === "object" ? { put: +g.optSum.put || 0, call: +g.optSum.call || 0 } : null, hist: (Array.isArray(g.hist) ? g.hist.slice(-12) : []), checked: String(g.checked || new Date().toISOString()).slice(0, 30) };
     n++;
   });
