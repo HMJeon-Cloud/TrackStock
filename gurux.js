@@ -340,8 +340,8 @@ function gxTick(sym) {
 function gxBlend(sym, p) { var C = gxCfg(); if (!C.on || !C.blend || typeof DS === "undefined" || !DS.guru) return null; var T = gxTick(sym); if (!T) return null; var b = C.blend / 100; return { g: T.score, t: Math.round(p * (1 - b) + T.score * b) }; }
 /* 평가표(자리 점수) 항목 비율 — 본질(체력) 항목은 건드리지 않는다: 거장 국면은 '변수'이지 '본질'이 아니다 */
 function gxCatK(id) { var C = gxCfg(); if (!C.on) return 1; var B = gxBasis(); if (!B || !B.s) return 1; var k = B.s / 20, off = B.score < 0; return id === "tech" ? (off ? 1 - k : 1 + k) : id === "mdd" ? (off ? 1 + k : 1 - k) : id === "ma" ? (off ? 1 + k / 2 : 1 - k / 2) : 1; }
-function gxAdjW(w) {
-  var C = gxCfg(); if (!C.on || typeof DS === "undefined" || !DS.guru) return w; var B = gxBasis(); if (!B || !B.s || w.length < 5) return w; var o = w.slice(), s = B.s;
+function gxAdjW(w, preview) {
+  var C = gxCfg(); if ((!C.on && !preview) || typeof DS === "undefined" || !DS.guru) return w; var B = gxBasis(); if (!B || !B.s || w.length < 5) return w; var o = w.slice(), s = B.s;
   if (B.score < 0) { var d = Math.min(s, o[0]); o[0] -= d; o[2] += Math.ceil(d / 2); o[3] += Math.floor(d / 2); } else { var d2 = Math.min(s, o[2]); o[2] -= d2; o[0] += d2; }
   return o;
 }
@@ -350,7 +350,7 @@ function gxBar(sc) { var p = Math.round((sc + 100) / 2); return '<span class="gx
 /* 설정 판 — 구루 종합과 종목 순위 화면에서 같이 쓴다 */
 function gxCfgHtml() {
   var C = gxCfg(), B = gxBasis(); if (!B) return '<div class="gxCfg"><b>거장 점수 반영</b><p class="gxNote">거장 13F 자료가 4명 이상 모이면 쓸 수 있어요.</p></div>';
-  var TS = B.types, W0 = typeof rkWBase === "function" ? rkWBase() : null, W1 = W0 ? gxAdjW(W0) : null, chips = [["all", "전체 종합"]].concat(GX_TY_ORDER.filter(function (k) { return TS[k]; }).map(function (k) { return [k, GX_TYPES[k].nm]; })).concat([["mix", "내 비율"]]);
+  var TS = B.types, W0 = typeof rkWBase === "function" ? rkWBase() : null, W1 = W0 ? gxAdjW(W0, true) : null, chips = [["all", "전체 종합"]].concat(GX_TY_ORDER.filter(function (k) { return TS[k]; }).map(function (k) { return [k, GX_TYPES[k].nm]; })).concat([["mix", "내 비율"]]);
   var h = '<div class="gxCfg"><div class="gxCfgH"><label class="gxSw"><input type="checkbox" data-gxon' + (C.on ? " checked" : "") + '><b>거장 점수를 앱 점수에 반영</b></label><span class="gxReg ' + (B.score >= 25 ? "up" : B.score <= -25 ? "dn" : "") + '">기준 점수 ' + (B.score > 0 ? "+" : "") + B.score + ' · ' + B.label + '</span></div>';
   h += '<p class="gxNote">거장들의 움직임을 -100(위험 축소) ~ +100(위험 확대)의 점수로 바꾼 뒤, 이 점수를 기준으로 앱이 매기는 다른 점수의 계산 비율을 옮겨요. 어떤 의견을 기준으로 삼을지 고를 수 있어요.</p>';
   h += '<div class="gxCfgR"><span>기준으로 삼을 의견</span><div class="gxChips">' + chips.map(function (c) { return '<button type="button" data-gxbasis="' + c[0] + '" class="' + (C.basis === c[0] ? "on" : "") + '">' + c[1] + '</button>'; }).join("") + '</div></div>';
