@@ -33,6 +33,18 @@ export const GURUS = [
   { id: "thirdpoint", cik: "1040273", nm: "댄 로브", org: "서드 포인트" },
   { id: "tiger", cik: "1167483", nm: "체이스 콜먼", org: "타이거 글로벌" },
   { id: "ark", cik: "1697748", nm: "캐시 우드", org: "ARK 인베스트" },
+  /* v14.50 거장 추가 — chk: SEC에 등록된 이름에 이 말이 들어 있어야 받는다(번호가 틀려 엉뚱한 기관의 보고서를 그 사람 이름으로 보여 주는 일을 막는다) */
+  { id: "tci", cik: "1647251", nm: "크리스 혼", org: "TCI 펀드", chk: "tci" },
+  { id: "fundsmith", cik: "1569205", nm: "테리 스미스", org: "펀드스미스", chk: "fundsmith" },
+  { id: "akre", cik: "1112520", nm: "척 애커", org: "애커 캐피털", chk: "akre" },
+  { id: "pabrai", cik: "1549575", nm: "모니시 파브라이", org: "달랄 스트리트", chk: "dalal" },
+  { id: "greenlight", cik: "1079114", nm: "데이비드 아인혼", org: "그린라이트 캐피털", chk: "greenlight" },
+  { id: "oaktree", cik: "949509", nm: "하워드 막스", org: "오크트리 캐피털", chk: "oaktree" },
+  { id: "icahn", cik: "921669", nm: "칼 아이칸", org: "아이칸 엔터프라이즈", chk: "icahn" },
+  { id: "trian", cik: "1345471", nm: "넬슨 펠츠", org: "트라이언 펀드", chk: "trian" },
+  { id: "coatue", cik: "1135730", nm: "필립 라폰트", org: "코튜 매니지먼트", chk: "coatue" },
+  { id: "altimeter", cik: "1541617", nm: "브래드 거스트너", org: "알티미터 캐피털", chk: "altimeter" },
+  { id: "lonepine", cik: "1061165", nm: "스티븐 맨델", org: "론 파인 캐피털", chk: "lone pine" },
 ];
 
 /* ---------- 공용 ---------- */
@@ -235,7 +247,7 @@ async function secFilings(cik, ms) {
     const s = await secJson("https://data.sec.gov/submissions/CIK" + cik.padStart(10, "0") + ".json", ms);
     const R = s.filings && s.filings.recent; if (!R) throw new Error("filings 없음");
     const out = []; for (let i = 0; i < R.form.length; i++) if (R.form[i] === "13F-HR") out.push({ acc: R.accessionNumber[i], filed: R.filingDate[i], period: R.reportDate[i] });
-    return { list: out, via: "data" };
+    return { list: out, via: "data", name: String(s.name || "") };
   } catch (e) {
     if (!/HTTP 403/.test(e.message)) throw e;
     const xml = await secText("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=" + cik + "&type=13F-HR&dateb=&owner=include&count=10&output=atom", ms).catch((e2) => { throw new Error(e.message + " / www: " + e2.message); });
@@ -244,7 +256,7 @@ async function secFilings(cik, ms) {
       if (tg("filing-type") !== "13F-HR") return; const filed = tg("filing-date"); const acc = tg("accession-number") || tg("accession-nunber");
       if (acc && filed) out.push({ acc, filed, period: tg("period-of-report") || qEnd(filed) });
     });
-    return { list: out, via: "www" };
+    const cn = String(xml).match(/<conformed-name>([^<]*)</i); return { list: out, via: "www", name: cn ? cn[1].trim() : "" };
   }
 }
 const STOP = new Set(["INC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "LIMITED", "PLC", "HLDGS", "HOLDINGS", "HLDG", "HOLDING", "GROUP", "GRP", "THE", "OF", "NEW", "DEL", "DE", "CL", "CLASS", "A", "B", "C", "COM", "SA", "NV", "AG", "SE", "LP", "LLC", "ADR", "SPONSORED", "SPON", "ADS", "SHS", "ORD", "CAP", "STK", "COS", "MD", "NY", "PA"]);
@@ -277,14 +289,15 @@ export function matchTicker(map, issuer) {
 export function parseInfoTable(xml) {
   const rows = [], parts = String(xml).split(/<(?:[\w-]+:)?infoTable>/i).slice(1);
   const tag = (s, n) => { const m = s.match(new RegExp("<(?:[\\w-]+:)?" + n + ">([^<]*)<", "i")); return m ? m[1].trim() : ""; };
+  const opt = {};   // v14.50 옵션(풋·콜)은 주식 합계에서 빼되, 따로 모아 둔다 — 매크로 투자자의 방향성 베팅을 읽는 재료
   parts.forEach((p) => {
-    if (tag(p, "putCall")) return;   // 옵션(풋·콜)은 뺀다
+    const pc = tag(p, "putCall"); if (pc) { const cu = tag(p, "cusip").toUpperCase(), nm = tag(p, "nameOfIssuer").replace(/&amp;/g, "&"), k = (cu || nm) + "|" + pc.toLowerCase(); const o = opt[k] || (opt[k] = { n: nm, cu, pc: /put/i.test(pc) ? "put" : "call", v: 0 }); o.v += num(tag(p, "value")) || 0; return; }
     const typ = tag(p, "sshPrnamtType"); if (typ && typ.toUpperCase() !== "SH") return;
     rows.push({ n: tag(p, "nameOfIssuer").replace(/&amp;/g, "&"), cls: tag(p, "titleOfClass"), cu: tag(p, "cusip").toUpperCase(), v: num(tag(p, "value")) || 0, sh: num(tag(p, "sshPrnamt")) || 0 });
   });
   const by = {};   // 같은 종목이 여러 줄(운용역별)로 나오면 합친다
   rows.forEach((r) => { const k = r.cu || r.n; const x = by[k] || (by[k] = { n: r.n, cls: r.cls, cu: r.cu, v: 0, sh: 0 }); x.v += r.v; x.sh += r.sh; });
-  return Object.values(by);
+  const list = Object.values(by); list.opts = Object.values(opt); return list;
 }
 async function filingTable(cik, acc, deadline) {
   const ms = (cap) => Math.max(1500, Math.min(cap, (deadline || Date.now() + 60000) - Date.now()));
@@ -299,13 +312,22 @@ export function diffHoldings(cur, prev, total, map) {
   const P = {}; prev.forEach((x) => { P[x.cu || x.n] = x; });
   const C = {}; cur.forEach((x) => { C[x.cu || x.n] = x; });
   const tk = (n) => (map ? matchTicker(map, n) : null);
-  const top = cur.slice().sort((a, b) => b.v - a.v).slice(0, 15).map((x) => { const p = P[x.cu || x.n]; return { n: x.n, t: tk(x.n), v: x.v, sh: x.sh, w: total ? x.v / total : null, chg: p ? (p.sh ? x.sh / p.sh - 1 : null) : "new" }; });
+  const pTot = prev.reduce((a, x) => a + x.v, 0), pw = (p) => (p && pTot ? p.v / pTot : 0);
+  const top = cur.slice().sort((a, b) => b.v - a.v).slice(0, 15).map((x) => { const p = P[x.cu || x.n]; return { n: x.n, t: tk(x.n), v: x.v, sh: x.sh, w: total ? x.v / total : null, pw: p ? +pw(p).toFixed(4) : 0, chg: p ? (p.sh ? x.sh / p.sh - 1 : null) : "new" }; });
   const moves = [];
-  cur.forEach((x) => { const p = P[x.cu || x.n], px = x.sh ? x.v / x.sh : 0; if (!p) moves.push({ n: x.n, kind: "new", dsh: x.sh, dv: x.v, v: x.v, w: total ? x.v / total : null }); else if (p.sh && Math.abs(x.sh / p.sh - 1) >= 0.01) moves.push({ n: x.n, kind: x.sh > p.sh ? "add" : "trim", dsh: x.sh - p.sh, dv: (x.sh - p.sh) * px, v: x.v, pct: x.sh / p.sh - 1, w: total ? x.v / total : null }); });
-  prev.forEach((p) => { if (!C[p.cu || p.n]) moves.push({ n: p.n, kind: "exit", dsh: -p.sh, dv: -p.v, v: 0, pct: -1, w: 0 }); });
+  cur.forEach((x) => { const p = P[x.cu || x.n], px = x.sh ? x.v / x.sh : 0; if (!p) moves.push({ n: x.n, kind: "new", dsh: x.sh, dv: x.v, v: x.v, w: total ? x.v / total : null, pw: 0 }); else if (p.sh && Math.abs(x.sh / p.sh - 1) >= 0.01) moves.push({ n: x.n, kind: x.sh > p.sh ? "add" : "trim", dsh: x.sh - p.sh, dv: (x.sh - p.sh) * px, v: x.v, pct: x.sh / p.sh - 1, w: total ? x.v / total : null, pw: +pw(p).toFixed(4) }); });
+  prev.forEach((p) => { if (!C[p.cu || p.n]) moves.push({ n: p.n, kind: "exit", dsh: -p.sh, dv: -p.v, v: 0, pct: -1, w: 0, pw: +pw(p).toFixed(4) }); });
+  /* v14.50 유형별 해석에 쓰는 요약 — 집중도 · 회전율 · ETF 비중 · 옵션 */
+  const sw = cur.map((x) => (total ? x.v / total : 0)).sort((a, b) => b - a), sumN = (k) => +sw.slice(0, k).reduce((a, x) => a + x, 0).toFixed(4);
+  const isEtf = (x) => /\b(ETF|ISHARES|SPDR|VANGUARD|INVESCO QQQ|PROSHARES|SELECT SECTOR|INDEX FD|INDEX FUND|TR UNIT|GOLD TR|GOLD SHS)\b/i.test(x.n + " " + (x.cls || ""));
+  const conc = { t1: sumN(1), t5: sumN(5), t10: sumN(10) }, turn = total ? +(moves.reduce((a, m) => a + Math.abs(m.dv), 0) / 2 / total).toFixed(4) : null;
+  const etfW = total ? +(cur.filter(isEtf).reduce((a, x) => a + x.v, 0) / total).toFixed(4) : null;
+  const PO = {}; (prev.opts || []).forEach((o) => { PO[(o.cu || o.n) + "|" + o.pc] = o; });
+  const opts = (cur.opts || []).slice().sort((a, b) => b.v - a.v).slice(0, 8).map((o) => { const p = PO[(o.cu || o.n) + "|" + o.pc]; return { n: o.n, t: tk(o.n), pc: o.pc, v: o.v, isNew: !p, chg: p && p.v ? +(o.v / p.v - 1).toFixed(3) : null }; });
+  const optSum = { put: (cur.opts || []).filter((o) => o.pc === "put").reduce((a, o) => a + o.v, 0), call: (cur.opts || []).filter((o) => o.pc === "call").reduce((a, o) => a + o.v, 0) };
   const buys = moves.filter((m) => m.dv > 0).sort((a, b) => b.dv - a.dv).slice(0, 12).map((m) => Object.assign(m, { t: tk(m.n) }));
   const sells = moves.filter((m) => m.dv < 0).sort((a, b) => a.dv - b.dv).slice(0, 12).map((m) => Object.assign(m, { t: tk(m.n) }));
-  return { top, buys, sells, nNew: moves.filter((m) => m.kind === "new").length, nExit: moves.filter((m) => m.kind === "exit").length };
+  return { top, buys, sells, nNew: moves.filter((m) => m.kind === "new").length, nExit: moves.filter((m) => m.kind === "exit").length, conc, turn, etfW, opts, optSum, prevTotal: pTot };
 }
 
 /* 13F 계산 본체 — 저장소와 무관 (Vercel 수집기와 GitHub Actions 스크립트가 같이 쓴다)
@@ -324,15 +346,21 @@ export async function buildGurus(prev, opt) {
       const cik10 = G.cik.padStart(10, "0");
       const F = await secFilings(G.cik, Math.max(1500, Math.min(8000, budget - (Date.now() - t0)))); log.checked++; if (F.via === "www") log.via = "www";
       const list = F.list;
+      if (G.chk && F.name && F.name.toLowerCase().indexOf(G.chk) < 0) { log.errors.push(G.id + ": SEC 번호 확인 필요 — 등록된 이름이 '" + F.name.slice(0, 60) + "'라서 받지 않았어요"); continue; }
       const seenP = {}, q = list.filter((x) => (seenP[x.period] ? false : (seenP[x.period] = 1)));   // 분기별 최신 1건
       const old = byId[G.id];
       if (!q.length) { byId[G.id] = Object.assign(old || { id: G.id }, { checked: new Date().toISOString() }); continue; }
-      if (old && old.acc === q[0].acc) { old.checked = new Date().toISOString(); continue; }
+      if (old && old.acc === q[0].acc && old.conc) {   // conc가 없으면 옛 형식 — 한 번 다시 계산해 새 요약(집중도 · 옵션 · 기록)을 채운다
+        old.checked = new Date().toISOString(); continue; }
       if (upd >= maxUpd || Date.now() - t0 > budget * 0.6) { pend++; continue; }
       if (!map) map = (await opt.getMap(Math.max(1500, Math.min(12000, budget - (Date.now() - t0))))) || {};
       const dl = t0 + budget, cur = await filingTable(G.cik, q[0].acc, dl), pv = q[1] ? await filingTable(G.cik, q[1].acc, dl) : [];
       const total = cur.reduce((a, x) => a + x.v, 0), D = diffHoldings(cur, pv, total, map);
-      byId[G.id] = { id: G.id, nm: G.nm, org: G.org, cik: G.cik, acc: q[0].acc, filed: q[0].filed, period: q[0].period, prevPeriod: q[1] ? q[1].period : null, total, n: cur.length, ...D, checked: new Date().toISOString() };
+      /* 분기 기록 — 새 보고서가 올 때마다 한 줄씩 쌓는다(최근 12분기). 처음에는 지난 분기 한 줄도 같이 넣는다 */
+      const hist = ((old && old.hist) || []).filter((h) => h && h.p !== q[0].period), hl = (rows, tot, p) => { const s = rows.slice().sort((a, b) => b.v - a.v); return { p, total: tot, n: rows.length, t5: tot ? +(s.slice(0, 5).reduce((a, x) => a + x.v, 0) / tot).toFixed(4) : null, top: s.slice(0, 5).map((x) => ({ n: x.n, t: matchTicker(map, x.n), w: tot ? +(x.v / tot).toFixed(4) : null })) }; };
+      if (q[1] && pv.length && !hist.some((h) => h.p === q[1].period)) hist.push(hl(pv, D.prevTotal, q[1].period));
+      hist.push(Object.assign(hl(cur, total, q[0].period), { turn: D.turn, nNew: D.nNew, nExit: D.nExit })); hist.sort((a, b) => String(a.p).localeCompare(String(b.p)));
+      byId[G.id] = { id: G.id, nm: G.nm, org: G.org, cik: G.cik, acc: q[0].acc, filed: q[0].filed, period: q[0].period, prevPeriod: q[1] ? q[1].period : null, total, n: cur.length, ...D, hist: hist.slice(-12), checked: new Date().toISOString() };
       upd++; log.updated.push(G.id);
     } catch (e) {
       const m = String(e.message || e);
@@ -364,7 +392,9 @@ export async function saveGurusFromUpload(redis, body) {
   arr.forEach((g) => {
     if (!g || !ids[g.id] || !/^\d{4}-\d{2}-\d{2}$/.test(String(g.period || ""))) return;
     byId[g.id] = { id: g.id, nm: ids[g.id].nm, org: ids[g.id].org, cik: ids[g.id].cik, acc: String(g.acc || "").slice(0, 30), filed: String(g.filed || "").slice(0, 10), period: g.period, prevPeriod: g.prevPeriod || null,
-      total: +g.total || 0, n: +g.n || 0, nNew: +g.nNew || 0, nExit: +g.nExit || 0, top: clip(g.top, 15), buys: clip(g.buys, 12), sells: clip(g.sells, 12), checked: String(g.checked || new Date().toISOString()).slice(0, 30) };
+      total: +g.total || 0, n: +g.n || 0, nNew: +g.nNew || 0, nExit: +g.nExit || 0, top: clip(g.top, 15), buys: clip(g.buys, 12), sells: clip(g.sells, 12),
+      conc: g.conc && typeof g.conc === "object" ? { t1: +g.conc.t1 || 0, t5: +g.conc.t5 || 0, t10: +g.conc.t10 || 0 } : null, turn: g.turn == null ? null : +g.turn || 0, etfW: g.etfW == null ? null : +g.etfW || 0, prevTotal: +g.prevTotal || 0,
+      opts: clip(g.opts, 8), optSum: g.optSum && typeof g.optSum === "object" ? { put: +g.optSum.put || 0, call: +g.optSum.call || 0 } : null, hist: (Array.isArray(g.hist) ? g.hist.slice(-12) : []), checked: String(g.checked || new Date().toISOString()).slice(0, 30) };
     n++;
   });
   const log = body && body.log ? { at: new Date().toISOString(), checked: +body.log.checked || 0, updated: clip(body.log.updated, 20), errors: clip(body.log.errors, 20).map((x) => String(x).slice(0, 300)), via: "github" } : { at: new Date().toISOString(), via: "github" };
