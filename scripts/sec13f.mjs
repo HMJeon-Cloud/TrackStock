@@ -38,5 +38,7 @@ async function main() {
   const j = await r.json().catch(() => ({}));
   line("올리기: HTTP " + r.status + " · " + JSON.stringify(j));
   if (!r.ok || !j.ok) process.exit(1);
+  // v14.80 새 보고서가 온 사람만 '발언 조사 + 해석'을 서버에 맡긴다 — 앱에서 자동 실행을 켜 두었을 때만 실제로 돈다
+  if (result.updated.length) { try { const g = await fetch(SITE + "/api/channel?op=guru", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SECRET }, body: JSON.stringify({ gjob: { ids: result.updated } }) }); line("구루 자동 해석: " + JSON.stringify(await g.json().catch(() => ({})))); } catch (e) { line("구루 자동 해석 요청 실패: " + e.message); } }
 }
 main().catch((e) => { console.error("실패: " + (e && e.stack || e)); process.exit(1); });

@@ -39,6 +39,8 @@ export default async function handler(req, res) {
   if (req.query.op === "guruput") return guruPut(req, res);
   // v13.70 아침 수집기가 부르는 실적 팔로업 자동 수집 — CRON_SECRET(Bearer)으로 확인
   if (req.query.op === "follow" && process.env.CRON_SECRET && String(req.headers.authorization || "") === "Bearer " + process.env.CRON_SECRET) return followHandler(req, res, true);
+  // v14.80 구루 '한 번에 처리' — 다음 차례 이어 달리기 · 13F 수집 뒤 자동 실행 (CRON_SECRET)
+  if (req.query.op === "guru" && process.env.CRON_SECRET && String(req.headers.authorization || "") === "Bearer " + process.env.CRON_SECRET) return guruHandler(req, res, true);
   // 운영자 전용: 토큰이 없으면 내용 없이 거절 (CDN에도 남기지 않음)
   if (!reqIsOwner(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(401).json({ ok: false, reason: "OWNER_ONLY" }); }
   if (req.query.op === "ai") return aiHandler(req, res);

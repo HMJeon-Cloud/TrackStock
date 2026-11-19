@@ -516,3 +516,75 @@ function gxHoldersHtml(sym) {
     "@media(max-width:640px){.gxCfgR{grid-template-columns:1fr;gap:6px}.gxTs>div{grid-template-columns:1fr 90px 40px}.gxTs small{grid-column:1 / -1}.gxTyT>div{grid-template-columns:1fr 1fr}.gxTyT>div.h{display:none}.gxCv,.gxAp{grid-template-columns:1fr}.gxNv>div{grid-template-columns:78px 1fr}.gxNv .k{display:none}.gxMemo{grid-template-columns:1fr}}";
   document.head.appendChild(st);
 })();
+
+/* ============================================================
+   v14.80 한 번에 처리 — 여러 인물의 '13F 밖의 이야기 + 왜 이렇게 움직였나'
+   ① 서버 자동: 고른 사람들을 서버가 3줄로 나눠 이어서 처리(창을 닫아도 계속)
+   ② 묶음 프롬프트: 여러 명을 한 프롬프트로 — 웹 검색이 되는 AI에 한 번 묻고, 답 하나로 모두 저장
+   ③ 13F 수집 뒤 자동: 새 보고서가 온 사람만 자동으로
+   ============================================================ */
+GXA.bsz = 3; GXA.what = "both";
+function gxSel() { if (!GXA._sel) { var a = []; try { a = JSON.parse(localStorage.getItem("sm.gx.sel") || "[]"); } catch (e) {} GXA._sel = {}; a.forEach(function (id) { if (GX_P[id]) GXA._sel[id] = 1; }); } return GXA._sel; }
+function gxSelSave() { try { localStorage.setItem("sm.gx.sel", JSON.stringify(Object.keys(GXA._sel || {}))); } catch (e) {} }
+function gxTyLabel(id) { var P = GX_P[id]; return GX_TYPES[P.ty].nm + ((P.ty2 || []).length ? " (부 유형: " + P.ty2.map(function (t) { return GX_TYPES[t].nm; }).join(", ") + ")" : ""); }
+function gxProfiles(ids) { var o = {}; ids.forEach(function (id) { if (GX_P[id]) o[id] = { p: gxProfileText(id), ty: gxTyLabel(id) }; }); return o; }
+/* 사람마다 지금 상태 — 무엇을 해야 하나 */
+function gxTodo(id) {
+  var have = {}; dsGurus().forEach(function (x) { have[x.id] = x; }); var g = have[id], D = GXA.doc || { notes: {}, ai: {} }, N = D.notes[id] || {}, A = D.ai[id], day = 86400e3;
+  if (!g) return { k: "no13f", t: "13F 없음", todo: !N.at || Date.now() - N.at > 30 * day };
+  if (!A) return { k: "none", t: "해석 없음", todo: true };
+  if (A.period !== g.period) return { k: "stale", t: "새 분기", todo: true };
+  if ((N.at && N.at > A.at && (N.views || []).length) || (N.memoAt && N.memoAt > A.at)) return { k: "behind", t: "발언 반영 안 됨", todo: true };
+  if (!N.at || Date.now() - N.at > 30 * day) return { k: "old", t: N.at ? "발언 " + Math.round((Date.now() - N.at) / day) + "일 전" : "발언 조사 없음", todo: true };
+  return { k: "ok", t: "최신", todo: false };
+}
+function gxJobHtml() {
+  if (!gxOwner()) return ""; var S = gxSel(), ids = Object.keys(GX_P), n = Object.keys(S).length, J = GXA.job, run = J && J.job && !J.done && !J.stale;
+  var h = '<h5 class="gxH5">한 번에 처리 <small class="briefDim">여러 명의 13F 밖의 이야기 + 왜 이렇게 움직였나</small></h5><div class="gxJob">';
+  h += '<div class="gxJq"><button type="button" data-gxsel="todo">할 일만 고르기</button><button type="button" data-gxsel="all">전원</button><button type="button" data-gxsel="none">선택 해제</button>' + GX_TY_ORDER.map(function (k) { return '<button type="button" data-gxsel="ty:' + k + '" style="--gx:' + GX_TYPES[k].c + '"><i></i>' + GX_TYPES[k].nm + '</button>'; }).join("") + '</div>';
+  h += '<div class="gxJl">' + ids.map(function (id) { var T = gxTodo(id), r = J && J.res && J.job && J.job.ids.indexOf(id) >= 0 ? J.res[id] : null; return '<label class="' + (S[id] ? "on" : "") + '"><input type="checkbox" data-gxpick="' + id + '"' + (S[id] ? " checked" : "") + '><i style="background:' + GX_TYPES[GX_P[id].ty].c + '"></i><b>' + gxE(GX_NM[id]) + '</b><span class="st ' + T.k + '">' + T.t + '</span>' + (r ? '<em class="jr ' + r.state + '">' + (r.state === "run" ? (r.phase === "read" ? "해석 중" : "발언 조사 중") : r.state === "done" ? "완료" : "실패") + '</em>' : '') + '</label>'; }).join("") + '</div>';
+  h += '<div class="gxCfgR"><span>할 일</span><div class="gxChips">' + [["both", "발언 조사 + 해석"], ["read", "해석만"], ["note", "발언 조사만"]].map(function (c) { return '<button type="button" data-gxwhat="' + c[0] + '" class="' + (GXA.what === c[0] ? "on" : "") + '">' + c[1] + '</button>'; }).join("") + '</div></div>';
+  var calls = n * (GXA.what === "both" ? 2 : 1), mins = Math.ceil(n / 3) * (GXA.what === "both" ? 4 : GXA.what === "note" ? 3 : 2);
+  h += '<div class="gxJm"><div><h5>① 서버에서 자동으로</h5><p>고른 ' + n + '명을 서버가 3명씩 동시에 처리해요. 창을 닫아도 계속 돌아요. Claude 호출 ' + calls + '회 · 약 ' + (n ? mins : 0) + '분' + (J && J.max ? ' · 오늘 사용 ' + J.used + '/' + J.max + '회' + (J.used + calls > J.max ? ' <b class="neg">— 하루 한도를 넘어요(Vercel의 CLAUDE_DAILY_MAX)</b>' : '') : '') + '</p><div class="gxBtns">' + (run ? '<button type="button" class="chip" data-gxjstop>멈추기</button>' : '<button type="button" class="chip" data-gxjgo' + (n ? "" : " disabled") + '>' + n + '명 시작</button>') + '</div><div class="gxJobSt">' + gxJobStHtml() + '</div></div>';
+  var chunks = [], sel = ids.filter(function (id) { return S[id]; }); for (var i = 0; i < sel.length; i += GXA.bsz) chunks.push(sel.slice(i, i + GXA.bsz));
+  h += '<div><h5>② 묶음 프롬프트로 직접</h5><p>' + GXA.bsz + '명을 한 프롬프트에 담아요. 웹 검색이 되는 AI에 붙여 넣고, 받은 답 하나를 붙여 넣으면 그 묶음 모두 저장돼요. 답이 끊기면 묶음 인원을 줄여 주세요.</p><div class="gxChips">' + [2, 3, 4].map(function (k) { return '<button type="button" data-gxbsz="' + k + '" class="' + (GXA.bsz === k ? "on" : "") + '">' + k + '명씩</button>'; }).join("") + '</div><div class="gxBtns gxBw">' + (chunks.length ? chunks.map(function (c, k) { return '<button type="button" class="chip" data-gxbprep="' + c.join(",") + '">' + (k + 1) + '묶음 복사 · ' + c.map(function (id) { return gxE(GX_NM[id]); }).join(", ") + '</button>'; }).join("") : '<small class="briefDim">위에서 인물을 골라 주세요</small>') + '</div><div class="gxMemo"><textarea data-gxbans rows="4" placeholder="AI가 준 답 전체를 붙여 넣어요 — {&quot;people&quot;:[ ... ]}"></textarea><button type="button" class="chip" data-gxbsave>답 저장(여러 명)</button></div></div></div>';
+  var cfg = (J && J.cfg) || {}; h += '<label class="gxSw gxAuto"><input type="checkbox" data-gxauto' + (cfg.auto ? " checked" : "") + '><b>③ 새 13F가 들어오면 그 사람만 자동으로 발언 조사 + 해석</b><small>매주 화요일 13F 수집 뒤 · 새 보고서가 온 사람만 · 켜면 Claude 사용이 자동으로 생겨요</small></label>';
+  return h + '</div>';
+}
+function gxJobStHtml() {
+  var J = GXA.job; if (!J || !J.job) return ""; var jb = J.job, R = J.res || {}, ok = 0, fail = [], runN = [];
+  jb.ids.forEach(function (id) { var r = R[id]; if (!r) return; if (r.state === "done") ok++; else if (r.state === "fail") fail.push(GX_NM[id] + ": " + (r.read && r.read !== "ok" ? r.read : r.note)); else if (r.state === "run") runN.push(GX_NM[id] + (r.phase === "read" ? "(해석)" : "(발언)")); });
+  var when = new Date(jb.at); return '<div class="gxJs"><b>' + (J.done ? "끝남" : J.stale ? "멈춘 것 같아요(12분 넘게 소식 없음)" : jb.stop ? "멈추는 중" : "진행 중") + ' · ' + J.fin + '/' + jb.ids.length + '명</b><span>' + (jb.by === "auto" ? "13F 수집 뒤 자동 · " : "") + (when.getMonth() + 1) + '/' + when.getDate() + ' ' + String(when.getHours()).padStart(2, "0") + ':' + String(when.getMinutes()).padStart(2, "0") + ' 시작</span><div class="gxJb"><i style="width:' + Math.round(J.fin / jb.ids.length * 100) + '%"></i></div>' + (runN.length ? '<small>지금: ' + runN.map(gxE).join(", ") + '</small>' : '') + (fail.length ? '<small class="neg">실패 ' + fail.length + '명 — ' + fail.slice(0, 4).map(gxE).join(" / ") + '</small>' : '') + (J.done && ok ? '<small>끝난 사람의 결과는 각 인물 화면에 저장됐어요. 이어서 위의 \'종합 해석\'을 다시 만들면 전체 그림이 갱신돼요.</small>' : '') + '</div>';
+}
+function gxJobLoad() { return gxApi({ jobstatus: 1 }).then(function (j) { if (j && j.ok) GXA.job = j; return GXA.job; }); }
+function gxJobPoll() {
+  if (GXA._poll) return; GXA._poll = setInterval(function () {
+    var el = document.querySelector(".gxJobSt"); if (!el) { clearInterval(GXA._poll); GXA._poll = null; return; }
+    var was = GXA.job ? GXA.job.fin : -1; gxJobLoad().then(function (J) { if (!J) return; var e2 = document.querySelector(".gxJobSt"); if (e2) e2.innerHTML = gxJobStHtml();
+      if (J.fin !== was) gxApi({ get: 1 }).then(function (d) { if (d && d.ok) { GXA.doc = d.doc; GXA._bs = null; } if (J.done || J.stale) { clearInterval(GXA._poll); GXA._poll = null; renderGuru(); } }); }); }, 15000);
+}
+function gxJobBind(el) {
+  if (!el.querySelector(".gxJob")) return; var S = gxSel(), re = function () { renderGuru(); };
+  Array.prototype.forEach.call(el.querySelectorAll("[data-gxpick]"), function (c) { c.onchange = function () { var id = c.getAttribute("data-gxpick"); if (c.checked) S[id] = 1; else delete S[id]; gxSelSave(); re(); }; });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-gxsel]"), function (b) { b.onclick = function () { var k = b.getAttribute("data-gxsel"); Object.keys(GX_P).forEach(function (id) { var on = k === "all" ? 1 : k === "none" ? 0 : k === "todo" ? gxTodo(id).todo : k.indexOf("ty:") === 0 ? GX_P[id].ty === k.slice(3) : 0; if (k.indexOf("ty:") === 0) { if (on) S[id] = 1; } else if (on) S[id] = 1; else delete S[id]; }); gxSelSave(); re(); }; });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-gxwhat]"), function (b) { b.onclick = function () { GXA.what = b.getAttribute("data-gxwhat"); re(); }; });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-gxbsz]"), function (b) { b.onclick = function () { GXA.bsz = +b.getAttribute("data-gxbsz"); re(); }; });
+  var go = el.querySelector("[data-gxjgo]"); if (go) go.onclick = function () { var ids = Object.keys(GX_P).filter(function (id) { return S[id]; }); go.disabled = true; go.textContent = "시작하는 중…";
+    gxApi({ job: { ids: ids, what: GXA.what, lanes: 3, profiles: gxProfiles(ids) } }).then(function (j) { if (!j || !j.ok) { gxToast((j && j.msg) || "시작하지 못했어요", "bad"); re(); return; } gxToast(ids.length + "명 처리를 시작했어요 — 창을 닫아도 계속돼요"); gxJobLoad().then(function () { re(); gxJobPoll(); }); }); };
+  var st = el.querySelector("[data-gxjstop]"); if (st) st.onclick = function () { gxApi({ jobstop: 1 }).then(function () { gxToast("지금 처리 중인 사람까지만 하고 멈춰요"); gxJobLoad().then(re); }); };
+  Array.prototype.forEach.call(el.querySelectorAll("[data-gxbprep]"), function (b) { b.onclick = function () { var ids = b.getAttribute("data-gxbprep").split(","); b.disabled = true; gxApi({ prep: "batch", ids: ids, profiles: gxProfiles(ids) }).then(function (j) { b.disabled = false; if (!j || !j.ok) { gxToast((j && j.msg) || "프롬프트를 만들지 못했어요", "bad"); return; } GXA.lastPrompt = j.prompt; gxCopy(j.prompt); b.classList.add("done"); gxToast(j.n + "명 묶음 프롬프트를 복사했어요 · " + j.prompt.length.toLocaleString() + "자"); }); }; });
+  var bs = el.querySelector("[data-gxbsave]"); if (bs) bs.onclick = function () { var ta = el.querySelector("[data-gxbans]"), t = ta ? ta.value.trim() : ""; if (t.length < 30) { gxToast("답을 붙여 넣어 주세요", "bad"); return; } bs.disabled = true;
+    gxApi({ save: "batch", text: t }).then(function (j) { bs.disabled = false; if (!j || !j.ok) { gxToast((j && j.msg) || "저장하지 못했어요", "bad"); return; } if (j.doc) { GXA.doc = j.doc; GXA._bs = null; } gxToast("저장: " + j.saved.join(", ") + (j.cut ? " — 답이 중간에 끊겨 온전한 사람까지만 저장했어요" : "") + (j.skip.length ? " · 건너뜀: " + j.skip.join(", ") : ""), j.cut ? "warn" : undefined); re(); }); };
+  var au = el.querySelector("[data-gxauto]"); if (au) au.onchange = function () { gxApi({ jobcfg: { auto: au.checked, what: "both" }, profiles: au.checked ? gxProfiles(Object.keys(GX_P)) : null }).then(function (j) { if (!j || !j.ok) { gxToast("설정을 저장하지 못했어요", "bad"); return; } GXA.job = GXA.job || {}; GXA.job.cfg = j.cfg; gxToast(au.checked ? "새 13F가 들어오면 그 사람만 자동으로 처리해요" : "자동 처리를 껐어요"); }); };
+  if (GXA.job && GXA.job.job && !GXA.job.done && !GXA.job.stale) gxJobPoll();
+}
+(function () {
+  if (typeof gxSumHtml === "function") { var s0 = gxSumHtml; gxSumHtml = function () { var h = s0.apply(this, arguments); var j = gxJobHtml(); if (!j) return h; var k = h.indexOf('<h5 class="gxH5">앱 점수에 반영하기</h5>'); return k > 0 ? h.slice(0, k) + j + h.slice(k) : h.replace(/<\/details>$/, j + "</details>"); }; }
+  if (typeof gxSumBind === "function") { var b0 = gxSumBind; gxSumBind = function (el) { b0.apply(this, arguments); try { gxJobBind(el); } catch (e) { if (window.console) console.warn("gxjob", e); } if (gxOwner() && !GXA._jl) { GXA._jl = 1; gxJobLoad().then(function () { renderGuru(); }); } }; }
+  var st = document.createElement("style"); st.textContent =
+    ".gxJob{border:1px solid var(--line,#e6e9ef);border-radius:10px;padding:12px 14px;background:var(--card,#fff)}.gxJq{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.gxJq button{border:1px solid var(--line,#e6e9ef);background:var(--card,#fff);border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--txt2,#4e5968);display:inline-flex;align-items:center;gap:5px}.gxJq i{width:7px;height:7px;border-radius:50%;background:var(--gx)}" +
+    ".gxJl{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:4px 10px;margin-bottom:8px}.gxJl label{display:flex;align-items:center;gap:6px;font-size:13px;padding:5px 8px;border-radius:7px;cursor:pointer}.gxJl label.on{background:var(--soft,#f2f4f6)}.gxJl i{width:7px;height:7px;border-radius:50%;flex:0 0 auto}.gxJl b{font-weight:700;white-space:nowrap}.gxJl .st{font-size:11.5px;color:var(--sub,#8b95a1);margin-left:auto;white-space:nowrap}.gxJl .st.none,.gxJl .st.stale,.gxJl .st.behind{color:#c9772b;font-weight:700}.gxJl .jr{font-style:normal;font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;background:#eceff3;white-space:nowrap}.gxJl .jr.run{background:#fbf1d9;color:#8a6414}.gxJl .jr.done{background:#e2f4ea;color:#157347}.gxJl .jr.fail{background:#fde8ea;color:#c03b3b}" +
+    ".gxJm{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}.gxJm>div{border:1px solid var(--line,#e6e9ef);border-radius:8px;padding:10px 12px}.gxJm h5{margin:0 0 4px;font-size:13px;font-weight:800}.gxJm p{margin:0 0 8px;font-size:12.5px;line-height:1.6;color:var(--txt2,#4e5968);word-break:keep-all}.gxBw{flex-wrap:wrap}.gxBw .chip.done{opacity:.6}.gxJs{display:grid;gap:4px;font-size:12.5px}.gxJs span{color:var(--sub,#8b95a1)}.gxJb{height:6px;border-radius:3px;background:var(--soft,#f2f4f6);overflow:hidden}.gxJb i{display:block;height:100%;background:var(--txt,#191f28)}.gxJs .neg{color:var(--down,#3182f6)}.gxAuto{margin-top:12px;flex-wrap:wrap;font-size:13px}.gxAuto small{flex-basis:100%;color:var(--sub,#8b95a1);font-size:12px;margin-left:22px}" +
+    "@media(max-width:640px){.gxJm{grid-template-columns:1fr}.gxJl{grid-template-columns:1fr 1fr}.gxJl .st{display:none}}";
+  document.head.appendChild(st);
+})();

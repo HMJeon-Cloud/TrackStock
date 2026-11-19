@@ -468,7 +468,8 @@ async function callClaude(key, payload, ms, allowThinkOff) {
 }
 
 /* 실제 작업 — 결과 객체를 돌려준다(응답은 claudeHandler 가). used 는 미리 세어 둔 오늘 횟수 */
-export function taskSystem(name) { return (TASKS[name] && TASKS[name].system) || ""; }   // v14.70 직접 물어보기용 프롬프트를 만들 때 쓴다
+export function taskSystem(name, noBase) { const t = (TASKS[name] && TASKS[name].system) || ""; return noBase && t.indexOf(BASE) === 0 ? t.slice(BASE.length).trim() : t; }
+export function baseSystem() { return BASE; }   // v14.70 직접 물어보기용 프롬프트를 만들 때 쓴다
 export async function runClaude(body, key, used) {
   const T = TASKS[body.task];
   /* v14.00 실적 팔로업(받아오기)은 전용 모델을 쓴다 — FOLLOW_MODEL, 없으면 Opus 5.5. 글 작성 등 다른 작업은 그대로 ANTHROPIC_MODEL.
