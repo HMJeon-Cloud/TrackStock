@@ -7,6 +7,12 @@
 //     · fed   미 기준금리 (목표 상단, 2008.12 이전은 단일 목표) DFEDTAR + DFEDTARU → 바뀐 날만
 //     · us10y 미 국채 10년 금리 (일별) DGS10
 //     · m2    미 M2 통화량 (월별, 10억 달러) M2SL
+//   v15.00 매크로 전문가의 기본 계기판 (모두 FRED · 일별은 주 1개로 줄여 저장)
+//     · t10y3m 장단기 금리차 10년 − 3개월 (T10Y3M)      — 침체 예고 지표
+//     · baa10y 신용 스프레드 Baa 회사채 − 10년 국채 (BAA10Y) — 신용 위험
+//     · nfci   시카고 연준 금융여건지수 (NFCI, 주별)     — 0 위 = 평균보다 조임
+//     · real10 10년 물가연동국채 금리 (DFII10)           — 실질금리
+//     · sahm   삼 법칙 실시간 값 (SAHMREALTIME, 월별)    — 0.5 이상 = 침체 시작 신호
 //   저장: Redis sm:macro (gzip, 기존 스냅샷과 같은 방식) · 공개 읽기 /api/snap?macro=1
 //   실행: 아침 수집 크론 안에서 하루 한 번(지표마다 오늘 받았으면 건너뜀) · 운영자 수동(/api/channel?op=disc&part=macro)
 //   처음엔 1995년부터 전부, 그 뒤로는 최근 60일(M2는 2년)만 받아 덮어쓴다 — 크론 개수·함수 개수 그대로
@@ -25,6 +31,11 @@ export const MACRO_DEF = {
   fed: { n: "미국 기준금리(상단)", u: "%", f: "S", src: "FRED" },
   us10y: { n: "미 국채 10년 금리", u: "%", f: "D", src: "FRED" },
   m2: { n: "미국 M2 통화량", u: "십억 달러", f: "M", src: "FRED" },
+  t10y3m: { n: "장단기 금리차(10년−3개월)", u: "%p", f: "W", src: "FRED" },
+  baa10y: { n: "신용 스프레드(Baa−10년)", u: "%p", f: "W", src: "FRED" },
+  nfci: { n: "금융여건지수(NFCI)", u: "", f: "W", src: "FRED · 시카고 연준" },
+  real10: { n: "미 실질금리(10년 물가연동)", u: "%", f: "W", src: "FRED" },
+  sahm: { n: "삼 법칙(실시간)", u: "%p", f: "M", src: "FRED" },
 };
 
 function kstYmd(t) { return new Date((t == null ? Date.now() : t) + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, ""); }
@@ -82,6 +93,8 @@ async function fred(id, from, ms) {
 
 /* 계단 지표(기준금리)는 바뀐 날만 남긴다 */
 export function steps(rows) { const out = []; rows.forEach((r) => { if (!out.length || out[out.length - 1][1] !== r[1]) out.push(r); }); return out; }
+/* 일별 → 주 1개(그 주의 마지막 값). 월요일에 주가 바뀐다 — 금리차 · 스프레드는 주 단위면 충분하고 저장 크기를 1/5로 줄인다 */
+export function weekly(rows) { const out = []; let k0 = null; rows.forEach((r) => { const k = Math.floor((Date.UTC(+r[0].slice(0, 4), +r[0].slice(4, 6) - 1, +r[0].slice(6, 8)) / DAY + 3) / 7); if (k === k0) out[out.length - 1] = r; else { out.push(r); k0 = k; } }); return out; }
 /* 기존 + 새로 받은 것: 새 값의 첫 날짜부터 갈아끼운다 */
 export function merge(old, add) {
   if (!add.length) return old || [];
@@ -103,6 +116,11 @@ const JOBS = {
   },
   us10y: (ctx, from) => fred("DGS10", from, ctx.tmo()),
   m2: (ctx, from) => fred("M2SL", from, ctx.tmo()),
+  t10y3m: async (ctx, from) => weekly(await fred("T10Y3M", from, ctx.tmo())),
+  baa10y: async (ctx, from) => weekly(await fred("BAA10Y", from, ctx.tmo())),
+  nfci: async (ctx, from) => weekly(await fred("NFCI", from, ctx.tmo())),
+  real10: async (ctx, from) => weekly(await fred("DFII10", from, ctx.tmo())),
+  sahm: (ctx, from) => fred("SAHMREALTIME", from, ctx.tmo()),
 };
 
 export async function collectMacro(redis, opt) {
@@ -117,7 +135,7 @@ export async function collectMacro(redis, opt) {
   await Promise.all(ids.map(async (id) => {
     if ((id === "krw" || id === "bok") && !key) { log.errors.push(MACRO_DEF[id].n + ": ECOS_API_KEY 없음"); return; }
     const old = S[id] && S[id].d && S[id].d.length ? S[id].d : null;
-    const from = !old || opt.full ? START : id === "m2" ? ymdAdd(today, -730) : MACRO_DEF[id].f === "S" ? ymdAdd(old[old.length - 1][0], -10) : ymdAdd(today, -60);
+    const from = !old || opt.full ? START : MACRO_DEF[id].f === "M" ? ymdAdd(today, -730) : MACRO_DEF[id].f === "S" ? ymdAdd(old[old.length - 1][0], -10) : ymdAdd(today, MACRO_DEF[id].f === "W" ? -70 : -60);
     try {
       if (left() < 1500) throw new Error("시간 부족");
       const rows = await JOBS[id](ctx, from); log.calls++;

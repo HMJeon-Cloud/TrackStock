@@ -97,6 +97,7 @@ export async function runNote(rc, G, prof) {
 export async function runRead(rc, G, prof, ty) {
   const key = process.env.ANTHROPIC_API_KEY; if (!key) return { ok: false, msg: "ANTHROPIC_API_KEY 없음" };
   const gd = (await readDoc(rc, DISC_KEY.guru)) || { gurus: [] }, g = (gd.gurus || []).filter((x) => x.id === G.id)[0] || null;
+  if (G.voice) return { ok: false, voice: true, msg: "발언형 인물이에요(13F 없음) — 발언 조사만 해요" };
   if (!g) return { ok: false, msg: "이 인물의 13F를 아직 받지 않았어요 — GitHub의 'SEC 13F 수집'을 먼저 실행해 주세요" };
   const sl = await claudeSlot(rc); if (sl.over) return { ok: false, msg: "오늘 Claude 작업 횟수(CLAUDE_DAILY_MAX)를 다 썼어요" };
   const nt = (await readAi(rc)).notes[G.id] || {};
@@ -114,7 +115,7 @@ export function batchPrompt(people) {
   L.push("\n[2단계 규칙 — 해석]\n" + taskSystem("guruA", 1).replace(/^이번 작업:[\s\S]*?분석 순서/, "분석 순서").replace(/출력: JSON 하나만[\s\S]*$/, "").replace(/- 답은 설명 없이[^\n]*\n?/, "").trim());
   L.push("\n[출력 — JSON 하나만. 설명 · 인사 · 코드블록 표시 없이 { 로 시작해 } 로 끝낸다. 이 답은 앱에 그대로 붙여 넣어 한 번에 저장한다]\n{\"people\":[{\"id\":\"인물 머리말의 id 그대로\",\"note\":{\"views\":[{\"date\":\"YYYY-MM-DD\",\"kind\":\"발언|서한|보도|공시\",\"say\":\"...\",\"pos\":\"자산 · 방향 또는 빈 문자열\",\"src\":\"매체 · 행사\",\"url\":\"https://...\"}],\"stance\":{\"risk\":\"확대|중립|축소|미확인\",\"why\":\"...\"},\"themes\":[\"...\"],\"miss\":[\"...\"]},\"ai\":{\"head\":\"40자 안\",\"view\":\"...\",\"shift\":\"...\",\"intent\":[{\"move\":\"90자 안\",\"why\":\"...\",\"alt\":\"...\",\"basis\":\"...\",\"conf\":\"높음|보통|낮음\"}],\"consist\":\"...\",\"apply\":[{\"do\":\"...\",\"how\":\"...\"}],\"dont\":[\"...\"],\"watch\":[\"...\"],\"risk\":\"확대|중립|축소|미확인\",\"caveat\":\"...\"}}]}\n13F를 아직 받지 않은 인물(13F 숫자 없음)은 ai를 빼고 note만 쓴다. people의 순서는 아래 인물 순서와 같게.");
   L.push("\n오늘: " + kstDay() + " (한국 시간)");
-  people.forEach((x, i) => { L.push("\n\n==================== 인물 " + (i + 1) + "/" + people.length + " · id: " + x.G.id + " ===================="); L.push(x.g ? inRead(x.G, x.g, x.prof, x.ty, x.nt) : "[인물] " + x.G.nm + " · " + x.G.org + "\n[인물 정보]\n" + (x.prof || "(없음)") + "\n\n[13F 숫자] 아직 받지 않음 — note만 답한다."); if (x.nt && (x.nt.views || []).length) L.push("\n(위 '13F 밖의 이야기'는 이미 저장된 조사다. 1단계에서 다시 확인하고 그 뒤의 새 발언을 보충한다.)"); });
+  people.forEach((x, i) => { L.push("\n\n==================== 인물 " + (i + 1) + "/" + people.length + " · id: " + x.G.id + " ===================="); L.push(x.g ? inRead(x.G, x.g, x.prof, x.ty, x.nt) : "[인물] " + x.G.nm + " · " + x.G.org + "\n[인물 정보]\n" + (x.prof || "(없음)") + "\n\n[13F 숫자] " + (x.G.voice ? "없음 — 13F로 읽지 않는 발언형 인물이다. note만 답한다(ai는 쓰지 않는다)." : "아직 받지 않음 — note만 답한다.")); if (x.nt && (x.nt.views || []).length) L.push("\n(위 '13F 밖의 이야기'는 이미 저장된 조사다. 1단계에서 다시 확인하고 그 뒤의 새 발언을 보충한다.)"); });
   return L.join("\n");
 }
 /* 붙여 넣은 묶음 답 — 끊긴 답이어도 온전한 인물까지는 살린다 */
@@ -148,7 +149,12 @@ export async function guruHandler(req, res, viaCron) {
       if (ss.length) L.push("  판 것: " + ss.map((m) => nm(m) + (m.kind === "exit" ? " 전량 매도" : " 축소") + pcw(m)).join(", "));
       if (nt.stance && nt.stance.risk && nt.stance.risk !== "미확인") L.push("  발언으로 본 위험 태도: " + nt.stance.risk + " — " + nt.stance.why + ((nt.views || []).length ? " (최근 발언 " + nt.views[0].date + ")" : ""));
       if (doc.ai[g.id] && doc.ai[g.id].period === g.period && doc.ai[g.id].head) L.push("  개별 해석 한 줄: " + doc.ai[g.id].head + " (위험 " + doc.ai[g.id].risk + ")"); });
-    return "[앱이 계산한 종합 숫자]\n" + String(ctx || "").slice(0, 6000) + "\n\n[인물별 요약 — " + L.filter((x) => x[0] === "■").length + "명]\n" + L.join("\n"); };
+    /* v15.00 발언형(13F 없음) — 조사한 발언이 있는 사람만, 위험 태도와 최근 발언 두 줄 */
+    const V = []; GURUS.filter((G) => G.voice).forEach((G) => { const p = P[G.id], nt = doc.notes[G.id]; if (!p || !nt || !(nt.views || []).length) return;
+      V.push("□ " + G.nm + " (" + G.org + ") · 발언형(13F 없음) · 유형: " + S(p.ty, 60) + " · " + S(p.one, 80));
+      if (nt.stance && nt.stance.risk && nt.stance.risk !== "미확인") V.push("  발언으로 본 위험 태도: " + nt.stance.risk + " — " + nt.stance.why);
+      nt.views.slice(0, 2).forEach((v) => V.push("  " + v.date + " · " + v.src + ": " + S(v.say, 220) + (v.pos ? " / 포지션: " + v.pos : ""))); });
+    return "[앱이 계산한 종합 숫자]\n" + String(ctx || "").slice(0, 6000) + "\n\n[인물별 요약 — " + L.filter((x) => x[0] === "■").length + "명]\n" + L.join("\n") + (V.length ? "\n\n[발언형 — 13F가 없어 발언으로만 읽는 사람. 숫자 근거가 아니라 '무엇을 위험으로 보는가'의 재료로만 쓴다]\n" + V.join("\n") : ""); };
   /* 종합 해석 */
   if (b.sum || b.prep === "sum" || b.save === "sum") {
     const inp = inSum(b.ctx, b.people), per = (gdoc0.gurus || []).map((g) => g.period || "").sort().pop() || "";
@@ -179,6 +185,7 @@ export async function guruHandler(req, res, viaCron) {
   const prof = profOf(b.profile), g0 = (gdoc0.gurus || []).filter((x) => x.id === id)[0] || null;
   if (prof) { try { await jobAuto.saveProf(rc, id, prof, b.ty); } catch (e) {} }
   if (b.prep === "note") return res.status(200).json({ ok: true, prompt: taskSystem("guruN") + MANUAL_TAIL + "\n\n오늘: " + kstDay() + " (한국 시간)\n\n" + inNote(G, g0, prof, doc.notes[id]) });
+  if ((b.prep === "read" || b.save === "read" || b.read) && G.voice) return res.status(200).json({ ok: false, voice: true, msg: "발언형 인물이에요(13F 없음) — 발언 조사만 해요" });
   if (b.prep === "read") { if (!g0) return res.status(200).json({ ok: false, msg: "이 인물의 13F를 아직 받지 않았어요" }); return res.status(200).json({ ok: true, prompt: taskSystem("guruA") + MANUAL_TAIL + "\n\n오늘: " + kstDay() + " (한국 시간)\n\n" + inRead(G, g0, prof, b.ty, doc.notes[id] || {}) }); }
   if (b.save === "note") { const d = parseAnswer(b.text); if (!d || !Array.isArray(d.views)) return res.status(200).json(BAD); let rec; await updAi(rc, (D) => { rec = D.notes[id] = Object.assign({}, keepMemo(D.notes[id]), noteRec(d, { manual: true })); }); return res.status(200).json({ ok: true, note: rec }); }
   if (b.save === "read") { if (!g0) return res.status(200).json({ ok: false, msg: "이 인물의 13F를 아직 받지 않았어요" }); const d = parseAnswer(b.text); if (!d || !d.head || !Array.isArray(d.intent)) return res.status(200).json(BAD); let rec; await updAi(rc, (D) => { rec = D.ai[id] = aiRec(d, g0, D.notes[id], { manual: true }); }); return res.status(200).json({ ok: true, ai: rec }); }

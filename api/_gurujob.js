@@ -38,15 +38,17 @@ async function laneStep(rc, origin, r) {
     const i = (+(await redisCmd(rc, ["INCR", "sm:gurujob:i:" + job.id])) || 1) - 1; if (i >= job.ids.length) return { ok: true, end: "empty" };
     id = job.ids[i]; phase = job.what === "read" ? "read" : "note";
   }
+  /* v15.00 발언형(13F 없음)은 해석 단계가 없다 — '해석만' 작업이면 건너뛰고, '둘 다'면 발언 조사에서 끝낸다 */
+  if (IDS[id] && IDS[id].voice && phase === "read") { await setR(rc, job.id, id, { state: "done", read: "발언형 — 해석 없음", lane: r.lane, phase: "read" }); return chain(origin, { jrun: { jid: job.id, lane: r.lane } }); }
   const G = IDS[id], P = (job.prof && job.prof[id]) || ((await rd(rc, PROF)) || {})[id] || {};
   if (!G) { await setR(rc, job.id, id, { state: "fail", msg: "모르는 인물" }); return chain(origin, { jrun: { jid: job.id, lane: r.lane } }); }
   const prevR = (await getR(rc, job.id))[id] || {};
   await setR(rc, job.id, id, Object.assign({}, prevR, { state: "run", phase, lane: r.lane, t0: Date.now() }));
   const out = phase === "note" ? await runNote(rc, G, P.p || "") : await runRead(rc, G, P.p || "", P.ty || "");
   const rec = Object.assign({}, prevR, { lane: r.lane }); rec[phase] = out.ok ? "ok" : String(out.msg || "실패").slice(0, 140);
-  const stop = !!((await rd(rc, JOB)) || {}).stop, more = phase === "note" && job.what === "both" && !stop;   // 발언 조사가 실패해도 해석은 이어서 한다(발언 없이 해석)
+  const stop = !!((await rd(rc, JOB)) || {}).stop, more = phase === "note" && job.what === "both" && !stop && !G.voice;   // 발언 조사가 실패해도 해석은 이어서 한다(발언 없이 해석)
   if (more) { rec.state = "run"; rec.phase = "read"; }
-  else { const key = job.what === "note" || (phase === "note" && stop) ? "note" : "read"; rec.state = rec[key] === "ok" ? "done" : "fail"; rec.phase = phase; }
+  else { const key = job.what === "note" || (phase === "note" && (stop || G.voice)) ? "note" : "read"; rec.state = rec[key] === "ok" ? "done" : "fail"; rec.phase = phase; if (G.voice && rec.state === "done") rec.read = "발언형 — 발언만 저장"; }
   if (rec.state === "fail" && phase === "read" && /13F를 아직/.test(rec.read || "") && rec.note === "ok") { rec.state = "done"; rec.read = "13F 없음 — 발언만 저장"; }
   await setR(rc, job.id, id, rec);
   return chain(origin, more ? { jrun: { jid: job.id, lane: r.lane, id, phase: "read" } } : { jrun: { jid: job.id, lane: r.lane } });

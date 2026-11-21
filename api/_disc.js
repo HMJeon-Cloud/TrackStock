@@ -45,6 +45,16 @@ export const GURUS = [
   { id: "coatue", cik: "1135730", nm: "필립 라폰트", org: "코튜 매니지먼트", chk: "coatue" },
   { id: "altimeter", cik: "1541617", nm: "브래드 거스트너", org: "알티미터 캐피털", chk: "altimeter" },
   { id: "lonepine", cik: "1061165", nm: "스티븐 맨델", org: "론 파인 캐피털", chk: "lone pine" },
+  /* v15.00 거장 추가 — 13F로 읽을 수 있는 4명(행동주의 2 · 가치 1 · 기술 1). chk로 SEC 등록 이름을 확인한다 */
+  { id: "elliott", cik: "1791786", nm: "폴 싱어", org: "엘리엇 매니지먼트", chk: "elliott" },
+  { id: "starboard", cik: "1517137", nm: "제프 스미스", org: "스타보드 밸류", chk: "starboard" },
+  { id: "hhintl", cik: "1759760", nm: "돤융핑", org: "H&H 인터내셔널", chk: "international investment" },
+  { id: "atreides", cik: "1777813", nm: "개빈 베이커", org: "아트레이디스", chk: "atreides" },
+  /* v15.00 발언형 — 13F가 없거나(등록 말소 · 채권 운용) 조직 포트폴리오라 읽을 수 없는 사람. 13F는 받지 않고 '발언 조사'만 한다 */
+  { id: "ptj", nm: "폴 튜더 존스", org: "튜더 인베스트먼트", voice: true },
+  { id: "burry", nm: "마이클 버리", org: "사이언(등록 말소)", voice: true },
+  { id: "gundlach", nm: "제프리 건들락", org: "더블라인 캐피털", voice: true },
+  { id: "grantham", nm: "제러미 그랜섬", org: "GMO", voice: true },
 ];
 
 /* ---------- 공용 ---------- */
@@ -352,7 +362,7 @@ export async function buildGurus(prev, opt) {
   const byId = {}; prev.gurus.forEach((g) => { byId[g.id] = g; });
   let map = null, upd = 0, pend = 0;
   // 오래 확인 안 한 투자자부터
-  const order = GURUS.slice().sort((a, b) => ((byId[a.id] && byId[a.id].checked) || "").localeCompare((byId[b.id] && byId[b.id].checked) || ""));
+  const order = GURUS.filter((G) => !G.voice && G.cik).sort((a, b) => ((byId[a.id] && byId[a.id].checked) || "").localeCompare((byId[b.id] && byId[b.id].checked) || ""));   // 발언형은 13F를 받지 않는다
   for (const G of order) {
     if (Date.now() - t0 > budget * 0.8) break;
     try {
