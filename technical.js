@@ -164,7 +164,7 @@ function renderLevelsTable() {
       '<td class="pos">+' + (lv.pct * 100).toFixed(1) + "%</td><td>" + lv.touches + "회</td><td>" + fmtDate(lv.lastT) + "</td></tr>";
   });
   var lastT = state.rows[state.rows.length - 1].t;
-  html += "<tr style='background:#e8f3ff'><td><b>최근 종가</b><br><small style='color:var(--sub)'>" + fmtDate(lastT) +
+  html += "<tr style='background:var(--goldSoft,#f7f0de)'><td><b>최근 종가</b><br><small style='color:var(--sub)'>" + fmtDate(lastT) +
     "</small></td><td><b>" + fmtPrice(L.cur) + unit + "</b></td><td>-</td><td>-</td><td>-</td></tr>";
   L.support.forEach(function (lv) {
     html += "<tr><td><b style='color:var(--good)'>지지</b></td><td>" + fmtPrice(lv.price) + unit + "</td>" +
@@ -184,7 +184,7 @@ function renderCandles() {
   }
   $("candleCard").classList.remove("hidden");
 
-  var UP = "#f04452", DOWN = "#3182f6";
+  var UP = "#d9342b", DOWN = "#2f6fd6";
   var colors = rows.map(function (r) { return r.c >= r.o ? UP : DOWN; });
   var closes = rows.map(function (r) { return r.c; });
   var maxVol = 0;

@@ -386,7 +386,7 @@ function renderSim() {
   var datasets = [{
     label: "내 포트폴리오",
     data: actual.values,
-    borderColor: "#3182f6", borderWidth: 2.4, pointRadius: 0, tension: 0, fill: false
+    borderColor: "#14161c", borderWidth: 2.4, pointRadius: 0, tension: 0, fill: false
   }];
   if (I.rebal > 0) {
     datasets.push({
@@ -539,7 +539,7 @@ function renderSimCompare(I, R, allTrue, idx, idxNoRebal, actual, actualNoRebal,
       if (rr != null) { sum += rr; cnt++; }
     }
     var avgCrisis = cnt ? sum / cnt : null;
-    html += "<tr" + (r.hi ? " style='background:#e8f3ff'" : "") + "><td>" +
+    html += "<tr" + (r.hi ? " style='background:var(--goldSoft,#f7f0de)'" : "") + "><td>" +
       (r.color ? "<i class='dot' style='background:" + r.color + "'></i>" : "") +
       (r.hi ? "<b>" + r.name + "</b>" : r.name) + "</td>" +
       "<td>" + Math.round(r.val).toLocaleString("ko-KR") + "원</td>" +
@@ -580,7 +580,7 @@ function renderSimCrisis(I, R, idx) {
     var typeCol = cw[3] === "회복" ? "var(--good)" : "var(--sub)";
     html += "<tr><td style='text-align:left'>" + cw[0] +
       "<br><small style='color:" + typeCol + "'>" + cw[1].slice(2) + " ~ " + cw[2].slice(2) + "</small></td>" +
-      '<td class="' + pctCls(pr) + '" style="font-weight:bold;background:#e8f3ff">' + fmtPct(pr) + "</td>" +
+      '<td class="' + pctCls(pr) + '" style="font-weight:bold;background:var(--goldSoft,#f7f0de)">' + fmtPct(pr) + "</td>" +
       cells.join("") + "</tr>";
   }
   if (!found) {
@@ -620,7 +620,7 @@ function renderSimWorst(I, R, idx) {
     var days = Math.round((ep.t2 - ep.t1) / 86400000);
     html += "<tr><td style='text-align:left'>" + (n + 1) + "위 하락<br>" +
       "<small style='color:var(--sub)'>" + fmtDate(ep.t1) + " ~ " + fmtDate(ep.t2) + " (" + days + "일)</small></td>" +
-      '<td class="' + pctCls(ep.dd) + '" style="font-weight:bold;background:#e8f3ff">' + fmtPct(ep.dd) + "</td>" +
+      '<td class="' + pctCls(ep.dd) + '" style="font-weight:bold;background:var(--goldSoft,#f7f0de)">' + fmtPct(ep.dd) + "</td>" +
       cells.join("") +
       "<td>" + (ep.recovered ? fmtDate(ep.recovered)
         : ongoingStatusHtml(ep.peakV, ep.troughV, idx.values[idx.values.length - 1])) + "</td></tr>";

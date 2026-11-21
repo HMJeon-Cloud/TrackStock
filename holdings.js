@@ -409,7 +409,7 @@ function renderHoldChart(tl) {
     data: {
       labels: tl.map(function (p) { return fmtDate(p.t); }),
       datasets: [
-        { label: "평가금액", data: tl.map(function (p) { return p.value; }), borderColor: "#3182f6", borderWidth: 2,
+        { label: "평가금액", data: tl.map(function (p) { return p.value; }), borderColor: "#14161c", borderWidth: 2,
           pointRadius: 0, tension: 0, fill: false },
         { label: "투입 원금", data: tl.map(function (p) { return p.cost; }), borderColor: "#6b7684", borderWidth: 1.5,
           borderDash: [6, 4], pointRadius: 0, tension: 0, fill: false, stepped: true }

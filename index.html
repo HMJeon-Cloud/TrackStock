@@ -97,7 +97,7 @@
   #cmpResults .item:hover { background: #e5e8eb; }
   #cmpResults .exch { color: var(--sub); font-size: 11px; float: right; }
   tr.crisisRow { cursor: pointer; }
-  tr.crisisRow:hover td { background: #e8f3ff; }
+  tr.crisisRow:hover td { background: var(--soft); }
   tr.crisisRow.active td { background: #e5e8eb; }
   /* 탭 */
   /* 상단 고정 헤더 */
@@ -125,8 +125,8 @@
   .tabItem:hover .submenu, .tabItem.open .submenu { display: block; }
   .submenu button { display: block; width: 100%; text-align: left; border: none; border-radius: 0;
     padding: 10px 14px; font-size: 13px; color: var(--txt); }
-  .submenu button:hover { background: #e8f3ff; color: var(--accent); }
-  .submenu button.active { color: var(--accent); font-weight: bold; background: #e8f3ff; }
+  .submenu button:hover { background: var(--accentSoft); color: var(--accent); }
+  .submenu button.active { color: var(--accent); font-weight: bold; background: var(--accentSoft); }
   .submenu button small { display: block; color: var(--sub); font-size: 11px; font-weight: normal; margin-top: 2px; }
   /* 비중 슬라이더 */
   .cartBtn { position: relative; font-size: 17px; padding: 8px 12px; line-height: 1; cursor: pointer; }
@@ -182,7 +182,7 @@
   .hResults { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: var(--card2);
     border: 1px solid var(--line); border-radius: 8px; margin-top: 2px; max-height: 240px; overflow-y: auto; }
   .hRes { padding: 8px 10px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f2f4f6; }
-  .hRes:hover { background: #e8f3ff; }
+  .hRes:hover { background: var(--soft); }
   .hRes small { color: var(--sub); margin-left: 4px; }
   .hLot td { font-size: 12px; background: #f9fafb; color: var(--sub); }
   .hBar { height: 4px; background: #f2f4f6; border-radius: 2px; margin-top: 3px; min-width: 50px; }
@@ -222,7 +222,7 @@
   .newsItem a { color: var(--txt); text-decoration: none; font-size: 13px; line-height: 1.5; display: block; }
   .newsItem a:hover { color: var(--accent); text-decoration: underline; }
   .newsMeta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--sub); }
-  .newsTag { background: #e8f3ff; color: var(--accent); border-radius: 999px; padding: 1px 7px; }
+  .newsTag { background: var(--accentSoft); color: var(--accent); border-radius: 999px; padding: 1px 7px; }
   .newsSym { color: var(--good); font-weight: bold; }
   .newsGroup { margin-bottom: 14px; }
   .newsGroupTitle { font-size: 13px; font-weight: bold; color: var(--accent); margin-bottom: 2px; }
@@ -403,7 +403,7 @@
   button:hover { background: #e5e8eb; }
   button:active { transform: scale(0.97); }
   button.primary { background: var(--accent); color: #fff; font-weight: 700; }
-  button.primary:hover { background: #1b64da; }
+  button.primary:hover { background: #2c313c; }
   button.chip { background: var(--card2); border: none; border-radius: 999px; padding: 7px 13px; font-size: 13px;
     font-weight: 600; color: var(--txt2); }
   button.chip:hover { background: var(--accentSoft); color: var(--accent); }
@@ -889,7 +889,7 @@
   .briefTemp { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
   .briefTempWord { font-size: 20px; font-weight: 700; }
   .briefTempWord b { color: var(--accent); }
-  .briefTempBar { height: 10px; border-radius: 999px; background: #e8f3ff; margin: 10px 0 6px; overflow: hidden; }
+  .briefTempBar { height: 10px; border-radius: 999px; background: var(--card2); margin: 10px 0 6px; overflow: hidden; }
   .briefTempBar > div { height: 100%; background: linear-gradient(90deg, var(--down), var(--up)); border-radius: 999px; }
   .briefTempNum { font-size: 13px; color: var(--txt2); }
   .briefTempDesc { font-size: 13px; color: var(--txt2); margin-top: 8px; line-height: 1.6; background: var(--soft); border-radius: 12px; padding: 10px 12px; }
@@ -1399,7 +1399,7 @@
   .dsD { white-space: nowrap; }
   @media (max-width: 560px) { .mHide { display: none; } #watchTabs button { padding-left: 2px !important; padding-right: 2px !important; } }
   .ipoTabs.mkTabs { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  .dsTag.ipo-now { background: #fde8ea; color: var(--up); } .dsTag.ipo-soon { background: #fbf1d9; color: #8a6a24; } .dsTag.ipo-wait { background: #e3eefe; color: var(--down); } .dsTag.ipo-listed { background: #14161c; color: #e6c57a; }
+  .dsTag.ipo-now { background: #fde8ea; color: var(--up); } .dsTag.ipo-soon { background: #fbf1d9; color: #8a6a24; } .dsTag.ipo-wait { background: var(--downSoft, #e3eefe); color: var(--down); } .dsTag.ipo-listed { background: #14161c; color: #e6c57a; }
   .dsV small { font-size: 10.5px; color: var(--sub); font-weight: 600; margin-left: 2px; }
   .ipoT td, .ipoT th { font-variant-numeric: tabular-nums; } .ipoT td.l { min-width: 150px; } .ipoT .linkBtn { padding: 0; border: 0; background: none; font-weight: 700; color: var(--txt); font-size: 13px; }
   .ipoBk { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px; margin-bottom: 8px; }
@@ -1537,7 +1537,7 @@
   .dsAgg .linkBtn, .dsTopR .linkBtn { padding: 0; border: 0; background: none; font-weight: 700; color: var(--txt); text-align: left; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .dsAgg b, .dsTopR b { font-variant-numeric: tabular-nums; white-space: nowrap; } .dsAgg .dsNm { min-width: 0; grid-column: span 2; } .dsNm small { display: block; color: var(--sub); font-size: 11px; }
   .dsTable td.l small { display: block; color: var(--sub); font-size: 11px; } .dsTable td small { display: block; color: var(--sub); font-size: 11px; } .dsD { color: var(--sub); font-variant-numeric: tabular-nums; margin-right: 4px; }
-  .dsTag { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; white-space: nowrap; background: #eef0f3; color: var(--sub); } .dsTag.buy { background: #fde8ea; color: var(--up); } .dsTag.sell { background: #e3eefe; color: var(--down); } .dsTag.cancel { background: #14161c; color: #e6c57a; }
+  .dsTag { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; white-space: nowrap; background: #eef0f3; color: var(--sub); } .dsTag.buy { background: #fde8ea; color: var(--up); } .dsTag.sell { background: var(--downSoft, #e3eefe); color: var(--down); } .dsTag.cancel { background: #14161c; color: #e6c57a; }
   .dsGuruPills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; } .dsGuruPills button { flex: 0 0 auto; }
   .dsGHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; } .dsGHead b { font-size: 18px; }
   .dsTop { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px; margin-bottom: 8px; }
@@ -2746,7 +2746,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "15.00"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "16.00"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -4047,16 +4047,16 @@ function renderChart() {
     data: pctMode
       ? rows.map(function (r) { return (r.c / base0 - 1) * 100; })
       : rows.map(function (r) { return r.c; }),
-    borderColor: "#3182f6", borderWidth: 1.6,
+    borderColor: "#14161c", borderWidth: 1.6,
     pointRadius: 0, tension: 0,
     fill: "start",
     backgroundColor: function (context) {
       // 라인 아래를 옅은 그라디언트로 채워 방향을 한눈에 보이게 한다
       var area = context.chart.chartArea;
-      if (!area) return "rgba(49,130,246,0.05)";
+      if (!area) return "rgba(201,162,79,0.06)";
       var g = context.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-      g.addColorStop(0, "rgba(49,130,246,0.16)");
-      g.addColorStop(1, "rgba(49,130,246,0)");
+      g.addColorStop(0, "rgba(201,162,79,0.22)");
+      g.addColorStop(1, "rgba(201,162,79,0)");
       return g;
     }
   }];
@@ -5165,11 +5165,11 @@ setTimeout(smBootDone, 3000);
 <!-- v12.13 앱 스크립트 한 곳에서 로드 — 버전은 SM_VER 하나만 올리면 전 파일 캐시가 같이 갱신된다(파일마다 ?v= 손으로 올리던 실수 방지). 순서는 의존 관계 그대로 -->
 <script>
 (function () {
-  var files = ["dataq.js","metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","gurux.js","gurux2.js","gurux3.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js","pro.js","tg.js","anx.js","ux.js","krx.js","core.js","edge.js","edgex.js","dd.js","admin.js","rank.js","rankbt.js","ranklog.js","follow.js","fuviz.js","cardx.js","calx.js","datax.js","clean.js"];
+  var files = ["dataq.js","metrics.js","technical.js","company.js","compare.js","sim.js","insight.js","guide.js","watch.js","holdings.js","brief.js","channel.js","datahub.js","cards.js","mind.js","issues.js","publish.js","periodic.js","story.js","deep.js","threads.js","reels.js","slides.js","onecard.js","aicard.js","onepage.js","picks.js","tpl.js","tplx.js","maker.js","lib.js","dividend.js","disc.js","gurux.js","gurux2.js","gurux3.js","ipo.js","macro.js","rebal.js","daily.js","hub.js","vs.js","report.js","archive.js","analyst.js","claudeui.js","ops.js","pro.js","tg.js","anx.js","ux.js","krx.js","core.js","edge.js","edgex.js","dd.js","admin.js","rank.js","rankbt.js","ranklog.js","follow.js","fuviz.js","cardx.js","calx.js","datax.js","clean.js","skin.js","shell.js","homex.js","stockx.js"];
   document.write(files.map(function (f) { return '<script src="' + f + '?v=' + SM_VER + '"><\/script>'; }).join(""));
 })();
 </script>
 <script src="ui.js?v=11.7"></script>
-<script src="snapshot.js?v=12.2"></script>
+<script src="snapshot.js?v=16.0"></script>
 </body>
 </html>
