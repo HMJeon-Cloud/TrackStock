@@ -64,6 +64,11 @@ function coreFund(sym) {
     var eps = v(["eps", "earningPerShare", "epsTtm"]), bps = v(["bps", "bookValuePerShare"]);
     var roe = roeS.length ? roeS[roeS.length - 1][1] : v(["roe", "returnOnEquity"]); if (roe == null && eps != null && bps) roe = eps / bps * 100;
     var F = { per: v(["per", "peRatio", "priceEarningRatio", "perTtm"]), pbr: v(["pbr", "pbRatio", "priceBookRatio"]), roe: roe, divY: v(["dividendYieldRatio", "dividendYield"]), eps: eps, revG: g3(rev), opG: g3(op), niG: g3(ni), revT: trend(rev), opT: trend(op), margin: margin, rev: rev.slice(-4), op: op.slice(-4), name: d.name, opNeg: op.length ? op[op.length - 1][1] < 0 : null, lastY: rev.length ? rev[rev.length - 1][0] : "" };
+    /* v15.00 애널리스트 추정치(컨센서스) — 목표가 평균 · 다음 회계연도 추정(영업이익 · EPS · 매출). 점수에는 쓰지 않고, 순위의 실전 기록에 주마다 남겨 '추정치가 오르는 중인가'를 보는 재료로 쓴다 */
+    F.tp = null; F.recomm = null; F.fwdY = ""; F.fwdOp = null; F.fwdEps = null; F.fwdRev = null;
+    try { var fp = fin ? fin.periods.filter(function (p) { return p.forecast; })[0] : null, fv = function (title) { if (!fp || typeof findRow !== "function") return null; var row = findRow(fin, title); return row && row.values[fp.key] != null ? kNum(row.values[fp.key]) : null; };
+      var Cn = d.consensus || {}, cn = function (x) { if (x == null) return null; if (typeof x === "object") x = x.value; var n = typeof kNum === "function" ? kNum(x) : parseFloat(x); return n != null && isFinite(n) ? n : null; };
+      F.tp = cn(Cn.priceTargetMean || Cn.targetPrice || Cn.priceTarget); F.recomm = cn(Cn.recommMean || Cn.recommendMean); F.fwdY = fp ? String(fp.title || "") : ""; F.fwdOp = fv("영업이익"); F.fwdEps = fv("EPS"); F.fwdRev = fv("매출액"); } catch (e) {}
     CORE.fund[sym] = F; return F;
   }).catch(function () { CORE.fund[sym] = null; return null; });
 }

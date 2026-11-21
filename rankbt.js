@@ -3,7 +3,9 @@
    방법 (되돌려 보기 · 백테스트)
      1) 과거 시점을 잡는다: 최근 13년의 6월 말 · 12월 말 (1년 뒤 결과가 있는 시점까지)
      2) 그 시점까지의 시세만 남기고(그 뒤는 가린다) 지금과 똑같은 방법으로 항목 점수를 매긴다
-        — 기업 정보(ROE 등)와 매크로는 그때 값을 알 수 없어 뺀다 (지금 값을 쓰면 미래를 미리 본 셈이 된다)
+        — 기업 정보(ROE 등)는 그때 값을 알 수 없어 뺀다 (지금 값을 쓰면 미래를 미리 본 셈이 된다)
+        — v15.00 매크로(VIX · 금리 · 환율 · 금리 곡선 · 신용 …)는 '그 시점에 알려진 값'으로 넣는다(edge.js가 시세 마지막 날 기준으로 읽는다)
+        — v15.00 전문가 기법 6항목(52주 고점 근접도 · 12-1 모멘텀 · 상대강도 · 추세 템플릿 · 거래량 비 · 매끄러움)도 같이 검증한다
      3) 그 시점에서 252거래일(1년) 뒤 수익률을 붙인다
      4) 시점마다 점수 순으로 줄 세워: 5등분 평균 수익, 순위상관(점수 순위와 수익 순위가 얼마나 같이 가나), 상위 10개 성적
    한계: 지금 목록에 남아 있는 종목만 본다(사라진 종목이 빠져 실제보다 좋게 나온다), 시점들이 서로 겹친다,
@@ -11,7 +13,9 @@
    새 api 함수 없음 · 서버 호출은 종목 시세 받기뿐(순위 계산과 같은 주소라 30분 안에는 다시 받지 않는다).
    ============================================================ */
 var RB = { obs: null, run: false, done: 0, total: 0, dates: null, saved: null };
-var RB_SKIP = { roe: 1, margin: 1, revg: 1, opg: 1, per: 1, vix: 1, fed: 1, us10: 1, krw: 1 };
+var RB_SKIP = { roe: 1, margin: 1, revg: 1, opg: 1, per: 1 };   // v15.00 매크로는 그 시점 값으로 읽게 되어 검증에 넣는다
+var RB_KEEP = ["^VIX", "^GSPC", "^KS11", "BTC-USD"];   // 상대강도 · 공포지수에 쓰는 줄 — 검증 내내 남겨 둔다
+function rbKeys() { return RK_I.map(function (I) { return I[0]; }).filter(function (k) { return !RB_SKIP[k]; }); }
 function rbDates() { var now = Date.now(), y = new Date(now).getUTCFullYear(), a = []; for (var k = y - 13; k <= y; k++) { a.push(Date.UTC(k, 5, 30, 23)); a.push(Date.UTC(k, 11, 31, 23)); } return a.filter(function (t) { return t <= now - 372 * 86400e3; }); }
 function rbIdx(rows, T) { var lo = 0, hi = rows.length - 1, r = -1; while (lo <= hi) { var m = (lo + hi) >> 1; if (rows[m].t <= T) { r = m; lo = m + 1; } else hi = m - 1; } return r; }
 function rbSpear(x, y) {
@@ -27,7 +31,7 @@ function rbMed(a) { return typeof ddMed === "function" ? ddMed(a) : null; }
 function rbRun(onTick) {
   if (RB.run) return Promise.resolve(RB.obs);
   var list = egScanList().filter(function (s) { return !DD_LEV[s] && !(typeof egLev === "function" && egLev(s)); }), dates = rbDates(), obs = [], had = {}, idx = 0;
-  Object.keys(nbHist).forEach(function (k) { had[k] = 1; }); RB.run = true; RB.done = 0; RB.total = list.length; RB.dates = dates;
+  Object.keys(nbHist).forEach(function (k) { had[k] = 1; }); RB_KEEP.forEach(function (k) { had[k] = 1; }); RB.run = true; RB.done = 0; RB.total = list.length; RB.dates = dates;
   var wipe = function (sym) { try { Object.keys(EG.memo).forEach(function (k) { if (k.indexOf(":" + sym + ":") > 0 || k.indexOf(sym + ":") === 0) delete EG.memo[k]; }); Object.keys(DD.memo).forEach(function (k) { if (k.indexOf(sym + ":") === 0) delete DD.memo[k]; }); Object.keys(EG).forEach(function (k) { if (/^(sm|sd|sw|w|rw|cd|cr):/.test(k) && k.indexOf(sym) >= 0) delete EG[k]; }); } catch (e) {} };
   var one = function () {
     if (idx >= list.length) return Promise.resolve(); var sym = list[idx++];
@@ -47,7 +51,8 @@ function rbRun(onTick) {
       } finally { nbHist[sym] = full; wipe(sym); if (typeof CORE !== "undefined") { if (hadF) CORE.fund[sym] = fSave; else delete CORE.fund[sym]; } if (!had[sym]) delete nbHist[sym]; }
     }).then(function () { RB.done++; if (onTick) onTick(); return new Promise(function (ok) { setTimeout(ok, 0); }); }).then(one);
   };
-  return Promise.all([one(), one(), one()]).then(function () { RB.obs = obs; RB.run = false; RB.at = Date.now(); rbSave(); rbSaveObs(); return obs; }).catch(function (e) { RB.run = false; throw e; });
+  var pre = [nbLoad(RB_KEEP).catch(function () {}), typeof macroEnsure === "function" ? macroEnsure().catch(function () {}) : null];
+  return Promise.all(pre).then(function () { return Promise.all([one(), one(), one()]); }).then(function () { RB.obs = obs; RB.run = false; RB.at = Date.now(); RB.keys = rbKeys(); RB._c = null; rbSave(); rbSaveObs(); return obs; }).catch(function (e) { RB.run = false; throw e; });
 }
 
 /* ---------- 집계 ---------- */
@@ -99,8 +104,8 @@ function rbVerdict(a) {
   return [P + " · " + T, txt, pk >= 1 && tm >= 1 ? "up" : pk < 0 || tm < 0 ? "down" : "mid"];
 }
 /* 시점별 항목 점수를 이 기기에 보관 — 항목 · 비중을 바꿔 볼 때 5분짜리 검증을 다시 돌리지 않아도 되게 */
-function rbSaveObs() { try { var keys = RK_I.map(function (I) { return I[0]; }).filter(function (k) { return !RB_SKIP[k]; }); localStorage.setItem("sm.rank.btobs", JSON.stringify({ at: RB.at, dates: RB.dates, keys: keys, rows: RB.obs.map(function (o) { return [o.s, o.d, o.u == null ? -1 : o.u, Math.round(o.f * 1e4) / 1e4, keys.map(function (k) { return o.i[k] == null ? -1 : o.i[k]; })]; }) })); } catch (e) { try { localStorage.removeItem("sm.rank.btobs"); } catch (x) {} } }
-function rbLoadObs() { if (RB.obs || RB._tried) return; RB._tried = 1; try { var v = JSON.parse(localStorage.getItem("sm.rank.btobs") || "null"); if (!v || !v.rows || !v.keys) return; RB.obs = v.rows.map(function (r) { var m = {}; v.keys.forEach(function (k, j) { if (r[4][j] >= 0) m[k] = r[4][j]; }); return { s: r[0], d: r[1], u: r[2] < 0 ? null : r[2], f: r[3], i: m }; }); RB.dates = v.dates; RB.at = v.at; } catch (e) {} }
+function rbSaveObs() { try { var keys = RB.keys || rbKeys(); localStorage.setItem("sm.rank.btobs", JSON.stringify({ at: RB.at, dates: RB.dates, keys: keys, rows: RB.obs.map(function (o) { return [o.s, o.d, o.u == null ? -1 : o.u, Math.round(o.f * 1e4) / 1e4, keys.map(function (k) { return o.i[k] == null ? -1 : o.i[k]; })]; }) })); } catch (e) { try { localStorage.removeItem("sm.rank.btobs"); } catch (x) {} } }
+function rbLoadObs() { if (RB.obs || RB._tried) return; RB._tried = 1; try { var v = JSON.parse(localStorage.getItem("sm.rank.btobs") || "null"); if (!v || !v.rows || !v.keys) return; RB.obs = v.rows.map(function (r) { var m = {}; v.keys.forEach(function (k, j) { if (r[4][j] >= 0) m[k] = r[4][j]; }); return { s: r[0], d: r[1], u: r[2] < 0 ? null : r[2], f: r[3], i: m }; }); RB.dates = v.dates; RB.at = v.at; RB.keys = v.keys; } catch (e) {} }
 
 /* ---------- 항목 하나하나가 맞았나 ---------- */
 function rbDateList(obs) { var c = {}; obs.forEach(function (o) { c[o.d] = (c[o.d] || 0) + 1; }); return Object.keys(c).map(Number).filter(function (d) { return c[d] >= 25; }).sort(function (a, b) { return a - b; }); }
@@ -120,7 +125,7 @@ function rbSuggest(obs, dates) {
   var it = rbItems(obs, tr, 6), pick = [], time = [];
   it.forEach(function (x) { var p = x.nd >= 5 && x.ic != null && x.ic >= 0.02 && x.pos >= 0.55, t = x.wn >= 20 && x.wic != null && x.wic >= 0.05 && x.wpos >= 0.6; if (p && t) { if (x.ic / 0.03 >= x.wic / 0.1) t = false; else p = false; } if (p) pick.push(x.k); else if (t) time.push(x.k); });
   if (!pick.length || !time.length) return { none: 1, cut: dates ? dates[cut] : null };
-  /* 검증할 수 없는 항목(기업 정보 · 매크로)은 기본 역할 그대로 */
+  /* 검증할 수 없는 항목(기업 정보)은 기본 역할 그대로 */
   var role = { pick: pick.concat(RK_ROLE_DEF.pick.filter(function (k) { return RB_SKIP[k]; })), time: time.concat(RK_ROLE_DEF.time.filter(function (k) { return RB_SKIP[k]; })) };
   return { role: role, pick: pick, time: time, cut: dates ? dates[cut] : null, nTr: D.filter(tr).length, nTe: D.filter(te).length,
     curTr: rbAgg(obs, false, dates, { keep: tr }), curTe: rbAgg(obs, false, dates, { keep: te }), sugTr: rbAgg(obs, false, dates, { role: role, keep: tr }), sugTe: rbAgg(obs, false, dates, { role: role, keep: te }) };
@@ -128,7 +133,7 @@ function rbSuggest(obs, dates) {
 /* ---------- 풀이: 항목 하나하나를 말로 ---------- */
 function rbRead(x) {
   var c = RK_CRIT[x.k] || ["", ""], ro = rkRoleOf(x.k), sg = function (v) { return (v >= 0 ? "+" : "") + v.toFixed(3); }, pc = function (v) { return Math.round(v * 100) + "%"; };
-  var a = x.ic == null ? "같은 날 종목끼리 견줄 만큼 자료가 모이지 않았어요." : "같은 날 종목끼리 견주면 순위상관 " + sg(x.ic) + ", " + x.nd + "개 시점 가운데 " + pc(x.pos) + "에서 방향이 맞았어요 — 종목을 고르는 데 " + (x.ic >= 0.03 && x.pos >= 0.55 ? "도움이 됐어요." : x.ic <= -0.03 && x.pos <= 0.45 ? "오히려 방해가 됐어요(점수가 높은 종목이 덜 올랐어요)." : "뚜렷한 힘이 없었어요.");
+  var a = x.ic == null ? (x.g === 4 ? "모든 종목에 같은 값이라 종목끼리는 견줄 수 없어요 — 매크로는 '언제'로만 봐요." : "같은 날 종목끼리 견줄 만큼 자료가 모이지 않았어요.") : "같은 날 종목끼리 견주면 순위상관 " + sg(x.ic) + ", " + x.nd + "개 시점 가운데 " + pc(x.pos) + "에서 방향이 맞았어요 — 종목을 고르는 데 " + (x.ic >= 0.03 && x.pos >= 0.55 ? "도움이 됐어요." : x.ic <= -0.03 && x.pos <= 0.45 ? "오히려 방해가 됐어요(점수가 높은 종목이 덜 올랐어요)." : "뚜렷한 힘이 없었어요.");
   var b = x.wic == null ? "같은 종목의 시점끼리 견줄 만큼 자료가 모이지 않았어요." : "같은 종목의 시점끼리 견주면 순위상관 " + sg(x.wic) + ", " + x.wn + "종목 가운데 " + pc(x.wpos) + "에서 방향이 맞았어요 — 살 시기를 고르는 데 " + (x.wic >= 0.05 && x.wpos >= 0.6 ? "도움이 됐어요." : x.wic <= -0.05 && x.wpos <= 0.4 ? "오히려 방해가 됐어요(점수가 높았던 때 사면 결과가 나빴어요)." : "뚜렷한 힘이 없었어요.");
   var st = x.ic1 != null && x.ic2 != null ? (x.ic1 > 0 && x.ic2 > 0 ? "앞 절반(" + x.ic1.toFixed(2) + ")과 뒤 절반(" + x.ic2.toFixed(2) + ") 모두 플러스라 우연일 가능성은 낮아요." : x.ic1 < 0 && x.ic2 < 0 ? "앞 절반과 뒤 절반 모두 마이너스였어요." : "앞 절반(" + x.ic1.toFixed(2) + ")과 뒤 절반(" + x.ic2.toFixed(2) + ")의 방향이 달라요 — 한쪽 기간에만 맞았을 수 있어 다음 검증에서 다시 봐야 해요.") : x.ic1 == null && x.ic2 != null ? "앞 절반에는 사례가 없고 뒤 절반에만 있어요 — 사례가 적어 숫자를 그대로 믿기 어려워요." : "";
   var why = ro === "pick" ? (x.ic != null && x.ic >= 0.03 && x.pos >= 0.55 ? "그래서 종목 점수에 넣었어요." : x.ic != null && x.ic > 0 ? "힘은 약하지만 방향이 맞아 종목 점수에 넣었어요." : "성격상 종목 항목으로 뒀지만 이번 검증에서는 근거가 약해요.")
@@ -161,10 +166,12 @@ function rbP(v, d) { return typeof ddPct === "function" ? ddPct(v, d == null ? 1
 function rbHtml() {
   var cur = rbCur(), saved = !cur ? rbLoadSaved() : null, C = cur || (saved ? { fit: saved.fit, flat: saved.flat } : null), stale = !cur && saved && saved.sig !== rbSig(), h = '';
   h += '<details class="egBox rkHow rbBox"' + (RB.open || RB.run ? " open" : "") + '><summary>점수 검증 — 과거에 이 점수가 높았던 종목이 정말 더 올랐나' + (C && C.fit && (C.flat || C.fit).verdict ? ' <em>' + rkEsc((C.flat || C.fit).verdict[0]) + '</em>' : ' <em>아직 검증 전</em>') + '</summary>';
-  h += '<div class="rbTop"><div class="briefDim">최근 13년의 6월 말 · 12월 말마다, 그 시점까지의 시세만 가지고 지금과 같은 방법으로 점수를 매긴 뒤 1년 뒤 수익과 맞춰 봐요. 기업 정보 · 매크로는 그때 값을 알 수 없어 빼고, 레버리지 상품도 빼요. 종목 시세를 다시 받으므로 3~8분쯤 걸려요(화면이 잠깐씩 멈출 수 있어요).</div><div class="rkTopR">' + (RB.run ? '<span class="rkProg">검증 중 ' + RB.done + ' / ' + RB.total + '</span>' : '') + '<button class="primary" data-rbrun' + (RB.run ? " disabled" : "") + '>' + (C ? "다시 검증" : "검증 실행") + '</button></div></div>';
+  h += '<div class="rbTop"><div class="briefDim">최근 13년의 6월 말 · 12월 말마다, 그 시점까지의 시세만 가지고 지금과 같은 방법으로 점수를 매긴 뒤 1년 뒤 수익과 맞춰 봐요. 기업 정보(ROE 등)는 그때 값을 알 수 없어 빼고, 레버리지 상품도 빼요. 매크로와 전문가 기법 항목은 그 시점에 알 수 있던 값으로 넣어요. 종목 시세를 다시 받으므로 3~8분쯤 걸려요(화면이 잠깐씩 멈출 수 있어요).</div><div class="rkTopR">' + (RB.run ? '<span class="rkProg">검증 중 ' + RB.done + ' / ' + RB.total + '</span>' : '') + '<button class="primary" data-rbrun' + (RB.run ? " disabled" : "") + '>' + (C ? "다시 검증" : "검증 실행") + '</button></div></div>';
   if (!C || !C.fit) return h + '</details>';
   var A = C.flat || C.fit, B = null, ym = function (t) { return t ? new Date(t).toISOString().slice(0, 7) : "?"; };
   if (!A) return h + '<div class="briefDim">집계할 만큼 자료가 모이지 않았어요.</div></details>';
+  var missK = cur && RB.keys ? RK_I.filter(function (I) { return !RB_SKIP[I[0]] && RB.keys.indexOf(I[0]) < 0; }) : [];
+  if (missK.length) h += '<div class="ddWarn"><b>새 항목 ' + missK.length + '개는 아직 검증 전이에요</b> ' + missK.map(function (I) { return rkEsc(I[2]); }).join(" · ") + ' — "다시 검증"을 누르면 이 항목들도 과거 13년에 맞았는지 나와요. 아래 표는 예전 검증(새 항목 제외) 그대로예요.</div>';
   if (stale) h += '<div class="ddWarn"><b>항목 · 비중 · 잣대가 그때와 달라요</b> 아래는 예전 설정으로 검증한 결과예요. 지금 설정으로 보려면 "다시 검증"을 누르세요.</div>';
   h += '<div class="rbV ' + A.verdict[2] + '"><b>' + rkEsc(A.verdict[0]) + '</b><span>' + rkEsc(A.verdict[1]) + '</span></div>';
   var notes = [];
@@ -193,14 +200,14 @@ function rbHtml() {
   if (cur && cur.sug) { var S2 = cur.sug, ymc = function (t) { return t ? new Date(t).toISOString().slice(0, 7) : "?"; }, nmK = function (k) { var I = RK_I.filter(function (x) { return x[0] === k; })[0]; return I ? RK_G[I[1]].no + " " + I[2] : k; };
     if (S2.none) h += '<div class="ddMini"><b>데이터가 제안하는 역할 나누기</b> 앞 절반 시점(~' + ymc(S2.cut) + ')만으로는 종목 항목과 타이밍 항목을 가를 만큼 꾸준한 항목이 없었어요. 기본 구성을 그대로 쓰세요.</div>';
     else { var line = function (nm, a) { return '<tr><td><b>' + nm + '</b></td><td>' + sg(a.ic) + '</td><td>' + pc(a.icPos) + '</td><td>' + pc(a.topWinMed) + '</td><td>' + sg(a.wic.ic) + '</td><td>' + pc(a.wic.pos) + '</td></tr>'; }, okP = S2.sugTe && S2.sugTe.ic >= 0.03, okT = S2.sugTe && S2.sugTe.wic.ic >= 0.05, better = S2.sugTe && S2.curTe && (S2.sugTe.ic > S2.curTe.ic + 0.01 || S2.sugTe.wic.ic > S2.curTe.wic.ic + 0.02) && S2.sugTe.ic >= S2.curTe.ic - 0.01 && S2.sugTe.wic.ic >= S2.curTe.wic.ic - 0.02;
-      h += '<div class="ddSub">데이터가 제안하는 역할 나누기 — 앞 절반으로 정하고 뒤 절반으로 확인</div><div class="rbSug"><div class="briefDim">' + ymc(S2.cut) + ' 이전 ' + S2.nTr + '개 시점에서 "무엇을"에 꾸준히 맞은 항목은 종목 점수에, "언제"에 꾸준히 맞은 항목은 타이밍 점수에 넣고, 어느 쪽에도 맞지 않은 항목은 뺐어요. 그 구성을 ' + ymc(S2.cut) + ' 이후 ' + S2.nTe + '개 시점(정할 때 보지 않은 기간)에 넣어 본 결과가 "확인 기간"이에요. 기업 정보 · 매크로는 검증할 수 없어 기본 역할 그대로 둬요. 묶음 비중은 바꾸지 않아요.</div>' +
+      h += '<div class="ddSub">데이터가 제안하는 역할 나누기 — 앞 절반으로 정하고 뒤 절반으로 확인</div><div class="rbSug"><div class="briefDim">' + ymc(S2.cut) + ' 이전 ' + S2.nTr + '개 시점에서 "무엇을"에 꾸준히 맞은 항목은 종목 점수에, "언제"에 꾸준히 맞은 항목은 타이밍 점수에 넣고, 어느 쪽에도 맞지 않은 항목은 뺐어요. 그 구성을 ' + ymc(S2.cut) + ' 이후 ' + S2.nTe + '개 시점(정할 때 보지 않은 기간)에 넣어 본 결과가 "확인 기간"이에요. 기업 정보는 검증할 수 없어 기본 역할 그대로 둬요. 매크로는 모든 종목에 같은 값이라 "언제"로만 검증되고, 맞지 않으면 타이밍 점수에서 빠져요(시점이 ' + S2.nTr + '개뿐이라 우연에 약해요). 묶음 비중은 바꾸지 않아요.</div>' +
         '<div class="rbSugC"><b>종목 항목 ' + S2.pick.length + '개</b> ' + S2.pick.map(nmK).join(" · ") + '<br><b>타이밍 항목 ' + S2.time.length + '개</b> ' + S2.time.map(nmK).join(" · ") + '</div>' +
         '<div class="dxWrap"><table class="dgT"><thead><tr><th>구성 · 기간</th><th>종목 점수 순위상관</th><th>맞은 시점</th><th>상위 20%가 이긴 시점(중앙값)</th><th>타이밍 점수 순위상관</th><th>맞은 종목</th></tr></thead><tbody>' + (S2.curTr ? line("지금 구성 · 정한 기간", S2.curTr) : "") + (S2.sugTr ? line("제안 구성 · 정한 기간", S2.sugTr) : "") + (S2.curTe ? line("지금 구성 · 확인 기간", S2.curTe) : "") + (S2.sugTe ? '<tr class="ddNow">' + line("제안 구성 · 확인 기간", S2.sugTe).slice(4) : "") + '</tbody></table></div>' +
         '<div class="rbV ' + (better && okP && okT ? "up" : "") + '" style="margin-top:8px"><b>' + (better && okP && okT ? "확인 기간에서도 나아졌어요" : better ? "조금 나아졌지만 아직 약해요" : "지금 구성보다 낫지 않았어요") + '</b><span>' + (better && okP && okT ? "정할 때 보지 않은 기간에서도 두 점수 모두 지금 구성 이상이었어요. 적용해 볼 만해요 — 다만 확인 기간이 " + S2.nTe + "개 시점뿐이라 확신할 정도는 아니에요." : better ? "한쪽은 좋아졌지만 기준(종목 +0.03 · 타이밍 +0.05)에는 못 미쳐요." : "지금 구성이 확인 기간에서 같거나 더 나았어요. 그대로 두는 편이 맞아요 — 앞 기간에만 맞춘 구성은 뒤에서 무너지기 쉬워요.") + '</span></div>' +
         '<div style="margin-top:8px"><button class="' + (better && okP && okT ? "primary" : "ghost") + '" data-rbapply>이 구성 적용</button> <button class="ghost" data-rbreset>기본 구성으로 되돌리기</button></div></div>'; } }
   if (B) h += '<div class="ddMini"><b>잣대 비교</b> ' + (A.fit ? "분위기에 맞는 잣대" : "고른 항목 그대로") + ': 순위상관 ' + (A.ic >= 0 ? "+" : "") + A.ic.toFixed(3) + ' · 상위−하위 ' + rbP(A.spread, 1) + 'p / ' + (B.fit ? "분위기에 맞는 잣대" : "고른 항목 그대로") + ': 순위상관 ' + (B.ic >= 0 ? "+" : "") + B.ic.toFixed(3) + ' · 상위−하위 ' + rbP(B.spread, 1) + 'p — ' + (Math.abs(A.ic - B.ic) < 0.01 ? "두 잣대의 차이는 거의 없었어요." : (A.ic > B.ic) === A.fit ? "분위기에 맞춘 쪽이 과거에는 더 잘 맞았어요." : "분위기에 맞추지 않은 쪽이 과거에는 더 잘 맞았어요.") + '</div>';
   h += '<details class="rbPer"><summary>시점별 결과 ' + A.per.length + '개</summary><div class="dxWrap"><table class="dgT"><thead><tr><th>시점</th><th>분위기</th><th>종목 수</th><th>순위상관</th><th>상위 20%</th><th>하위 20%</th><th>전체 평균</th></tr></thead><tbody>' + A.per.map(function (p) { return '<tr><td>' + ym(p.t) + '</td><td>' + RK_MOODN[p.mood] + '</td><td>' + p.n + '</td><td>' + (p.ic == null ? "–" : (p.ic >= 0 ? "+" : "") + p.ic.toFixed(2)) + '</td><td>' + rbP(p.top) + '</td><td>' + rbP(p.bot) + '</td><td>' + rbP(p.uni) + '</td></tr>'; }).join("") + '</tbody></table></div></details>';
-  h += '<div class="ddMini"><b>이 검증이 말해 주지 못하는 것</b> ① 지금 목록에 남아 있는 종목만 봤어요 — 상장폐지되거나 목록에서 빠진 종목이 없어서 전체 수익이 실제보다 좋게 나와요. ② 기업 정보(ROE · 성장 · PER)와 매크로는 빠졌어요 — 실제 순위는 이 항목들까지 쓰므로 결과가 다를 수 있어요. ③ 시점이 6개월 간격이라 1년 수익 구간이 서로 겹쳐요 — 독립된 시점은 표에 보이는 수의 절반쯤이에요. ④ 평균은 크게 오른 몇 종목(특히 코인)에 끌려가요 — 중앙값과 플러스 비율을 같이 보세요. ⑤ 과거에 맞았다고 앞으로도 맞는 것은 아니에요. 항목이나 비중을 여러 번 바꿔 가며 가장 잘 맞는 조합을 고르면, 그 조합은 과거에만 맞는 조합일 수 있어요.</div>';
+  h += '<div class="ddMini"><b>이 검증이 말해 주지 못하는 것</b> ① 지금 목록에 남아 있는 종목만 봤어요 — 상장폐지되거나 목록에서 빠진 종목이 없어서 전체 수익이 실제보다 좋게 나와요. ② 기업 정보(ROE · 성장 · PER)는 빠졌어요 — 실제 순위는 이 항목들까지 쓰므로 결과가 다를 수 있어요. 매크로는 모든 종목에 같은 값이라, 맞았는지 가르는 실제 표본은 시점 수(약 25개, 서로 겹침)뿐이에요. ③ 시점이 6개월 간격이라 1년 수익 구간이 서로 겹쳐요 — 독립된 시점은 표에 보이는 수의 절반쯤이에요. ④ 평균은 크게 오른 몇 종목(특히 코인)에 끌려가요 — 중앙값과 플러스 비율을 같이 보세요. ⑤ 과거에 맞았다고 앞으로도 맞는 것은 아니에요. 항목이나 비중을 여러 번 바꿔 가며 가장 잘 맞는 조합을 고르면, 그 조합은 과거에만 맞는 조합일 수 있어요.</div>';
   return h + '</details>';
 }
 function rbBind(el) {

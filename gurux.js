@@ -143,7 +143,49 @@ var GX_P = {
     phil: ["경쟁 우위가 뚜렷한 성장 기업", "기업 탐방 · 조사에 기반한 상향식 선택", "가격이 맞지 않으면 기다린다"],
     how: ["20~30종목", "분기마다 꽤 갈아탄다", "지금은 창업자가 아닌 후임 운용역들이 결정한다"],
     hist: [["1997", "론 파인 설립('타이거 컵')"], ["2019", "창업자가 일선 운용에서 물러남"], ["2022", "성장주 급락기에 큰 손실"]],
-    read: "새로 산 종목과 다 판 종목의 업종을 본다. 인물보다 조직의 판단으로 읽는다.", learn: "성장주도 '질'로 고른다는 기준.", trust: 2, tw: "창업자 개인의 판단이 아니다. 숏은 보이지 않는다." }
+    read: "새로 산 종목과 다 판 종목의 업종을 본다. 인물보다 조직의 판단으로 읽는다.", learn: "성장주도 '질'로 고른다는 기준.", trust: 2, tw: "창업자 개인의 판단이 아니다. 숏은 보이지 않는다." },
+  /* ---------- v15.00 추가: 13F로 읽을 수 있는 4명 ---------- */
+  elliott: { bio: "1977년 변호사 출신 폴 싱어가 세운 헤지펀드. 부실채권에서 출발해 지금은 세계에서 가장 활발한 행동주의 투자자로 꼽힌다. 아르헨티나 국채를 두고 15년 가까이 소송을 벌여 끝내 돈을 받아 낸 일, 2015년 삼성물산 합병에 반대한 일로 한국에도 잘 알려져 있다. 손실을 극도로 싫어해 포트폴리오 전체에 헤지를 넓게 건다.", ty: "activist", ty2: ["deep"], tags: ["최대 행동주의", "넓은 헤지"], one: "가치가 눌린 곳을 찾아, 풀릴 때까지 물러서지 않는다.",
+    phil: ["잃지 않는 것이 먼저 — 헤지를 넓게 건다", "가치가 눌린 이유를 찾고, 그 이유를 직접 없앤다", "법 · 계약 · 지배구조를 끝까지 파고든다"],
+    how: ["대형 기업에 지분을 쌓고 공개서한으로 구조 개편 · 자사주 매입 · 경영진 교체를 요구", "13F에 지수 풋옵션 같은 헤지가 크게 잡힌다", "한 캠페인을 몇 년씩 끌고 간다"],
+    hist: [["1977", "엘리엇 설립"], ["2001~2016", "아르헨티나 국채 소송 — 끝내 합의금을 받아 냄"], ["2015", "삼성물산 · 제일모직 합병 반대"], ["2020년대", "대형 기술 · 산업 기업으로 캠페인 확대"]],
+    read: "큰 신규 · 증액은 캠페인의 시작일 수 있다. 지수 · ETF 풋은 약세 베팅이 아니라 보험으로 읽는다.", learn: "'왜 싼가'에서 멈추지 않고 '무엇이 바뀌면 값이 풀리는가'까지 적어 보는 습관.", trust: 2, tw: "채권 · 비상장 · 해외 포지션과 스왑으로 쌓은 지분은 13F에 없다. 옵션 금액은 기초자산 값이라 크게 보인다." },
+  starboard: { bio: "2011년 제프 스미스가 독립시켜 만든 행동주의 펀드. 2014년 다든 레스토랑(올리브가든의 모회사)의 이사 12명을 전원 교체한 일로 유명하다 — 300쪽 가까운 발표 자료에서 '파스타 삶는 물에 소금을 넣지 않는다'는 것까지 지적했다. 중형 기술 · 소비재 · 헬스케어 기업에 마진 개선과 사업 재편을 요구한다.", ty: "activist", tags: ["이사회 교체", "운영 개선"], one: "숫자로 설득하고, 안 되면 이사회를 바꾼다.",
+    phil: ["경쟁사보다 마진이 낮은 이유를 찾아 고치게 한다", "요구는 구체적인 숫자와 자료로 한다", "필요하면 이사회 의석을 직접 확보한다"],
+    how: ["지분 5~10%를 사고 13D로 공개", "상세한 발표 자료로 개선안을 제시", "표 대결까지 가지 않고 합의로 이사 몇 자리를 얻는 경우가 많다"],
+    hist: [["2011", "스타보드 밸류 독립"], ["2014", "다든 레스토랑 이사회 12명 전원 교체"], ["2020년대", "세일즈포스 · 화이자 등 대형 기업으로 확대"]],
+    read: "새로 등장한 비중 3% 이상 종목은 새 캠페인 후보다. 전량 매도는 캠페인 종료.", learn: "경쟁사와 마진을 나란히 놓고 '차이의 이유'를 묻는 분석 틀.", trust: 3, tw: "미국 주식 매수 포지션 중심이라 잘 보인다. 다만 13D가 13F보다 먼저 나온다." },
+  hhintl: { bio: "중국에서 부부가오(BBK)를 세워 오포 · 비보의 뿌리를 만든 기업가이자 투자자. 2006년 버핏과의 점심을 낙찰받아 '중국의 버핏'으로 불린다. 닷컴 붕괴 뒤 넷이즈를 헐값에 사서 100배 넘게 번 일로 이름을 알렸고, 지금은 애플에 자산의 큰 부분을 싣고 있다. 원하는 값에 사기 위해 풋옵션을 파는 방식을 자주 쓴다.", ty: "value", tags: ["초집중", "풋 매도"], one: "이해하는 좋은 회사를, 싸질 때 크게 산다.",
+    phil: ["'맞는 일을 하고, 일을 맞게 한다' — 본분", "이해하지 못하는 것은 사지 않는다", "좋은 회사가 싸질 때까지 기다린다"],
+    how: ["애플이 13F의 가장 큰 부분", "주가가 빠지면 풋옵션을 팔아 '더 싸게 살 약속'을 돈 받고 만든다", "중국 투자 커뮤니티에서 매매 이유를 직접 밝힌다"],
+    hist: [["1995", "부부가오(BBK) 설립"], ["2002 무렵", "넷이즈 대량 매수 — 100배 넘는 수익"], ["2006", "버핏과의 점심 낙찰"], ["2011~", "애플 집중 매수"]],
+    read: "종목이 10개 안팎이라 신규 · 증액이 곧 의견이다. 풋 매도는 13F에 온전히 드러나지 않는다.", learn: "'사고 싶은 값'을 먼저 정해 두고 그 값이 올 때까지 기다리는 방식.", trust: 2, tw: "개인 계좌 · 중국 자산 · 옵션 매도 포지션은 13F에 없다." },
+  atreides: { bio: "피델리티에서 대형 기술주 펀드를 운용하다 2019년 독립한 기술 전문 투자자. 반도체 · AI 인프라 · 소프트웨어의 공급망을 깊이 파는 것으로 알려져 있고, 상장 주식과 비상장 기술 기업을 함께 본다. SNS와 팟캐스트에서 산업 견해를 자주 밝힌다.", ty: "growth", tags: ["반도체 · AI", "기술 전문"], one: "기술의 변곡점에서, 숫자로 확인되는 승자에 싣는다.",
+    phil: ["기술 변화가 이익으로 바뀌는 지점을 찾는다", "공급망 전체를 본다 — 칩 · 장비 · 전력 · 소프트웨어", "틀리면 빨리 고친다"],
+    how: ["상위 종목이 반도체 · AI 관련에 몰려 있다", "분기마다 비중을 적극적으로 조정한다", "비상장 지분도 함께 보유한다"],
+    hist: [["2009~2017", "피델리티에서 기술주 펀드 운용"], ["2019", "아트레이디스 설립"], ["2023~", "AI 인프라 집중으로 주목"]],
+    read: "상위 종목의 테마 구성과 그 안에서의 비중 이동을 본다. 한 분기보다 2~3분기 흐름으로.", learn: "한 종목이 아니라 공급망의 병목이 어디인지부터 묻는 순서.", trust: 2, tw: "비상장 지분과 숏은 보이지 않는다. 회전이 있는 편이다." },
+  /* ---------- v15.00 추가: 발언형 4명 — 13F가 없거나 읽을 수 없어 '발언 조사'만 한다 (voice: true · trust 0) ---------- */
+  ptj: { voice: true, bio: "1987년 블랙 먼데이를 예측해 그해 큰 수익을 낸 매크로 트레이더. 선물 · 통화 · 금리를 넘나들며 '공격보다 방어'를 원칙으로 삼는다. 튜더 인베스트먼트는 13F를 내지만 여러 팀이 수천 종목을 굴려 그의 생각이 드러나지 않는다 — 그래서 1년에 몇 번 하는 방송 인터뷰가 신호다.", ty: "macro", tags: ["방어 우선", "추세"], style: "swing", one: "방어가 먼저다 — 200일선 아래에 있는 것은 들지 않는다.",
+    phil: ["잃지 않는 것이 가장 중요하다 — 손실 한도를 먼저 정한다", "200일 이동평균선 아래에 있는 자산은 피한다", "1을 걸고 5를 노릴 수 있는 자리만 고른다"],
+    how: ["1년에 몇 번 방송에서 시장 견해를 밝힌다", "인플레이션 · 재정적자 국면에서 금 · 비트코인 · 원자재를 말해 왔다", "틀렸다고 보면 바로 뒤집는다"],
+    hist: [["1980", "튜더 인베스트먼트 설립"], ["1987", "블랙 먼데이를 예측 — 그해 세 자릿수 수익률"], ["2020", "인플레이션 대비로 비트코인 보유를 공개"]],
+    read: "13F는 읽지 않는다. 발언에서 '무엇을 위험으로 보는가'와 '무엇으로 대비하는가'를 뽑는다.", learn: "살 이유보다 '어디서 틀렸다고 인정할지'를 먼저 정하는 순서.", trust: 0, tw: "튜더의 13F는 여러 운용팀의 수천 종목이라 본인의 견해가 아니다." },
+  burry: { voice: true, bio: "의사 출신으로, 2000년대 중반 서브프라임 주택담보대출의 부실을 서류를 직접 읽어 찾아내고 그 붕괴에 걸어 큰 수익을 낸 인물. 영화 '빅쇼트'의 주인공이다. 이후 소수 종목 · 역발상 투자를 이어 오다 2025년 11월 펀드 등록을 말소했고, 지금은 유료 뉴스레터로 견해를 밝힌다.", ty: "deep", ty2: ["macro"], tags: ["역발상", "원문 읽기"], one: "모두가 믿는 것의 숫자를 직접 뜯어본다.",
+    phil: ["재무제표 · 계약서를 직접 읽는다", "인기 없는 곳에서 안전마진을 찾는다", "거품이라고 보면 공개적으로 반대편에 선다"],
+    how: ["소수 종목에 집중하고 자주 갈아탄다", "풋옵션으로 하락에 건 적이 여러 번 있다", "글로 길게 논리를 설명한다"],
+    hist: [["2000", "사이언 캐피털 설립"], ["2005~2008", "서브프라임 붕괴에 베팅 — '빅쇼트'"], ["2025.11", "펀드 등록 말소 · 유료 뉴스레터 시작"]],
+    read: "새 13F는 나오지 않는다. 뉴스레터와 발언에서 '무엇이 과대평가됐다고 보는가'의 논리를 읽는다.", learn: "남의 요약이 아니라 원문(공시 · 주석)을 직접 읽는 습관.", trust: 0, tw: "2025년 11월 등록 말소로 13F가 더 나오지 않는다. 과거에도 풋옵션 금액이 기초자산 값으로 보도돼 베팅 크기가 부풀려지곤 했다." },
+  gundlach: { voice: true, bio: "채권 운용사 더블라인의 창업자로 '채권왕'으로 불린다. 주식이 아니라 금리 · 신용 · 달러를 보는 사람이라 13F에는 생각이 없다. 분기 웹캐스트와 연준 회의 날 인터뷰에서 금리 방향, 달러, 신용 시장의 위험을 말하는데, 주식 투자자에게는 '채권 시장이 보내는 경고'를 듣는 창구다.", ty: "macro", tags: ["채권의 눈", "금리 · 달러"], one: "주식이 모르는 것을 채권 시장은 먼저 안다.",
+    phil: ["금리와 신용이 모든 자산 가격의 바탕이다", "시장이 한쪽으로 쏠리면 반대편을 본다", "장기 추세가 바뀌는 순간을 찾는다"],
+    how: ["분기마다 공개 웹캐스트를 한다", "연준 회의 날 방송 인터뷰를 한다", "달러 · 금 · 신흥국처럼 자산군 단위로 말한다"],
+    hist: [["2009", "더블라인 캐피털 설립"], ["2010년대", "'채권왕' 호칭을 얻음"], ["2020년대", "미국 부채 · 달러 · 사모신용의 위험을 경고"]],
+    read: "13F는 읽지 않는다. 금리 · 신용 스프레드 · 달러에 대한 견해를 뽑는다.", learn: "주식을 보기 전에 금리와 신용 시장부터 확인하는 순서.", trust: 0, tw: "채권 운용사라 13F에 의미 있는 주식 포지션이 없다." },
+  grantham: { voice: true, bio: "자산운용사 GMO의 공동 창업자로, 버블의 역사를 연구해 온 가치 투자자. 1989년 일본, 2000년 닷컴, 2008년 주택 버블을 미리 경고한 것으로 유명하지만, 경고가 몇 년 일렀던 탓에 그사이 고객 자금이 빠져나간 경험도 여러 번 했다. GMO가 분기마다 내는 서한과 '7년 자산군 기대수익'이 그의 견해를 담는다.", ty: "value", ty2: ["macro"], tags: ["버블 연구", "평균 회귀"], one: "모든 것은 평균으로 돌아간다 — 버블도.",
+    phil: ["가격과 이익률은 결국 평균으로 돌아간다", "평균에서 크게 벗어난 가격을 버블로 정의한다", "일찍 옳은 것은 틀린 것과 구별하기 어렵다 — 그래도 원칙을 지킨다"],
+    how: ["분기 서한으로 시장을 진단한다", "자산군별 7년 기대수익을 발표한다", "비싼 미국 대형주 대신 싼 자산군을 권해 왔다"],
+    hist: [["1977", "GMO 공동 설립"], ["2000 · 2008", "닷컴 · 주택 버블을 사전에 경고"], ["2021~", "'슈퍼 버블' 경고"]],
+    read: "GMO의 13F는 분산된 조직 포트폴리오라 읽지 않는다. 서한의 버블 진단과 자산군 기대수익을 본다.", learn: "'지금 비싼가'를 과거 분포(평균에서 얼마나 벗어났나)로 재는 방식 — 이 앱의 낙폭 · 평균선 항목과 같은 생각이다.", trust: 0, tw: "GMO의 13F는 수백 종목의 조직 포트폴리오다. 경고는 맞더라도 몇 년 이른 경우가 많았다." }
 };
 var GX = { ty: "all", sel: null };
 try { var gx0 = JSON.parse(localStorage.getItem("sm.gurux") || "{}"); if (gx0.ty) GX.ty = gx0.ty; } catch (e) {}
@@ -235,8 +277,11 @@ function gxDecorate() {
   while (ex.firstChild) { if (how) how.parentNode.insertBefore(ex.firstChild, how); else box.appendChild(ex.firstChild); }
 }
 function gxEmpty(box) { }
-var GX_NM = { berkshire: "워런 버핏", pershing: "빌 애크먼", duquesne: "스탠리 드러켄밀러", appaloosa: "데이비드 테퍼", himalaya: "리루", baupost: "세스 클라만", soros: "조지 소로스", bridgewater: "레이 달리오", thirdpoint: "댄 로브", tiger: "체이스 콜먼", ark: "캐시 우드", tci: "크리스 혼", fundsmith: "테리 스미스", akre: "척 애커", pabrai: "모니시 파브라이", greenlight: "데이비드 아인혼", oaktree: "하워드 막스", icahn: "칼 아이칸", trian: "넬슨 펠츠", coatue: "필립 라폰트", altimeter: "브래드 거스트너", lonepine: "스티븐 맨델" };
-var GX_ORG = { berkshire: "버크셔 해서웨이", pershing: "퍼싱 스퀘어", duquesne: "듀케인 패밀리오피스", appaloosa: "아팔루사", himalaya: "히말라야 캐피털", baupost: "바우포스트", soros: "소로스 펀드", bridgewater: "브리지워터", thirdpoint: "서드 포인트", tiger: "타이거 글로벌", ark: "ARK 인베스트", tci: "TCI 펀드", fundsmith: "펀드스미스", akre: "애커 캐피털", pabrai: "달랄 스트리트", greenlight: "그린라이트 캐피털", oaktree: "오크트리 캐피털", icahn: "아이칸 엔터프라이즈", trian: "트라이언 펀드", coatue: "코튜 매니지먼트", altimeter: "알티미터 캐피털", lonepine: "론 파인 캐피털" };
+var GX_NM = { berkshire: "워런 버핏", pershing: "빌 애크먼", duquesne: "스탠리 드러켄밀러", appaloosa: "데이비드 테퍼", himalaya: "리루", baupost: "세스 클라만", soros: "조지 소로스", bridgewater: "레이 달리오", thirdpoint: "댄 로브", tiger: "체이스 콜먼", ark: "캐시 우드", tci: "크리스 혼", fundsmith: "테리 스미스", akre: "척 애커", pabrai: "모니시 파브라이", greenlight: "데이비드 아인혼", oaktree: "하워드 막스", icahn: "칼 아이칸", trian: "넬슨 펠츠", coatue: "필립 라폰트", altimeter: "브래드 거스트너", lonepine: "스티븐 맨델", elliott: "폴 싱어", starboard: "제프 스미스", hhintl: "돤융핑", atreides: "개빈 베이커", ptj: "폴 튜더 존스", burry: "마이클 버리", gundlach: "제프리 건들락", grantham: "제러미 그랜섬" };
+var GX_ORG = { berkshire: "버크셔 해서웨이", pershing: "퍼싱 스퀘어", duquesne: "듀케인 패밀리오피스", appaloosa: "아팔루사", himalaya: "히말라야 캐피털", baupost: "바우포스트", soros: "소로스 펀드", bridgewater: "브리지워터", thirdpoint: "서드 포인트", tiger: "타이거 글로벌", ark: "ARK 인베스트", tci: "TCI 펀드", fundsmith: "펀드스미스", akre: "애커 캐피털", pabrai: "달랄 스트리트", greenlight: "그린라이트 캐피털", oaktree: "오크트리 캐피털", icahn: "아이칸 엔터프라이즈", trian: "트라이언 펀드", coatue: "코튜 매니지먼트", altimeter: "알티미터 캐피털", lonepine: "론 파인 캐피털", elliott: "엘리엇 매니지먼트", starboard: "스타보드 밸류", hhintl: "H&H 인터내셔널", atreides: "아트레이디스", ptj: "튜더 인베스트먼트", burry: "사이언(등록 말소)", gundlach: "더블라인 캐피털", grantham: "GMO" };
+/* v15.00 발언형 — 13F 없이 발언만으로 읽는 사람 */
+function gxVoiceIds() { return Object.keys(GX_P).filter(function (id) { return GX_P[id].voice; }); }
+function gxIsVoice(id) { return !!(GX_P[id] && GX_P[id].voice); }
 (function () {
   if (typeof renderGuru !== "function") return;
   var r0 = renderGuru; renderGuru = function () { r0.apply(this, arguments); try { gxDecorate(); } catch (e) { if (window.console) console.warn("gx", e); } };
@@ -271,7 +316,7 @@ function gxApi(body) { if (typeof proPost !== "function") return Promise.resolve
 function gxToast(m, k) { if (typeof smToast === "function") smToast(m, k); }
 /* 인물 정보를 글로 — AI에게 주는 재료 */
 function gxProfileText(id) { var P = GX_P[id]; if (!P) return ""; var T = GX_TYPES[P.ty];
-  return ["소개: " + (P.bio || ""), "유형(주): " + T.nm + ((P.ty2 || []).length ? " · 부 유형: " + P.ty2.map(function (k) { return GX_TYPES[k].nm; }).join(", ") : "") + (P.style === "swing" ? " (집중 베팅형 — 확신이 있을 때 크게, 틀리면 바로 정리)" : "") + " · 특징: " + (P.tags || []).join(", "), "한 줄: " + P.one, "철학: " + P.phil.join(" / "), "매매 습관: " + P.how.join(" / "), "이력: " + P.hist.map(function (x) { return x[0] + " " + x[1]; }).join(" / "), "이 사람의 13F 읽는 법: " + P.read, "13F의 한계: " + P.tw, "유형에서 버릴 것: " + T.skip].join("\n"); }
+  return ["소개: " + (P.bio || ""), "유형(주): " + T.nm + ((P.ty2 || []).length ? " · 부 유형: " + P.ty2.map(function (k) { return GX_TYPES[k].nm; }).join(", ") : "") + (P.style === "swing" ? " (집중 베팅형 — 확신이 있을 때 크게, 틀리면 바로 정리)" : "") + " · 특징: " + (P.tags || []).join(", "), "한 줄: " + P.one, "철학: " + P.phil.join(" / "), "매매 습관: " + P.how.join(" / "), "이력: " + P.hist.map(function (x) { return x[0] + " " + x[1]; }).join(" / "), "이 사람의 13F 읽는 법: " + P.read, "13F의 한계: " + P.tw, "유형에서 버릴 것: " + T.skip].concat(typeof gxProText === "function" ? gxProText(id) : []).join("\n"); }
 /* 순매매 방향 — 서버 값(flow)이 없으면 주요 매매 목록으로 어림 */
 function gxFlow(g) { if (g.flow != null) return g.flow; var b = (g.buys || []).reduce(function (a, m) { return a + (m.dv || 0); }, 0), s = (g.sells || []).reduce(function (a, m) { return a + (m.dv || 0); }, 0), base = g.prevTotal || g.total; return base ? (b + s) / base : null; }
 function gxClamp(x) { return Math.max(-1, Math.min(1, x)); }
@@ -282,9 +327,12 @@ function gxRegime() {
     if (P.ty === "macro" && g.optSum && g.total) x = gxClamp(x + gxClamp((g.optSum.call - g.optSum.put) / g.total / 0.2) * 0.5);
     var sy = gxSayInfo(g.id); if (sy) x = x * (1 - sy.w) + sy.v * sy.w;   // 발언 조사 · AI 해석의 위험 태도를 섞는다(분기 말 뒤 발언이면 50%, 아니면 30%)
     var w = P.trust * (P.ty === "macro" || P.ty === "deep" ? 1.5 : 1); a += x * w; b += w; rows.push({ id: g.id, nm: g.nm, ty: P.ty, f: f, x: x, w: w }); if ((g.period || "") > per) per = g.period; });
-  if (rows.length < 4 || !b) return null; var sc = Math.round(a / b * 100);
+  if (rows.length < 4 || !b) return null;
+  /* v15.00 발언형 — 13F가 없어 발언 조사의 위험 태도만으로 한 줄. 무게는 13F 신뢰도 ★★에 해당(매크로 · 딥밸류는 1.5배). 조사한 발언이 없으면 넣지 않는다 */
+  var nv = 0; gxVoiceIds().forEach(function (id) { var P = GX_P[id], sy = gxSayInfo(id); if (!sy) return; var w = 2 * (P.ty === "macro" || P.ty === "deep" ? 1.5 : 1) * (sy.old ? 0.5 : 1); a += sy.v * w; b += w; nv++; rows.push({ id: id, nm: GX_NM[id], ty: P.ty, f: null, x: sy.v, w: w, voice: true }); });
+  var sc = Math.round(a / b * 100);
   var say = { up: 0, dn: 0 }, N = (GXA.doc && GXA.doc.notes) || {}; Object.keys(N).forEach(function (id) { var r = N[id] && N[id].stance && N[id].stance.risk; if (r === "확대") say.up++; else if (r === "축소") say.dn++; });
-  return { score: sc, label: sc >= 25 ? "위험 확대" : sc <= -25 ? "위험 축소" : "중립", n: rows.length, rows: rows.sort(function (p, q) { return q.x - p.x; }), period: per, say: say };
+  return { score: sc, label: sc >= 25 ? "위험 확대" : sc <= -25 ? "위험 축소" : "중립", n: rows.length - nv, nv: nv, rows: rows.sort(function (p, q) { return q.x - p.x; }), period: per, say: say };
 }
 /* 확신 종목 — 집중 투자자(13F 신뢰도 2 이상 · 상위 5종목 30% 이상)가 비중을 바꾼 폭(%p) × 신뢰도 */
 function gxConviction() {
@@ -292,6 +340,9 @@ function gxConviction() {
     (g.buys || []).concat(g.sells || []).forEach(function (m) { var d = m.pw != null && m.w != null ? m.w - m.pw : (tot ? m.dv / tot : 0); if (Math.abs(d) < 0.005) return; var k = m.t || m.n, x = by[k] || (by[k] = { k: k, t: m.t, n: m.n, s: 0, who: [] }); x.s += d * 100 * P.trust / 3; x.who.push({ nm: g.nm, d: d, kind: m.kind, ty: P.ty }); }); });
   var L = Object.keys(by).map(function (k) { return by[k]; }); return { up: L.filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 6), dn: L.filter(function (x) { return x.s < 0; }).sort(function (a, b) { return a.s - b.s; }).slice(0, 6) };
 }
+/* v15.00 종목별 거장 점수의 무게 — 복제 적합도(gurux3.js: 상위 종목 유지율 · 회전율 · 집중도 · 13F 신뢰도로 계산)가 있으면 그것을, 없으면 13F 신뢰도.
+   '확신 종목'(gxConviction)은 그대로 13F 신뢰도를 쓴다 — 빨리 갈아타는 사람의 큰 베팅도 '확신'으로는 읽어야 하므로. 따라 살 만한지는 다른 질문이다 */
+function gxFitW(id, P) { try { if (typeof gxCloneFit === "function") { var c = gxCloneFit(id); if (c && c.s != null) return c.s / 100; } } catch (e) {} return (P || GX_P[id]).trust / 3; }
 /* 종목 하나를 누가 들고 있나 — 순위 상세 · 다른 화면에서 쓴다 */
 function gxHolders(sym) {
   var out = []; if (!sym || typeof dsGurus !== "function" || !DS.guru) return out; var s = String(sym).toUpperCase();
@@ -311,12 +362,12 @@ function gxCfgSave(c) { GXA._cfg = c; GXA._bs = null; try { localStorage.setItem
 function gxSayInfo(id) { var D = GXA.doc || {}, n = D.notes && D.notes[id], a = D.ai && D.ai[id], nr = n && n.stance && n.stance.risk !== "미확인" ? n.stance.risk : null, ar = a && a.risk && a.risk !== "미확인" ? a.risk : null;
   var r = nr && ar ? ((n.at || 0) > (a.at || 0) ? nr : ar) : nr || ar; if (!r) return null; var g = (typeof dsGurus === "function" ? dsGurus() : []).filter(function (x) { return x.id === id; })[0], per = g && g.period ? g.period : "";
   var fresh = !!(n && (n.views || []).some(function (v) { return String(v.date || "") > per; }));
-  return { v: r === "확대" ? 1 : r === "축소" ? -1 : 0, w: fresh ? 0.5 : 0.3, fresh: fresh }; }
+  return { v: r === "확대" ? 1 : r === "축소" ? -1 : 0, w: fresh ? 0.5 : 0.3, fresh: fresh, old: !!(n && n.at && Date.now() - n.at > 60 * 86400e3) }; }
 function gxSay(id) { var s = gxSayInfo(id); return s ? s.v : null; }
 function gxTypeScores() {
   var R = gxRegime(), out = {}; if (!R) return null;
-  GX_TY_ORDER.forEach(function (ty) { var rs = R.rows.filter(function (r) { return r.ty === ty; }), a = 0, b = 0, says = 0; rs.forEach(function (r) { var t = GX_P[r.id].trust; if (gxSay(r.id) != null) says++; a += r.x * t; b += t; });
-    out[ty] = rs.length ? { score: Math.round(a / b * 100), n: rs.length, says: says, up: rs.filter(function (r) { return r.f > 0.01; }).length, dn: rs.filter(function (r) { return r.f < -0.01; }).length } : null; });
+  GX_TY_ORDER.forEach(function (ty) { var rs = R.rows.filter(function (r) { return r.ty === ty; }), a = 0, b = 0, says = 0; rs.forEach(function (r) { var t = r.voice ? 2 : GX_P[r.id].trust; if (gxSay(r.id) != null) says++; a += r.x * t; b += t; });
+    out[ty] = rs.length && b ? { score: Math.round(a / b * 100), n: rs.length, says: says, nv: rs.filter(function (r) { return r.voice; }).length, up: rs.filter(function (r) { return r.voice ? r.x > 0 : r.f > 0.01; }).length, dn: rs.filter(function (r) { return r.voice ? r.x < 0 : r.f < -0.01; }).length } : null; });
   return out;
 }
 function gxLabel(sc) { return sc >= 25 ? "위험 확대" : sc <= -25 ? "위험 축소" : "중립"; }
@@ -334,7 +385,7 @@ function gxTick(sym) {
   var H = gxHolders(sym); if (!H.length) return null; var C = gxCfg(), sum = 0;
   H.forEach(function (h) { if (!h.ty) return; var tw = C.basis === "all" ? 1 : C.basis === "mix" ? (+C.mix[h.ty] || 0) / 20 : (h.ty === C.basis ? 1.5 : 0.4);
     var sig = h.kind === "new" ? 1 : h.kind === "add" ? 0.6 : h.kind === "exit" ? -1 : h.kind === "trim" ? -0.5 : 0.3 * Math.min(1, (h.w || 0) / 0.05), size = h.kind === "exit" ? Math.min(1, (h.pw || 0.02) / 0.05) : Math.min(1, 0.3 + (h.w || 0) / 0.05);
-    sum += tw * (h.trust / 3) * sig * (h.kind === "hold" ? 1 : size); });
+    sum += tw * gxFitW(h.id) * sig * (h.kind === "hold" ? 1 : size); });
   var t = sum / 1.2, th = (Math.exp(t) - Math.exp(-t)) / (Math.exp(t) + Math.exp(-t)); return { score: Math.round(50 + 50 * th), n: H.length, H: H };
 }
 function gxBlend(sym, p) { var C = gxCfg(); if (!C.on || !C.blend || typeof DS === "undefined" || !DS.guru) return null; var T = gxTick(sym); if (!T) return null; var b = C.blend / 100; return { g: T.score, t: Math.round(p * (1 - b) + T.score * b) }; }
@@ -388,13 +439,15 @@ function gxSumCtx() {
   var R = gxRegime(), TS = gxTypeScores(), C = gxConviction(), L = []; if (!R || !TS) return "";
   L.push("거장 국면(전체): " + (R.score > 0 ? "+" : "") + R.score + " (" + R.label + ") · " + R.n + "명 · -100 = 전원 순매도, +100 = 전원 순매수 방향. 순매매 = 주식 수 변화 × 분기 말 가격 ÷ 지난 분기 합계(주가 변동 제외)");
   GX_TY_ORDER.forEach(function (k) { var t = TS[k]; if (t) L.push("- " + GX_TYPES[k].nm + ": 점수 " + (t.score > 0 ? "+" : "") + t.score + " · " + t.n + "명 · 순매수 " + t.up + "명 / 순매도 " + t.dn + "명"); });
-  L.push("사람별 순매매: " + R.rows.map(function (r) { return r.nm + " " + (r.f >= 0 ? "+" : "") + (r.f * 100).toFixed(1) + "%"; }).join(", "));
+  L.push("사람별 순매매: " + R.rows.filter(function (r) { return !r.voice; }).map(function (r) { return r.nm + " " + (r.f >= 0 ? "+" : "") + (r.f * 100).toFixed(1) + "%"; }).join(", "));
+  var vr = R.rows.filter(function (r) { return r.voice; }); if (vr.length) L.push("발언형(13F 없음 · 발언으로 본 위험 태도 · 국면 점수에 포함): " + vr.map(function (r) { return r.nm + " " + (r.x > 0 ? "확대" : r.x < 0 ? "축소" : "중립"); }).join(", "));
+  try { if (typeof gxConsensus === "function") { var CS = gxConsensus().slice(0, 6); if (CS.length) L.push("합의 종목(여러 거장의 상위 10종목에 함께 든 것 — 쏠림 위험도 같이 본다): " + CS.map(function (x) { return (x.t || x.n) + " " + x.who.length + "명(" + x.who.map(function (w) { return w.nm; }).join(", ") + ")" + (x.crowd ? " [쏠림 주의]" : ""); }).join(" / ")); } } catch (e) {}
   var row = function (x) { return (x.t || x.n) + " " + (x.s > 0 ? "+" : "") + x.s.toFixed(1) + " (" + x.who.map(function (w) { return w.nm + " " + (w.kind === "new" ? "신규" : w.kind === "exit" ? "전량 매도" : (w.d > 0 ? "+" : "") + (w.d * 100).toFixed(1) + "%p"); }).join(", ") + ")"; };
   if (C.up.length) L.push("확신을 실은 종목(집중 투자자의 비중 변화 %p × 신뢰도): " + C.up.map(row).join(" / "));
   if (C.dn.length) L.push("확신을 거둔 종목: " + C.dn.map(row).join(" / "));
   return L.join("\n");
 }
-function gxPeople() { var o = {}; Object.keys(GX_P).forEach(function (id) { var P = GX_P[id]; o[id] = { ty: GX_TYPES[P.ty].nm + ((P.ty2 || []).length ? "(부: " + P.ty2.map(function (k) { return GX_TYPES[k].nm; }).join(", ") + ")" : ""), trust: P.trust, one: P.one }; }); return o; }
+function gxPeople() { var o = {}; Object.keys(GX_P).forEach(function (id) { var P = GX_P[id]; o[id] = { ty: GX_TYPES[P.ty].nm + ((P.ty2 || []).length ? "(부: " + P.ty2.map(function (k) { return GX_TYPES[k].nm; }).join(", ") + ")" : ""), trust: P.trust, one: P.one, voice: P.voice ? 1 : 0 }; }); return o; }
 function gxSumHtml() {
   var R = gxRegime(), G = dsGurus(); if (!G.length) return "";
   var open = true; try { open = localStorage.getItem("sm.gurux.sum") !== "0"; } catch (e) {}
@@ -424,7 +477,7 @@ function gxSumHtml() {
       ((SM.dont || []).length ? '<h5>이렇게 쓰면 안 된다</h5><ul>' + SM.dont.map(function (x) { return '<li>' + gxE(x) + '</li>'; }).join("") + '</ul>' : '') + ((SM.watch || []).length ? '<h5>다음 분기에 확인할 것</h5><ul>' + SM.watch.map(function (x) { return '<li>' + gxE(x) + '</li>'; }).join("") + '</ul>' : '') +
       '<p class="gxTw"><b>한계</b> ' + gxE(SM.caveat) + ' <span>· ' + new Date(SM.at).toISOString().slice(0, 10) + (SM.manual ? " 직접 저장" : " 작성") + '</span></p></div>';
     else h += '<div class="dvNone">' + (own ? "아직 종합 해석을 만들지 않았어요." : "아직 종합 해석이 준비되지 않았어요.") + '</div>';
-    if (own) h += '<div class="gxBtns"><button type="button" class="chip" data-gxsum' + (GXA.busy._sum ? " disabled" : "") + '>' + (GXA.busy._sum ? "종합하는 중…" : SM ? "종합 해석 다시 만들기" : "종합 해석 만들기") + '</button><small class="briefDim">Claude 1회 · 웹 검색 없음</small></div>' + gxManualHtml("sum", "22명의 요약과 위 숫자가 프롬프트에 들어 있어요.");
+    if (own) h += '<div class="gxBtns"><button type="button" class="chip" data-gxsum' + (GXA.busy._sum ? " disabled" : "") + '>' + (GXA.busy._sum ? "종합하는 중…" : SM ? "종합 해석 다시 만들기" : "종합 해석 만들기") + '</button><small class="briefDim">Claude 1회 · 웹 검색 없음</small></div>' + gxManualHtml("sum", Object.keys(GX_P).length + "명의 요약과 위 숫자가 프롬프트에 들어 있어요.");
     h += '<h5 class="gxH5">앱 점수에 반영하기</h5>' + gxCfgHtml();
   }
   return h + '</details>';
@@ -438,8 +491,10 @@ function gxSumBind(el) {
 function gxAiHtml(id, g) {
   var D = GXA.doc || { notes: {}, ai: {} }, N = D.notes[id] || {}, A = D.ai[id], own = gxOwner(), T = GX_TYPES[GX_P[id].ty], h = '';
   var stale = A && g && A.period !== g.period, behind = A && ((N.at && N.at > A.at && (N.views || []).length) || (N.memoAt && N.memoAt > A.at));
-  h += '<div class="mkStep"><b>AI</b>왜 이렇게 움직였나 <small class="briefDim">인물 정보 + 13F 숫자 + 발언을 겹쳐 읽은 추정이에요</small></div>';
-  if (A) {
+  var voice = gxIsVoice(id);
+  if (!voice) h += '<div class="mkStep"><b>AI</b>왜 이렇게 움직였나 <small class="briefDim">인물 정보 + 13F 숫자 + 발언을 겹쳐 읽은 추정이에요</small></div>';
+  if (voice) h += '<div class="gxVoiceN"><b>발언형</b> 이 사람은 13F로 읽을 수 없어요 — ' + gxE(GX_P[id].tw) + ' 그래서 포트폴리오 해석 대신 아래 발언 조사가 전부예요.</div>';
+  else if (A) {
     h += '<div class="gxAi" style="--gx:' + T.c + '"><div class="gxAh"><b>' + gxE(A.head) + '</b><span class="gxReg ' + (A.risk === "확대" ? "up" : A.risk === "축소" ? "dn" : "") + '">위험 ' + gxE(A.risk) + '</span></div>' + (stale ? '<p class="gxStale">이 해석은 ' + dsQ(A.period) + ' 기준이에요 — 새 분기 보고서가 나왔어요.</p>' : '') + (behind ? '<p class="gxStale">이 해석을 만든 뒤에 ' + (N.at && N.at > A.at && (N.views || []).length ? '발언 조사(' + N.views.length + '건' + (N.stance && N.stance.risk !== "미확인" ? ' · 위험 태도 ' + gxE(N.stance.risk) : '') + ')' : '') + (N.memoAt && N.memoAt > A.at ? (N.at && N.at > A.at ? '와 ' : '') + '메모' : '') + '가 추가됐어요 — 해석에는 아직 반영되지 않았어요. \'해석 다시 만들기\'나 프롬프트를 다시 복사해 반영해 주세요.</p>' : '') + '<p class="gxAv">' + gxE(A.view) + '</p>' + (A.shift ? '<h5>포트폴리오는 어디에서 어디로 옮겨 갔나</h5><p class="gxAv">' + gxE(A.shift) + '</p>' : '') +
       '<h5>움직임별 해석 <small>확신 = 이 해석이 맞을 가능성(본인 발언이 뒷받침하면 높음, 숫자만으로 한 짐작이면 낮음)</small></h5><div class="gxIn">' + (A.intent || []).map(function (x) { return '<div><div class="m"><b>' + gxE(x.move) + '</b><span class="gxCf c' + (x.conf === "높음" ? 3 : x.conf === "보통" ? 2 : 1) + '">확신 ' + gxE(x.conf) + '</span></div><p>' + gxE(x.why) + '</p>' + (x.alt ? '<p class="alt"><b>다른 설명</b> ' + gxE(x.alt) + '</p>' : '') + (x.basis ? '<small>근거: ' + gxE(x.basis) + '</small>' : '') + '</div>'; }).join("") + '</div>' + (A.consist ? '<h5>평소 철학 · 습관과 견주면</h5><p class="gxAv">' + gxE(A.consist) + '</p>' : '') +
       ((A.apply || []).length ? '<h5>우리는 이렇게 적용한다</h5><div class="gxAp">' + A.apply.map(function (x) { return '<div><b>' + gxE(x.do) + '</b><p>' + gxE(x.how) + '</p></div>'; }).join("") + '</div>' : '') +
@@ -447,8 +502,8 @@ function gxAiHtml(id, g) {
       ((A.watch || []).length ? '<h5>다음 분기에 확인할 것</h5><ul>' + A.watch.map(function (x) { return '<li>' + gxE(x) + '</li>'; }).join("") + '</ul>' : '') +
       '<p class="gxTw"><b>한계</b> ' + gxE(A.caveat) + ' <span>· ' + new Date(A.at).toISOString().slice(0, 10) + ' 작성' + (A.withNote ? " · 발언 조사 반영" : " · 발언 조사 없이 작성") + (A.withMemo ? " · 메모 반영" : "") + (A.manual ? " · 직접 저장" : "") + '</span></p></div>';
   } else h += '<div class="dvNone">' + (own ? "아직 해석을 만들지 않았어요. 발언 조사를 먼저 하면 근거가 더 탄탄해져요." : "아직 해석이 준비되지 않았어요.") + '</div>';
-  if (own && g) h += '<div class="gxBtns"><button type="button" class="chip" data-gxrun="read"' + (GXA.busy[id] ? " disabled" : "") + '>' + (GXA.busy[id] === "read" ? "해석하는 중…" : A ? "해석 다시 만들기" : "해석 만들기") + '</button><small class="briefDim">Claude 1회 · 웹 검색 없음</small></div>' + gxManualHtml("read", "인물 정보 · 13F 숫자 · 조사한 발언 · 메모가 프롬프트에 들어 있어요.");
-  h += '<div class="mkStep"><b>✎</b>13F 밖의 이야기 <small class="briefDim">공매도 · 선물 · 채권 · 현금과 "왜"는 13F에 없어요 — 인터뷰 · 서한에서 찾아요</small></div>';
+  if (own && g && !voice) h += '<div class="gxBtns"><button type="button" class="chip" data-gxrun="read"' + (GXA.busy[id] ? " disabled" : "") + '>' + (GXA.busy[id] === "read" ? "해석하는 중…" : A ? "해석 다시 만들기" : "해석 만들기") + '</button><small class="briefDim">Claude 1회 · 웹 검색 없음</small></div>' + gxManualHtml("read", "인물 정보 · 13F 숫자 · 조사한 발언 · 메모가 프롬프트에 들어 있어요.");
+  h += '<div class="mkStep"><b>✎</b>13F 밖의 이야기 <small class="briefDim">' + (voice ? "방송 · 서한 · 뉴스레터에서 본인이 밝힌 견해와 포지션" : '공매도 · 선물 · 채권 · 현금과 "왜"는 13F에 없어요 — 인터뷰 · 서한에서 찾아요') + '</small></div>';
   if ((N.views || []).length) h += '<div class="gxNv">' + N.views.map(function (v) { return '<div><span class="d">' + gxE(v.date) + '</span><span class="k">' + gxE(v.kind) + '</span><p>' + gxE(v.say) + (v.pos ? ' <em>' + gxE(v.pos) + '</em>' : '') + '<small>' + (v.url ? '<a href="' + gxE(v.url) + '" target="_blank" rel="noopener">' + gxE(v.src) + '</a>' : gxE(v.src)) + '</small></p></div>'; }).join("") + '</div>' + (N.stance && N.stance.risk !== "미확인" ? '<p class="gxNote"><b>발언으로 본 위험 태도: ' + gxE(N.stance.risk) + '</b> — ' + gxE(N.stance.why) + '</p>' : '') + ((N.miss || []).length ? '<p class="gxNote">찾지 못한 것 · 주의: ' + N.miss.map(gxE).join(" / ") + '</p>' : '') + '<p class="gxNote">' + gxE(N.asOf || "") + ' 조사 · AI가 웹에서 찾은 내용이라 원문 링크로 확인해 주세요.</p>';
   else if (N.at) h += '<div class="dvNone">최근 6개월 안에서 확인된 발언을 찾지 못했어요' + ((N.miss || []).length ? " — " + N.miss.map(gxE).join(" / ") : "") + '</div>';
   else h += '<div class="dvNone">' + (own ? "아직 조사하지 않았어요." : "아직 조사된 발언이 없어요.") + '</div>';
@@ -492,7 +547,7 @@ function gxRankMount(el) {
 function gxHoldersHtml(sym) {
   var H = gxHolders(sym); if (!H.length) return "";
   var KN = { "new": "신규", add: "증액", trim: "축소", exit: "전량 매도", hold: "유지" }, TK = gxTick(sym), C = gxCfg();
-  return '<div class="gxHold"><h4>거장 보유 ' + (TK ? '<span class="gxTk" style="color:' + (typeof smScCol === "function" ? smScCol(TK.score) : "inherit") + '">거장 점수 ' + TK.score + '</span>' : '') + '<small>' + (typeof dsQ === "function" ? dsQ(H[0].period) : "") + ' 13F · ' + (C.on && C.blend ? '종목 점수에 ' + C.blend + '% 섞는 중' : '점수에는 섞지 않고 참고로 보여 줘요') + '</small></h4>' + H.slice(0, 8).map(function (x) { var T = x.ty ? GX_TYPES[x.ty] : null; return '<div><span class="n">' + (T ? '<i style="background:' + T.c + '"></i>' : '') + gxE(x.nm) + (T ? '<small>' + T.nm + '</small>' : '') + '</span><span>' + (x.w ? gxPc(x.w, 1) + (x.rank ? ' · ' + x.rank + '위' : '') : '–') + '</span><b class="' + (x.kind === "new" || x.kind === "add" ? "pos" : x.kind === "trim" || x.kind === "exit" ? "neg" : "") + '">' + KN[x.kind] + '</b></div>'; }).join("") + '<p>거장 점수(0~100)는 50이 중립이에요. 신규 · 증액은 올리고 축소 · 전량 매도는 내리며, 비중이 클수록 · 13F 신뢰도가 높을수록 · 기준으로 고른 유형일수록 크게 반영해요. 매크로 투자자의 작은 비중은 뜻이 약하고, 집중 투자자의 신규 · 전량 매도는 강한 의견이에요.</p></div>';
+  return '<div class="gxHold"><h4>거장 보유 ' + (TK ? '<span class="gxTk" style="color:' + (typeof smScCol === "function" ? smScCol(TK.score) : "inherit") + '">거장 점수 ' + TK.score + '</span>' : '') + '<small>' + (typeof dsQ === "function" ? dsQ(H[0].period) : "") + ' 13F · ' + (C.on && C.blend ? '종목 점수에 ' + C.blend + '% 섞는 중' : '점수에는 섞지 않고 참고로 보여 줘요') + '</small></h4>' + H.slice(0, 8).map(function (x) { var T = x.ty ? GX_TYPES[x.ty] : null; return '<div><span class="n">' + (T ? '<i style="background:' + T.c + '"></i>' : '') + gxE(x.nm) + (T ? '<small>' + T.nm + (function () { try { var c = typeof gxCloneFit === "function" ? gxCloneFit(x.id) : null; return c ? ' · 복제 적합도 ' + c.s : ''; } catch (e) { return ''; } })() + '</small>' : '') + '</span><span>' + (x.w ? gxPc(x.w, 1) + (x.rank ? ' · ' + x.rank + '위' : '') : '–') + '</span><b class="' + (x.kind === "new" || x.kind === "add" ? "pos" : x.kind === "trim" || x.kind === "exit" ? "neg" : "") + '">' + KN[x.kind] + '</b></div>'; }).join("") + '<p>거장 점수(0~100)는 50이 중립이에요. 신규 · 증액은 올리고 축소 · 전량 매도는 내리며, 비중이 클수록 · 복제 적합도가 높을수록(오래 들고 가는 \'느린 손\'일수록) · 기준으로 고른 유형일수록 크게 반영해요. 빨리 갈아타는 사람의 13F는 이미 바뀌었을 수 있어 가볍게 봐요.' + (function () { try { var cs = typeof gxConsensus === "function" ? gxConsensus().filter(function (c) { return c.t === String(sym).toUpperCase(); })[0] : null; return cs ? ' <b>' + cs.who.length + '명의 상위 10종목에 함께 든 합의 종목이에요' + (cs.crowd ? ' — 쏠림 주의: 평소에는 순풍이지만 누군가 팔기 시작하면 같이 팔릴 수 있어요.' : '.') + '</b>' : ''; } catch (e) { return ''; } })() + '</p></div>';
 }
 (function () {
   if (typeof renderGuru === "function") { var r1 = renderGuru; renderGuru = function () { r1.apply(this, arguments); try { gxDecorate2(); } catch (e) { if (window.console) console.warn("gx2", e); } }; }
@@ -531,6 +586,7 @@ function gxProfiles(ids) { var o = {}; ids.forEach(function (id) { if (GX_P[id])
 /* 사람마다 지금 상태 — 무엇을 해야 하나 */
 function gxTodo(id) {
   var have = {}; dsGurus().forEach(function (x) { have[x.id] = x; }); var g = have[id], D = GXA.doc || { notes: {}, ai: {} }, N = D.notes[id] || {}, A = D.ai[id], day = 86400e3;
+  if (gxIsVoice(id)) return !N.at ? { k: "none", t: "발언 조사 없음", todo: true, voice: 1 } : Date.now() - N.at > 30 * day ? { k: "old", t: "발언 " + Math.round((Date.now() - N.at) / day) + "일 전", todo: true, voice: 1 } : { k: "ok", t: "발언 최신", todo: false, voice: 1 };   // v15.00 발언형은 13F · 해석이 없다
   if (!g) return { k: "no13f", t: "13F 없음", todo: false, noteOld: !N.at || Date.now() - N.at > 30 * day };   // 13F가 들어오면 그때 할 일로 — 13F 수집이 먼저
   if (!A) return { k: "none", t: "해석 없음", todo: true };
   if (A.period !== g.period) return { k: "stale", t: "새 분기", todo: true };

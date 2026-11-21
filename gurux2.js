@@ -21,7 +21,7 @@ function gyHero() {
   var lead = R.score <= -25 ? "큰돈은 위험을 줄이는 쪽으로 기울어 있어요" : R.score >= 25 ? "큰돈은 위험을 더 지는 쪽으로 기울어 있어요" : "한쪽으로 쏠리지 않았어요 — 방향보다 '누가 무엇을 바꿨나'를 볼 때예요";
   var tk = GX_TY_ORDER.filter(function (k) { return TS && TS[k]; });
   var h = '<div class="gyHero"><div class="gyHeroL"><span class="gyK">거장 국면 점수</span><div class="gyBig ' + gyRiskCls(R.label) + '">' + gySgn(R.score) + '<small>/ ±100</small></div><span class="gyReg ' + gyRiskCls(R.label) + '">' + R.label + '</span>' +
-    '<p class="gyLead">' + lead + '</p><p class="gyMeta">' + R.n + '명 · 순매수 ' + up + '명 · 순매도 ' + dn + '명 · ' + dsQ(R.period) + ' 말 13F 기준</p>' +
+    '<p class="gyLead">' + lead + '</p><p class="gyMeta">' + R.n + '명 · 순매수 ' + up + '명 · 순매도 ' + dn + '명 · ' + dsQ(R.period) + ' 말 13F 기준' + (R.nv ? ' · 발언형 ' + R.nv + '명의 위험 태도 포함' : '') + '</p>' +
     '<div class="gyGauge"><i style="left:' + pos + '%"></i></div><div class="gyGl"><span>위험 축소</span><span>중립</span><span>위험 확대</span></div></div>';
   h += '<div class="gyHeroR"><span class="gyK">유형별 점수</span>' + tk.map(function (k) { var t = TS[k]; return '<button type="button" class="gyTyR" data-gyty="' + k + '" style="--gx:' + GX_TYPES[k].c + '"><span class="n"><i></i>' + GX_TYPES[k].nm + '</span>' + gxBar(t.score) + '<b class="' + (t.score >= 25 ? "pos" : t.score <= -25 ? "neg" : "") + '">' + gySgn(t.score) + '</b><small>' + t.up + '↑ ' + t.dn + '↓</small></button>'; }).join("") + '<p class="gyNote">점수 = 주가 변동을 뺀 실제 순매매 방향(사람마다 ±10%면 끝값). 유형을 누르면 그 유형의 인물만 봐요.</p></div></div>';
   return h;
@@ -33,6 +33,8 @@ function gyPeopleGrid() {
     ids.sort(function (a, b) { return ((have[b] || {}).flow != null ? 1 : 0) - ((have[a] || {}).flow != null ? 1 : 0) || (gxFlow(have[a] || {}) || 0) - (gxFlow(have[b] || {}) || 0); });
     return '<div class="gyPgCol" style="--gx:' + GX_TYPES[ty].c + '"><h4><i></i>' + GX_TYPES[ty].nm + '</h4>' + ids.map(function (id) {
       var g = have[id], f = g ? gxFlow(g) : null, A = D.ai[id], st = gxTodo(id), risk = A && A.risk && A.risk !== "미확인" ? A.risk : null;
+      if (GX_P[id].voice) { var N = D.notes[id], nv = N && (N.views || []).length, sr = N && N.stance && N.stance.risk !== "미확인" ? N.stance.risk : null;   // v15.00 발언형 — 13F 대신 발언으로
+        return '<button type="button" class="gyPc' + (N && N.at ? "" : " off") + '" data-gyp="' + id + '"><span class="nm">' + gxE(GX_NM[id]) + '<em class="gyVb">발언</em></span><span class="fl">' + (N && N.at ? "발언 " + nv + "건 · " + gxE(N.asOf || "") : "발언 조사 전") + '</span>' + (sr ? '<span class="gyReg sm ' + gyRiskCls(sr) + '">' + sr + '</span>' : '') + (N && (N.themes || []).length ? '<span class="hd">' + N.themes.slice(0, 3).map(gxE).join(" · ") + '</span>' : '') + '</button>'; }
       return '<button type="button" class="gyPc' + (g ? "" : " off") + '" data-gyp="' + id + '"><span class="nm">' + gxE(GX_NM[id]) + '</span><span class="fl ' + (f > 0.01 ? "pos" : f < -0.01 ? "neg" : "") + '">' + (f == null ? "13F 없음" : "순매매 " + gySgn(f * 100, 1) + "%") + '</span>' + (risk ? '<span class="gyReg sm ' + gyRiskCls(risk) + '">' + risk + '</span>' : '') + (A && A.head && st.k !== "stale" ? '<span class="hd">' + gxE(A.head) + '</span>' : st.k !== "ok" && g ? '<span class="hd dim">' + gxE(st.t) + '</span>' : '') + '</button>';
     }).join("") + '</div>';
   }).join("") + '</div>';
@@ -58,13 +60,17 @@ function gySumAiHtml() {
     var ul = function (t, a) { return (a || []).length ? '<div class="gyBox"><h4>' + t + '</h4><ul>' + a.map(function (x) { return '<li>' + gxE(x) + '</li>'; }).join("") + '</ul></div>' : ''; }, two2 = ul("이렇게 쓰면 안 된다", SM.dont) + ul("다음 분기에 확인할 것", SM.watch); if (two2) h += '<div class="gy2">' + two2 + '</div>';
     h += '<p class="gyFoot"><b>한계</b> ' + gxE(SM.caveat) + ' · ' + new Date(SM.at).toISOString().slice(0, 10) + (SM.manual ? " 직접 저장" : " 작성") + '</p></div>';
   } else h += '<div class="gyEmpty">' + (own ? "아직 종합 해석이 없어요. 개별 해석을 몇 명 만든 뒤에 만들면 더 탄탄해요." : "아직 종합 해석이 준비되지 않았어요.") + '</div>';
-  if (own) h += '<div class="gyAct"><button type="button" class="chip" data-gxsum' + (GXA.busy._sum ? " disabled" : "") + '>' + (GXA.busy._sum ? "종합하는 중…" : SM ? "다시 만들기" : "종합 해석 만들기") + '</button><small>Claude 1회</small></div>' + gxManualHtml("sum", "22명의 요약과 종합 숫자가 프롬프트에 들어 있어요.");
+  if (own) h += '<div class="gyAct"><button type="button" class="chip" data-gxsum' + (GXA.busy._sum ? " disabled" : "") + '>' + (GXA.busy._sum ? "종합하는 중…" : SM ? "다시 만들기" : "종합 해석 만들기") + '</button><small>Claude 1회</small></div>' + gxManualHtml("sum", Object.keys(GX_P).length + "명의 요약과 종합 숫자가 프롬프트에 들어 있어요.");
   return h;
 }
 function gySumTab() {
   var h = gySec("지금 큰돈은 어느 쪽인가", "", gyHero(), " gyFirst");
-  h += gySec("22명 한눈에", "유형별로 묶었어요 · 누르면 그 사람의 해석으로 가요 · 순매매 = 주가 변동을 뺀 실제 사고판 방향", gyPeopleGrid());
+  h += gySec(Object.keys(GX_P).length + "명 한눈에", "유형별로 묶었어요 · 누르면 그 사람의 해석으로 가요 · 순매매 = 주가 변동을 뺀 실제 사고판 방향 · '발언' 표시는 13F 없이 발언으로만 읽는 사람", gyPeopleGrid());
+  /* v15.00 전문가처럼 쓰기 — 활용 지도 · 복제 적합도 · 합의와 쏠림 (gurux3.js) */
+  var um = typeof gzUseHtml === "function" ? gzUseHtml() : ""; if (um) h += gySec("전문가는 거장을 이렇게 쓴다", "따라 사지 않고, 사람마다 다른 곳을 읽어요 — 다섯 가지 원칙과 유형별 쓰임", um);
+  var ft = typeof gzFitHtml === "function" ? gzFitHtml() : ""; if (ft) h += gySec("누구의 13F를 따라갈 수 있나", "복제 적합도 — 13F가 늦게 나와도 쓸모 있는 '느린 손'인지 기록으로 계산 · 누르면 그 사람으로 가요", ft);
   var cv = gyConvHtml(); if (cv) h += gySec("확신이 실린 곳 · 거둔 곳", "", cv);
+  var cs = typeof gzConsHtml === "function" ? gzConsHtml() : ""; if (cs) h += gySec("거장들이 함께 들고 있는 종목", "합의이자 쏠림 — 평소에는 순풍, 팔 때는 같이 팔려요", cs);
   var cr = gyCrossHtml(); if (cr) h += gySec("여러 거장이 함께 움직인 종목", "최근 13F에서 2명 이상이 같은 분기에 사거나 판 종목", cr);
   h += gySec("AI 종합 해석", "유형별로 무엇이 일치하고 엇갈리는지", gySumAiHtml());
   h += '<details class="gyHow"><summary>숫자는 어떻게 만들었나 · 13F 읽는 법</summary><div><p><b>13F</b> — 미국에서 1억 달러 이상을 굴리는 기관이 분기가 끝나고 45일 안에 내는 보유 주식 보고서. 미국 주식의 매수 포지션만 담기고 공매도 · 채권 · 원자재 · 현금은 빠져요. 지금은 이미 바뀌었을 수 있어요.</p><p><b>순매매</b> — 주식 수가 늘고 준 만큼만 계산한 금액(주식 수 변화 × 분기 말 가격)을 지난 분기 보유액으로 나눈 값. 주가가 올라 평가액이 커진 것은 빼요.</p><p><b>거장 국면 점수</b> — 사람마다 순매매를 -100~+100으로 바꿔 평균. 13F가 생각을 잘 보여 주는 사람(신뢰도 ★ 많은 사람)과 매크로 · 딥밸류 유형에 무게를 더 줘요. 발언 조사나 AI 해석에서 위험 태도가 확인되면 30%(13F 분기 말 뒤의 발언이면 50%) 섞어요.</p><p><b>풋 · 콜</b> — 풋은 내릴 때, 콜은 오를 때 이익이 나는 옵션. 13F의 옵션 금액은 기초자산 값이라 크게 보이고, 보험인지 베팅인지는 알 수 없어요.</p></div></details>';
@@ -77,16 +83,20 @@ function gyPick() {
   var ids = gxIds().sort(function (a, b) { return (have[b] ? 1 : 0) - (have[a] ? 1 : 0); }), cur = gyCur();
   return '<div class="gyPick"><div class="gyChips">' + [["all", "전체"]].concat(GX_TY_ORDER.map(function (k) { return [k, GX_TYPES[k].nm]; })).map(function (t) { return '<button type="button" data-gxty="' + t[0] + '" class="' + (GX.ty === t[0] ? "on" : "") + '"' + (t[0] !== "all" ? ' style="--gx:' + GX_TYPES[t[0]].c + '"' : '') + '>' + (t[0] !== "all" ? '<i></i>' : '') + t[1] + ' <small>' + cnt(t[0]) + '</small></button>'; }).join("") + '</div>' +
     (GX.ty !== "all" ? '<p class="gyTyD" style="--gx:' + GX_TYPES[GX.ty].c + '"><b>' + GX_TYPES[GX.ty].nm + '</b> ' + gxE(GX_TYPES[GX.ty].easy || GX_TYPES[GX.ty].d) + '</p>' : '') +
-    '<div class="gyPeople">' + ids.map(function (id) { return '<button type="button" data-gyp="' + id + '" class="' + (id === cur ? "on" : "") + (have[id] ? "" : " off") + '"><i style="background:' + GX_TYPES[GX_P[id].ty].c + '"></i>' + gxE(GX_NM[id]) + '</button>'; }).join("") + '</div></div>';
+    '<div class="gyPeople">' + ids.map(function (id) { return '<button type="button" data-gyp="' + id + '" class="' + (id === cur ? "on" : "") + (have[id] || GX_P[id].voice ? "" : " off") + '"><i style="background:' + GX_TYPES[GX_P[id].ty].c + '"></i>' + gxE(GX_NM[id]) + (GX_P[id].voice ? '<em class="gyVb">발언</em>' : '') + '</button>'; }).join("") + '</div></div>';
 }
 function gyCur() { var have = gyHave(); if (GX.sel && GX_P[GX.sel]) return GX.sel; var id = DS.g && DS.g.id; if (id && GX_P[id] && (GX.ty === "all" || GX_P[id].ty === GX.ty)) return id; var L = gxIds().filter(function (x) { return have[x]; }); return L[0] || gxIds()[0]; }
 function gyPersonHead(id, g) {
   var P = GX_P[id], T = GX_TYPES[P.ty], A = GXA.doc && GXA.doc.ai[id], N = GXA.doc && GXA.doc.notes[id], c = g ? gxConc(g) : null, f = g ? gxFlow(g) : null, st = gxTodo(id);
   var h = '<div class="gyPh" style="--gx:' + T.c + '"><div class="gyPhT"><div><h3>' + gxE(GX_NM[id]) + '</h3><span class="org">' + gxE(GX_ORG[id] || (g && g.org) || "") + '</span></div><div class="tags"><span class="gxTy">' + T.nm + '</span>' + (P.ty2 || []).map(function (k) { return '<span class="gxTy2" style="--gx2:' + GX_TYPES[k].c + '">+ ' + GX_TYPES[k].nm + '</span>'; }).join("") + '</div></div>';
   h += '<p class="gyOne">“' + gxE(P.one) + '”</p>';
-  h += '<div class="gyKpi">' + [["13F 합계", g ? dsUsd(g.total) : "–"], ["순매매", f == null ? "–" : gySgn(f * 100, 1) + "%", f > 0.01 ? "pos" : f < -0.01 ? "neg" : ""], ["상위 5종목", c ? gxPc(c.t5) : "–"], ["신규 / 전량매도", g ? (g.nNew || 0) + " · " + (g.nExit || 0) : "–"], ["AI 위험 태도", A && A.risk ? A.risk : "–", gyRiskCls(A && A.risk)], ["13F 신뢰도", "★★★".slice(0, P.trust) + "☆☆☆".slice(0, 3 - P.trust)]].map(function (k) { return '<div><span>' + k[0] + '</span><b class="' + (k[2] || "") + '">' + k[1] + '</b></div>'; }).join("") + '</div>';
-  if (A && A.head) h += '<div class="gyHl"><span>이번 분기 한 줄</span><b>' + gxE(A.head) + '</b>' + (st.k !== "ok" ? '<em>' + gxE(st.t) + '</em>' : '') + '</div>';
-  h += '<p class="gyMeta">' + (g ? dsQ(g.period) + ' 말 기준 · ' + gxE(g.filed) + ' 공개' + (g.prevPeriod ? ' · ' + dsQ(g.prevPeriod) + '와 비교' : '') : '13F를 아직 받지 않았어요') + (N && N.asOf ? ' · 발언 조사 ' + gxE(N.asOf) : '') + '</p></div>';
+  var cf = null; try { cf = typeof gxCloneFit === "function" ? gxCloneFit(id) : null; } catch (e) {}
+  var sr = N && N.stance && N.stance.risk && N.stance.risk !== "미확인" ? N.stance.risk : null, sig = typeof GZ_P !== "undefined" && GZ_P[id] ? GZ_CH[GZ_P[id].sig[0]] : "–";
+  var K = P.voice ? [["읽는 방법", "발언"], ["발언 위험 태도", sr || "–", gyRiskCls(sr)], ["확인된 발언", N && N.at ? ((N.views || []).length + "건") : "–"], ["발언 조사", N && N.asOf ? N.asOf.slice(5) : "–"], ["주 무대", sig], ["13F", "읽지 않음"]]
+    : [["13F 합계", g ? dsUsd(g.total) : "–"], ["순매매", f == null ? "–" : gySgn(f * 100, 1) + "%", f > 0.01 ? "pos" : f < -0.01 ? "neg" : ""], ["상위 5종목", c ? gxPc(c.t5) : "–"], ["신규 / 전량매도", g ? (g.nNew || 0) + " · " + (g.nExit || 0) : "–"], ["AI 위험 태도", A && A.risk ? A.risk : "–", gyRiskCls(A && A.risk)], cf ? ["복제 적합도", cf.s + '<small class="gzLv ' + cf.cls + '">' + cf.label + '</small>'] : ["13F 신뢰도", "★★★".slice(0, P.trust) + "☆☆☆".slice(0, 3 - P.trust)]];
+  h += '<div class="gyKpi">' + K.map(function (k) { return '<div><span>' + k[0] + '</span><b class="' + (k[2] || "") + '">' + k[1] + '</b></div>'; }).join("") + '</div>';
+  if (A && A.head && !P.voice) h += '<div class="gyHl"><span>이번 분기 한 줄</span><b>' + gxE(A.head) + '</b>' + (st.k !== "ok" ? '<em>' + gxE(st.t) + '</em>' : '') + '</div>';
+  h += '<p class="gyMeta">' + (P.voice ? '13F로 읽지 않는 발언형이에요' : g ? dsQ(g.period) + ' 말 기준 · ' + gxE(g.filed) + ' 공개' + (g.prevPeriod ? ' · ' + dsQ(g.prevPeriod) + '와 비교' : '') : '13F를 아직 받지 않았어요') + (N && N.asOf ? ' · 발언 조사 ' + gxE(N.asOf) : '') + '</p></div>';
   return h;
 }
 function gyHoldHtml(g) {
@@ -103,19 +113,21 @@ function gyQuarterTab(id, g) {
   h += gyHoldHtml(g);
   var op = gxOptsHtml(g, P); if (op) h += gySec("옵션 포지션", "금액 = 기초자산 값(실제 건 돈 아님) · 헤지일 수도 있어요", op.replace(/^<div class="mkStep">[\s\S]*?<\/div>/, ""));
   var hi = gxHistHtml(g); if (hi) h += gySec("분기별 흐름", "합계 · 종목 수 · 상위 5 비중 · 상위 종목", hi.replace(/^<div class="mkStep">[\s\S]*?<\/div>/, ""));
+  var bd = typeof gzBandHtml === "function" ? gzBandHtml(id, g) : ""; if (bd) { var bs = gySec("이번 분기에 산 종목 — 그때 가격대와 지금", "거장이 산 구간보다 지금이 싼가 비싼가", bd), mk = '<section class="gySec"><header><h3>가장 많이 들고 있는 종목', at = h.indexOf(mk); h = at >= 0 ? h.slice(0, at) + bs + h.slice(at) : h + bs; }   // 가격에 $가 들어 있어 replace의 치환 문자열로 쓰지 않는다
   return h;
 }
 function gyAiTab(id, g) { return '<div class="gxAiWrap gyAiWrap">' + gxAiHtml(id, g) + '</div>'; }
 function gyBioTab(id) {
   var P = GX_P[id], T = GX_TYPES[P.ty];
-  return gxProfileHtml(id).replace(/<div class="gxTop">[\s\S]*?<\/div><p class="gxOne">[\s\S]*?<\/p>/, "") + '<div class="gxApply" style="--gx:' + T.c + '"><h5>우리는 여기서 무엇을 얻나</h5><p>' + gxE(P.learn) + '</p><p class="briefDim">' + gxE(T.use) + '</p></div>';
+  return (typeof gzProHtml === "function" ? gzProHtml(id) : "") + gxProfileHtml(id).replace(/<div class="gxTop">[\s\S]*?<\/div><p class="gxOne">[\s\S]*?<\/p>/, "") + '<div class="gxApply" style="--gx:' + T.c + '"><h5>우리는 여기서 무엇을 얻나</h5><p>' + gxE(P.learn) + '</p><p class="briefDim">' + gxE(T.use) + '</p></div>';
 }
 function gyWhoTab() {
   var have = gyHave(), id = gyCur(); if (!id) return '<div class="dvEmpty">인물이 없어요</div>'; var g = have[id];
   if (g && DS.g.id !== id) { DS.g.id = id; try { dsSave(); } catch (e) {} }
   var h = gyPick() + gyPersonHead(id, g), A = GXA.doc && GXA.doc.ai[id];
-  h += gyTabs([["ai", "해석", A ? "" : "없음"], ["q", "이번 분기 숫자"], ["bio", "인물 소개"]], GY.sub, "data-gysub");
-  h += '<div class="gyBody">' + (GY.sub === "q" ? gyQuarterTab(id, g) : GY.sub === "bio" ? gyBioTab(id) : gyAiTab(id, g)) + '</div>';
+  var V = !!GX_P[id].voice, sub = V && GY.sub === "q" ? "ai" : GY.sub, Nn = GXA.doc && GXA.doc.notes[id];
+  h += gyTabs(V ? [["ai", "발언", Nn && Nn.at ? "" : "없음"], ["bio", "인물 소개 · 쓰임"]] : [["ai", "해석", A ? "" : "없음"], ["q", "이번 분기 숫자"], ["bio", "인물 소개 · 쓰임"]], sub, "data-gysub");
+  h += '<div class="gyBody">' + (sub === "q" ? gyQuarterTab(id, g) : sub === "bio" ? gyBioTab(id) : gyAiTab(id, g)) + '</div>';
   return h;
 }
 
@@ -143,7 +155,7 @@ function gyBind(box) {
   var q = function (s) { return box.querySelectorAll(s); }, each = function (s, f) { Array.prototype.forEach.call(q(s), f); };
   each("[data-gytab]", function (b) { b.onclick = function () { GY.tab = b.getAttribute("data-gytab"); gySave(); gyRender(); box.scrollIntoView({ block: "start", behavior: "smooth" }); }; });
   each("[data-gysub]", function (b) { b.onclick = function () { GY.sub = b.getAttribute("data-gysub"); gySave(); gyRender(); }; });
-  each("[data-gyp]", function (b) { b.onclick = function () { var id = b.getAttribute("data-gyp"), have = gyHave(); if (have[id]) { GX.sel = null; DS.g.id = id; try { dsSave(); } catch (e) {} } else GX.sel = id; if (GX.ty !== "all" && GX_P[id].ty !== GX.ty) GX.ty = "all"; GY.tab = "who"; gySave(); gxSave(); gyRender(); var pb = box.querySelector(".gyPh"); if (pb && b.closest(".gyPg")) pb.scrollIntoView({ block: "start", behavior: "smooth" }); }; });
+  each("[data-gyp]", function (b) { b.onclick = function () { var id = b.getAttribute("data-gyp"), have = gyHave(); if (have[id]) { GX.sel = null; DS.g.id = id; try { dsSave(); } catch (e) {} } else GX.sel = id; if (GX.ty !== "all" && GX_P[id].ty !== GX.ty) GX.ty = "all"; GY.tab = "who"; gySave(); gxSave(); gyRender(); var pb = box.querySelector(".gyPh"); if (pb && (b.closest(".gyPg") || b.closest(".gzFit") || b.closest(".gzPl"))) pb.scrollIntoView({ block: "start", behavior: "smooth" }); }; });
   each("[data-gxty]", function (b) { b.onclick = function () { GX.ty = b.getAttribute("data-gxty"); GX.sel = null; gxSave(); gyRender(); }; });
   each("[data-gyty]", function (b) { b.onclick = function () { GX.ty = b.getAttribute("data-gyty"); GX.sel = null; GY.tab = "who"; gxSave(); gySave(); gyRender(); }; });
   if (typeof dsBindOpen === "function") dsBindOpen(box);
@@ -151,6 +163,7 @@ function gyBind(box) {
   if (GY.tab === "sum") { var sb = box.querySelector("[data-gxsum]"); if (sb) sb.onclick = function () { GXA.busy._sum = 1; gyRender(); gxApi({ sum: 1, ctx: gxSumCtx(), people: gxPeople() }).then(function (j) { delete GXA.busy._sum; if (!j || !j.ok) gxToast((j && (j.msg || j.reason)) || "실패했어요", "bad"); else { GXA.doc.sum = j.sum; gxToast("종합 해석을 만들었어요"); } gyRender(); }); };
     gxManualBind(pane, function () { return { ctx: gxSumCtx(), people: gxPeople() }; }, function (k, j) { if (j.sum) GXA.doc.sum = j.sum; gyRender(); }); }
   if (GY.tab === "who") { var id = gyCur(), w = box.querySelector(".gyAiWrap"); if (w) gxAiBind(w, id); }
+  if (typeof gzBind === "function") { try { gzBind(box); } catch (e) {} }
   if (GY.tab === "admin") { gxCfgBind(pane, gyRender); try { gxJobBind(pane); } catch (e) {} if (gxOwner() && !GXA._jl) { GXA._jl = 1; gxJobLoad().then(gyRender); } }
 }
 /* 기존 그리기를 바꾼다 — gurux.js의 버튼 처리(renderGuru 호출)도 이 화면을 다시 그린다 */
@@ -212,7 +225,7 @@ function gyJobHtml() {
   var stOf = function (id) { var T = gxTodo(id), r = J && J.res && J.job && J.job.ids.indexOf(id) >= 0 ? J.res[id] : null;
     if (r && r.state === "run") return { c: "run", t: r.phase === "read" ? "해석 중" : "발언 조사 중" };
     if (r && r.state === "fail" && !(J.done && !T.todo)) return { c: "fail", t: "실패 · " + String((r.read && r.read !== "ok" ? r.read : r.note) || "").slice(0, 40) };
-    if (T.k === "ok") return { c: "done", t: "최신 해석" };
+    if (T.k === "ok") return { c: "done", t: T.voice ? "발언 최신" : "최신 해석" };
     if (T.k === "no13f") return T.noteOld ? { c: "wait", t: "13F 없음 · 13F 수집 뒤에 처리" } : { c: "wait", t: "13F 없음 · 발언만 최신" };
     return { c: "todo", t: T.k === "old" ? "발언 조사 오래됨" : T.t }; };
   var ALL = Object.keys(GX_P), cnt = { done: 0, todo: 0, wait: 0, run: 0, fail: 0 }; ALL.forEach(function (id) { cnt[stOf(id).c]++; });
@@ -220,7 +233,7 @@ function gyJobHtml() {
   var h = '<div class="gyStep"><div class="gyStepH"><span class="no">1</span><b>누구를</b><em>' + n + '명 선택</em></div>';
   h += '<div class="gyStat"><div class="gyStatBar"><i class="d" style="width:' + pct + '%"></i><i class="r" style="width:' + Math.round((cnt.run) / ALL.length * 100) + '%"></i></div><div class="gyStatN">' +
     [["done", "완료"], ["todo", "할 일"], ["run", "진행 중"], ["fail", "실패"], ["wait", "13F 없음"]].filter(function (k) { return k[0] === "done" || k[0] === "todo" || cnt[k[0]]; }).map(function (k) { return '<span class="' + k[0] + '"><i>' + STC[k[0]][1] + '</i>' + k[1] + ' <b>' + cnt[k[0]] + '</b></span>'; }).join("") + '<span class="tot">전체 ' + ALL.length + '명 중 ' + pct + '% 완료</span></div>' +
-    '<p class="gyNote">완료 = 이번 분기 13F 해석이 있고, 그 뒤에 추가된 발언 · 메모가 없고, 발언 조사가 30일 안. 하나라도 어긋나면 할 일이에요. 13F가 없는 사람은 13F 수집 뒤에 할 일로 바뀌어요.</p></div>';
+    '<p class="gyNote">완료 = 이번 분기 13F 해석이 있고, 그 뒤에 추가된 발언 · 메모가 없고, 발언 조사가 30일 안. 하나라도 어긋나면 할 일이에요. 13F가 없는 사람은 13F 수집 뒤에 할 일로 바뀌어요. \'발언형\'(13F 없이 읽는 사람)은 발언 조사가 30일 안이면 완료예요.</p></div>';
   h += '<div class="gyQuick"><button type="button" data-gxsel="todo">할 일만 고르기 <small>' + todoN + '</small></button><button type="button" data-gxsel="all">전원</button><button type="button" data-gxsel="none">선택 해제</button></div>';
   h += GX_TY_ORDER.map(function (ty) { var ids = ALL.filter(function (id) { return GX_P[id].ty === ty; }), dn = ids.filter(function (id) { return stOf(id).c === "done"; }).length;
     return '<div class="gyPickRow" style="--gx:' + GX_TYPES[ty].c + '"><button type="button" class="gyTyLbl" data-gxsel="ty:' + ty + '" title="이 유형 모두 추가"><i></i>' + GX_TYPES[ty].nm + ' <small>' + dn + '/' + ids.length + '</small></button><div class="gyTog">' + ids.map(function (id) { var t = stOf(id);

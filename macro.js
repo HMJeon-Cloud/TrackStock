@@ -25,7 +25,14 @@ var MAC_COND = [
   { id: "us10y45", icon: "🏦", tag: "미 10년 금리 4.5% 돌파", short: "미 10년물 4.5%", s: "us10y", type: "lv", lv: 4.5, dir: 1, gap: 365, mean: "주식의 '경쟁 상대'인 안전한 채권 이자가 높아진 때예요." },
   { id: "inv", icon: "🔁", tag: "한미 금리 역전 (미국 > 한국)", short: "한미 금리 역전", s: "gap", type: "gap", gap: 365, mean: "미국 기준금리가 한국보다 높아진 때 — 원화 약세 압력으로 자주 이야기돼요." },
   { id: "m2neg", icon: "💧", tag: "미 M2 전년比 감소", short: "M2 감소", s: "m2", type: "yoy", th: 0, dir: -1, gap: 365, mean: "시중에 풀린 돈(M2)이 1년 전보다 줄어든 때. 아주 드물어요." },
-  { id: "m2hot", icon: "💧", tag: "미 M2 전년比 +10% 이상", short: "M2 급증", s: "m2", type: "yoy", th: 0.1, dir: 1, gap: 365, mean: "돈이 크게 풀린 때(위기 대응 등). 자산 가격이 같이 오르는 경우가 많았어요." }
+  { id: "m2hot", icon: "💧", tag: "미 M2 전년比 +10% 이상", short: "M2 급증", s: "m2", type: "yoy", th: 0.1, dir: 1, gap: 365, mean: "돈이 크게 풀린 때(위기 대응 등). 자산 가격이 같이 오르는 경우가 많았어요." },
+  /* v15.00 매크로 전문가의 기본 계기판 — 금리 곡선 · 신용 · 금융여건 · 실질금리 · 고용 */
+  { id: "curveInv", icon: "🔻", tag: "장단기 금리 역전 (10년 < 3개월)", short: "금리 역전", s: "t10y3m", type: "lv", lv: 0, dir: -1, abs: 1, gap: 365, mean: "짧은 금리가 긴 금리보다 높아진 때. 1955년 이후 미국의 모든 침체 앞에 있었지만, 역전부터 침체까지 1~2년이 걸렸고 그사이 주가가 오른 적도 많아요." },
+  { id: "curveSteep", icon: "📐", tag: "장단기 금리차 +2%p 이상", short: "금리차 +2%p", s: "t10y3m", type: "lv", lv: 2, dir: 1, abs: 1, gap: 365, mean: "곡선이 아주 가팔라진 때 — 보통 침체 한가운데나 직후, 연준이 금리를 크게 내린 뒤에 나와요." },
+  { id: "credWide", icon: "🧯", tag: "신용 스프레드 3%p 돌파 (Baa−10년)", short: "신용 3%p", s: "baa10y", type: "lv", lv: 3, dir: 1, abs: 1, gap: 365, mean: "회사채에 붙는 위험 값이 크게 뛴 때. 신용 시장이 겁먹은 구간이에요." },
+  { id: "nfciTight", icon: "🧊", tag: "금융여건 긴축 전환 (NFCI 0 위)", short: "금융여건 긴축", s: "nfci", type: "lv", lv: 0, dir: 1, abs: 1, gap: 365, mean: "시카고 연준 금융여건지수가 평균(0)보다 조여진 때. 돈 구하기가 어려워졌다는 뜻이에요." },
+  { id: "real2", icon: "🏦", tag: "미 실질금리 2% 돌파", short: "실질금리 2%", s: "real10", type: "lv", lv: 2, dir: 1, abs: 1, gap: 365, mean: "물가를 뺀 '진짜 이자'가 2%를 넘은 때. 성장주 · 금에 부담으로 이야기돼요." },
+  { id: "sahmOn", icon: "👷", tag: "삼 법칙 발동 (0.5 이상)", short: "삼 법칙", s: "sahm", type: "lv", lv: 0.5, dir: 1, abs: 1, lag: 35, gap: 730, mean: "실업률 3개월 평균이 지난 1년 최저보다 0.5%p 넘게 오른 때 — 침체가 시작됐다는 신호로 쓰여요. 발표 시차 35일을 두고 계산했어요." }
 ];
 
 function macEsc(s) { return typeof escapeHtml === "function" ? escapeHtml(s) : String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -36,7 +43,7 @@ function macD(t, full) { var d = new Date(t); return full === false ? (d.getUTCM
 function macMed(a) { if (!a.length) return null; var s = a.slice().sort(function (x, y) { return x - y; }), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 function macIdx(T, t) { var lo = 0, hi = T.length; while (lo < hi) { var m = (lo + hi) >> 1; if (T[m] < t) lo = m + 1; else hi = m; } return lo; }   // t 이상인 첫 위치
 function macAt(S, t) { if (!S || !S.t.length) return null; var i = macIdx(S.t, t + 1) - 1; return i >= 0 ? S.v[i] : null; }   // t 시점에 알려진 마지막 값
-function macFmt(id, v) { if (v == null || !isFinite(v)) return "-"; if (id === "krw") return Math.round(v).toLocaleString("ko-KR") + "원"; if (id === "m2y") return macPct(v); if (id === "gap") return (v > 0 ? "+" : "") + v.toFixed(2) + "%p"; return v.toFixed(2) + "%"; }
+function macFmt(id, v) { if (v == null || !isFinite(v)) return "-"; if (id === "krw") return Math.round(v).toLocaleString("ko-KR") + "원"; if (id === "m2y") return macPct(v); if (id === "gap" || id === "t10y3m") return (v > 0 ? "+" : "") + v.toFixed(2) + "%p"; if (id === "baa10y" || id === "sahm") return v.toFixed(2) + "%p"; if (id === "nfci") return (v > 0 ? "+" : "") + v.toFixed(2); return v.toFixed(2) + "%"; }
 
 /* ---------- 데이터 ---------- */
 function macroEnsure(fresh) {
@@ -94,7 +101,8 @@ function macBase(k, h) {
 }
 
 /* ---------- 조건 → 사례 날짜 ---------- */
-function macSerOf(c) { return c.s === "gap" ? macGapSer() : c.s === "m2" ? macM2y() : macSer(c.s); }
+function macLagSer(id, days) { var S = macSer(id); if (!S) return null; var key = "_lag" + id + days; if (!MAC[key] || MAC[key].src !== S) MAC[key] = { src: S, t: S.t.map(function (x) { return x + days * MAC_DAY; }), v: S.v, f: S.f }; return MAC[key]; }
+function macSerOf(c) { return c.s === "gap" ? macGapSer() : c.s === "m2" ? macM2y() : c.lag ? macLagSer(c.s, c.lag) : macSer(c.s); }
 function macEvents(c) {
   var S = macSerOf(c); if (!S) return { S: null, ev: [] };
   var ev = [], lastOn = null, warm = S.t[0] + c.gap * MAC_DAY;   // 자료 시작 직후는 '처음 참'인지 알 수 없어 뺀다
@@ -117,7 +125,7 @@ function macEvents(c) {
 function macNow(c, S, ev) {
   if (!S || !S.t.length) return { on: false, txt: "데이터 없음" };
   var n = S.t.length, x = S.v[n - 1], last = ev[ev.length - 1];
-  if (c.type === "lv") { var on = c.dir > 0 ? x >= c.lv : x <= c.lv; return { on: on, v: x, big: macFmt(c.s, x), txt: "지금 " + macFmt(c.s, x) + (on ? " · 기준선 위" : " · 기준까지 " + macPct(c.lv / x - 1)) }; }
+  if (c.type === "lv") { var on = c.dir > 0 ? x >= c.lv : x <= c.lv; return { on: on, v: x, big: macFmt(c.s, x), txt: "지금 " + macFmt(c.s, x) + (on ? (c.dir > 0 ? " · 기준선 위" : " · 기준선 아래") : " · 기준까지 " + (c.abs ? (c.lv - x > 0 ? "+" : "") + (c.lv - x).toFixed(2) + (c.s === "nfci" ? "" : "%p") : macPct(c.lv / x - 1))) }; }
   if (c.type === "gap") return { on: x > 0, v: x, big: "한미 금리차 " + macFmt("gap", x), txt: "지금 금리차 " + macFmt("gap", x) + (x > 0 ? " · 역전 중" : "") };
   if (c.type === "yoy") return { on: c.dir > 0 ? x >= c.th : x < c.th, v: x, big: "M2 전년比 " + macPct(x), txt: "지금 M2 전년比 " + macPct(x) };
   if (c.type === "chg") { var j = macIdx(S.t, S.t[n - 1] - c.win * MAC_DAY), g = S.v[n - 1] / S.v[j] - 1; return { on: g >= c.th, v: g, big: "환율 한 달 " + macPct(g), txt: "최근 한 달 " + macPct(g) + " · 지금 " + macFmt(c.s, x) }; }
@@ -149,6 +157,12 @@ function macKpis() {
   add("gap", "한미 금리차(미-한)", macGapSer(), function (x) { return macFmt("gap", x); }, function (S, x) { return x > 0 ? "미국이 더 높음" : "한국이 더 높음"; });
   add("us10y", "미 10년 금리", macSer("us10y"), function (x) { return macFmt("us10y", x); }, function (S, x, j) { return "1년 전 " + macFmt("us10y", S.v[j]); });
   add("m2y", "미 M2 전년比", macM2y(), function (x) { return macPct(x); }, function (S) { return macD(S.t[S.t.length - 1] - 45 * MAC_DAY) + " 기준"; });
+  /* v15.00 금리 곡선 · 신용 · 금융여건 · 실질금리 · 고용 */
+  add("t10y3m", "장단기 금리차(10년−3개월)", macSer("t10y3m"), function (x) { return macFmt("t10y3m", x); }, function (S, x) { return x < 0 ? "역전 중" : x < 0.5 ? "평평함" : "정상(우상향)"; });
+  add("baa10y", "신용 스프레드(Baa−10년)", macSer("baa10y"), function (x) { return macFmt("baa10y", x); }, function (S, x, j) { return "1년 전 " + macFmt("baa10y", S.v[j]); });
+  add("nfci", "금융여건(NFCI)", macSer("nfci"), function (x) { return macFmt("nfci", x); }, function (S, x) { return x > 0 ? "평균보다 조임" : "평균보다 느슨함"; });
+  add("real10", "미 실질금리(10년)", macSer("real10"), function (x) { return macFmt("real10", x); }, function (S, x, j) { return "1년 전 " + macFmt("real10", S.v[j]); });
+  add("sahm", "삼 법칙", macSer("sahm"), function (x) { return macFmt("sahm", x); }, function (S, x) { return x >= 0.5 ? "침체 신호(0.5 이상)" : "기준 0.5 아래"; });
   return out;
 }
 function macSpark(S, days) {
