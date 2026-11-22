@@ -318,8 +318,11 @@ function buildMarketRows(recent) {
     var c = d.c || [], v = d.v || [], n = c.length;
     if (n < 22 || c[n - 1] == null) return;
     var last = c[n - 1];
-    var m1 = last / c[Math.max(0, n - 22)] - 1;
-    var m3 = last / c[0] - 1;                                  // 90일 파일이라 사실상 약 3~4개월
+    /* v16.10 수익률 기준 바로잡기: 최근 묶음이 90일 → 400일로 늘어난 뒤에도 '3개월' 칸이 묶음의 첫 값(약 13개월 전)과 비교하고 있었다.
+       날짜로 30일 전 · 91일 전 종가를 찾아 계산한다(코인처럼 주말에도 거래되는 종목도 같은 기간이 되게). 날짜가 없으면 거래일 수(22 · 64)로. */
+    var T = d.t || [], back = function (days, bars) { if (T.length === n && T[n - 1]) { var t0 = T[n - 1] - days * 86400; if (T[0] > t0 + 5 * 86400) return null; for (var k = n - 1; k >= 0; k--) if (T[k] <= t0) return c[k] > 0 ? last / c[k] - 1 : null; return null; } return n > bars && c[n - 1 - bars] > 0 ? last / c[n - 1 - bars] - 1 : null; };
+    var m1 = back(30, 22);
+    var m3 = back(91, 64);
     var hi = d.meta && d.meta.fiftyTwoWeekHigh;
     var vsHi = hi > 0 ? last / hi - 1 : null;
     var rsi = typeof rsiWilder === "function" && n > 15 ? rsiWilder(c, 14) : null;

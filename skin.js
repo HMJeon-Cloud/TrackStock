@@ -14,15 +14,22 @@
   var C = [
     /* ---------- 색 · 크기 ---------- */
     ":root{--bg:#f3f4f6;--card:#fff;--card2:#f1f2f4;--soft:#f7f8f9;--line:#e3e6ea;--line2:#eef0f2;--txt:#14161c;--txt2:#3d4452;--sub:#667080;--muted:#98a0ad;",
-    "--up:#d9342b;--down:#2f6fd6;--upSoft:#fdeeed;--downSoft:#ebf2fd;--accent:#14161c;--accentSoft:#eceef1;--good:#0b8a55;--goodSoft:#e7f5ee;--warn:#b25e09;--warnSoft:#fdf3e3;",
+    "--up:#d9342b;--down:#2f6fd6;--upSoft:#fdeeed;--downSoft:#ebf2fd;--accent:#14161c;--accentSoft:#eceef1;--good:#1d7f55;--goodSoft:#e8f5ee;--goodLine:#bfe3cf;--warn:#b9600f;--warnSoft:#fdf3e3;--warnLine:#f1d9ae;--bad:#c03b3b;--badSoft:#fcefef;--badLine:#f3c9c9;--runSoft:#edf1fd;",
     "--ink:#14161c;--run:#4a6fd8;--gold:#c9a24f;--goldInk:#8a6a1f;--goldSoft:#f7f0de;--goldLine:#e6d3a3;--r-card:14px;--r-ctl:9px;",
     "--admBg:var(--bg);--admCard:#fff;--admLine:var(--line);--admTxt:var(--txt);--admSub:var(--sub);--admMute:var(--muted);--admAcc:var(--txt);--admInk:#14161c;--admGold:#c9a24f;--admSoft:var(--soft);",
-    "--shRail:76px;--shTopH:56px;--shStick:44px;--shPad:14px}",
+    "--shRail:76px;--shTopH:56px;--shStick:46px;--shPad:14px}",
     "#ddDeck,.ddS{--bg:#f2f4f6;--card:#ffffff;--card2:#f2f4f6;--soft:#f9fafb;--line:#e5e8eb;--txt:#191f28;--txt2:#4e5968;--sub:#8b95a1;--up:#f04452;--down:#3182f6;--accent:#3182f6;--accentSoft:#e8f3ff;--good:#03a15b;--r-card:20px;--r-ctl:12px}",
 
+    /* ---------- 상태 색 · 흐린 글자 한 벌로 (v16.10)
+       각 화면이 따로 쓰던 초록 20여 가지 · 빨강 12가지 · 주황 6가지와 너무 흐린 회색 글자를, 화면(탭 · 창) 안에서만 한 값으로 모은다.
+       원본에는 var(--k-원래색, #원래색) 꼴로 적혀 있어서, 이 줄이 닿지 않는 곳(PDF 덱 · 카드 · 저장 이미지)은 원래 색 그대로다. ---------- */
+    "html.sh [id^=\"tab-\"],html.sh .modalWrap,html.sh #clDrawer,html.sh #smToasts,html.sh .banners{--k-03a15b:var(--good);--k-157347:var(--good);--k-15803d:var(--good);--k-176b36:var(--good);--k-178a47:var(--good);--k-1d7f55:var(--good);--k-1f7a45:var(--good);--k-1f8a5b:var(--good);--k-1fa463:var(--good);--k-2e7d4f:var(--good);--k-a12b2b:var(--bad);--k-b42318:var(--bad);--k-b4342b:var(--bad);--k-b45309:var(--warn);--k-b91c1c:var(--bad);--k-b9600f:var(--warn);--k-bfe3cc:var(--goodLine);--k-bfe3cf:var(--goodLine);--k-c0303e:var(--bad);--k-c0392b:var(--bad);--k-c03b3b:var(--bad);--k-c2410c:var(--warn);--k-c6f0d8:var(--goodLine);--k-d64545:var(--bad);--k-dc2626:var(--bad);--k-e2f4ea:var(--goodSoft);--k-e3f3e8:var(--goodSoft);--k-e3f4e6:var(--goodSoft);--k-e5484d:var(--bad);--k-e7f5ee:var(--goodSoft);--k-e7f6ec:var(--goodSoft);--k-eef6ef:var(--goodSoft);--k-eef8f2:var(--goodSoft);--k-effaf3:var(--goodSoft);--k-f0fbf4:var(--goodSoft);--k-f3f8f4:var(--goodSoft);--k-f3faf6:var(--goodSoft);--k-fcefef:var(--badSoft);--k-fde7e7:var(--badSoft);--k-fde8e6:var(--badSoft);--k-fde8ea:var(--badSoft);--k-fdecee:var(--badSoft);--k-ffd8dc:var(--badLine);--k-fff1f2:var(--badSoft);--k-fff3f3:var(--badSoft);--k-fff5f6:var(--badSoft);--k-fff7f6:var(--badSoft);--k-fff8f8:var(--badSoft);--t-8a92a3:var(--sub);--t-8a93a3:var(--sub);--t-8b95a1:var(--sub);--t-9aa3b2:var(--sub);}",
     /* ---------- 뼈대 ---------- */
     "html.sh body{background:var(--bg);color:var(--txt);font-size:14.5px;line-height:1.6;max-width:none;margin:0;padding:0 var(--shPad) calc(84px + var(--sab,0px))}",
     "html.sh .topbar,html.sh #watchTabs{display:none!important}",
+    /* 위쪽 바와 표의 열 이름이 화면에 붙어 있으려면 body가 따로 스크롤 상자가 되면 안 된다.
+       예전 규칙(html, body 둘 다 overflow-x:hidden)이 그렇게 만들고 있어서 붙지 않고 같이 올라가 버렸다 → 옆 넘침은 '자르기'로만 막는다. */
+    "html.sh body{overflow-x:clip;overflow-y:visible}",
     "html.sh [id^=\"tab-\"]{max-width:1400px;margin-left:auto;margin-right:auto}",
     "html.shLock{overflow:hidden}",
     ".shIc{display:block;flex:none}",
@@ -107,6 +114,14 @@
     W + ".iconBtn{box-shadow:none}",
     W + "table" + N + "{font-feature-settings:\"tnum\" 1}",
     "html.sh .footLine{max-width:1400px;margin:8px auto 0;color:var(--muted)}",
+    "html.sh [id^=\"tab-\"] .macSpark polyline{stroke:#5a6373;stroke-width:1.4}",
+    /* 글자를 '…'로 자르던 곳을 풀었다: 실적 화면 머리 숫자 칸, 작업 순서 줄의 '다음 할 일' */
+    "html.sh [id^=\"tab-\"] .fuTiles b{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;line-height:1.25}@media(max-width:700px){html.sh [id^=\"tab-\"] .fuTiles b{font-size:18px}}",
+    "html.sh [id^=\"tab-\"] .smFlowHint{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;line-height:1.5}",
+    /* 작은 숫자 칸: 등락 값은 색으로 먼저 읽히게(예전에는 칸 안 숫자가 전부 검정이었다) */
+    "html.sh [id^=\"tab-\"] .badge b.pos{color:var(--up)}html.sh [id^=\"tab-\"] .badge b.neg{color:var(--down)}",
+    /* 상태 꼬리표: 화면마다 조금씩 다르던 모서리 · 글자 크기를 한 모양으로 */
+    "html.sh [id^=\"tab-\"] :is(.dsTag,.dhBadge,.pkTag,.gyTag,.uxChip,.rkRo){display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:750;line-height:18px;padding:1px 8px;border-radius:999px;white-space:nowrap;vertical-align:middle}",
     /* 표: 넓은 화면에서는 한 번에 더 많은 줄을 보여 준다(예전에는 어디서나 430px에서 잘렸다). 관심 종목은 화면의 본문이라 자르지 않는다 */
     "@media(min-width:1024px){html.sh [id^=\"tab-\"] .tableWrap{max-height:min(76vh,820px)}}html.sh #wp-list .tableWrap{max-height:none;overflow-y:visible}",
     "html.sh .banners>div{border:1px solid var(--line)!important;box-shadow:none!important;border-radius:12px!important}",

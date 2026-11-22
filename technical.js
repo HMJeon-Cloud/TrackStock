@@ -207,7 +207,7 @@ function renderCandles() {
     var ma20 = smaSeries(allCloses, 20).slice(-rows.length);
     datasets.push({
       label: "20일선", type: "line", data: ma20,
-      borderColor: "#f97316", borderWidth: 1.2, pointRadius: 0, tension: 0, fill: false, order: 0
+      borderColor: "#b8892f", borderWidth: 1.2, pointRadius: 0, tension: 0, fill: false, order: 0
     });
   }
   if (maxVol > 0) {

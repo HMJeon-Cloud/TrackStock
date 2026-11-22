@@ -25,7 +25,7 @@ function hxRow(sym, d) {
   for (i = Math.max(0, n - 252); i < n; i++) if (c[i] > hi) hi = c[i];
   var mh = d.meta && +d.meta.fiftyTwoWeekHigh; if (mh > hi) hi = mh;
   var v5 = 0, v20 = 0, m = v.length; for (i = m - 5; i < m; i++) v5 += v[i] || 0; for (i = Math.max(0, m - 25); i < m - 5; i++) v20 += v[i] || 0; v5 /= 5; v20 /= Math.max(1, Math.min(20, m - 5));
-  return { s: sym, n: hxName(sym), grp: hxGrp(sym), last: last, chg: prev > 0 ? last / prev - 1 : null, vsHi: hi > 0 ? last / hi - 1 : null, m1: n > 22 ? last / c[n - 22] - 1 : null,
+  return { s: sym, n: hxName(sym), grp: hxGrp(sym), last: last, chg: prev > 0 ? last / prev - 1 : null, vsHi: hi > 0 ? last / hi - 1 : null, 
     volX: v20 > 0 && m >= 25 ? v5 / v20 : null, cur: (d.meta && d.meta.currency) || "", t: d.t && d.t.length ? d.t[d.t.length - 1] * 1000 : null, sp: c.slice(-66) };
 }
 function hxBuild(recent) {

@@ -130,7 +130,7 @@ function anxSections(root) {
   var pv = root.querySelector("[data-anxpv]"); if (pv) pv.onclick = function () { if (!pvBox.hidden) { pvBox.hidden = true; return; } withPrompt(function (t) { pvBox.hidden = false; pvBox.querySelector("textarea").value = t; pvBox.querySelector(".anxLen").textContent = t.length.toLocaleString() + "자"; }); };
   var cx = root.querySelector("[data-anctx2]"); if (cx) cx.onchange = function () { AN.useCtx = cx.checked; };
   var inp = root.querySelector("#anxIn"), chk = root.querySelector(".anxChk");
-  if (inp) inp.oninput = function () { var J2 = anxSumParse(inp.value); chk.innerHTML = !inp.value.trim() ? "" : J2 ? '<b style="color:#1d7f55">✓ 요약 JSON 읽음</b> · 틀 ' + J2.frames.length + '개 · ' + anxEsc(J2.verdict || "") : /##\s*요약 JSON|```json/.test(inp.value) ? '<b style="color:#b9600f">요약 JSON 형식이 깨졌어요</b> — 그래도 서술형으로 저장돼요' : '<span style="color:#b9600f">요약 JSON이 없어요 — 서술형만 저장돼요</span>'; };
+  if (inp) inp.oninput = function () { var J2 = anxSumParse(inp.value); chk.innerHTML = !inp.value.trim() ? "" : J2 ? '<b style="color:var(--k-1d7f55,#1d7f55)">✓ 요약 JSON 읽음</b> · 틀 ' + J2.frames.length + '개 · ' + anxEsc(J2.verdict || "") : /##\s*요약 JSON|```json/.test(inp.value) ? '<b style="color:var(--k-b9600f,#b9600f)">요약 JSON 형식이 깨졌어요</b> — 그래도 서술형으로 저장돼요' : '<span style="color:var(--k-b9600f,#b9600f)">요약 JSON이 없어요 — 서술형만 저장돼요</span>'; };
   var sv = root.querySelector("[data-anxsave]"); if (sv) sv.onclick = function () { var t = inp.value; if (!t.trim()) return; if (!AN.sym) return smToast("종목을 먼저 골라 주세요", "bad"); sv.disabled = true; sv.textContent = "저장 중…"; anxSave(t).then(function (it) { if (!it) throw new Error("저장하지 못했어요"); AN.arcPairs = null; smToast("저장했어요 — 아래 ⑤에 요약했어요"); renderAnalyst(); setTimeout(function () { var s = document.querySelectorAll("#anBody .anSec")[4]; if (s) try { s.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 100); }).catch(function (e) { smToast("저장 실패: " + e.message, "bad"); sv.disabled = false; sv.textContent = "💾 저장하고 요약 보기"; }); };
   Array.prototype.forEach.call(root.querySelectorAll("[data-anxpick]"), function (b) { b.onclick = function () { AN.ansId = b.getAttribute("data-anxpick"); renderAnalyst(); }; });
   var dk = root.querySelector("[data-anxdeck]"); if (dk) dk.onclick = function () { var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve(); ready.then(function () { cur._deck = true; var list = anxDeck(cur, J); hubShow((cur.name || "") + " · 6틀 분석", list, { ctx: "analyst:" + cur.sym, modal: true, note: "요약 JSON으로 만든 카드 — 숫자·판정은 답변 그대로" }); }); };
@@ -167,9 +167,9 @@ function rpxOpen(rp) {
   w.querySelector("details textarea").value = p;
   var cb = w.querySelector("[data-rpxc]"); cb.onclick = function () { (typeof chCopy === "function" ? chCopy : function (x) { navigator.clipboard.writeText(x); })(p, cb); };
   var inp = w.querySelector("[data-rpxin]"), msg = w.querySelector("[data-rpxmsg]");
-  inp.oninput = function () { var J = rpxParse(inp.value); msg.innerHTML = !inp.value.trim() ? "" : J ? '<b style="color:#1d7f55">✓ 읽음</b> · ' + escapeHtml(J.headline || "") : '<b style="color:#b9600f">JSON을 못 읽었어요</b> — ```json 블록 전체를 붙여넣어 주세요'; };
+  inp.oninput = function () { var J = rpxParse(inp.value); msg.innerHTML = !inp.value.trim() ? "" : J ? '<b style="color:var(--k-1d7f55,#1d7f55)">✓ 읽음</b> · ' + escapeHtml(J.headline || "") : '<b style="color:var(--k-b9600f,#b9600f)">JSON을 못 읽었어요</b> — ```json 블록 전체를 붙여넣어 주세요'; };
   w.querySelector("[data-rpxok]").onclick = function () {
-    var J = rpxParse(inp.value); if (!J) { msg.innerHTML = '<b style="color:#b9600f">JSON을 못 읽었어요</b>'; return; }
+    var J = rpxParse(inp.value); if (!J) { msg.innerHTML = '<b style="color:var(--k-b9600f,#b9600f)">JSON을 못 읽었어요</b>'; return; }
     if (J.rationale && !J.thinking) J.thinking = J.rationale;   // 화면·카드는 기존 thinking 칸을 씀
     RP.ai = { ok: true, out: Object.assign({ interpretation: [], plan: [], watch: [], forecast: {}, added: [] }, J), model: "claude.ai(직접)", claude: true, manual: true, sources: [], searches: [] };
     try { rpNumChk(RP.ai, p); rpAiSave(rp, RP.ai); } catch (e) {}
@@ -199,13 +199,13 @@ function rpxOpen(rp) {
 ".anxHeroL{flex:1;min-width:0}.anxVerdict{font-size:22px;font-weight:800}.anxOne{font-size:14px;margin-top:4px;line-height:1.45}.anxMeta{font-size:11.5px;opacity:.8;margin-top:6px}",
 ".anxGauge{--v:50;width:78px;height:78px;border-radius:50%;flex:none;display:grid;place-items:center;align-content:center;background:conic-gradient(#fff calc(var(--v)*1%),rgba(255,255,255,.25) 0);position:relative}.anxGauge:before{content:'';position:absolute;inset:7px;border-radius:50%;background:rgba(0,0,0,.25)}.anxGauge b,.anxGauge small{position:relative;line-height:1}.anxGauge b{font-size:24px}.anxGauge small{font-size:10px;opacity:.8}",
 ".anxH{font-weight:700;font-size:13.5px;margin:14px 0 6px;color:#1f3a68}",
-".anxFrames{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.anxFrame{border-radius:10px;padding:9px 10px;background:#f4f6fb;border-left:4px solid #8090b0}.anxFrame.good{border-color:#1d7f55;background:#eef8f2}.anxFrame.bad{border-color:#c03b3b;background:#fcefef}",
+".anxFrames{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.anxFrame{border-radius:10px;padding:9px 10px;background:#f4f6fb;border-left:4px solid #8090b0}.anxFrame.good{border-color:var(--k-1d7f55,#1d7f55);background:var(--k-eef8f2,#eef8f2)}.anxFrame.bad{border-color:var(--k-c03b3b,#c03b3b);background:var(--k-fcefef,#fcefef)}",
 ".anxFT{display:flex;justify-content:space-between;font-size:13px}.anxFT i{font-style:normal;font-size:11.5px;opacity:.75}.anxFN{font-size:15px;font-weight:800;margin:4px 0 2px}.anxFL{font-size:12px;line-height:1.4;color:#445}",
-".anxTwo{display:grid;grid-template-columns:1fr 1fr;gap:8px}.anxTwo ul,.anxThree ul,.anxAct ul,.anxAct ol{margin:0;padding-left:18px;font-size:12.5px;line-height:1.5}.anxBull{background:#eef8f2;border-radius:10px;padding:8px 8px 8px 24px!important}.anxBear{background:#fcefef;border-radius:10px;padding:8px 8px 8px 24px!important}",
-".anxQA>div{background:#f4f6fb;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;line-height:1.5}.anxQA b{color:#c03b3b}.anxQA b.a{color:#1d7f55}",
+".anxTwo{display:grid;grid-template-columns:1fr 1fr;gap:8px}.anxTwo ul,.anxThree ul,.anxAct ul,.anxAct ol{margin:0;padding-left:18px;font-size:12.5px;line-height:1.5}.anxBull{background:var(--k-eef8f2,#eef8f2);border-radius:10px;padding:8px 8px 8px 24px!important}.anxBear{background:var(--k-fcefef,#fcefef);border-radius:10px;padding:8px 8px 8px 24px!important}",
+".anxQA>div{background:#f4f6fb;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;line-height:1.5}.anxQA b{color:var(--k-c03b3b,#c03b3b)}.anxQA b.a{color:var(--k-1d7f55,#1d7f55)}",
 ".anxThree{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.anxThree>div{background:#f7f3ee;border-radius:10px;padding:8px}.anxThree small,.anxChg small{display:block;font-weight:700;margin-bottom:4px;color:#7a5520}",
 ".anxAct{background:#eef2fa;border-radius:12px;padding:10px 12px}.anxStance{font-weight:800;font-size:14.5px;margin-bottom:6px}.anxW{font-size:12.5px;margin-top:6px}.anxChg{margin-top:8px;border-top:1px dashed #b8c2d8;padding-top:6px}",
-".anxChk{width:100%;border-collapse:collapse;font-size:12.5px}.anxChk td{text-align:left;padding:5px 6px;border-bottom:1px solid #eceff5;vertical-align:top}.anxChk small{display:block;color:#667}.anxChk td:first-child{width:22px}.anxChk .good{color:#1d7f55}.anxChk .bad{color:#c03b3b}.anxSrc{font-size:11.5px;color:#667;margin-top:10px}",
+".anxChk{width:100%;border-collapse:collapse;font-size:12.5px}.anxChk td{text-align:left;padding:5px 6px;border-bottom:1px solid #eceff5;vertical-align:top}.anxChk small{display:block;color:#667}.anxChk td:first-child{width:22px}.anxChk .good{color:var(--k-1d7f55,#1d7f55)}.anxChk .bad{color:var(--k-c03b3b,#c03b3b)}.anxSrc{font-size:11.5px;color:#667;margin-top:10px}",
 "@media(max-width:560px){.anxTwo,.anxThree{grid-template-columns:1fr}.anxVerdict{font-size:19px}}",
 "[data-theme=dark] .anxSteps>div,[data-theme=dark] .anxFrame,[data-theme=dark] .anxQA>div,[data-theme=dark] .anxAct,[data-theme=dark] .anxThree>div{background:#1e2533;color:#dde}[data-theme=dark] .anxFL{color:#bbc}"
 ].join(""); document.head.appendChild(st); })();
@@ -280,10 +280,10 @@ function dlxOpen() {
   var cb = w.querySelector("[data-dlxc]"); cb.onclick = function () { build(function (t) { chCopy(t, cb); pv.querySelector("textarea").value = t; pv.querySelector(".anxLen").textContent = t.length.toLocaleString() + "자"; }); };
   w.querySelector("[data-dlxv]").onclick = function () { if (!pv.hidden) { pv.hidden = true; return; } var show = function (t) { pv.hidden = false; pv.querySelector("textarea").value = t; pv.querySelector(".anxLen").textContent = t.length.toLocaleString() + "자"; }; if (cur) show(cur); else build(show); };
   var inp = w.querySelector("[data-dlxin]"), chk = w.querySelector("[data-dlxchk]"), m2 = w.querySelector("[data-dlxmsg]");
-  inp.oninput = function () { var D = dlxParse(inp.value); if (!inp.value.trim()) { chk.innerHTML = ""; return; } if (!D) { chk.innerHTML = '<span style="color:#b9600f">JSON을 아직 못 읽었어요 — ```json 블록 전체를 붙여넣어 주세요</span>'; return; } chk.innerHTML = dlxCheckHtml(dlxCheck(D)); };
+  inp.oninput = function () { var D = dlxParse(inp.value); if (!inp.value.trim()) { chk.innerHTML = ""; return; } if (!D) { chk.innerHTML = '<span style="color:var(--k-b9600f,#b9600f)">JSON을 아직 못 읽었어요 — ```json 블록 전체를 붙여넣어 주세요</span>'; return; } chk.innerHTML = dlxCheckHtml(dlxCheck(D)); };
   w.querySelector("[data-dlxok]").onclick = function () {
     try { var C = dlxApply(inp.value); if (infoModal.close) infoModal.close(); smToast("오늘 브리핑을 적용했어요 — 작업실 · 브리핑 · 카드 편성 · 리포트 선정에 반영"); if (typeof renderOps === "function" && currentTab === "ops") renderOps(); if (typeof smFlowPaint === "function") smFlowPaint(); }
-    catch (e) { m2.innerHTML = '<span style="color:#b9600f">' + anxEsc(e.message) + '</span>'; }
+    catch (e) { m2.innerHTML = '<span style="color:var(--k-b9600f,#b9600f)">' + anxEsc(e.message) + '</span>'; }
   };
   infoModal.open("오늘 브리핑 — 직접 질문 (claude.ai)", w);
 }
@@ -301,6 +301,6 @@ function dlxOpen() {
     } catch (e) { console.warn("dlx", e); }
     return r;
   };
-  var st = document.createElement("style"); st.textContent = ".dlxChk{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0}.dlxChk td{padding:4px 6px;border-bottom:1px solid #eceff5;text-align:left}.dlxChk td:first-child{width:22px}.dlxChk .good{color:#1d7f55}.dlxChk .bad{color:#c03b3b}.dlxChk .warn{color:#b9600f}"; document.head.appendChild(st);
+  var st = document.createElement("style"); st.textContent = ".dlxChk{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0}.dlxChk td{padding:4px 6px;border-bottom:1px solid #eceff5;text-align:left}.dlxChk td:first-child{width:22px}.dlxChk .good{color:var(--k-1d7f55,#1d7f55)}.dlxChk .bad{color:var(--k-c03b3b,#c03b3b)}.dlxChk .warn{color:var(--k-b9600f,#b9600f)}"; document.head.appendChild(st);
   if (typeof SM_FLOW !== "undefined") SM_FLOW.forEach(function (s) { if (s.k === "brief") s.hint = "작업실 ② 직접 질문 — 프롬프트 복사 → claude.ai(Fable 5.1) → 답 붙여넣기. 급하면 자동(API)"; });
 })();

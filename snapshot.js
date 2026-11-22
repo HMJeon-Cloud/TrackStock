@@ -23,7 +23,7 @@
     ".snapBox{position:absolute;left:-30000px;top:0;background:#fff;padding:28px 28px 22px;box-sizing:border-box;font-family:" + FONT + ";color:#191f28}" +
     ".snapBox .snapTitle{font-size:20px;font-weight:800;line-height:1.35}" +
     ".snapBox .snapSub{font-size:13px;color:#4e5968;margin-top:4px;line-height:1.5}" +
-    ".snapBox .snapFoot{margin-top:14px;padding-top:10px;border-top:1px solid #e5e8eb;font-size:11px;color:#8b95a1;display:flex;justify-content:space-between;gap:12px}" +
+    ".snapBox .snapFoot{margin-top:14px;padding-top:10px;border-top:1px solid #e5e8eb;font-size:11px;color:var(--t-8b95a1,#8b95a1);display:flex;justify-content:space-between;gap:12px}" +
     ".snapBox .snapFoot b{color:#14161c}" +
     ".snapBox .snapCard{margin:14px 0 0!important;padding:0!important;box-shadow:none!important;border:none!important;background:#fff!important}" +
     ".snapBox .tableWrap{max-height:none!important;overflow:visible!important}" +

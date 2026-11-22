@@ -213,11 +213,17 @@ function macLine(r, a) {
   return r.c.tag + " " + s.n + "번 중 1년 뒤 " + an + (a === "fx" ? "이 오른(원화 약세) 건 " : "가 오른 건 ") + s.win + "번, 중앙값 " + macPct(s.med, 0) + (b ? " (평소 " + macPct(b.med, 0) + ")" : "") + ". " + (s.n < 5 ? "사례가 적어 참고만 해 주세요." : s.min != null ? "가장 나빴던 때 " + macPct(s.min, 0) + ", 가장 좋았던 때 " + macPct(s.max, 0) + "." : "");
 }
 function macOverview(R) {
+  /* v16.10 한눈에: ① 지금 해당하는 조건을 맨 위로 올리고 조건 이름 옆에 표시(예전에는 맨 오른쪽 열이라 휴대폰에서 화면 밖이었다)
+     ② 중앙값 옆에 '오른 횟수'를 막대로(빨강 = 오른 해, 파랑 = 내린 해) ③ 열을 4개로 줄여 옆으로 밀지 않아도 다 보인다. 계산은 그대로. */
   var bk = macBase("ks", 365), bs = macBase("spk", 365);
-  return '<div class="tableWrap"><table class="dvTable macT"><thead><tr><th class="l">조건</th><th>사례</th><th>코스피 1년</th><th>S&P500(원화) 1년</th><th>지금</th></tr></thead><tbody>' +
-    '<tr class="macBaseRow"><td class="l">평소 (아무 날)</td><td>-</td><td>' + macPct(bk && bk.med, 0) + (bk ? ' <small>' + Math.round(bk.win * 100) + '%</small>' : '') + '</td><td>' + macPct(bs && bs.med, 0) + (bs ? ' <small>' + Math.round(bs.win * 100) + '%</small>' : '') + '</td><td></td></tr>' +
-    R.map(function (r) { var a = r.st.ks[2], b = r.st.spk[2]; function c(s) { return s.n ? '<td class="' + (s.med > 0 ? "pos" : "neg") + '">' + macPct(s.med, 0) + ' <small>' + s.win + '/' + s.n + '</small></td>' : '<td class="briefDim">-</td>'; }
-      return '<tr><td class="l"><button class="linkBtn" data-macc="' + r.c.id + '">' + macEsc(r.c.tag) + '</button></td><td>' + r.ev.length + '번</td>' + c(a) + c(b) + '<td>' + (r.now.on ? '<span class="dsTag ipo-now">해당</span>' : '') + '</td></tr>'; }).join("") + '</tbody></table></div>';
+  function bar(w, n) { return '<i class="vxAd" title="' + n + '번 중 ' + w + '번 올랐어요"><u style="flex:' + w + '"></u><s style="flex:' + (n - w) + '"></s></i>'; }
+  function base(b) { return '<td class="mcV">' + (b ? '<b>' + macPct(b.med, 0) + '</b>' + bar(Math.round(b.win * 100), 100) + '<small>' + Math.round(b.win * 100) + '% 상승</small>' : '-') + '</td>'; }
+  function c(st) { return st.n ? '<td class="mcV ' + (st.med > 0 ? "pos" : st.med < 0 ? "neg" : "") + '"><b>' + macPct(st.med, 0) + '</b>' + bar(st.win, st.n) + '<small>' + st.win + '/' + st.n + ' 상승</small></td>' : '<td class="mcV briefDim">-<small>아직 없음</small></td>'; }
+  var L = R.map(function (r, i) { return { r: r, i: i }; }).sort(function (a, b) { return (b.r.now.on ? 1 : 0) - (a.r.now.on ? 1 : 0) || a.i - b.i; }), on = L.filter(function (x) { return x.r.now.on; }).length;
+  return '<p class="mcOnLine">' + (on ? '<b>지금 해당하는 조건 ' + on + '개</b>를 맨 위에 올렸어요.' : '지금 해당하는 조건은 없어요.') + ' 숫자는 1년 뒤 중앙값, 막대는 오른 횟수예요.</p>' +
+    '<div class="tableWrap"><table class="dvTable macT mcOv"><thead><tr><th class="l">조건</th><th>사례</th><th>코스피<br>1년 뒤</th><th>S&P500<br>(원화) 1년 뒤</th></tr></thead><tbody>' +
+    '<tr class="macBaseRow"><td class="l">평소 (아무 날)</td><td>-</td>' + base(bk) + base(bs) + '</tr>' +
+    L.map(function (x) { var r = x.r; return '<tr class="' + (r.now.on ? "macOn" : "") + '"><td class="l"><button class="linkBtn" data-macc="' + r.c.id + '">' + macEsc(r.c.tag) + '</button>' + (r.now.on ? '<span class="mcNow">지금 해당</span>' : '') + '</td><td>' + r.ev.length + '번</td>' + c(r.st.ks[2]) + c(r.st.spk[2]) + '</tr>'; }).join("") + '</tbody></table></div>';
 }
 
 /* ---------- 운영자: 지금 수집 ---------- */

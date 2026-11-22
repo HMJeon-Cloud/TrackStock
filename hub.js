@@ -901,7 +901,7 @@ function hubAiThreads(out, title, list) {
 function hubTodayHtml() {
   var L = hubToday(10), ck = typeof pubChecklist === "function" ? pubChecklist() : [];
   var bad = ck.filter(function (c) { return !c.ok; }).length;
-  var h = '<details class="hubCk"' + (bad ? ' open' : '') + '><summary>발행 전 점검 ' + (bad ? '<b class="rbWarn">확인 ' + bad + '건</b>' : '<b style="color:#2e7d4f">이상 없음</b>') + '</summary><div class="pubCk">' + ck.map(function (c) { return '<div class="pubCkRow ' + (c.ok ? "ok" : c.w ? "bad" : "warn") + '"><span>' + (c.ok ? "✅" : c.w ? "⛔" : "⚠️") + '</span><span>' + hubEsc(c.t) + '</span></div>'; }).join("") + '</div></details>';
+  var h = '<details class="hubCk"' + (bad ? ' open' : '') + '><summary>발행 전 점검 ' + (bad ? '<b class="rbWarn">확인 ' + bad + '건</b>' : '<b style="color:var(--k-2e7d4f,#2e7d4f)">이상 없음</b>') + '</summary><div class="pubCk">' + ck.map(function (c) { return '<div class="pubCkRow ' + (c.ok ? "ok" : c.w ? "bad" : "warn") + '"><span>' + (c.ok ? "✅" : c.w ? "⛔" : "⚠️") + '</span><span>' + hubEsc(c.t) + '</span></div>'; }).join("") + '</div></details>';
   h += '<h4 class="chSub">오늘의 주제 10 <small>' + "일월화수목금토"[hubKst().getUTCDay()] + '요일 · 시장 신호 · 일정 · 데이터로 점수를 매겼어요</small></h4><div class="hubList">' + L.map(function (x, i) {
     return '<div class="hubItem"><div class="hubRank">' + (i + 1) + '</div><div class="hubMain"><b>' + hubEsc(x.t) + '</b><small>' + hubEsc(x.d) + '</small><div class="hubWhy"><span>선정 이유</span>' + hubEsc(x.why || "상시 콘텐츠") + '</div>' + hubBtns(x.ctx) + '</div></div>';
   }).join("") + '</div><div class="briefDim" style="margin-top:8px">한 장 = 묶음 전체에서 핵심 숫자만 꽉 채운 한 장 · 여러 장 = 상세 묶음 · AI 한 장 / AI 여러 장 = AI가 같은 내용을 읽고 기획(숫자는 앱 데이터 그대로)</div>';

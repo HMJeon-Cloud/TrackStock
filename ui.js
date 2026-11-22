@@ -37,12 +37,15 @@
   var RE;
   try { RE = new RegExp("(?:[\\p{Extended_Pictographic}\\u{1F1E6}-\\u{1F1FF}\\u20BF][\\uFE0F\\u200D\\u20E3]*)+\\s?", "gu"); } catch (e) { RE = null; }
   if (!RE) return;
-  var KEEP = ".tabs, canvas, svg, textarea, input, option, [data-keep-emoji]";
+  var KEEP = ".tabs, canvas, svg, textarea, input, option, [data-keep-emoji], .gi";
+  var STAT = /[\u26A0\u2705\u274C\u23F3\u2714\u2716]/;   // v16.10 상태 표시(주의 · 완료 · 실패 · 대기)는 지우지 않는다 — viewx.js가 같은 모양의 아이콘으로 바꿔 그린다
   function clean(node) {
     if (node.nodeType === 3) {
       var t = node.nodeValue; if (!t || !RE.test(t)) { RE.lastIndex = 0; return; } RE.lastIndex = 0;
       var p = node.parentElement; if (!p || p.closest(KEEP)) return;
-      var n = t.replace(RE, "");
+      var deck = !!p.closest("#ddDeck, .ddS, .snapBox");   // 내보내는 덱 · 저장 이미지 안은 예전 그대로(지운다) — 결과물 모양을 바꾸지 않는다
+      var n = t.replace(RE, function (m) { return !deck && STAT.test(m) ? m : ""; });
+      if (n === t) return;
       if (n.trim()) { node.nodeValue = n; return; }
       // v10.9 그림 문자만 있던 자리: 버튼·링크는 그대로(누를 곳이 사라지면 안 됨), 나머지는 비우고 칸을 숨김
       var btn = p.closest("button, a, label");

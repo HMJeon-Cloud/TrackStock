@@ -297,7 +297,7 @@ function thrBind(box, variants) {
 
         ab.disabled = false; ab.innerHTML = old;
         if (j && j.ok && !fromCache) try { localStorage.setItem(ckey, JSON.stringify(j)); } catch (e) {}
-        if (!j || !j.ok) { ao.innerHTML = '<span style="color:#b45309">AI 문구 실패: ' + escapeHtml((j && (j.msg || j.reason)) || "응답 없음") + '</span>'; return; }
+        if (!j || !j.ok) { ao.innerHTML = '<span style="color:var(--k-b45309,#b45309)">AI 문구 실패: ' + escapeHtml((j && (j.msg || j.reason)) || "응답 없음") + '</span>'; return; }
         variants = j.variants.concat(variants.filter(function (v) { return !/^✨/.test(v.label); }));
         tabs.innerHTML = variants.map(function (v) { return '<button>' + escapeHtml(v.label) + '</button>'; }).join("");
         Array.prototype.forEach.call(tabs.children, function (b, i) { b.onclick = function () { show(i); }; });
@@ -308,7 +308,7 @@ function thrBind(box, variants) {
         ao.innerHTML = '<b>✨ Claude 결과</b> · ' + escapeHtml(j.model || "") + ' · 오늘 ' + j.used + '/' + j.max + '회' + (j.searches && j.searches.length ? ' · 웹 검색 ' + j.searches.length + '회' : ' · 웹 검색 없음') +
           (j.added && j.added.length ? '<div>보완한 사실: ' + j.added.map(escapeHtml).join(" / ") + '</div>' : '') +
           (j.sources && j.sources.length ? '<div>출처: ' + j.sources.map(function (s) { return '<a href="' + escapeHtml(s.u) + '" target="_blank" rel="noopener">' + escapeHtml(s.t || s.u) + '</a>'; }).join(" · ") + '</div>' : '') +
-          (odd.length ? '<div style="color:#b45309">⚠️ 우리 데이터에서 못 찾은 숫자: ' + escapeHtml(odd.join(", ")) + ' — 올리기 전에 확인하세요</div>' : '<div style="color:var(--good)">✓ 글 속 % 숫자가 모두 우리 데이터·보완 사실과 일치</div>') +
+          (odd.length ? '<div style="color:var(--k-b45309,#b45309)">⚠️ 우리 데이터에서 못 찾은 숫자: ' + escapeHtml(odd.join(", ")) + ' — 올리기 전에 확인하세요</div>' : '<div style="color:var(--good)">✓ 글 속 % 숫자가 모두 우리 데이터·보완 사실과 일치</div>') +
           (j.note ? '<div>편집 메모: ' + escapeHtml(j.note) + '</div>' : '');
         if (fromCache) ao.innerHTML = '<span class="briefDim">오늘 만든 문구를 다시 불러왔어요(API 없음) · 새로 쓰려면 ✨ 버튼</span><br>' + ao.innerHTML;
   }

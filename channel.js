@@ -62,7 +62,7 @@ function chPrepare() {
 function chRenderQuality() {   // v12.33 점검·수집 버튼은 데이터 센터로 옮기고, 채널엔 한 줄 상태만
   var R = chState.brief, el = $("chQualityLine"); if (!R || !el) return;
   var q = R.quality, n = q.stale.length + q.spike.length, gen = chState.recent && chState.recent.generated ? kstFmt(chState.recent.generated) : "-";
-  el.innerHTML = '🩺 수집 ' + gen + ' · ' + (n ? '<span style="color:#b45309">확인 필요 ' + n + '개(' + escapeHtml(q.stale.concat(q.spike).slice(0, 3).map(function (s) { return briefName(s); }).join(", ")) + ') — 순위·카드에서 제외</span>' : '<span style="color:var(--good)">이상 없음</span>');
+  el.innerHTML = '🩺 수집 ' + gen + ' · ' + (n ? '<span style="color:var(--k-b45309,#b45309)">확인 필요 ' + n + '개(' + escapeHtml(q.stale.concat(q.spike).slice(0, 3).map(function (s) { return briefName(s); }).join(", ")) + ') — 순위·카드에서 제외</span>' : '<span style="color:var(--good)">이상 없음</span>');
 }
 /* v9.4 — 과거 데이터 전체 점검: 서버(/api/cron-snapshot?audit=1)가 저장된 모든 종목을 순서·중복·0/음수·자릿수·튀었다 돌아온 값·유지된 급변·
    수정주가 비율·과거파일↔최근값 불일치·52주 최고가 교차확인·갱신 지연으로 검사한다. 운영자 토큰으로 실행(CRON_SECRET 불필요) */
@@ -71,7 +71,7 @@ var CH_AUDIT_WORD = { order: "날짜 순서", dup: "중복 날짜", value: "0·�
 function chUniStatus() {
   var out = $("chUniOut"); if (!out) return;
   Promise.all(["us", "kr"].map(function (m) { return fetch("/api/snap?universe=" + m + "&fresh=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); })).then(function (D) {
-    out.innerHTML = D.map(function (d, i) { var m = i ? "코스피 시총상위 200" : "S&P 500"; if (!d || !d.rows) return m + ": 아직 없음"; var st = d.rows.filter(function (r) { return r.stale; }).length, dt = new Date(d.asOf + 9 * 3600e3); return m + ": " + d.n + "종목" + (d.ver === 2 ? (d.lagN ? ' · <span style="color:#b45309">하루 늦은 ' + d.lagN + '개(집계 제외)</span>' : "") : ' · <span style="color:#b45309">옛 방식 요약 — 다시 받기 필요</span>') + " · 거래일 " + (d.asOfD || (dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0"))) + (st ? " · 전일 값 " + st : "") + " · 목록 " + escapeHtml(String(d.listSource || "")); }).join(" &nbsp;|&nbsp; ");
+    out.innerHTML = D.map(function (d, i) { var m = i ? "코스피 시총상위 200" : "S&P 500"; if (!d || !d.rows) return m + ": 아직 없음"; var st = d.rows.filter(function (r) { return r.stale; }).length, dt = new Date(d.asOf + 9 * 3600e3); return m + ": " + d.n + "종목" + (d.ver === 2 ? (d.lagN ? ' · <span style="color:var(--k-b45309,#b45309)">하루 늦은 ' + d.lagN + '개(집계 제외)</span>' : "") : ' · <span style="color:var(--k-b45309,#b45309)">옛 방식 요약 — 다시 받기 필요</span>') + " · 거래일 " + (d.asOfD || (dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0"))) + (st ? " · 전일 값 " + st : "") + " · 목록 " + escapeHtml(String(d.listSource || "")); }).join(" &nbsp;|&nbsp; ");
   });
 }
 function chRunUniverse(mkt, btn, outEl) {
@@ -79,9 +79,9 @@ function chRunUniverse(mkt, btn, outEl) {
   var old = btn.innerHTML; btn.disabled = true; btn.textContent = "받는 중… (1~4분)";
   return fetch("/api/cron-snapshot?universe=" + mkt + "&only=1", { headers: { "x-owner": tok }, cache: "no-store" }).then(function (r) { return r.json().then(function (j) { j._st = r.status; return j; }); }).then(function (j) {
     btn.disabled = false; btn.innerHTML = old; var u = j.universe || {};
-    if (j._st !== 200 || !u.ok) { out.innerHTML = '<span style="color:#b45309">실패: ' + escapeHtml(u.error || u.reason || j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + (u.stats ? ' (야후 429 ' + (u.stats.h429 || 0) + '회)' : '') + '</span>'; return; }
+    if (j._st !== 200 || !u.ok) { out.innerHTML = '<span style="color:var(--k-b45309,#b45309)">실패: ' + escapeHtml(u.error || u.reason || j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + (u.stats ? ' (야후 429 ' + (u.stats.h429 || 0) + '회)' : '') + '</span>'; return; }
     out.innerHTML = '<span style="color:var(--good)"><b>' + (mkt === "us" ? "S&P 500" : "코스피 시총상위 200") + " " + u.fresh + "/" + u.n + "종목 받음</b></span> · 전일 값 유지 " + (u.kept || 0) + " · 실패 " + (u.failed || 0) + " · 목록 " + escapeHtml(String(u.list || "")) + "(" + u.listN + ") · 야후 429 " + ((u.stats && u.stats.h429) || 0) + "회 · " + Math.round((u.elapsedMs || 0) / 1000) + "초" + (u.stopped ? " · 시간 제한으로 중단(다음 실행에 이어서)" : "");
-    if (u.asOfD) out.innerHTML += ' · 거래일 ' + escapeHtml(u.asOfD) + (u.lagN ? ' · <span style="color:#b45309">하루 늦은 ' + u.lagN + '종목(집계 제외)</span>' : '');
+    if (u.asOfD) out.innerHTML += ' · 거래일 ' + escapeHtml(u.asOfD) + (u.lagN ? ' · <span style="color:var(--k-b45309,#b45309)">하루 늦은 ' + u.lagN + '종목(집계 제외)</span>' : '');
     try { if (typeof DL_UNI !== "undefined") delete DL_UNI[mkt]; if (typeof BRIEF_UNI_PENDING !== "undefined") delete BRIEF_UNI_PENDING[mkt];   // v12.29 새 요약으로 화면 숫자 다시 계산
       if (typeof briefState !== "undefined" && briefState.recent && briefState.result && briefState.result.market === mkt && typeof briefCompute === "function") { briefState.result = briefCompute(briefState.recent, { mode: briefState.mode, market: mkt, popular: briefState.popular }); if (typeof renderBrief === "function") renderBrief(); } } catch (e2) {}
     setTimeout(chUniStatus, 1500);
@@ -94,7 +94,7 @@ function chRunSnapshot(btn) {
   var old = btn.innerHTML; btn.disabled = true; btn.textContent = "수집 중… (1~5분)"; if (out) out.textContent = "";
   fetch("/api/cron-snapshot?run=1&universe=0", { headers: { "x-owner": tok }, cache: "no-store" }).then(function (r) { return r.json().then(function (j) { j._st = r.status; return j; }); }).then(function (j) {
     btn.disabled = false; btn.innerHTML = old;
-    if (j._st !== 200 || j.error) { out.innerHTML = '<span style="color:#b45309">실패: ' + escapeHtml(j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + '</span>'; return; }
+    if (j._st !== 200 || j.error) { out.innerHTML = '<span style="color:var(--k-b45309,#b45309)">실패: ' + escapeHtml(j.error || ("HTTP " + j._st)) + (j._st === 401 ? ' — 운영자 모드가 이 기기에 켜져 있어야 해요.' : '') + '</span>'; return; }
     try { var dk = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("sm.chart.") === 0) dk.push(k); } dk.forEach(function (k) { localStorage.removeItem(k); }); } catch (e2) {}   // v12.26 이 기기의 종목 캐시 비우기
     if (typeof smCacheClear === "function") smCacheClear("snapshot");   // v12.91 모든 화면의 옛 값 비우기
     if (typeof DATA !== "undefined") { DATA.ready = null; DATA.recentPromise = null; DATA.recentData = null; }
@@ -102,7 +102,7 @@ function chRunSnapshot(btn) {
     setTimeout(function () { chUniHeal(j.bench, out); }, 300);   // v12.31 전체 시장 요약 날짜가 다르면 이어서 자동으로 받기
     out.innerHTML = '<span style="color:var(--good)">완료</span> · 과거 ' + (j.historyUpdated != null ? j.historyUpdated : "-") + '종목 · 최근 ' + (j.recentSymbols != null ? j.recentSymbols : "-") + '종목 · ' + Math.round((j.elapsedMs || 0) / 1000) + '초 — 화면은 새로고침 뒤 반영'
       + (j.bench ? '<br>마지막 거래일 · 미국 ' + escapeHtml(String(j.bench.us || "-").slice(5)) + ' · 국내 ' + escapeHtml(String(j.bench.kr || "-").slice(5)) + (j.repaired ? ' · 빈 날 메운 종목 ' + j.repaired + '개' : '') : '')
-      + (j.behindN ? '<br><span style="color:#b45309">지수보다 하루 이상 늦은 종목 ' + j.behindN + '개: ' + escapeHtml((j.behind || []).slice(0, 12).join(", ")) + '</span>' : (j.bench ? ' · <span style="color:var(--good)">모든 종목이 지수와 같은 날까지 받아짐</span>' : ''));
+      + (j.behindN ? '<br><span style="color:var(--k-b45309,#b45309)">지수보다 하루 이상 늦은 종목 ' + j.behindN + '개: ' + escapeHtml((j.behind || []).slice(0, 12).join(", ")) + '</span>' : (j.bench ? ' · <span style="color:var(--good)">모든 종목이 지수와 같은 날까지 받아짐</span>' : ''));
   }).catch(function (e) { btn.disabled = false; btn.innerHTML = old; out.textContent = "실패: " + e.message; });
 }
 
@@ -172,7 +172,7 @@ function chRunAudit() {
     var sum = Object.keys(j.summary || {}).map(function (k) { return (CH_AUDIT_WORD[k] || k) + " " + j.summary[k]; }).join(" · ");
     var ser = j.serious || [];
     out.innerHTML = '<div class="chWhyBox" style="margin-top:6px"><b>' + j.checked + '/' + j.total + '개 종목 점검</b> · ' + escapeHtml(j.at || "") + '<br>' +
-      (ser.length ? '<span style="color:#b45309"><b>바로 확인할 종목 ' + ser.length + '개</b></span>' : '<span style="color:var(--good)"><b>바로 고칠 문제 없음</b></span>') + (sum ? ' <span class="briefDim">(' + escapeHtml(sum) + ')</span>' : '') +
+      (ser.length ? '<span style="color:var(--k-b45309,#b45309)"><b>바로 확인할 종목 ' + ser.length + '개</b></span>' : '<span style="color:var(--good)"><b>바로 고칠 문제 없음</b></span>') + (sum ? ' <span class="briefDim">(' + escapeHtml(sum) + ')</span>' : '') +
       (ser.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + ser.slice(0, 30).map(function (s) { return '<li><b>' + escapeHtml(chName(s)) + '</b> <span class="briefDim">' + escapeHtml(s) + '</span> — ' + escapeHtml((j.report[s] || []).map(function (x) { var k = x.split(":")[0]; return (CH_AUDIT_WORD[k] || k) + x.slice(k.length); }).join(" / ")) + '</li>'; }).join("") + '</ul>' : '') +
       ((j.missingHistory || []).length ? '<div class="briefDim" style="margin-top:4px">과거 파일 없음 ' + j.missingHistory.length + '개: ' + escapeHtml(j.missingHistory.slice(0, 12).join(", ")) + '</div>' : '') +
       (j.checked < j.total ? '<div class="briefDim">시간 제한으로 ' + (j.total - j.checked) + '개는 시간 제한(50초)으로 이번에 확인하지 못했어요. 한 번 더 누르면 다시 처음부터 점검해요.</div>' : '') +
