@@ -14,7 +14,7 @@ var CORE_GROUPS = [
   { g: "내 관심 · 보유", syms: [] }
 ];
 function coreEsc(s) { return escapeHtml(String(s == null ? "" : s)); }
-function corePct(v, d) { return v == null || !isFinite(v) ? "-" : (v > 0 ? "+" : "") + (v * 100).toFixed(d == null ? 1 : d) + "%"; }
+function corePct(v, d) { if (v == null || !isFinite(v)) return "-"; var s = (v * 100).toFixed(d == null ? 1 : d); if (+s === 0) return s.replace("-", "") + "%"; return (v > 0 ? "+" : "") + s + "%"; }
 function coreName(s) { return typeof nbName === "function" ? nbName(s) : s; }
 function coreIsStock(s) { return /\.K[SQ]$/.test(s) || (/^[A-Z][A-Z\-]{0,5}$/.test(s) && ["SPY", "QQQ", "GLD", "SCHD", "TLT", "SLV", "USO", "DBC", "IWM", "VTI", "VOO"].indexOf(s) < 0); }
 function coreGroups() {

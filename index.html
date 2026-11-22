@@ -2746,7 +2746,7 @@
   클라우드 저장을 켜고 "보유 현황 거래 기록도 함께 저장"을 선택한 경우에만 서버에 저장됩니다.
 </div></footer>
 
-<script>var SM_VER = "16.10"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
+<script>var SM_VER = "16.20"; document.addEventListener("DOMContentLoaded", function () { var e = document.getElementById("footVer"); if (e) e.textContent = "v" + SM_VER; });</script>
 <script src="tickers.js?v=9.5"></script>
 <script>
 "use strict";
@@ -3407,10 +3407,10 @@ function fmtPrice(v) {
 }
 function fmtPct(v) {
   if (v == null || !isFinite(v)) return "-";   // v12.91 값이 없으면 0.0%·NaN% 대신 '-' (없는 숫자를 0으로 보이지 않게)
-  var s = (v * 100).toFixed(1) + "%";
-  return v > 0 ? "+" + s : s;
+  var n = (v * 100).toFixed(1); if (+n === 0) return "0.0%";   // v16.20 반올림하면 0인 값이 -0.0% · +0.0%로 나오던 것
+  return (v > 0 ? "+" : "") + n + "%";
 }
-function pctCls(v) { return v >= 0 ? "pos" : "neg"; }
+function pctCls(v) { return v == null || !isFinite(v) || Math.abs(v) < 0.0005 ? "" : v > 0 ? "pos" : "neg"; }   // v16.20 0.0%로 보이는 값 · 없는 값은 색을 입히지 않는다
 function evtTag(e) {
   var col = EVENT_TYPES[e.type] || "#999";
   return '<span class="evtTag" style="border:1px solid ' + col + ';color:' + col + '">' + e.name + "</span>";

@@ -17,7 +17,7 @@ var VX_G = { "✓": "ok", "✔": "ok", "✅": "ok", "✗": "no", "✕": "no", "�
 var VX_RE = /[✓✔✅✗✕✖❌⚠⏳ⓘ]/, VX_SPLIT = /([✓✔✅✗✕✖❌⚠⏳ⓘ]️?)/;
 var VX_SKIP = "textarea,input,option,select,pre,code,svg,canvas,script,style,.gi,[contenteditable],[data-keep-emoji],#ddDeck,.ddS,.snapBox";
 function vxE(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-function vxPct(v, d) { if (v == null || !isFinite(v)) return "–"; var s = (v * 100).toFixed(d == null ? 1 : d); return (v > 0 && +s !== 0 ? "+" : "") + s + "%"; }
+function vxPct(v, d) { if (v == null || !isFinite(v)) return "–"; var s = (v * 100).toFixed(d == null ? 1 : d); if (+s === 0) return s.replace("-", "") + "%"; return (v > 0 ? "+" : "") + s + "%"; }
 
 /* ---------- ③ 상태 글자 → 아이콘 ---------- */
 function vxGlyphs(root) {
@@ -143,6 +143,51 @@ function vxRankSum() {
   ], ref);
 }
 
+/* ---------- ⑤ 긴 화면: 목차 · 순서 · 접기 (v16.20) ----------
+   구루 종합 · 실적 허브처럼 한 화면이 길 때: 위쪽 바 아래에 칸 이름 줄을 붙여 두고 누르면 그 칸으로 간다. 지금 보고 있는 칸이 표시된다.
+   구루 종합은 순서를 '지금 상태 → 이번 분기에 한 일 → 사람 → 쓰는 법'으로 바꾸고, 자주 바뀌지 않는 참고 칸 두 개는 접어 둔다. 내용 · 계산은 그대로. */
+var VX_TOC = [[/지금 큰돈/, "국면"], [/확신이 실린/, "산 것, 판 것"], [/함께 움직인/, "함께 움직임"], [/함께 들고/, "함께 보유"], [/\d+명 한눈에/, "인물"], [/따라갈 수/, "따라가기"], [/이렇게 쓴다/, "쓰는 법"], [/AI 종합/, "AI 해석"],
+  [/우리의 결론/, "결론"], [/핵심 데이터/, "핵심 데이터"], [/품질 점검/, "품질 점검"], [/인사이트/, "인사이트"], [/리뷰/, "리뷰"], [/밸류 위치/, "밸류"], [/KPI/, "KPI"], [/숫자로 보는/, "숫자"], [/리스크/, "리스크"], [/분기별 추이/, "추이"], [/실적과 밸류/, "실적 표"], [/시나리오/, "시나리오"], [/Q&A/, "Q&A"], [/거장/, "거장"], [/우리 앱 데이터/, "앱 데이터"], [/누락/, "누락 점검"]];
+function vxTocLabel(t) {
+  t = String(t || "").replace(/\s+/g, " ").trim(); for (var i = 0; i < VX_TOC.length; i++) if (VX_TOC[i][0].test(t)) return VX_TOC[i][1];
+  t = t.split(/ — | · |\(/)[0].trim(); if (t.length <= 9) return t; var w = t.split(" "), o = ""; for (var k = 0; k < w.length; k++) { if ((o + " " + w[k]).trim().length > 9) break; o = (o + " " + w[k]).trim(); } return o || t.slice(0, 9);
+}
+function vxHeadText(sec) { var h = sec.querySelector(":scope > header h3, :scope > .egH, :scope > summary b, :scope > h3, :scope > h4"); if (!h) return ""; for (var n = h.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && n.nodeValue.trim()) return n.nodeValue.trim(); return (h.textContent || "").trim(); }
+function vxToc(host, secs, id) {
+  var old = document.getElementById(id); if (old) old.remove();
+  secs = secs.filter(function (x) { return x && x.offsetParent !== null && vxHeadText(x); }); host.classList.toggle("vxHasToc", secs.length >= 4); if (secs.length < 4) { if (VX.toc && VX.toc.id === id) VX.toc = null; return; }
+  var nav = document.createElement("nav"); nav.id = id; nav.className = "vxToc"; nav.setAttribute("aria-label", "이 화면의 칸으로 바로 가기");
+  nav.innerHTML = secs.map(function (x, i) { x.classList.add("vxSec"); return '<button type="button" data-i="' + i + '">' + vxE(vxTocLabel(vxHeadText(x))) + '</button>'; }).join("");
+  secs[0].parentNode.insertBefore(nav, secs[0]);
+  nav.onclick = function (e) { var b = e.target.closest ? e.target.closest("button[data-i]") : null; if (!b) return; var x = secs[+b.getAttribute("data-i")]; if (!x) return; if (x.classList.contains("vxFold")) vxFoldSet(x, true); var T = VX.toc; if (T) { T.pin = +b.getAttribute("data-i"); T.pinY = null; clearTimeout(T.pt); T.pt = setTimeout(function () { T.pinY = window.scrollY; }, 900); } try { x.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (er) { x.scrollIntoView(); } vxTocMark(); };
+  VX.toc = { id: id, nav: nav, secs: secs }; vxTocMark();
+}
+function vxTocMark() {
+  var T = VX.toc; if (!T || !T.nav.isConnected || T.nav.offsetParent === null) return;
+  var line = T.nav.getBoundingClientRect().bottom + 14, at = 0; T.secs.forEach(function (x, i) { if (x.isConnected && x.getBoundingClientRect().top <= line) at = i; });
+  /* 방금 누른 칸은 그 칸으로 표시한다(화면 맨 아래 칸은 더 내려갈 수 없어 위치만으로는 앞 칸으로 잡힌다). 직접 스크롤하면 다시 위치로 판단한다 */
+  if (T.pin != null) { if (T.pinY == null || Math.abs(window.scrollY - T.pinY) < 40) at = T.pin; else T.pin = null; }
+  Array.prototype.forEach.call(T.nav.children, function (b, i) { var on = i === at; if (b.classList.contains("on") !== on) { b.classList.toggle("on", on); if (on && T.nav.scrollWidth > T.nav.clientWidth) T.nav.scrollLeft = Math.max(0, b.offsetLeft - T.nav.clientWidth / 2 + b.offsetWidth / 2); } });
+}
+function vxFoldSet(sec, open) { sec.classList.toggle("vxFold", !open); var b = sec.querySelector(":scope > header .vxFoldB"); if (b) { b.textContent = open ? "접기" : "펼치기"; b.setAttribute("aria-expanded", open ? "true" : "false"); } try { var o = JSON.parse(localStorage.getItem("sm.vx.open") || "{}"); o[sec.getAttribute("data-vxk")] = open ? 1 : 0; localStorage.setItem("sm.vx.open", JSON.stringify(o)); } catch (e) {} }
+function vxGuru() {
+  var pane = document.querySelector("#tab-watch .gyPane"); if (!pane || typeof GY === "undefined" || GY.tab !== "sum") return;
+  var secs = Array.prototype.slice.call(pane.querySelectorAll(":scope > section.gySec")); if (secs.length < 4) return;
+  var ORD = [/지금 큰돈/, /확신이 실린/, /함께 움직인/, /함께 들고/, /AI 종합/, /\d+명 한눈에/, /따라갈 수/, /이렇게 쓴다/], FOLD = /따라갈 수|이렇게 쓴다/, open = {}; try { open = JSON.parse(localStorage.getItem("sm.vx.open") || "{}"); } catch (e) {}
+  var rank = function (x) { var t = vxHeadText(x); for (var i = 0; i < ORD.length; i++) if (ORD[i].test(t)) return i; return 5.5; };
+  var sorted = secs.map(function (x, i) { return [x, rank(x), i]; }).sort(function (a, b) { return a[1] - b[1] || a[2] - b[2]; }).map(function (x) { return x[0]; });
+  var tail = secs[secs.length - 1].nextSibling; sorted.forEach(function (x) { pane.insertBefore(x, tail); });
+  sorted.forEach(function (x, i) { x.classList.toggle("gyFirst", i === 0); var t = vxHeadText(x); if (!FOLD.test(t)) return; var k = "guru:" + vxTocLabel(t), hd = x.querySelector(":scope > header"); x.setAttribute("data-vxk", k);
+    if (hd && !hd.querySelector(".vxFoldB")) { var b = document.createElement("button"); b.type = "button"; b.className = "vxFoldB"; hd.appendChild(b); b.onclick = function () { vxFoldSet(x, x.classList.contains("vxFold")); vxQueue(); }; }
+    vxFoldSet(x, !!open[k]); });
+  vxToc(pane, sorted, "vxTocGuru");
+}
+function vxFollow() {
+  var host = document.getElementById("followBody"); if (!host || typeof FU === "undefined") return;
+  if (!FU.sel) { var o = document.getElementById("vxTocFu"); if (o) o.remove(); host.classList.remove("vxHasToc"); return; }
+  vxToc(host, Array.prototype.slice.call(host.querySelectorAll(":scope > .egBox.fuSec, :scope > details.egBox.fuSec")), "vxTocFu");
+}
+
 /* ---------- 돌리기 ---------- */
 function vxRun() {
   VX.tm = null;
@@ -160,6 +205,11 @@ function vxQueue() { if (!VX.tm) VX.tm = setTimeout(vxRun, 90); }
   }
   if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
   if (typeof renderWatchList === "function") { var w0 = renderWatchList; renderWatchList = function () { var r = w0.apply(this, arguments); try { vxWatchSum(); } catch (e) {} return r; }; }
+  if (typeof gyRender === "function") { var g0 = gyRender; gyRender = function () { var r = g0.apply(this, arguments); try { vxGuru(); } catch (e) { console.warn("vx guru", e); } return r; };
+    /* 구루 화면은 renderGuru 이름으로도 불린다(예전 함수를 그대로 가리키고 있다) → 그쪽도 같이 바꿔 둔다 */
+    if (typeof renderGuru === "function") { if (renderGuru === g0) renderGuru = gyRender; else { var rg0 = renderGuru; renderGuru = function () { var r = rg0.apply(this, arguments); try { vxGuru(); } catch (e) {} return r; }; } } }
+  if (typeof renderFollow === "function") { var f0 = renderFollow; renderFollow = function () { var r = f0.apply(this, arguments); try { vxFollow(); } catch (e) { console.warn("vx follow", e); } return r; }; }
+  var sc = false; window.addEventListener("scroll", function () { if (sc) return; sc = true; requestAnimationFrame(function () { sc = false; try { vxTocMark(); } catch (e) {} }); }, { passive: true });
   if (typeof renderRank === "function") { var k0 = renderRank; renderRank = function () { var r = k0.apply(this, arguments); try { vxRankSum(); } catch (e) {} return r; }; }
   if (typeof renderMarketMap === "function") { var m0 = renderMarketMap; renderMarketMap = function () { var r = m0.apply(this, arguments); try { vxMapSum(); } catch (e) {} return r; }; }
   document.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && e.target && e.target.classList && e.target.classList.contains("vxK") && e.target.getAttribute("data-shsym")) { e.preventDefault(); e.target.click(); } });
@@ -181,6 +231,11 @@ function vxQueue() { if (!VX.tm) VX.tm = setTimeout(vxRun, 90); }
     "html.sh .vxW.vxX:not(.vxEnd){-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 30px),rgba(0,0,0,.18));mask-image:linear-gradient(90deg,#000 calc(100% - 30px),rgba(0,0,0,.18))}",
     "@media(max-width:700px){html.sh .vxW table.vxT :is(td,th):first-child{position:sticky;left:0;z-index:2;background:#fff}html.sh .vxW table.vxT thead th:first-child{z-index:5}html.sh .vxW.vxX table.vxT :is(td,th):first-child{box-shadow:1px 0 0 var(--line)}}",
     "html.sh td.vxH.vxUp{background-color:rgb(217 52 43 / var(--ht,.06))}html.sh td.vxH.vxDn{background-color:rgb(47 111 214 / var(--ht,.06))}",
+    /* 긴 화면 목차 · 접기 */
+    ".vxToc{position:sticky;top:var(--shStick);z-index:6;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;background:#fff;padding:8px 0;margin:4px 0 12px;border-bottom:1px solid var(--line2)}.vxToc::-webkit-scrollbar{display:none}",
+    "html.sh .vxToc button{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:650;color:var(--txt2);cursor:pointer;white-space:nowrap;line-height:1.4}html.sh .vxToc button:hover{border-color:var(--txt);color:var(--txt);background:#fff}html.sh .vxToc button.on{background:var(--txt);border-color:var(--txt);color:#fff}",
+    ".vxSec{scroll-margin-top:calc(var(--shStick) + 62px)}html.sh .vxHasToc table.vxPg thead th{top:calc(var(--shStick) + 49px)}",
+    ".gySec>header{position:relative}html.sh .vxFoldB{position:absolute;right:0;top:0;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:650;color:var(--txt2);cursor:pointer}html.sh .vxFoldB:hover{border-color:var(--txt);color:var(--txt);background:#fff}.gySec.vxFold>:not(header){display:none}.gySec.vxFold{padding:12px 14px;border:1px dashed #d6dae1;border-radius:12px}.gySec.vxFold>header{margin:0;padding-right:86px}.gySec:not(.vxFold)>header:has(.vxFoldB){padding-right:70px}",
     /* 한눈에 요약 */
     ".vxSum{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin:4px 0 14px}",
     ".vxK{min-width:0;background:var(--soft);border:1px solid var(--line2);border-radius:10px;padding:9px 12px 10px}.vxK.wide{grid-column:span 1}.vxK[data-shsym]{cursor:pointer}.vxK[data-shsym]:hover{border-color:var(--txt);background:#fff}",

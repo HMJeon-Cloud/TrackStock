@@ -13,7 +13,7 @@ var IPO_FD = [[-9, 0, "공모가 아래"], [0, 0.5, "0~50%"], [0.5, 1, "50~100%"
 var IPO_DEF = { minQ: 10, depPct: 50, genPct: 25 };   // 원문에서 못 읽으면 쓰는 보통값
 
 function ipoEsc(s) { return typeof escapeHtml === "function" ? escapeHtml(s) : String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-function ipoPct(x, d) { return x == null || !isFinite(x) ? "-" : (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 1 : d) + "%"; }
+function ipoPct(x, d) { if (x == null || !isFinite(x)) return "-"; var s = (x * 100).toFixed(d == null ? 1 : d); if (+s === 0) return s.replace("-", "") + "%"; return (x > 0 ? "+" : "") + s + "%"; }
 function ipoWon(v) { return v == null || !isFinite(v) ? "-" : Math.round(v).toLocaleString("ko-KR") + "원"; }
 function ipoNum(v) { return v == null || !isFinite(v) ? "-" : Math.round(v).toLocaleString("ko-KR"); }
 function ipoD(d) { d = String(d || ""); return d.length >= 8 ? +d.slice(4, 6) + "." + +d.slice(6, 8) : "-"; }

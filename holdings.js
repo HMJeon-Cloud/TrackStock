@@ -297,8 +297,8 @@ function renderHoldingsBody(H, groups, syms) {
     html += '<tr' + (closed ? ' style="opacity:.55"' : "") + '><td style="text-align:left"><b>' + cmpLabel(x.s) + "</b><br><small style='color:var(--sub)'>" + x.s +
       (x.pos.warn ? " · <span style='color:var(--up)'>⚠</span>" : "") + "</small></td>" +
       "<td>" + (closed ? "전량 매도" : fmtQty(x.pos.qty)) + "</td>" +
-      "<td>" + (x.pos.avgN ? fmtPrice(x.pos.avgN) + cur : "-") + "</td>" +
-      "<td>" + (x.last ? fmtPrice(x.last.c) + cur + "<br><small style='color:var(--sub)'>" + fmtDate(x.last.t) + "</small>" : "-") + "</td>" +
+      "<td>" + (x.pos.avgN ? mapPrice(x.pos.avgN, x.krw ? "KRW" : "USD") + cur : "-") + "</td>" +
+      "<td>" + (x.last ? mapPrice(x.last.c, x.krw ? "KRW" : "USD") + cur + "<br><small style='color:var(--sub)'>" + fmtDate(x.last.t) + "</small>" : "-") + "</td>" +
       "<td>" + fmtKrw(x.pos.costK) + "</td>" +
       "<td><b>" + fmtKrw(x.val) + "</b></td>" +
       '<td class="' + pctCls(x.pnl) + '">' + signKrw(x.pnl) + "<br><b>" + (x.ret == null ? "-" : fmtPct(x.ret)) + "</b>" +
@@ -363,7 +363,7 @@ function lotRowsHtml(sym, lots, krw) {
     return "<tr class='hLot'><td colspan='2' style='text-align:left'>└ " + L.d.replace(/-/g, ".") +
       " <b class='" + (L.side === "sell" ? "neg" : "pos") + "'>" + (L.side === "sell" ? "매도" : "매수") + "</b>" +
       (L.memo ? " <small style='color:var(--sub)'>" + escHtml(L.memo) + "</small>" : "") + "</td>" +
-      "<td>" + fmtPrice(L.p) + (krw ? "원" : "") + "</td><td>" + fmtQty(L.q) + "주</td>" +
+      "<td>" + mapPrice(L.p, krw ? "KRW" : "USD") + (krw ? "원" : "") + "</td><td>" + fmtQty(L.q) + "주</td>" +
       "<td colspan='2'>" + fmtKrw(amt) + (krw ? "" : "<br><small style='color:var(--sub)'>환율 " + (+L.fx).toFixed(1) + "</small>") + "</td>" +
       "<td colspan='3'></td><td><button class='chip' data-hdel='" + L.id + "' title='이 기록 삭제'>삭제</button></td></tr>";
   });
@@ -527,7 +527,7 @@ $("hAddBtn").onclick = function () {
       }
     }
     hMsg("기록했습니다: " + cmpLabel(s) + " " + d.replace(/-/g, ".") + " " + (side === "sell" ? "매도 " : "매수 ") +
-      fmtQty(q) + "주 × " + fmtPrice(p) + (krw ? "원" : "") + (isFinite(price) && price > 0 ? "" : " (그날 종가)") + warn);
+      fmtQty(q) + "주 × " + mapPrice(p, krw ? "KRW" : "USD") + (krw ? "원" : "") + (isFinite(price) && price > 0 ? "" : " (그날 종가)") + warn);
     $("hVal").value = ""; $("hPrice").value = ""; $("hFx").value = ""; $("hMemo").value = "";
     renderHoldings();
   });

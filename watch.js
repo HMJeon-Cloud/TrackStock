@@ -151,7 +151,7 @@ function renderWatchList() {
       html += "<td colspan='6' style='color:var(--sub)'>불러오는 중...</td>";
     } else {
       var u = q.cur === "KRW" ? "원" : " " + q.cur;
-      html += "<td>" + fmtPrice(q.last) + u + "<br><small style='color:var(--sub)'>" + fmtDate(q.date) + "</small></td>" +
+      html += "<td>" + mapPrice(q.last, q.cur) + u + "<br><small style='color:var(--sub)'>" + fmtDate(q.date) + "</small></td>" +
         '<td class="' + pctCls(q.chg) + '">' + fmtPct(q.chg) + "</td>" +
         '<td class="' + pctCls(q.m1 || 0) + '">' + (q.m1 == null ? "-" : fmtPct(q.m1)) + "</td>" +
         '<td class="' + pctCls(q.y1 || 0) + '">' + (q.y1 == null ? "-" : fmtPct(q.y1)) + "</td>" +

@@ -9,7 +9,7 @@
 var SX = {};
 function sxE(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 function sxPct(v) { return typeof fmtPct === "function" ? fmtPct(v) : (v == null ? "-" : (v * 100).toFixed(1) + "%"); }
-function sxCls(v) { return v == null || !isFinite(v) || Math.abs(v) < 0.00005 ? "" : v > 0 ? "pos" : "neg"; }
+function sxCls(v) { return v == null || !isFinite(v) || Math.abs(v) < 0.0005 ? "" : v > 0 ? "pos" : "neg"; }
 function sxStats() {
   var R = state.rows, n = R.length, last = R[n - 1], prev = n > 1 ? R[n - 2] : null, i, D = 86400e3;
   var hi = -Infinity, lo = Infinity, t1 = last.t - 365 * D;

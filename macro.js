@@ -36,7 +36,7 @@ var MAC_COND = [
 ];
 
 function macEsc(s) { return typeof escapeHtml === "function" ? escapeHtml(s) : String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-function macPct(x, d) { return x == null || !isFinite(x) ? "-" : (x > 0 ? "+" : "") + (x * 100).toFixed(d == null ? 1 : d) + "%"; }
+function macPct(x, d) { if (x == null || !isFinite(x)) return "-"; var s = (x * 100).toFixed(d == null ? 1 : d); if (+s === 0) return s.replace("-", "") + "%"; return (x > 0 ? "+" : "") + s + "%"; }
 function macT(ymd) { ymd = String(ymd); return Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)); }
 function macYmd(t) { return new Date(t).toISOString().slice(0, 10).replace(/-/g, ""); }
 function macD(t, full) { var d = new Date(t); return full === false ? (d.getUTCMonth() + 1) + "." + d.getUTCDate() : d.getUTCFullYear() + "." + String(d.getUTCMonth() + 1).padStart(2, "0") + (full ? "." + String(d.getUTCDate()).padStart(2, "0") : ""); }

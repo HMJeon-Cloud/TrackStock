@@ -8,7 +8,7 @@
    ============================================================ */
 var EG = { memo: {}, port: null, portAt: 0 };
 function egEsc(s) { return typeof escapeHtml === "function" ? escapeHtml(String(s == null ? "" : s)) : String(s == null ? "" : s); }
-function egPct(v, d) { return v == null || !isFinite(v) ? "-" : (v > 0 ? "+" : "") + (v * 100).toFixed(d == null ? 0 : d) + "%"; }
+function egPct(v, d) { if (v == null || !isFinite(v)) return "-"; var s = (v * 100).toFixed(d == null ? 0 : d); if (+s === 0) return s.replace("-", "") + "%"; return (v > 0 ? "+" : "") + s + "%"; }
 function egName(s) { return typeof nbName === "function" ? nbName(s) : s; }
 function egYm(t) { var d = new Date(t); return d.getUTCFullYear() + "." + ("0" + (d.getUTCMonth() + 1)).slice(-2); }
 function egMed(a) { if (!a.length) return null; var s = a.slice().sort(function (x, y) { return x - y; }), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }

@@ -115,6 +115,8 @@
     W + "table" + N + "{font-feature-settings:\"tnum\" 1}",
     "html.sh .footLine{max-width:1400px;margin:8px auto 0;color:var(--muted)}",
     "html.sh [id^=\"tab-\"] .macSpark polyline{stroke:#5a6373;stroke-width:1.4}",
+    /* 본질·변수 요약: 깊이 막대(왼쪽 선이 고점, 길수록 깊다) */
+    "html.sh [id^=\"tab-\"] .clRow:has(.clDp){grid-template-columns:minmax(110px,200px) minmax(60px,240px) 52px 1fr;align-items:center}html.sh [id^=\"tab-\"] .clRow .clDp{display:block;height:8px;border-left:2px solid #14161c;background:#eceef1;border-radius:0 4px 4px 0;overflow:hidden}html.sh [id^=\"tab-\"] .clRow .clDp u{display:block;height:100%;background:#7aa3ea;border-radius:0 4px 4px 0;text-decoration:none}@media(max-width:700px){html.sh [id^=\"tab-\"] .clRow:has(.clDp){grid-template-columns:minmax(84px,1fr) minmax(44px,90px) 44px auto;gap:8px}}",
     /* 글자를 '…'로 자르던 곳을 풀었다: 실적 화면 머리 숫자 칸, 작업 순서 줄의 '다음 할 일' */
     "html.sh [id^=\"tab-\"] .fuTiles b{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;line-height:1.25}@media(max-width:700px){html.sh [id^=\"tab-\"] .fuTiles b{font-size:18px}}",
     "html.sh [id^=\"tab-\"] .smFlowHint{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;line-height:1.5}",

@@ -10,7 +10,7 @@ var HX_ENV = [["^VIX", "변동성(VIX)"], ["KRW=X", "달러/원"], ["TLT", "미�
 var HX_BK = [[-0.05, "고점 부근", "#d5e2f8"], [-0.1, "-5~-10%", "#a9c4f1"], [-0.2, "-10~-20%", "#7aa3ea"], [-0.3, "-20~-30%", "#4a80e0"], [-9, "-30% 아래", "#1f56b8"]];
 function hxE(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 function hxPct(v, d) { if (v == null || !isFinite(v)) return "–"; var s = (v * 100).toFixed(d == null ? 1 : d); if (+s === 0) s = (0).toFixed(d == null ? 1 : d); return (v > 0 && +s !== 0 ? "+" : "") + s + "%"; }
-function hxCls(v) { return v == null || !isFinite(v) || Math.abs(v) < 0.00005 ? "flat" : v > 0 ? "pos" : "neg"; }
+function hxCls(v) { return v == null || !isFinite(v) || Math.abs(v) < 0.0005 ? "flat" : v > 0 ? "pos" : "neg"; }   /* 0.0%로 보이는 값에는 색을 입히지 않는다 */
 function hxNum(v) { if (v == null || !isFinite(v)) return "–"; var a = Math.abs(v); return v.toLocaleString("en-US", { maximumFractionDigits: a >= 10000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : 4, minimumFractionDigits: a >= 10000 ? 0 : a >= 100 ? 1 : 2 }); }
 function hxMoney(r) { if (r.last == null || !isFinite(r.last)) return "–"; var c = r.cur || (/\.K[SQ]$/.test(r.s) ? "KRW" : ""); if (c === "KRW") return Math.round(r.last).toLocaleString("ko-KR") + "원"; if (c === "USD") return "$" + hxNum(r.last); return hxNum(r.last) + (c ? " " + c : ""); }
 function hxName(s) { var n = typeof cmpLabel === "function" ? cmpLabel(s) : s; return n; }
