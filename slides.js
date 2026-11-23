@@ -61,7 +61,7 @@ function slBrief() {
   slBindHero(el, []);
   var kp = document.getElementById("briefKpi"); if (kp) kp.style.display = "none";   // 3초 요약과 겹치는 숫자 띠는 숨김
   // v12.14 섹션 위 '핵심 한 줄' 배너 제거 — 바로 아래 본문(막대·큰 숫자·첫 행)을 그대로 되풀이해 중복이었다. 요약은 위 3초 요약 한 곳에만.
-  Array.prototype.forEach.call(document.querySelectorAll('#tab-brief .slKey, #tab-brief .slToggle'), function (e) { e.remove(); });
+  Array.prototype.forEach.call(document.querySelectorAll('#tab-brief .slKey, #tab-brief .slToggle'), function (e) { if (!e.closest("#bxPos")) e.remove(); });   // v16.31 채널에서 옮겨 온 '지금 위치' 칸의 한 줄 · 자세히 보기는 지우지 않는다
 }
 
 /* ---------- 채널 (운영자) ---------- */
