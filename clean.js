@@ -198,7 +198,7 @@ function clOps() {
   if (Ms.length) h += clK("데이터", badM.length ? "확인 " + badM.length + "곳" : "모두 정상", Ms.map(function (m) { return NM[m.mk] + " " + (typeof dhMD === "function" && m.date ? dhMD(m.date) : "-") + (m.level === "ok" ? "" : " ⚠"); }).join(" · "), badM.length ? "warn" : "ok", "todo");
   var iss = (typeof briefState !== "undefined" && briefState.issues) || [], R = typeof briefState !== "undefined" ? briefState.result : null;
   if (R && R.temp && !R.temp.empty && R.temp.word && R.temp.total > 0 && !(R.marketWideOff) && !clOpsOff()) h += clK("시장 온도", clEsc(R.temp.word || "-"), "오른 종목 " + Math.round((R.temp.upPct || 0) * 100) + "%" + (R.temp.total ? " · " + R.temp.up + "/" + R.temp.total : ""), "", "note");
-  if (iss.length) h += clK("핵심 이슈 " + iss.length, clEsc(String(iss[0].title || "").slice(0, 22)), clEsc(iss[0].sub || ""), "", "note");
+  if (iss.length) h += clK("핵심 이슈 " + iss.length, clEsc(String(iss[0].title || "")), clEsc(iss[0].sub || ""), "", "note");
   var made = Array.prototype.slice.call(board.querySelectorAll(".opsMade b, .opsPanel .opsTiles .opsTile")).slice(-3), mt = []; made.forEach(function (t) { var b = t.querySelector ? t.querySelector("b") : null, l = t.querySelector ? t.querySelector("span") : null; if (b && l && /카드|리포트|분석/.test(l.textContent)) mt.push(l.textContent.trim().replace(/ 저장$/, "") + " " + b.textContent.trim()); });
   if (mt.length) h += clK("오늘 만든 것", mt.map(function (x) { return x.replace(/^\D+/, ""); }).join(" · "), mt.map(function (x) { return x.replace(/\s*\d+$/, ""); }).join(" · "), "", "note");
   h += '</div>';

@@ -1,6 +1,8 @@
 /* ============================================================ v16.00 화면 뼈대 — 메뉴 · 상단 바 · 종목 검색 · 전체 메뉴
    목표: 어느 화면에서든 같은 자리에서 같은 방법으로 움직인다.
-   - PC(1024px 이상): 왼쪽 먹색 메뉴(큰 갈래 6개) + 위쪽 바(그 갈래의 화면 탭 · 종목 검색 · 내 데이터 · 공유)
+   - PC(1024px 이상): 왼쪽 메뉴 + 위쪽 바(종목 검색 · 내 데이터 · 공유)
+       v16.30 왼쪽 메뉴는 펼친 모양이 기본(1280px 이상): 갈래 이름 + 한 줄 설명 아래에 모든 화면이 아이콘과 함께 보인다. 위쪽 바에는 '갈래 › 화면 · 설명'.
+       접으면 아이콘만 남고(갈래에 올리면 화면 목록), 위쪽 바에 그 갈래의 화면 탭이 나온다. 고른 모양은 기기에 기억한다(sm.sh.rail).
    - 휴대폰: 위쪽 바(검색 · 전체 메뉴) + 화면 탭 줄 + 아래쪽 갈래 메뉴
    - 갈래는 일하는 순서: 시장 → 종목 → 큰손 → 내 투자 → 만들기 → 배우기
    - 관심 탭 안에 숨어 있던 화면(시장 지도 · 매크로 · 공모주 · 뉴스 · 구루 · 공시 · 배당)을 각자 제자리로 꺼냈다.
@@ -8,12 +10,12 @@
    ============================================================ */
 var SH = {
   secs: [
-    { id: "market", t: "시장", pages: ["home", "map", "macro", "ipo", "news"] },
-    { id: "stock", t: "종목", pages: ["single", "rank", "compare", "follow", "core"] },
-    { id: "big", t: "큰손", pages: ["guru", "disc"] },
-    { id: "mine", t: "내 투자", pages: ["watch", "sim", "div"] },
-    { id: "make", t: "만들기", pages: ["ops", "data", "brief", "onecard", "report", "analyst", "channel"] },
-    { id: "learn", t: "배우기", pages: ["guide", "mind"] }
+    { id: "market", t: "시장", d: "지금 오르나 내리나", pages: ["home", "map", "macro", "ipo", "news"] },
+    { id: "stock", t: "종목", d: "무엇을 살까", pages: ["single", "rank", "compare", "follow", "core"] },
+    { id: "big", t: "큰손", d: "누가 사고 파나", pages: ["guru", "disc"] },
+    { id: "mine", t: "내 투자", d: "내 돈은 어디에", pages: ["watch", "sim", "div"] },
+    { id: "make", t: "만들기", d: "운영자 전용", pages: ["ops", "data", "brief", "onecard", "report", "analyst", "channel"] },
+    { id: "learn", t: "배우기", d: "처음이라면", pages: ["guide", "mind"] }
   ],
   pages: {
     home: { t: "홈", d: "지금 시장이 고점에서 얼마나 내려와 있는지", tab: "home" },
@@ -59,7 +61,34 @@ var SH_IC = {
   share: '<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   star: '<path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4-3.9-3.8 5.4-.8z"/>',
-  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.9"/><path d="M12 16.6h.01"/>'
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.9"/><path d="M12 16.6h.01"/>',
+  fold: '<path d="M13 7l-5 5 5 5"/><path d="M18.5 7l-5 5 5 5"/>',
+  unfold: '<path d="M11 7l5 5-5 5"/><path d="M5.5 7l5 5-5 5"/>',
+  /* v16.30 화면마다 하나씩 — 왼쪽 메뉴에서 글자를 읽기 전에 모양으로 먼저 찾는다 */
+  p_home: '<path d="M4 11.2L12 4.8l8 6.4"/><path d="M6.3 9.8v9.7h11.4V9.8"/><path d="M10 19.5v-5h4v5"/>',
+  p_map: '<rect x="4" y="4" width="16" height="16" rx="2.2"/><path d="M12.5 4v16M4 13.5h8.5M12.5 9.5H20"/>',
+  p_macro: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.7 2.3 2.7 14.7 0 17M12 3.5c-2.7 2.3-2.7 14.7 0 17"/>',
+  p_ipo: '<path d="M6 20.5V4"/><path d="M6 5h11.5l-2.3 3.5 2.3 3.5H6"/>',
+  p_news: '<rect x="4" y="5" width="16" height="14.5" rx="2.2"/><path d="M7.8 9.5h8.4M7.8 13h8.4M7.8 16h5"/>',
+  p_single: '<path d="M4 19.5h16"/><path d="M5 15.2l4.2-4.7 3.3 2.9 6.5-7.4"/>',
+  p_rank: '<path d="M6 19.5v-6.5M12 19.5V5M18 19.5v-10"/>',
+  p_compare: '<path d="M8 5v14M16 5v14"/><path d="M4.8 8.2L8 5l3.2 3.2M12.8 15.8L16 19l3.2-3.2"/>',
+  p_follow: '<rect x="5" y="5" width="14" height="15.5" rx="2.2"/><path d="M9.2 5V3.7h5.6V5"/><path d="M8.8 13l2.2 2.2 4.2-4.4"/>',
+  p_core: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.3"/><path d="M12 12h.01"/>',
+  p_guru: '<circle cx="12" cy="8.3" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  p_disc: '<path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10.5a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M14 3.5v4h4M9.5 12.5h5M9.5 16h5"/>',
+  p_watch: '<path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4-3.9-3.8 5.4-.8z"/>',
+  p_sim: '<path d="M11.5 4.5a8 8 0 1 0 8 8h-8z"/><path d="M15 3.8a8 8 0 0 1 5.2 5.2H15z"/>',
+  p_div: '<circle cx="12" cy="12" r="8.5"/><path d="M14.6 9.6c-.5-.9-1.5-1.4-2.6-1.4-1.5 0-2.7.8-2.7 1.9 0 2.8 5.5 1.2 5.5 3.9 0 1.2-1.2 2-2.8 2-1.2 0-2.3-.5-2.8-1.5"/><path d="M12 6.5v1.7M12 16v1.5"/>',
+  p_ops: '<path d="M4.5 7l1.7 1.7 3-3.2M4.5 13.5l1.7 1.7 3-3.2"/><path d="M12.5 7.5h7M12.5 14h7M5 19.5h14.5"/>',
+  p_data: '<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v11c0 1.7 3.1 3 7 3s7-1.3 7-3v-11"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+  p_brief: '<path d="M3.5 17.5h17"/><path d="M6.5 17.5a5.5 5.5 0 0 1 11 0"/><path d="M12 6v2.3M5.2 9.3l1.6 1.6M18.8 9.3l-1.6 1.6"/>',
+  p_onecard: '<rect x="7.5" y="7.5" width="12.5" height="12.5" rx="2.2"/><path d="M4.5 15.5V6.2A1.7 1.7 0 0 1 6.2 4.5h9.3"/>',
+  p_report: '<rect x="5" y="3.5" width="14" height="17" rx="2.2"/><path d="M9 16.5v-3M12 16.5V9.5M15 16.5V12"/>',
+  p_analyst: '<path d="M12 3.5l7.4 4.250v8.5L12 20.5l-7.4-4.250v-8.5z"/><path d="M12 12l7.2-4.1M12 12v8.3M12 12L4.8 7.9"/>',
+  p_channel: '<path d="M20.5 3.8L3.5 10.6l6.4 2.5 2.5 6.4z"/><path d="M9.9 13.1L20.5 3.8"/>',
+  p_guide: '<circle cx="12" cy="12" r="8.5"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/>',
+  p_mind: '<circle cx="12" cy="12" r="8.5"/><path d="M8.8 14.2c.8 1.1 1.9 1.7 3.2 1.7s2.4-.6 3.2-1.7"/><path d="M9.3 10h.01M14.7 10h.01"/>'
 };
 function shIc(k, sz) { return '<svg class="shIc" viewBox="0 0 24 24" width="' + (sz || 22) + '" height="' + (sz || 22) + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (SH_IC[k] || "") + '</svg>'; }
 function shEsc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -125,8 +154,8 @@ function shBuild() {
   top.innerHTML =
     '<div class="shApp"><button type="button" class="shBrand" data-shgo="home" aria-label="홈으로"><img src="/icons/icon-192.png?v=2" alt="" width="28" height="28"><b>StockMind</b></button>' +
     '<span class="shAppSp"></span><button type="button" class="shIb" data-shfind aria-label="종목 검색">' + shIc("search", 21) + '</button><button type="button" class="shIb" data-shmenu aria-label="전체 메뉴">' + shIc("menu", 21) + '</button></div>' +
-    '<div class="shBarRow"><nav class="shTabs" aria-label="이 갈래의 화면"></nav>' +
-    '<div class="shTools"><div class="shFind" role="search"><label class="shFindIn">' + shIc("search", 17) + '<input id="shQ" type="search" placeholder="종목 검색" autocomplete="off" spellcheck="false" aria-label="종목 이름이나 코드로 검색"><kbd>/</kbd><button type="button" class="shFindX" data-shfindx aria-label="검색 닫기">' + shIc("close", 18) + '</button></label><div class="shFindBox" hidden></div></div>' +
+    '<div class="shBarRow"><div class="shCrumb" aria-label="지금 화면"></div><nav class="shTabs" aria-label="이 갈래의 화면"></nav>' +
+    '<div class="shTools"><div class="shFind" role="search"><label class="shFindIn">' + shIc("search", 17) + '<input id="shQ" type="search" placeholder="화면 · 종목 검색" autocomplete="off" spellcheck="false" aria-label="화면 이름, 종목 이름이나 코드로 검색"><kbd>/</kbd><button type="button" class="shFindX" data-shfindx aria-label="검색 닫기">' + shIc("close", 18) + '</button></label><div class="shFindBox" hidden></div></div>' +
     '<span class="shActs"></span></div></div>';
   var bar = document.createElement("nav"); bar.id = "shBar"; bar.setAttribute("aria-label", "주 메뉴");
   var menu = document.createElement("div"); menu.id = "shMenu"; menu.hidden = true;
@@ -159,6 +188,7 @@ function shBuild() {
     var g = t.closest("[data-shgo]"); if (g) { e.preventDefault(); shGo(g.getAttribute("data-shgo")); return; }
     var s = t.closest("[data-shsec]"); if (s) { e.preventDefault(); shGoSec(s.getAttribute("data-shsec")); return; }
     var y = t.closest("[data-shsym]"); if (y) { e.preventDefault(); shOpenSym(y.getAttribute("data-shsym")); return; }
+    if (t.closest("[data-shfold]")) { e.preventDefault(); shRailSet(document.documentElement.classList.contains("shWide") ? "mini" : "wide"); return; }
     if (t.closest("[data-shmenu]")) { e.preventDefault(); shMenuOpen(); return; }
     if (t.closest("[data-shmenux]")) { e.preventDefault(); shMenuClose(); return; }
     if (t.closest("[data-shhelp]")) { e.preventDefault(); shMenuClose(); try { var dr = document.getElementById("clDrawer"); clDrawer(!dr || dr.hidden, "page"); } catch (er) {} return; }
@@ -180,7 +210,25 @@ function shBuild() {
     else if (e.key === "ArrowUp" && n) { e.preventDefault(); F.at = (F.at - 1 + n) % n; shFindMark(); }
     else if (e.key === "Enter") { e.preventDefault(); var it = F.items[F.at >= 0 ? F.at : 0]; if (it) shFindPick(it); else if (q.value.trim()) shOpenSym(q.value.trim()); }
   });
-  window.addEventListener("resize", function () { clearTimeout(SH.rt); SH.rt = setTimeout(shPaint, 150); });
+  window.addEventListener("resize", function () { clearTimeout(SH.rt); SH.rt = setTimeout(function () { shRailMode(); shPaint(); }, 150); });
+  shRailMode();
+}
+/* v16.30 왼쪽 메뉴: 펼친 모양(모든 화면이 한눈에)과 접은 모양(아이콘만).
+   고른 적이 없으면 화면 폭이 1280px 이상일 때 펼친다. 한 번 고르면 그 기기에서 기억한다. */
+function shRailPref() { try { var v = localStorage.getItem("sm.sh.rail"); return v === "wide" || v === "mini" ? v : ""; } catch (e) { return ""; } }
+function shRailMode() {
+  var w = window.innerWidth || document.documentElement.clientWidth || 0, pref = shRailPref();
+  var wide = w >= 1024 && (pref ? pref === "wide" : w >= 1280);
+  var H = document.documentElement, was = H.classList.contains("shWide");
+  H.classList.toggle("shWide", wide);
+  if (was !== wide) { SH.sig = ""; }
+  return wide;
+}
+function shRailSet(mode) {
+  try { localStorage.setItem("sm.sh.rail", mode); } catch (e) {}
+  shRailMode(); shPaint();
+  var r = document.getElementById("shRail"); if (r) r.classList.add("quiet");
+  try { window.dispatchEvent(new Event("resize")); } catch (e) {}   // 그래프 · 표가 넓어진(좁아진) 자리에 다시 맞추도록
 }
 
 function shPaint() {
@@ -191,14 +239,17 @@ function shPaint() {
   var done = {}; try { if (owner && typeof smFlowDone === "function") { var D = smFlowDone(); done = { data: D.data, brief: D.brief, onecard: D.make }; } } catch (e) {}
 
   /* 왼쪽 메뉴(PC) */
-  var rail = document.getElementById("shRail"), sig = secs.map(function (x) { return x.id + ":" + shPagesOf(x).join(","); }).join("|") + "#" + cur + "#" + JSON.stringify(done);
+  var rail = document.getElementById("shRail"), sig = secs.map(function (x) { return x.id + ":" + shPagesOf(x).join(","); }).join("|") + "#" + cur + "#" + JSON.stringify(done) + "#" + (document.documentElement.classList.contains("shWide") ? "w" : "m");
   if (SH.sig !== sig) {
     SH.sig = sig;
-    rail.innerHTML = '<button type="button" class="shLogo" data-shgo="home" aria-label="StockMind 홈"><img src="/icons/icon-192.png?v=2" alt="" width="44" height="44"></button><div class="shSecs">' + secs.map(function (x) {
+    var wide = document.documentElement.classList.contains("shWide");
+    rail.innerHTML = '<div class="shHead"><button type="button" class="shLogo" data-shgo="home" aria-label="StockMind 홈"><img src="/icons/icon-192.png?v=2" alt="" width="44" height="44"><b>StockMind</b></button></div><div class="shSecs">' + secs.map(function (x) {
       var ps = shPagesOf(x);
-      return '<div class="shSec' + (x.id === S.id ? " on" : "") + '"><button type="button" class="shSecB" data-shsec="' + x.id + '"' + (x.id === S.id ? ' aria-current="true"' : "") + '>' + shIc(x.id, 23) + '<span>' + x.t + '</span></button>' +
-        '<div class="shFly"><div class="shFlyIn"><b>' + x.t + '</b>' + ps.map(function (p) { return '<button type="button" data-shgo="' + p + '" class="' + (p === cur ? "on" : "") + '"><span>' + SH.pages[p].t + '</span>' + (done[p] ? '<em title="오늘 끝냄">완료</em>' : "") + '</button>'; }).join("") + '</div></div></div>';
-    }).join("") + '</div><div class="shRailFoot"><button type="button" class="shSecB" data-shmenu>' + shIc("menu", 21) + '<span>전체</span></button></div>';
+      return '<div class="shSec' + (x.id === S.id ? " on" : "") + '"><button type="button" class="shSecB" data-shsec="' + x.id + '"' + (x.id === S.id ? ' aria-current="true"' : "") + '>' + shIc(x.id, 23) + '<span>' + x.t + '</span>' + (x.d ? '<small>' + x.d + '</small>' : "") + '</button>' +
+        '<div class="shFly"><div class="shFlyIn"><b>' + x.t + '</b>' + ps.map(function (p) { return '<button type="button" data-shgo="' + p + '" class="' + (p === cur ? "on" : "") + '"' + (p === cur ? ' aria-current="page"' : "") + ' title="' + shEsc(SH.pages[p].d) + '">' + shIc("p_" + p, 19) + '<span>' + SH.pages[p].t + '</span>' + (done[p] ? '<em title="오늘 끝냄">완료</em>' : "") + '</button>'; }).join("") + '</div></div></div>';
+    }).join("") + '</div><div class="shRailFoot"><button type="button" class="shSecB shFoldB" data-shfold aria-label="' + (wide ? "메뉴 접기" : "메뉴 펼치기") + '">' + shIc(wide ? "fold" : "unfold", 20) + '<span>' + (wide ? "메뉴 접기" : "펼치기") + '</span></button><button type="button" class="shSecB shAllB" data-shmenu>' + shIc("menu", 21) + '<span>전체</span></button></div>';
+    var onB = rail.querySelector(".shFlyIn button.on"), sc = rail.querySelector(".shSecs");   // 지금 화면이 메뉴 안에서 보이게
+    if (wide && onB && sc) { try { var rb = onB.getBoundingClientRect(), rs = sc.getBoundingClientRect(); if (rb.bottom > rs.bottom - 8 || rb.top < rs.top + 8) sc.scrollTop += rb.top - rs.top - rs.height / 2; } catch (e) {} }
 
     /* 아래쪽 메뉴(휴대폰) — 갈래가 다섯을 넘으면 배우기는 '전체 메뉴'에서 */
     var bs = secs.length > 5 ? secs.filter(function (x) { return x.id !== "learn"; }).slice(0, 5) : secs;
@@ -210,6 +261,7 @@ function shPaint() {
     var tabs = top.querySelector(".shTabs"), ps = shPagesOf(S);
     tabs.innerHTML = ps.map(function (p) { return '<button type="button" data-shgo="' + p + '" class="' + (p === cur ? "on" : "") + '"' + (p === cur ? ' aria-current="page"' : "") + '>' + SH.pages[p].t + (done[p] ? '<i class="shDone" title="오늘 끝냄"></i>' : "") + '</button>'; }).join("");
     var on = tabs.querySelector(".on"); if (on && tabs.scrollWidth > tabs.clientWidth) { try { tabs.scrollLeft = Math.max(0, on.offsetLeft - 24); } catch (e) {} }
+    var cr = top.querySelector(".shCrumb"); if (cr) cr.innerHTML = '<span>' + S.t + '</span><i aria-hidden="true">›</i><b>' + SH.pages[cur].t + '</b><small>' + shEsc(SH.pages[cur].d) + '</small>';
     document.title = (cur === "home" ? "" : SH.pages[cur].t + " · ") + "StockMind";
   }
 }
