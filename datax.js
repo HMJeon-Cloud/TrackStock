@@ -57,14 +57,14 @@ function dxRows(Ms, recent) {
   rows.push({ g: "공시 · 기관", n: "구루 13F (분기 보고)", cyc: "분기마다 (2 · 5 · 8 · 11월 중순 공개)" + (G && G.via === "github" ? " · 지금은 손으로 실행" : ""), last: G && G.updated ? dxAgo(Date.parse(G.updated)) + (G.via ? '<small>경로: ' + dxEsc(G.via) + '</small>' : '') : "-", lv: !G ? "warn" : gu > 110 ? "warn" : "ok", why: !G ? "없음" : gu > 110 ? Math.round(gu) + "일째 그대로 — 새 분기분 확인 필요" : "정상", next: dxNext13F(), fix: !G || gu > 110 ? "sec" : "" });
   /* 국내 마감 자료(네이버 순위 · 수급) */
   var KD = typeof KRX !== "undefined" ? (KRX.data || (typeof krxCached === "function" ? krxCached() : null)) : null, kw = KD && typeof krxWhy === "function" ? krxWhy(KD) : "";
-  rows.push({ g: "네이버", n: "국내 급등락 · 외국인/기관 수급", cyc: "작업실에서 받을 때 (20분 보관)", last: KD ? dxAgo(KD.at) + (KD.tradeDay ? '<small>' + dxMD(KD.tradeDay) + ' 장' + (KD.live ? ' · 장중' : '') + '</small>' : '') : "오늘 안 받음", lv: !KD ? "" : kw || (KD.miss && KD.miss.length) ? "warn" : "ok", why: !KD ? "작업실 ①에서 받기" : kw ? kw : KD.miss && KD.miss.length ? "못 읽은 칸 " + KD.miss.length + "개: " + KD.miss.slice(0, 2).join(" / ") : "정상", next: "필요할 때", fix: "kr" });
+  rows.push({ g: "네이버", n: "국내 급등락 · 외국인/기관 수급", cyc: "작업실에서 받을 때 (20분 보관)", last: KD ? dxAgo(KD.at) + (KD.tradeDay ? '<small>' + dxMD(KD.tradeDay) + ' 장' + (KD.live ? ' · 장중' : '') + '</small>' : '') : "오늘 안 받음", lv: !KD ? "" : kw || (KD.miss && KD.miss.length) ? "warn" : "ok", why: !KD ? "작업실 \'데이터 현황\'에서 받기" : kw ? kw : KD.miss && KD.miss.length ? "못 읽은 칸 " + KD.miss.length + "개: " + KD.miss.slice(0, 2).join(" / ") : "정상", next: "필요할 때", fix: "kr" });
   rows.push({ g: "네이버", n: "뉴스 검색", cyc: "화면을 열 때 실시간 (30분 보관)", last: "실시간", lv: K.naverHub ? "ok" : K.naverDev ? "warn" : "bad", why: K.naverHub ? "HUB 키 사용 중" : K.naverDev ? "구 키 사용 중 — HUB 키로 교체 필요" : "키 없음", next: "-", fix: "" });
   rows.push({ g: "네이버", n: "종목 지표 · 재무 · 목표주가", cyc: "종목을 열 때 실시간 (30분 보관)", last: "실시간", lv: "", why: "키 없이 공개 화면에서 읽음 — 네이버가 주소를 바꾸면 빈칸이 됨", next: "-", fix: "" });
   /* 손으로 넣는 것 */
   var cal = typeof PUB_CAL !== "undefined" ? PUB_CAL : [], hand = cal.filter(function (e) { return e.k !== "hol" && !e.sure && e.src && !/공개 일정/.test(e.src); }).map(function (e) { return e.d; }).sort(), lastHand = hand.length ? hand[hand.length - 1] : "", allLast = cal.map(function (e) { return e.d; }).sort().slice(-1)[0] || "", dh = lastHand ? dxDiff(lastHand, today) : -1;
   rows.push({ g: "손으로", n: "경제 일정 (CPI · 고용 · 실적 등 직접 넣은 것)", cyc: "한 달에 한 번 손으로", last: lastHand ? dxMD(lastHand) + "까지" + '<small>FOMC · 금통위 · 휴장은 ' + dxMD(allLast) + '까지 자동</small>' : "-", lv: dh >= 30 ? "ok" : "warn", why: dh >= 30 ? "정상" : dh >= 0 ? "앞으로 " + dh + "일치뿐 — 다음 달 일정 추가" : "직접 넣은 일정이 지났어요", next: "매달 말", fix: "" });
   var dl = null; try { dl = JSON.parse(localStorage.getItem("sm.dailyManual:" + today) || "null"); } catch (e) {}
-  rows.push({ g: "손으로", n: "오늘 브리핑 (Claude 답 붙여넣기)", cyc: "매일 아침 손으로", last: dl && dl.out ? "오늘 적용함" : dl ? "프롬프트만 만듦" : "오늘 아직", lv: dl && dl.out ? "ok" : "", why: dl && dl.out ? "정상" : "작업실 ②에서 진행", next: "내일 아침", fix: "" });
+  rows.push({ g: "손으로", n: "오늘 브리핑 (Claude 답 붙여넣기)", cyc: "매일 아침 손으로", last: dl && dl.out ? "오늘 적용함" : dl ? "프롬프트만 만듦" : "오늘 아직", lv: dl && dl.out ? "ok" : "", why: dl && dl.out ? "정상" : "작업실 \'지금 할 일\'에서 진행", next: "내일 아침", fix: "" });
   return rows;
 }
 function dxNext13F() { var t = dxToday(), y = +t.slice(0, 4), c = [y + "-02-14", y + "-05-15", y + "-08-14", y + "-11-14", (y + 1) + "-02-14"]; for (var i = 0; i < c.length; i++) if (c[i] >= t) return dxMD(c[i]) + " 무렵"; return "-"; }
@@ -86,7 +86,7 @@ function dxTopHtml(Ms, recent) {
 var DX_SCHED = [
   ["매일 07:00", "자동", "대표 목록 시세(최근 400일) → 늦은 종목 메우기 → 환율·금리·공시·공모주·13F 확인 → 과거 25년 파일 20종목 → 국내 전체 요약 → 미국 전체 요약", "07:30 이후 데이터 센터가 '정상'인지 한 번 보기"],
   ["매일 09:00", "자동", "코인 먼저(오전 9시 마감분) → 나머지 시세 → 미국 전체 요약 나머지", "09:20 뒤에도 코인이 어제 마감분이 아니면 ☀️ 아침 수집"],
-  ["매일 아침", "손으로", "작업실 ① 확인 → ② 오늘 브리핑(프롬프트 복사 → Claude 답 붙여넣기) → ③ 카드 · 리포트", "국내 급등락 · 수급은 작업실에서 '받기'를 눌러야 와요"],
+  ["매일 아침", "손으로", "작업실에서 데이터 확인 → 오늘 브리핑(프롬프트 복사 → Claude 답 붙여넣기) → 카드 · 리포트", "국내 급등락 · 수급은 작업실에서 '받기'를 눌러야 와요"],
   ["매주 월요일", "손으로", "지난주 올린 글 성과 기록 · 이번 주 일정(실적 · 지표) 확인", "일정이 2주치 아래면 다음 달 일정 추가"],
   ["매월 1일", "손으로", "🔍 과거 데이터 전체 점검(30~50초) · 분석 기록 백업 · 경제 일정 다음 달 치 추가 · Upstash 사용량 · AI 사용 요금 확인", "점검에서 'serious'로 나온 종목만 확인"],
   ["분기 (2 · 5 · 8 · 11월 중순)", "손으로", "🧓 구루 13F 수집 · 키 점검(아래 ⑥ '점검 완료' 누르기) · 미국 시총 상위 10 목록 확인", "13F는 공개 뒤 며칠 안에 한 번"],

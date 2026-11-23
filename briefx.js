@@ -85,8 +85,9 @@ function bxSkeleton() {
 }
 
 /* ---------- 1 결론 ---------- */
-function bxSum() {
-  var R = briefState.result, el = document.getElementById("bxSum"); if (!R || !el) return;
+/* v16.40 결론 계산을 화면과 떼어 둔다 — 브리핑 1번과 작업실 '오늘 시장'이 같은 문장 · 같은 숫자를 쓰도록 */
+function bxVerdict(R) {
+  R = R || (typeof briefState !== "undefined" ? briefState.result : null); if (!R) return null;
   var t = R.uniTemp || R.temp || {}, ir = R.indexRow || [], i0 = ir[0], i1 = ir[1], unit = R.market === "coin" ? "코인" : "종목", off = !!R.marketWideOff || t.empty || !isFinite(t.upPct);
   var up = off ? null : Math.round(t.upPct * 100), a20 = off || !isFinite(t.abovePct) ? null : Math.round(t.abovePct * 100);
   var sp = function (x) { return '<em class="' + bxCls(x) + '">' + bxPct(x) + '</em>'; };
@@ -107,8 +108,13 @@ function bxSum() {
   if (now) { var sig = (now.why || []).map(function (w) { return w.split("→").pop().trim(); }); T.push({ l: "국면", v: sig.length ? sig[0] : "평소 구간", c: "", w: sig.length > 1 ? "신호 " + sig.length + "개" : sig.length ? "신호 1개" : "뚜렷한 신호 없음", s: sig.length ? (now.why[0].split("→")[0] || "").trim() : "금리 · 공포 · 유가 · 달러 모두 평소 범위", txt: 1 }); }
   var lines = []; try { lines = off || typeof thrInsights !== "function" ? [] : thrInsights(R, briefState.issues || [], unit).slice(0, 3); } catch (e) {}
   var basis = R.marketWideOff ? "" : R.uniTemp ? (R.uniTemp.uni || "전체 시장") + (R.basis && R.basis.date ? " · " + String(R.basis.date).slice(5).replace("-", "/") + " 마감" : "") + " 기준" : "대표 자산 " + (R.temp ? R.temp.total : 0) + "개 기준";
-  var h = '<p class="bxHead">' + head + '</p>';
-  if (R.marketWideOff) h += '<div class="bxWarn"><b>시장 전체 숫자를 숨겼어요.</b> ' + bxE((R.basis && R.basis.why) || "전체 시장 요약이 아직 준비되지 않았어요") + ' — 지수와 자산판만 믿을 수 있는 값이에요. 틀린 숫자를 보여 주지 않으려는 조치예요.</div>';
+  return { head: head, tiles: T, lines: lines, basis: basis, off: !!R.marketWideOff, offWhy: (R.basis && R.basis.why) || "" };
+}
+function bxSum() {
+  var el = document.getElementById("bxSum"), V = bxVerdict(); if (!V || !el) return;
+  var T = V.tiles, lines = V.lines, basis = V.basis;
+  var h = '<p class="bxHead">' + V.head + '</p>';
+  if (V.off) h += '<div class="bxWarn"><b>시장 전체 숫자를 숨겼어요.</b> ' + bxE(V.offWhy || "전체 시장 요약이 아직 준비되지 않았어요") + ' — 지수와 자산판만 믿을 수 있는 값이에요. 틀린 숫자를 보여 주지 않으려는 조치예요.</div>';
   h += '<div class="bxJ">' + T.map(function (k) { return '<div class="bxJt' + (k.txt ? " txt" : "") + '"><span>' + k.l + '</span><b class="' + k.c + '">' + bxE(k.v) + '</b><em>' + bxE(k.w) + '</em><small>' + bxE(k.s) + '</small></div>'; }).join("") + '</div>';
   if (lines.length) h += '<ol class="bxLines">' + lines.map(function (x) { return '<li>' + bxE(x) + '</li>'; }).join("") + '</ol>';
   if (basis) h += '<p class="bxNote">' + bxE(basis) + ' · 종가 기준 · 숫자에서 읽은 내용이고 전망이 아니에요</p>';
@@ -284,6 +290,9 @@ function bxIss() {
 }
 
 /* ---------- 옆: 일정 · 내 종목 ---------- */
+/* v16.40 일정 종류 표시 — 빨강 · 파랑은 '올랐다 · 내렸다'에만 쓰므로 여기선 먹 · 금 · 청록 · 회색 · 보라 */
+var BX_KIND = { rate: ["금리", "#14161c"], data: ["지표", "#8a6a1f"], earn: ["실적", "#0f7f7a"], hol: ["휴장", "#7a8494"], exp: ["만기", "#6b5bd2"] };
+function bxKind(k) { return BX_KIND[k] || ["일정", "#7a8494"]; }
 function bxCal() {
   var el = document.getElementById("bxCal"); if (!el) return;
   if (typeof cxlEvents !== "function" || typeof cxlToday !== "function" || typeof cxlAdd !== "function") { el.innerHTML = '<div class="bxEmpty">일정 자료가 없어요.</div>'; return; }
@@ -292,7 +301,7 @@ function bxCal() {
   if (!EV.length) { el.innerHTML = '<div class="bxEmpty">앞으로 7일 동안 등록된 일정이 없어요.</div><button type="button" class="bxLink" data-shgo="ops">달력 전체 보기</button>'; return; }
   var dow = function (d) { return "일월화수목금토".charAt(new Date(d + "T00:00:00Z").getUTCDay()); };
   el.innerHTML = '<ul class="bxCl">' + EV.slice(0, 7).map(function (e) {
-    var K = (typeof CXL_KIND !== "undefined" && CXL_KIND[e.kind]) || ["일정", "#6b7280"], note = e.n || ""; try { if (!note && typeof pubEvNote === "function") note = pubEvNote(e) || ""; } catch (er) {}
+    var K = bxKind(e.kind), note = e.n || ""; try { if (!note && typeof pubEvNote === "function") note = pubEvNote(e) || ""; } catch (er) {}
     var when = e.d === today ? "오늘" : e.d === cxlAdd(today, 1) ? "내일" : "";
     return '<li' + (when === "오늘" ? ' class="td"' : "") + '><time>' + (when ? '<b>' + when + '</b>' : "") + e.d.slice(5).replace("-", "/") + " " + dow(e.d) + '</time><div><span class="bxK" style="--c:' + K[1] + '">' + K[0] + '</span><b>' + bxE(bxClean(e.t)) + (e.est ? ' <small class="est">예상</small>' : "") + '</b>' + (note ? '<p>' + bxE(note) + '</p>' : "") + '</div></li>';
   }).join("") + '</ul>' + (EV.length > 7 ? '<p class="bxNote">외 ' + (EV.length - 7) + '건</p>' : "") + '<button type="button" class="bxLink" data-shgo="ops">달력 전체 보기</button>';

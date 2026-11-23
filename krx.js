@@ -102,7 +102,7 @@ function krxNewsOne() {
 /* ---------- 1) 오늘의 주요 뉴스 ---------- */
 function krxNewsDeck() {
   var N = krxNewsList(), F = krxFull(), PT = F && F.data ? (F.data.points || []) : [];
-  if (!N.length) throw new Error("오늘 브리핑에 뉴스 목록(news)이 없어요 — 작업실 ②에서 새 프롬프트로 다시 받으세요");
+  if (!N.length) throw new Error("오늘 브리핑에 뉴스 목록(news)이 없어요 — 작업실 \'지금 할 일\'에서 새 프롬프트로 다시 받으세요");
   var per = 4, pages = Math.ceil(N.length / per), total = pages + (PT.length ? 1 : 0), out = [];
   for (var p = 0; p < pages; p++) {
     var c = kxNew("오늘의 주요 뉴스", "핵심만 " + N.length + "개 기사", p + 1, total), g = c.g, items = N.slice(p * per, p * per + per), h = Math.floor((KX.H - 60 - c.y - 10) / per);
@@ -129,7 +129,7 @@ function krxNewsDeck() {
 function krxFlowDeck() {
   /* v12.93 순매매 순위는 그 자체로 한 장짜리 자료라 '자기 날짜'만 맞게 적으면 된다 — 네이버는 장 마감 뒤 저녁까지 전날 순위를 주므로 지수(오늘)와 날짜가 다를 수 있다.
      지수 수급 한 줄은 순매매 순위와 같은 날이고 장중이 아닐 때만 같이 싣는다. */
-  var K = KRX.data || krxCached(); if (!K) throw new Error("국내 수급 자료를 아직 못 받았어요 — 작업실 ①에서 받기");
+  var K = KRX.data || krxCached(); if (!K) throw new Error("국내 수급 자료를 아직 못 받았어요 — 작업실 \'데이터 현황\'에서 받기");
   var invD = K.invDate || K.tradeDay || "", same = !K.tradeDay || (invD === K.tradeDay && !K.live);
   if (K.live && !K.invDate) throw new Error("지금은 장중이라 마감 순매매가 아니에요 (15:45 이후 다시 받기)");
   var I = K.investor || {}, ik = same && K.index && K.index.kospi, iq = same && K.index && K.index.kosdaq, out = [];
