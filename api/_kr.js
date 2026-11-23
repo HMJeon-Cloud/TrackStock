@@ -79,9 +79,16 @@ function vote(pairs, cands, tol, minN) {   // pairs: [실제값, 응답값] → 
 async function dealUnits(rc, raws) {
   const items = [], biz = (raws.find((r) => r && r.biz) || {}).biz; raws.forEach((r) => { if (r && !r.err) r.buy.concat(r.sell).forEach((x) => items.push({ x, mk: r.mk })); });
   if (!items.length) return { err: "자료 없음" };
-  const ex = (() => { const it = items[0].x; return "예: " + String(it.itemname || "").slice(0, 10) + " 금액 " + it.accTradeAmount + " · 수량 " + it.accTradeVolume + " · 거래량 " + it.dailyTradeVolume + " · 가격 " + it.nowPrice; })();
+  const ex = (() => { const it = (items.find((o) => num(o.x.accTradeAmount)) || items[0]).x; return "예: " + String(it.itemname || "").slice(0, 10) + " 금액 " + it.accTradeAmount + " · 수량 " + it.accTradeVolume + " · 거래량 " + it.dailyTradeVolume + " · 가격 " + it.nowPrice; })();
   let recent = null; if (rc) { try { const t = await getJsonGzText(rc, "sm:recent"); if (t) recent = JSON.parse(t); } catch (e) {} }
   if (!recent || !recent.symbols || !biz) return { err: "단위 대조용 일봉을 못 읽음 (" + ex + ")" };
+  /* v16.31 네이버 수급이 앱 일봉보다 새 날짜면(예: 장 마감 뒤 오늘 자료 · 앱 일봉은 다음 날 아침 수집) 단위를 맞춰 볼 수 없다 → 이유를 한 줄로 */
+  const lastKr = (() => { let mx = ""; ["^KS11", "005930.KS", "000660.KS", "^KQ11"].forEach((k) => { const d = recent.symbols[k]; if (!d || !d.t || !d.t.length) return; const t = d.t[d.t.length - 1], ms = t < 1e11 ? t * 1000 : t, dd = new Date(ms + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, ""); if (dd > mx) mx = dd; }); return mx; })();
+  const fmt = (d) => d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6, 8);
+  if (lastKr && biz > lastKr) return { err: "날짜가 달라 단위를 확인하지 못함 — 네이버 수급은 " + fmt(biz) + " 장, 앱 일봉은 " + fmt(lastKr) + "까지예요. 다음 아침 수집이 끝난 뒤 '다시 받기'를 누르면 받아져요", code: "date" };
+  /* 순매매 수량이 그날 거래량과 똑같고 금액이 0인 줄이 대부분이면 네이버가 아직 확정 전 값을 주는 것 */
+  const odd = items.filter((o) => { const q = Math.abs(num(o.x.accTradeVolume) || 0), v = Math.abs(num(o.x.dailyTradeVolume) || 0); return q > 0 && q === v && !num(o.x.accTradeAmount); }).length;
+  if (odd >= Math.max(3, items.length * 0.5)) return { err: "네이버 수급이 아직 확정 전 값이에요(순매매 수량 = 거래량, 금액 0 인 줄 " + odd + "/" + items.length + ") — 잠시 뒤 '다시 받기'", code: "prov" };
   const bar = (code, mk) => { const d = recent.symbols[code + (mk === "KOSDAQ" ? ".KQ" : ".KS")] || recent.symbols[code + ".KS"] || recent.symbols[code + ".KQ"]; if (!d || !d.t) return null; for (let i = d.t.length - 1; i >= 0 && i >= d.t.length - 12; i--) { const ms = d.t[i] < 1e11 ? d.t[i] * 1000 : d.t[i]; if (new Date(ms + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "") === biz) return { v: d.v && d.v[i], c: d.c && d.c[i] }; } return null; };
   const vp = [], rows = [];
   for (const { x, mk } of items) { const code = String(x.itemcode || x.itemCode || "").replace(/\D/g, ""), b = bar(code, mk); if (!b) continue; rows.push({ x, b }); vp.push([b.v, Math.abs(num(x.dailyTradeVolume) || 0)]); }
@@ -153,7 +160,7 @@ export async function krHandler(req, res) {
   const miss = [], src = {};
   const [upK, upQ, dnK, dnQ] = await Promise.all([ranking("up", "KOSPI"), ranking("up", "KOSDAQ"), ranking("down", "KOSPI"), ranking("down", "KOSDAQ")]);
   [["up.kospi", upK], ["up.kosdaq", upQ], ["down.kospi", dnK], ["down.kosdaq", dnQ]].forEach(([k, r]) => { if (r.err) miss.push(k + ": " + r.err); else src[k] = r.src; });
-  const inv = {};
+  const inv = {}, invMiss = [];
   let invDate = null;
   const pairs = [["foreign", "9000", "FOREIGNER"], ["inst", "1000", "ORGANIZATION"]];   // 예전 표 주소의 구분값: 9000 외국인 · 1000 기관(전엔 서로 바뀌어 있었음)
   const raws = await Promise.all([dealRaw("KOSPI", "FOREIGNER"), dealRaw("KOSDAQ", "FOREIGNER"), dealRaw("KOSPI", "ORGANIZATION"), dealRaw("KOSDAQ", "ORGANIZATION")]);
@@ -162,15 +169,17 @@ export async function krHandler(req, res) {
     const [name, gubun] = pairs[i], a = raws[i * 2], b = raws[i * 2 + 1]; inv[name] = {};
     for (const type of ["buy", "sell"]) {
       let ra = !U.err && !a.err ? a[type].map((x) => dealRow(x, U.k)).filter(Boolean) : null, rb = !U.err && !b.err ? b[type].map((x) => dealRow(x, U.k)).filter(Boolean) : null, sA = a.src, sB = b.src, eA = U.err || a.err, eB = U.err || b.err;
-      if (!ra || !rb) {   // 새 주소가 안 되면 예전 표 주소로 한 번 더
-        const [oa, ob] = await Promise.all([ra ? null : dealRank("01", gubun, type), rb ? null : dealRank("02", gubun, type)]);
+      if ((!ra && a.err) || (!rb && b.err)) {   // 새 주소 자체가 안 될 때만 예전 표 주소로 한 번 더 (단위 확인 실패는 예전 표로 메울 수 없다)
+        const [oa, ob] = await Promise.all([ra || !a.err ? null : dealRank("01", gubun, type), rb || !b.err ? null : dealRank("02", gubun, type)]);
         if (oa) { ra = oa.rows; sA = oa.src; eA = (eA ? eA + " / " : "") + (oa.err || ""); } if (ob) { rb = ob.rows; sB = ob.src; eB = (eB ? eB + " / " : "") + (ob.err || ""); }
       }
       inv[name][type] = (ra || []).map((x) => Object.assign({ mk: "kospi" }, x)).concat((rb || []).map((x) => Object.assign({ mk: "kosdaq" }, x))).sort((p, q) => Math.abs(q.amt || 0) - Math.abs(p.amt || 0)).slice(0, 20);
-      if (!inv[name][type].length) miss.push("investor." + name + "." + type + ": " + (eA || eB || "없음")); else src["investor." + name + "." + type] = sA || sB;
+      if (!inv[name][type].length) invMiss.push([name + "." + type, eA || eB || "없음"]); else src["investor." + name + "." + type] = sA || sB;
     }
     const bz = a.biz || b.biz; if (bz && !U.err) invDate = bz.slice(0, 4) + "-" + bz.slice(4, 6) + "-" + bz.slice(6, 8);
   }
+  if (invMiss.length) { const same = invMiss.every((x) => x[1] === invMiss[0][1]); if (same) miss.push("외국인·기관 수급" + (invMiss.length < 4 ? "(" + invMiss.map((x) => x[0]).join(", ") + ")" : "") + ": " + invMiss[0][1]); else invMiss.forEach((x) => miss.push("investor." + x[0] + ": " + x[1])); }
+  if (U.err && U.code) src["investor.why"] = U.code;
   if (!U.err) src["investor.unit"] = U.unit + " (일봉 " + U.n + "종목과 대조)";
   const [ik, iq] = await Promise.all([indexFlow("KOSPI"), indexFlow("KOSDAQ")]);
   [["index.kospi", ik], ["index.kosdaq", iq]].forEach(([k, x]) => { if (x.foreign == null && x.up == null) miss.push(k + ": " + (x.err || "읽지 못함")); else src[k] = x.src; });
